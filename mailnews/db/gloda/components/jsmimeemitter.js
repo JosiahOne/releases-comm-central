@@ -2,12 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-var Cr = Components.results;
-var Cu = Components.utils;
-
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 var kStateUnknown = 0;
 var kStateInHeaders = 1;
@@ -51,9 +46,9 @@ var MAX_SANE_BODY_PART_SIZE = 20 * 1024;
  */
 function MimeMessageEmitter() {
   this._mimeMsg = {};
-  Cu.import("resource:///modules/gloda/mimemsg.js", this._mimeMsg);
+  ChromeUtils.import("resource:///modules/gloda/mimemsg.js", this._mimeMsg);
   this._utils = {};
-  Cu.import("resource:///modules/gloda/utils.js", this._utils);
+  ChromeUtils.import("resource:///modules/gloda/utils.js", this._utils);
 
   this._url = null;
   this._partRE = this._utils.GlodaUtils.PART_RE;
@@ -327,7 +322,7 @@ MimeMessageEmitter.prototype = {
    *  libmime wants us to attach an attachment to something that's not a
    *  container, we walk up the mime tree to find a suitable container to hold
    *  the attachment.
-   * The results are cached so that they're consistent accross calls — this
+   * The results are cached so that they're consistent across calls — this
    *  ensures the call to _replacePart works fine.
    */
   _findAnotherContainer: function(aPartName) {

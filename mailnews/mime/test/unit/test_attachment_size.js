@@ -14,7 +14,7 @@ load("../../../resources/messageModifier.js");
 load("../../../resources/messageInjection.js");
 
 // Somehow we hit the blocklist service, and that needs appInfo defined
-Components.utils.import("resource://testing-common/AppInfo.jsm");
+ChromeUtils.import("resource://testing-common/AppInfo.jsm");
 updateAppInfo();
 
 // Register the mime types provider we need for this test.
@@ -35,7 +35,7 @@ var scenarios = gMessageScenarioFactory = new MessageScenarioFactory(msgGen);
  * holds. However, on Windows, if the attachment is not encoded (that is, is
  * inline text), libmime will return N + 2 bytes.
  */
-var epsilon = ('@mozilla.org/windows-registry-key;1' in Components.classes) ? 4 : 2;
+var epsilon = ('@mozilla.org/windows-registry-key;1' in Cc) ? 4 : 2;
 
 var textAttachment =
   "Can't make the frug contest, Helen; stomach's upset. I'll fix you, " +
@@ -212,7 +212,7 @@ var gStreamListener = {
   },
   onStopRequest: function (aRequest, aContext, aStatusCode) {
     dump("*** Size is "+gMessageHeaderSink.size+" (expecting "+this.expectedSize+")\n\n");
-    do_check_true(Math.abs(gMessageHeaderSink.size - this.expectedSize) <= epsilon);
+    Assert.ok(Math.abs(gMessageHeaderSink.size - this.expectedSize) <= epsilon);
     this._stream = null;
     async_driver();
   },

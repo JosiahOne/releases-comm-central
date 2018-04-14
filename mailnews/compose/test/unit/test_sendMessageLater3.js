@@ -10,7 +10,7 @@
 
 load("../../../resources/alertTestUtils.js");
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var type = null;
 var test = null;
@@ -44,7 +44,7 @@ msll.prototype = {
   // nsIMsgSendLaterListener
   onStartSending: function (aTotal) {
     this._initialTotal = 1;
-    do_check_eq(msgSendLater.sendingMessages, true);
+    Assert.equal(msgSendLater.sendingMessages, true);
   },
   onMessageStartSending: function (aCurrentMessage, aTotalMessageCount,
                                    aMessageHeader, aIdentity) {
@@ -60,46 +60,46 @@ msll.prototype = {
     print("msll onStopSending\n");
 
     // NS_ERROR_SMTP_SEND_FAILED_REFUSED is 2153066798
-    do_check_eq(aStatus, 2153066798);
-    do_check_eq(aTotal, 1);
-    do_check_eq(aSuccessful, 0);
-    do_check_eq(this._initialTotal, 1);
-    do_check_eq(this._errorRaised, true);
-    do_check_eq(msgSendLater.sendingMessages, false);
+    Assert.equal(aStatus, 2153066798);
+    Assert.equal(aTotal, 1);
+    Assert.equal(aSuccessful, 0);
+    Assert.equal(this._initialTotal, 1);
+    Assert.equal(this._errorRaised, true);
+    Assert.equal(msgSendLater.sendingMessages, false);
     // Check that the send later service still thinks we have messages to send.
-    do_check_eq(msgSendLater.hasUnsentMessages(identity), true);
+    Assert.equal(msgSendLater.hasUnsentMessages(identity), true);
 
     do_test_finished();
   }
 };
 
 function OnStopCopy(aStatus) {
-  do_check_eq(aStatus, 0);
+  Assert.equal(aStatus, 0);
 
   // Check this is false before we start sending
-  do_check_eq(msgSendLater.sendingMessages, false);
+  Assert.equal(msgSendLater.sendingMessages, false);
 
   let folder = msgSendLater.getUnsentMessagesFolder(identity);
 
   // Check that the send later service thinks we have messages to send.
-  do_check_eq(msgSendLater.hasUnsentMessages(identity), true);
+  Assert.equal(msgSendLater.hasUnsentMessages(identity), true);
 
   // Check we have a message in the unsent message folder
-  do_check_eq(folder.getTotalMessages(false), 1);
+  Assert.equal(folder.getTotalMessages(false), 1);
 
-  
+
   // Now do a comparison of what is in the unsent mail folder
   let msgData = mailTestUtils
     .loadMessageToString(folder, mailTestUtils.firstMsgHdr(folder));
 
   // Skip the headers etc that mailnews adds
   var pos = msgData.indexOf("From:");
-  do_check_neq(pos, -1);
+  Assert.notEqual(pos, -1);
 
   msgData = msgData.substr(pos);
 
   // Check the data is matching.
-  do_check_eq(originalData, msgData);
+  Assert.equal(originalData, msgData);
 
   do_timeout(0, sendMessageLater);
 }
@@ -127,7 +127,7 @@ function run_test() {
   localAccountUtils.loadLocalMailAccount();
 
   // Check that the send later service thinks we don't have messages to send.
-  do_check_eq(msgSendLater.hasUnsentMessages(identity), false);
+  Assert.equal(msgSendLater.hasUnsentMessages(identity), false);
 
   MailServices.accounts.setSpecialFolders();
 

@@ -3,7 +3,7 @@
  * works correctly.
  */
 load("../../../resources/POP3pump.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var testSubjects = ["[Bug 397009] A filter will let me tag, but not untag",
                     "Hello, did you receive my bugmail?",
@@ -39,9 +39,9 @@ function continueTest()
   {
     let hdr = enumerator.getNext().QueryInterface(Ci.nsIMsgDBHdr);
     gMsgHdrs.push(hdr);
-    do_check_eq(hdr.subject, testSubjects[msgCount++]);
+    Assert.equal(hdr.subject, testSubjects[msgCount++]);
   }
-  do_check_eq(msgCount, 3);
+  Assert.equal(msgCount, 3);
   gPOP3Pump = null;
   streamNextMessage();
 }
@@ -65,7 +65,7 @@ gStreamListener = {
   },
   onStopRequest : function (aRequest, aContext, aStatusCode) {
     // check that the streamed message starts with "From "
-    do_check_true(this._data.startsWith("From "));
+    Assert.ok(this._data.startsWith("From "));
     if (++gHdrIndex == gFiles.length)
       do_test_finished();
     else

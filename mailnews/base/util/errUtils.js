@@ -31,8 +31,8 @@ function logException(aException, aRethrow, aMsg) {
   stringifier.dumpException(aException, aMsg);
 
   if (aMsg)
-    Components.utils.reportError(aMsg);
-  Components.utils.reportError(aException);
+    Cu.reportError(aMsg);
+  Cu.reportError(aException);
 
   if (aRethrow)
     throw aException;
@@ -57,7 +57,7 @@ function logEvent(aEvent) {
 /**
  * Dump the current stack and return an Error suitable for throwing.  We return
  *  the new Error so that your code can use a "throw" statement which makes it
- *  obvious to syntactic analysis that there is an exit occuring at that point.
+ *  obvious to syntactic analysis that there is an exit occurring at that point.
  *
  * Example:
  *   throw errorWithDebug("I did not expect this!");
@@ -121,8 +121,7 @@ Stringifier.prototype = {
   },
 
   getStack: function(skipCount) {
-    if (!((typeof Components == "object") &&
-          (typeof Components.classes == "object")))
+    if (typeof Components != "object" || typeof Cc != "object")
       return "No stack trace available.";
     if (typeof(skipCount) === undefined)
       skipCount = 0;

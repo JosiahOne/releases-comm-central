@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calExtract.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://calendar/modules/calExtract.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var calendarExtract = {
     onShowLocaleMenu: function(target) {
@@ -105,7 +105,7 @@ var calendarExtract = {
         item.title = message.mime2DecodedSubject;
         item.calendar = getSelectedCalendar();
         item.setProperty("DESCRIPTION", content);
-        cal.setDefaultStartEndHour(item);
+        cal.dtz.setDefaultStartEndHour(item);
         cal.alarms.setDefaultValues(item);
         let sel = GetMessagePaneFrame().getSelection();
         // Thunderbird Conversations might be installed
@@ -169,7 +169,7 @@ var calendarExtract = {
                     item.endDate.minute = endGuess.minute;
                 }
             } else {
-                let dtz = cal.calendarDefaultTimezone();
+                let dtz = cal.dtz.defaultTimezone;
                 let dueDate = new Date();
                 // set default
                 dueDate.setHours(0);
@@ -192,9 +192,9 @@ var calendarExtract = {
                     dueDate.setMinutes(endGuess.minute);
                 }
 
-                cal.setItemProperty(item, "entryDate", cal.jsDateToDateTime(date, dtz));
+                cal.item.setItemProperty(item, "entryDate", cal.dtz.jsDateToDateTime(date, dtz));
                 if (endGuess.year != null) {
-                    cal.setItemProperty(item, "dueDate", cal.jsDateToDateTime(dueDate, dtz));
+                    cal.item.setItemProperty(item, "dueDate", cal.dtz.jsDateToDateTime(dueDate, dtz));
                 }
             }
 

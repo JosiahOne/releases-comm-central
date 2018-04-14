@@ -715,7 +715,7 @@ function DoCellSelection()
   //   else we ignore CSS, JS, and HTML attributes not already in dialog
   SetElementEnabled(gDialog.AdvancedEditCell, gSelectedCellCount == 1);
 
-  gDialog.AdvancedEditCell.setAttribute("tooltiptext", 
+  gDialog.AdvancedEditCell.setAttribute("tooltiptext",
     gSelectedCellCount > 1 ? GetString("AdvancedEditForCellMsg") :
                              gDialog.AdvancedEditCellToolTipText);
 }
@@ -781,9 +781,9 @@ function ValidateTableData()
   // (This is a global to the dialog and we ask only once per dialog session)
   if ( !gCanDelete &&
         (gNewRowCount < gRowCount ||
-         gNewColCount < gColCount) ) 
+         gNewColCount < gColCount) )
   {
-    if (ConfirmWithTitle(GetString("DeleteTableTitle"), 
+    if (ConfirmWithTitle(GetString("DeleteTableTitle"),
                          GetString("DeleteTableMsg"),
                          GetString("DeleteCells")) )
     {
@@ -998,7 +998,7 @@ function ApplyTableAttributes()
         gActiveEditor.insertNode(gTableCaptionElement, gTableElement, 0);
       } catch(e) {}
 
-      // Put selecton back where it was
+      // Put selection back where it was
       ChangeSelection(RESET_SELECTION);
     }
   }
@@ -1023,7 +1023,7 @@ function ApplyTableAttributes()
           gActiveEditor.insertTableRow(countDelta, true);
           gRowCount = gNewRowCount;
           gLastRowIndex = gRowCount - 1;
-          // Put selecton back where it was
+          // Put selection back where it was
           ChangeSelection(RESET_SELECTION);
         }
         catch(ex) {
@@ -1063,7 +1063,7 @@ function ApplyTableAttributes()
               // move it to start of table
               ChangeSelectionToFirstCell()
             else
-              // Put selecton back where it was
+              // Put selection back where it was
               ChangeSelection(RESET_SELECTION);
           }
           catch(ex) {

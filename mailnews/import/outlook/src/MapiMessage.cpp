@@ -17,6 +17,7 @@
 #include "nsDirectoryServiceDefs.h"
 #include "nsMsgUtils.h"
 #include "nsMimeTypes.h"
+#include "nsNativeCharsetUtils.h"
 #include "nsIOutputStream.h"
 
 #include "nsMsgCompCID.h"
@@ -26,7 +27,6 @@
 
 #include "MapiMimeTypes.h"
 
-#include <algorithm>
 #include "nsMsgI18N.h"
 #include "nsICharsetConverterManager.h"
 #include "nsCRT.h"
@@ -624,7 +624,7 @@ void ExtractMetaCharset(const wchar_t* body, int bodySz, /*out*/nsCString& chars
 
   // remove everything from the string after the next ; or " or space,
   // whichever comes first.
-  // The inital sting looks something like
+  // The initial string looks something like
   // <META content="text/html; charset=utf-8" http-equiv=Content-Type>
   // <META content="text/html; charset=utf-8;" http-equiv=Content-Type>
   // <META content="text/html; charset=utf-8 ;" http-equiv=Content-Type>
@@ -873,14 +873,17 @@ bool CMapiMessage::CopyBinAttachToFile(LPATTACH lpAttach,
   rv = _tmp_file->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 00600);
   NS_ENSURE_SUCCESS(rv, false);
 
-  nsCString tmpPath;
-  _tmp_file->GetNativePath(tmpPath);
+  nsString tmpPath = _tmp_file->NativePath();
+  // We have to use native charset unless we migrate to Outlook 2013 "W" API.
+  nsCString tmpNativePath;
+  rv = NS_CopyUnicodeToNative(tmpPath, tmpNativePath);
+  NS_ENSURE_SUCCESS(rv, false);
   LPSTREAM lpStreamFile;
   HRESULT hr = CMapiApi::OpenStreamOnFile(gpMapiAllocateBuffer, gpMapiFreeBuffer, STGM_READWRITE | STGM_CREATE,
-    const_cast<char*>(tmpPath.get()), NULL, &lpStreamFile);
+    tmpNativePath.get(), NULL, &lpStreamFile);
   if (HR_FAILED(hr)) {
     MAPI_TRACE1("~~ERROR~~ OpenStreamOnFile failed - temp path: %s\r\n",
-                tmpPath.get());
+                tmpNativePath.get());
     return false;
   }
 
@@ -1079,7 +1082,7 @@ bool CMapiMessage::AddAttachment(DWORD aNum)
       // reference to an embedded object is not in the main body, but in another
       // embedded object - like body references a CSS attachment that in turn references
       // a picture as a background of its element). From the other hand, it's unreliable
-      // to relax the search criteria to any occurence of the Content-Id string in the body -
+      // to relax the search criteria to any occurrence of the Content-Id string in the body -
       // partly because the string may be simply in a text or other non-referencing part,
       // partly because of the abovementioned possibility that the reference is outside
       // the body at all.

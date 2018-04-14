@@ -64,8 +64,8 @@ function onLoad()
 
   try {
   // get the find service, which stores global find state
-    gFindService = Components.classes["@mozilla.org/find/find_service;1"]
-                         .getService(Components.interfaces.nsIFindService);
+    gFindService = Cc["@mozilla.org/find/find_service;1"]
+                         .getService(Ci.nsIFindService);
   } catch(e) { dump("No find service!\n"); gFindService = 0; }
 
   // Init gReplaceDialog.
@@ -126,7 +126,7 @@ function onFindNext()
     gReplaceDialog.findInput.select();
     gReplaceDialog.findInput.focus();
     return false;
-  } 
+  }
   return true;
 }
 
@@ -231,7 +231,7 @@ function onReplaceAll()
   // Transfer dialog contents to the find service.
   saveFindData();
 
-  var finder = Components.classes["@mozilla.org/embedcomp/rangefind;1"].createInstance().QueryInterface(Components.interfaces.nsIFind);
+  var finder = Cc["@mozilla.org/embedcomp/rangefind;1"].createInstance().QueryInterface(Ci.nsIFind);
 
   finder.caseSensitive = gReplaceDialog.caseSensitive.checked;
   finder.findBackwards = gReplaceDialog.searchBackwards.checked;
@@ -242,7 +242,7 @@ function onReplaceAll()
 
   // and to make sure we close the transaction, guard against exceptions:
   try {
-    // Make a range containing the current selection, 
+    // Make a range containing the current selection,
     // so we don't go past it when we wrap.
     var selection = gEditor.selection;
     var selecRange;
@@ -252,7 +252,7 @@ function onReplaceAll()
 
     // We'll need a range for the whole document:
     var wholeDocRange = gEditor.document.createRange();
-    var rootNode = gEditor.rootElement.QueryInterface(Components.interfaces.nsIDOMNode);
+    var rootNode = gEditor.rootElement;
     wholeDocRange.selectNodeContents(rootNode);
 
     // And start and end points:

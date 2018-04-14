@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/ical.js");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/ical.js");
 
 function calICALJSTimezone(innerObject) {
     this.innerObject = innerObject || new ICAL.Timezone();
@@ -95,7 +95,8 @@ calLibicalTimezone.prototype = {
     get displayName() {
         if (this.mDisplayName === undefined) {
             try {
-                this.mDisplayName = g_stringBundle.GetStringFromName("pref.timezone." + this.tzid.replace(/\//g, "."));
+                let bundle = cal.getTimezoneService().wrappedJSObject.stringBundle;
+                this.mDisplayName = bundle.GetStringFromName("pref.timezone." + this.tzid.replace(/\//g, "."));
             } catch (exc) {
                 // don't assert here, but gracefully fall back to TZID:
                 cal.LOG("Timezone property lookup failed! Falling back to " + this.tzid + "\n" + exc);

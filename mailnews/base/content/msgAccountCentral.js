@@ -3,14 +3,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var selectedServer = null;
 
 function OnInit()
 {
     // Set the header for the page.
-    // Title containts the brand name of the application and the account
+    // Title contains the brand name of the application and the account
     // type (mail/news) and the name of the account
     try {
         let msgFolder    = null;
@@ -54,7 +54,7 @@ function OnInit()
         document.getElementById("AccountCentralTitle").setAttribute("value", title);
     }
     catch(ex) {
-        Components.utils.reportError("Error getting selected account: " + ex + "\n");
+        Cu.reportError("Error getting selected account: " + ex + "\n");
     }
 }
 
@@ -208,7 +208,7 @@ function ArrangeAccountCentralItems(server, msgFolder)
     SetItemDisplay("AccountsSection", displayAdvFeatures);
 
     while (exceptions.length) {
-        Components.utils.reportError("Error in setting AccountCentral Items: "
+        Cu.reportError("Error in setting AccountCentral Items: "
             + exceptions.pop() + "\n");
     }
 }
@@ -254,8 +254,7 @@ function ReadMessages()
         window.parent.OpenInboxForServer(selectedServer);
     }
     catch(ex) {
-        Components.utils
-                  .reportError("Error opening Inbox for server: " + ex + "\n");
+        Cu.reportError("Error opening Inbox for server: " + ex + "\n");
     }
 }
 

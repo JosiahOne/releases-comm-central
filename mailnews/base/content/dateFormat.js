@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gSearchDateFormat = 0;
 var gSearchDateSeparator;
@@ -22,7 +22,7 @@ function initLocaleShortDateFormat()
   gSearchDateLeadingZeros = true;
 
   try {
-    const dateFormatter = Services.intl.createDateTimeFormat(undefined,
+    const dateFormatter = new Services.intl.DateTimeFormat(undefined,
       { dateStyle: "short" });
     var aDate = new Date(1999, 11, 1);
     var dateString = dateFormatter.format(aDate);
@@ -41,7 +41,7 @@ function initLocaleShortDateFormat()
     }
 
     // check the format option
-    if ( arrayOfStrings.length != 3 )       // no successfull split
+    if ( arrayOfStrings.length != 3 )       // no successful split
     {
       dump("getLocaleShortDateFormat: could not analyze the date format, defaulting to mm/dd/yyyy\n");
     }
@@ -79,11 +79,11 @@ function initializeSearchDateFormat()
   if (gSearchDateFormat)
     return;
 
-  // get a search date format option and a seprator
+  // get a search date format option and a separator
   try {
     gSearchDateFormat =
       Services.prefs.getComplexValue("mailnews.search_date_format",
-                                     Components.interfaces.nsIPrefLocalizedString);
+                                     Ci.nsIPrefLocalizedString);
     gSearchDateFormat = parseInt(gSearchDateFormat);
 
     // if the option is 0 then try to use the format of the current locale
@@ -97,17 +97,17 @@ function initializeSearchDateFormat()
 
       gSearchDateSeparator =
         Services.prefs.getComplexValue("mailnews.search_date_separator",
-                                       Components.interfaces.nsIPrefLocalizedString);
+                                       Ci.nsIPrefLocalizedString);
 
       gSearchDateLeadingZeros =
         (Services.prefs.getComplexValue(
            "mailnews.search_date_leading_zeros",
-           Components.interfaces.nsIPrefLocalizedString).data == "true");
+           Ci.nsIPrefLocalizedString).data == "true");
     }
   }
   catch (e)
   {
-    Components.utils.reportError("initializeSearchDateFormat: caught an exception: " + e);
+    Cu.reportError("initializeSearchDateFormat: caught an exception: " + e);
     // set to mm/dd/yyyy in case of error
     gSearchDateFormat = 3;
     gSearchDateSeparator = "/";
@@ -121,7 +121,7 @@ function convertPRTimeToString(tm)
   // PRTime is in microseconds, JavaScript time is in milliseconds
   // so divide by 1000 when converting
   time.setTime(tm / 1000);
-  
+
   return convertDateToString(time);
 }
 

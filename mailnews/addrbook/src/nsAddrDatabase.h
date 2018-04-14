@@ -8,13 +8,13 @@
 
 #include "mozilla/Attributes.h"
 #include "nsIAddrDatabase.h"
+#include "nsIFile.h"
 #include "mdb.h"
 #include "nsString.h"
 #include "nsIAddrDBListener.h"
 #include "nsCOMPtr.h"
 #include "nsTObserverArray.h"
 #include "nsWeakPtr.h"
-#include "nsIWeakReferenceUtils.h"
 
 typedef enum
 {
@@ -25,6 +25,7 @@ typedef enum
 
 class nsAddrDatabase : public nsIAddrDatabase
 {
+  using PathString = mozilla::PathString;
 public:
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIADDRDBANNOUNCER

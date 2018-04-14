@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 top.MAX_RECIPIENTS = 1; /* for the initial listitem created in the XUL */
 
@@ -14,8 +14,8 @@ var selectElementIndexTable = null;
 
 var gNumberOfCols = 0;
 
-var gDragService = Components.classes["@mozilla.org/widget/dragservice;1"]
-                             .getService(Components.interfaces.nsIDragService);
+var gDragService = Cc["@mozilla.org/widget/dragservice;1"]
+                     .getService(Ci.nsIDragService);
 
 var test_addresses_sequence = false;
 
@@ -424,7 +424,7 @@ function awTestRowSequence()
   /*
     This function is for debug and testing purpose only, normal user should not run it!
 
-    Everytime we insert or delete a row, we must be sure we didn't break the ID sequence of
+    Every time we insert or delete a row, we must be sure we didn't break the ID sequence of
     the addressing widget rows. This function will run a quick test to see if the sequence still ok
 
     You need to define the pref mail.debug.test_addresses_sequence to true in order to activate it
@@ -798,7 +798,7 @@ function DropOnAddressingWidget(event)
 {
   var dragSession = gDragService.getCurrentSession();
 
-  var trans = Components.classes["@mozilla.org/widget/transferable;1"].createInstance(Components.interfaces.nsITransferable);
+  var trans = Cc["@mozilla.org/widget/transferable;1"].createInstance(Ci.nsITransferable);
   trans.init(getLoadContext());
   trans.addDataFlavor("text/x-moz-address");
 
@@ -810,7 +810,7 @@ function DropOnAddressingWidget(event)
     var len = new Object();
     trans.getAnyTransferData ( bestFlavor, dataObj, len );
     if ( dataObj )
-      dataObj = dataObj.value.QueryInterface(Components.interfaces.nsISupportsString);
+      dataObj = dataObj.value.QueryInterface(Ci.nsISupportsString);
     if ( !dataObj )
       continue;
 
@@ -889,7 +889,7 @@ function awKeyDown(event, listboxElement)
   switch(event.keyCode) {
   case KeyEvent.DOM_VK_DELETE:
   case KeyEvent.DOM_VK_BACK_SPACE:
-    /* Warning, the listboxElement.selectedItems will change everytime we delete a row */
+    /* Warning, the listboxElement.selectedItems will change every time we delete a row */
     var length = listboxElement.selectedCount;
     for (var i = 1; i <= length; i++) {
       var inputs = listboxElement.selectedItem.getElementsByTagName(awInputElementName());
@@ -1162,7 +1162,7 @@ AutomatedAutoCompleteHandler.prototype =
       {
         addressToAdd = searchResultsForSession.items
           .queryElementAt(searchResultsForSession.defaultItemIndex,
-                          Components.interfaces.nsIAutoCompleteItem).value;
+                          Ci.nsIAutoCompleteItem).value;
         break;
       }
     }
@@ -1176,7 +1176,7 @@ AutomatedAutoCompleteHandler.prototype =
         if (searchResultsForSession && searchResultsForSession.defaultItemIndex == -1)
         {
           addressToAdd = searchResultsForSession.items
-            .queryElementAt(0, Components.interfaces.nsIAutoCompleteItem).value;
+            .queryElementAt(0, Ci.nsIAutoCompleteItem).value;
           break;
         }
       }
@@ -1201,16 +1201,16 @@ AutomatedAutoCompleteHandler.prototype =
 
   QueryInterface : function(iid)
   {
-      if (iid.equals(Components.interfaces.nsIAutoCompleteListener) ||
-          iid.equals(Components.interfaces.nsISupports))
+      if (iid.equals(Ci.nsIAutoCompleteListener) ||
+          iid.equals(Ci.nsISupports))
         return this;
-      throw Components.results.NS_NOINTERFACE;
+      throw Cr.NS_NOINTERFACE;
   }
 }
 
 // Returns the load context for the current window
 function getLoadContext() {
-  return window.QueryInterface(Components.interfaces.nsIInterfaceRequestor)
-               .getInterface(Components.interfaces.nsIWebNavigation)
-               .QueryInterface(Components.interfaces.nsILoadContext);
+  return window.QueryInterface(Ci.nsIInterfaceRequestor)
+               .getInterface(Ci.nsIWebNavigation)
+               .QueryInterface(Ci.nsILoadContext);
 }

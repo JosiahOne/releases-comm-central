@@ -6,17 +6,12 @@ this.EXPORTED_SYMBOLS = ["GlodaAttributeDBDef", "GlodaAccount",
                     "GlodaConversation", "GlodaFolder", "GlodaMessage",
                     "GlodaContact", "GlodaIdentity", "GlodaAttachment"];
 
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-var Cr = Components.results;
-var Cu = Components.utils;
+ChromeUtils.import("resource:///modules/mailServices.js");
 
-Cu.import("resource:///modules/mailServices.js");
-
-Cu.import("resource:///modules/gloda/log4moz.js");
+ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 var LOG = Log4Moz.repository.getLogger("gloda.datamodel");
 
-Cu.import("resource:///modules/gloda/utils.js");
+ChromeUtils.import("resource:///modules/gloda/utils.js");
 
 // Make it lazy.
 var gMessenger;
@@ -29,7 +24,7 @@ function getMessenger () {
 /**
  * @class Represents a gloda attribute definition's DB form.  This class
  *  stores the information in the database relating to this attribute
- *  definition.  Access its attrDef attribute to get at the realy juicy data.
+ *  definition.  Access its attrDef attribute to get at the really juicy data.
  *  This main interesting thing this class does is serve as the keeper of the
  *  mapping from parameters to attribute ids in the database if this is a
  *  parameterized attribute.

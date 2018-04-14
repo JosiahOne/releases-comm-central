@@ -1,13 +1,6 @@
-. "$topsrcdir/build/mozconfig.comm-support"
 . "$topsrcdir/build/unix/mozconfig.linux32"
 . "$topsrcdir/build/mozconfig.stylo"
-. "$commtopsrcdir/mail/config/mozconfigs/common"
-
-if [ "$MOZ_IS_COMM_TOPDIR" = "1" ]; then
-  # Disable webrender on Linux buildbot builders to avoid the Rust requirement
-  # of libX11 version > 1.4.99.1 (see bug 1350011).
-  ac_add_options --disable-webrender
-fi
+. "$topsrcdir/comm/mail/config/mozconfigs/common"
 
 ac_add_options --enable-debug
 
@@ -25,4 +18,4 @@ MOZ_REQUIRE_ADDON_SIGNING=0
 # Package js shell
 export MOZ_PACKAGE_JSSHELL=1
 
-. "$topsrcdir/build/mozconfig.cache"
+. "$topsrcdir/comm/build/mozconfig.sccache"

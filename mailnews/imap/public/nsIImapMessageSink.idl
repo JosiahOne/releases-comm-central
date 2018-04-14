@@ -12,7 +12,7 @@ interface nsIMsgMailNewsUrl;
 [scriptable, uuid(6ffb6a92-e43a-405f-92ea-92cf81a5e17b)]
 
 interface nsIImapMessageSink : nsISupports {
-  // set up messge download output stream
+  // set up message download output stream
   void setupMsgWriteStream(in nsIFile aFile, in boolean aAppendDummyEnvelope);
 
   /**
@@ -63,7 +63,7 @@ interface nsIImapMessageSink : nsISupports {
   void getMessageSizeFromDB(in string aId, out unsigned long aSize);
 
   void setContentModified(in nsIImapUrl aImapUrl, in nsImapContentModifiedType aModified);
-  
+
   /**
    * For a message stored in a file, get the message metadata needed to copy
    * that message to an imap folder
@@ -75,6 +75,6 @@ interface nsIImapMessageSink : nsISupports {
    *
    * @return             message flags
    */
-  unsigned long getCurMoveCopyMessageInfo(in nsIImapUrl aRunningUrl, 
+  unsigned long getCurMoveCopyMessageInfo(in nsIImapUrl aRunningUrl,
                                           out PRTime aDate, out ACString aKeywords);
 };

@@ -78,6 +78,7 @@
 #include "nsIInputStreamPump.h"
 #include "nsIInputStream.h"
 #include "nsIChannel.h"
+#include "nsIURIMutator.h"
 
 /* for logging to Error Console */
 #include "nsIScriptError.h"
@@ -105,7 +106,8 @@ NS_MSG_BASE void MsgLogToConsole4(const nsAString &aErrorText,
                                   aLinenumber,
                                   0,
                                   aFlag,
-                                  "mailnews")))
+                                  "mailnews",
+                                  false)))
     return;
   console->LogMessage(scriptError);
   return;
@@ -178,30 +180,35 @@ nsresult CreateStartupUrl(const char *uri, nsIURI** aUrl)
   // I think we should do something like GetMessageServiceFromURI() to get the service, and then have the service create the
   // appropriate nsI*Url, and then QI to nsIURI, and return it.
   // see bug #110689
+  nsCOMPtr<nsIMsgMailNewsUrl> newUri;
   if (PL_strncasecmp(uri, "imap", 4) == 0)
   {
     nsCOMPtr<nsIImapUrl> imapUrl = do_CreateInstance(kImapUrlCID, &rv);
 
     if (NS_SUCCEEDED(rv) && imapUrl)
-      rv = imapUrl->QueryInterface(NS_GET_IID(nsIURI),
-      (void**) aUrl);
+      rv = imapUrl->QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(newUri));
+
+    // XXX Consider: NS_MutateURI(new nsImapUrl::Mutator()).SetSpec(nsDependentCString(uri)).Finalize(newUri);
   }
   else if (PL_strncasecmp(uri, "mailbox", 7) == 0)
   {
     nsCOMPtr<nsIMailboxUrl> mailboxUrl = do_CreateInstance(kCMailboxUrl, &rv);
     if (NS_SUCCEEDED(rv) && mailboxUrl)
-      rv = mailboxUrl->QueryInterface(NS_GET_IID(nsIURI),
-      (void**) aUrl);
+      rv = mailboxUrl->QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(newUri));
   }
   else if (PL_strncasecmp(uri, "news", 4) == 0)
   {
     nsCOMPtr<nsINntpUrl> nntpUrl = do_CreateInstance(kCNntpUrlCID, &rv);
     if (NS_SUCCEEDED(rv) && nntpUrl)
-      rv = nntpUrl->QueryInterface(NS_GET_IID(nsIURI),
-      (void**) aUrl);
+      rv = nntpUrl->QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(newUri));
   }
-  if (*aUrl) // SetSpec can fail, for mailbox urls, but we still have a url.
-    (void) (*aUrl)->SetSpec(nsDependentCString(uri));
+
+  if (newUri) {
+    // SetSpec can fail, for mailbox urls, but we still have a url.
+    (void)newUri->SetSpecInternal(nsDependentCString(uri));
+
+    newUri.forget(aUrl);
+  }
   return rv;
 }
 
@@ -220,7 +227,7 @@ nsresult NS_MsgGetPriorityFromString(
   // Note: Checking the values separately and _before_ the names,
   //        hoping for a much faster match;
   //       Only _drawback_, as "priority" handling is not truly specified:
-  //        some softwares may have the number meanings reversed (1=Lowest) !?
+  //        some software may have the number meanings reversed (1=Lowest) !?
   if (PL_strchr(priority, '1'))
     outPriority = nsMsgPriority::highest;
   else if (PL_strchr(priority, '2'))
@@ -631,7 +638,7 @@ bool NS_MsgStripRE(const char **stringP, uint32_t *lengthP, char **modifiedSubje
                                               utf16LocalizedRe);
   NS_ConvertUTF16toUTF8 localizedRe(utf16LocalizedRe);
 
-  // hardcoded "Re" so that noone can configure Mozilla standards incompatible
+  // hardcoded "Re" so that no one can configure Mozilla standards incompatible
   nsAutoCString checkString("Re,RE,re,rE");
   if (!localizedRe.IsEmpty()) {
     checkString.Append(',');
@@ -719,7 +726,7 @@ bool NS_MsgStripRE(const char **stringP, uint32_t *lengthP, char **modifiedSubje
             strncpy(charset, p1, p2 - p1);
           nsAutoCString encodedString;
           rv = mimeConverter->EncodeMimePartIIStr_UTF8(nsDependentCString(s),
-            false, charset, sizeof("Subject:"),
+            false, "UTF-8", sizeof("Subject:"),
             nsIMimeConverter::MIME_ENCODED_WORD_SIZE, encodedString);
           if (NS_SUCCEEDED(rv))
           {
@@ -837,7 +844,7 @@ bool IsAFromSpaceLine(char *start, const char *end)
 }
 
 //
-// This function finds all lines starting with "From " or "From " preceeding
+// This function finds all lines starting with "From " or "From " preceding
 // with one or more '>' (ie, ">From", ">>From", etc) in the input buffer
 // (between 'start' and 'end') and prefix them with a ">" .
 //
@@ -1548,13 +1555,15 @@ nsresult MsgGetLocalFileFromURI(const nsACString &aUTF8Path, nsIFile **aFile)
   return NS_OK;
 }
 
-NS_MSG_BASE void MsgStripQuotedPrintable (unsigned char *src)
+NS_MSG_BASE void MsgStripQuotedPrintable (nsCString& aSrc)
 {
   // decode quoted printable text in place
 
-  if (!*src)
+  if (aSrc.IsEmpty())
     return;
-  unsigned char *dest = src;
+
+  char *src = aSrc.BeginWriting();
+  char *dest = src;
   int srcIdx = 0, destIdx = 0;
 
   while (src[srcIdx] != 0)
@@ -1595,6 +1604,7 @@ NS_MSG_BASE void MsgStripQuotedPrintable (unsigned char *src)
   }
 
   dest[destIdx] = src[srcIdx]; // null terminate
+  aSrc.SetLength(destIdx);
 }
 
 NS_MSG_BASE nsresult MsgEscapeString(const nsACString &aStr,

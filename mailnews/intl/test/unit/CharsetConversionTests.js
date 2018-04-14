@@ -1,10 +1,8 @@
-var Ci = Components.interfaces;
-var Cc = Components.classes;
 var CC = Components.Constructor;
 
 function CreateScriptableConverter()
 {
-  var ScriptableUnicodeConverter = 
+  var ScriptableUnicodeConverter =
     CC("@mozilla.org/intl/scriptableunicodeconverter",
        "nsIScriptableUnicodeConverter");
 
@@ -28,7 +26,7 @@ function checkDecode(converter, charset, inText, expectedText)
   } catch(e) {
     outText = "\ufffd";
   }
-  do_check_eq(outText, expectedText);
+  Assert.equal(outText, expectedText);
 }
 
 function checkEncode(converter, charset, inText, expectedText)
@@ -44,7 +42,7 @@ function checkEncode(converter, charset, inText, expectedText)
 
   dump("testing encoding from Unicode to " + charset + "\n");
   var outText = converter.ConvertFromUnicode(inText) + converter.Finish();
-  do_check_eq(outText, expectedText);
+  Assert.equal(outText, expectedText);
 }
 
 function testDecodeAliases()

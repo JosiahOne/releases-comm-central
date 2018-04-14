@@ -4,6 +4,7 @@
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
 <?xml-stylesheet type="text/css" href="chrome://global/skin/global.css"?>
+<?xml-stylesheet type="text/css" href="chrome://messenger/content/bindings.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/calendar-alarms.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/calendar-attendees.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar/content/widgets/calendar-widget-bindings.css"?>
@@ -265,6 +266,7 @@
            defaultlabelalign="end">
 
     <!-- Menubar -->
+    <toolbar type="menubar">
     <menubar id="event-menubar">
 
       <!-- Item menu -->
@@ -556,6 +558,7 @@
         </menupopup>
       </menu>
     </menubar>
+    </toolbar>
 
     <!-- toolbarpalette items are added with an overlay -->
     <toolbarpalette id="event-toolbarpalette"/>

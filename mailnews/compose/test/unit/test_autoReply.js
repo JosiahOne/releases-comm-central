@@ -7,10 +7,10 @@
 
 // make xpcshell-tests TEST_PATH=mailnews/compose/test/unit/test_autoReply.js
 
-Components.utils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource:///modules/mimeParser.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mimeParser.jsm");
 
 load("../../../resources/logHelper.js"); // watch for errors in the error console
 
@@ -41,49 +41,49 @@ function run_test() {
   run_next_test();
 }
 
-add_task(function* copy_gIncomingMailFile() {
+add_task(async function copy_gIncomingMailFile() {
   let promiseCopyListener = new PromiseTestUtils.PromiseCopyListener();
   // Copy gIncomingMailFile into the Inbox.
   MailServices.copy.CopyFileMessage(gIncomingMailFile,
     localAccountUtils.inboxFolder, null, false, 0, "",
     promiseCopyListener, null);
-  yield promiseCopyListener.promise;
+  await promiseCopyListener.promise;
 });
 
-add_task(function* copy_gIncomingMailFile2() {
+add_task(async function copy_gIncomingMailFile2() {
   let promiseCopyListener = new PromiseTestUtils.PromiseCopyListener();
   // Copy gIncomingMailFile2 into the Inbox.
   MailServices.copy.CopyFileMessage(gIncomingMailFile2,
     localAccountUtils.inboxFolder, null, false, 0, "",
     promiseCopyListener, null);
-  yield promiseCopyListener.promise;
+  await promiseCopyListener.promise;
 });
 
-add_task(function* copy_gIncomingMailFile3() {
+add_task(async function copy_gIncomingMailFile3() {
   let promiseCopyListener = new PromiseTestUtils.PromiseCopyListener();
   // Copy gIncomingMailFile3 into the Inbox.
   MailServices.copy.CopyFileMessage(gIncomingMailFile3,
     localAccountUtils.inboxFolder, null, false, 0, "",
     promiseCopyListener, null);
-  yield promiseCopyListener.promise;
+  await promiseCopyListener.promise;
 });
 
-add_task(function* copy_gTemplateMailFile() {
+add_task(async function copy_gTemplateMailFile() {
   let promiseCopyListener = new PromiseTestUtils.PromiseCopyListener();
   // Copy gTemplateMailFile into the Templates folder.
   MailServices.copy.CopyFileMessage(gTemplateMailFile,
     gTemplateFolder, null, true, 0, "",
     promiseCopyListener, null);
-  yield promiseCopyListener.promise;
+  await promiseCopyListener.promise;
 });
 
-add_task(function* copy_gTemplateMailFile2() {
+add_task(async function copy_gTemplateMailFile2() {
   let promiseCopyListener = new PromiseTestUtils.PromiseCopyListener();
   // Copy gTemplateMailFile2 into the Templates folder.
   MailServices.copy.CopyFileMessage(gTemplateMailFile2,
     gTemplateFolder, null, true, 0, "",
     promiseCopyListener, null);
-  yield promiseCopyListener.promise;
+  await promiseCopyListener.promise;
 });
 
 /// Test that a reply is NOT sent when the message is not addressed to "me".
@@ -93,7 +93,7 @@ add_task(function testReplyingToUnaddressedFails() {
     do_throw("Replied to a message not addressed to us!");
   }
   catch (e) {
-    if (e.result != Components.results.NS_ERROR_ABORT)
+    if (e.result != Cr.NS_ERROR_ABORT)
       throw e;
     // Ok! We didn't reply to the message not specifically addressed to
     // us (from@foo.invalid).
@@ -128,7 +128,7 @@ add_task(function testReplyingToMailWithNoFrom() {
              "with no From and no Reply-To");
   }
   catch (e) {
-    if (e.result != Components.results.NS_ERROR_FAILURE)
+    if (e.result != Cr.NS_ERROR_FAILURE)
       throw e;
   }
 });
@@ -142,8 +142,8 @@ function testReply(aHrdIdx, aTemplateHdrIdx = 0) {
   localAccountUtils.msgAccount.addIdentity(identity);
 
   let msgHdr = mailTestUtils.getMsgHdrN(localAccountUtils.inboxFolder, aHrdIdx);
-  do_print("Msg#" + aHrdIdx +  " author=" + msgHdr.author + ", recipients=" +
-           msgHdr.recipients);
+  info("Msg#" + aHrdIdx +  " author=" + msgHdr.author + ", recipients=" +
+       msgHdr.recipients);
   let templateHdr = mailTestUtils.getMsgHdrN(gTemplateFolder, aTemplateHdrIdx);
 
   // See <method name="getTemplates"> in searchWidgets.xml
@@ -157,10 +157,10 @@ function testReply(aHrdIdx, aTemplateHdrIdx = 0) {
   let headers, body;
   [headers, body] = MimeParser.extractHeadersAndBody(gServer._daemon.post);
   //dump("xxxmagnus gServer._daemon.post=" + gServer._daemon.post + "\n");
-  do_check_true(headers.get("Subject").startsWith("Auto: "));
-  do_check_eq(headers.get("Auto-submitted"), "auto-replied");
-  do_check_eq(headers.get("In-Reply-To"), "<" + msgHdr.messageId + ">");
-  do_check_eq(headers.get("References"), "<" + msgHdr.messageId + ">");
+  Assert.ok(headers.get("Subject").startsWith("Auto: "));
+  Assert.equal(headers.get("Auto-submitted"), "auto-replied");
+  Assert.equal(headers.get("In-Reply-To"), "<" + msgHdr.messageId + ">");
+  Assert.equal(headers.get("References"), "<" + msgHdr.messageId + ">");
   // XXX: something's wrong with how the fake server gets the data.
   // The text gets converted to UTF-8 (regardless of what it is) at some point.
   // Suspect a bug with how BinaryInputStream handles the strings.

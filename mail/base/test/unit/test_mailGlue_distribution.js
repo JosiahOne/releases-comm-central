@@ -1,5 +1,5 @@
-Components.utils.import("resource:///modules/distribution.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/distribution.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 function run_test()
 {
@@ -23,7 +23,7 @@ function run_test()
     do_throw("distribution.ini already exists in objdir/mozilla/dist/bin/distribution.");
   }
 
-  do_register_cleanup(function() {
+  registerCleanupFunction(function() {
     // Remove the distribution.ini file
     let iniFile = Services.dirsvc.get("XCurProcD", Ci.nsIFile);
     iniFile.append("distribution");
@@ -39,7 +39,7 @@ function run_test()
   testDistributionFile.append("distribution.ini");
   // Copy to distroDir
   testDistributionFile.copyTo(distroDir, "distribution.ini");
-  do_check_true(testDistributionFile.exists());
+  Assert.ok(testDistributionFile.exists());
 
   // Set the prefs
   TBDistCustomizer.applyPrefDefaults();
@@ -52,25 +52,25 @@ function run_test()
   // Global section in the ini file
   let iniValue = testIni.getString("Global", "id");
   let pref = Services.prefs.getCharPref("distribution.id");
-  do_check_eq(iniValue, pref);
+  Assert.equal(iniValue, pref);
 
   iniValue = testIni.getString("Global", "version");
   pref = Services.prefs.getCharPref("distribution.version");
-  do_check_eq(iniValue, pref);
+  Assert.equal(iniValue, pref);
 
   let aboutLocale;
   try {
     aboutLocale = testIni.getString("Global", "about.en-US");
   }
   catch (e) {
-    Components.utils.reportError(e);
+    Cu.reportError(e);
   }
 
   if (aboutLocale == undefined)
     aboutLocale = testIni.getString("Global", "about");
 
   pref = Services.prefs.getCharPref("distribution.about");
-  do_check_eq(aboutLocale, pref);
+  Assert.equal(aboutLocale, pref);
 
   // Test Preferences section
   let s = "Preferences";
@@ -80,13 +80,13 @@ function run_test()
     let value = eval(testIni.getString(s, key));
     switch (typeof value) {
     case "boolean":
-        do_check_eq(value, Services.prefs.getBoolPref(key));
+        Assert.equal(value, Services.prefs.getBoolPref(key));
         break;
     case "number":
-        do_check_eq(value, Services.prefs.getIntPref(key));
+        Assert.equal(value, Services.prefs.getIntPref(key));
         break;
     case "string":
-        do_check_eq(value, Services.prefs.getCharPref(key));
+        Assert.equal(value, Services.prefs.getCharPref(key));
         break;
     default:
         do_throw("The preference " + key + " is of unknown type: " + typeof value);
@@ -102,12 +102,12 @@ function run_test()
     let key = keys.getNext();
     let value = eval(testIni.getString(s, key));
     value = "data:text/plain," + key + "=" + value;
-    do_check_eq(value, Services.prefs.getCharPref(key));
+    Assert.equal(value, Services.prefs.getCharPref(key));
     overrides.push(key);
   }
 
   // Test the LocalizablePreferences section
-  // Any prefs here that aren't found in overrides are not overriden
+  // Any prefs here that aren't found in overrides are not overridden
   //   by LocalizablePrefs-[locale] and should be tested
   s = "LocalizablePreferences";
   keys = testIni.getKeys(s);
@@ -117,7 +117,7 @@ function run_test()
       let value = eval(testIni.getString(s, key));
       value =  value.replace(/%LOCALE%/g, "en-US");
       value = "data:text/plain," + key + "=" + value;
-      do_check_eq(value, Services.prefs.getCharPref(key));
+      Assert.equal(value, Services.prefs.getCharPref(key));
     }
   }
   do_test_finished();

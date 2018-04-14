@@ -2,31 +2,36 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource:///modules/imServices.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/imServices.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "gTextDecoder", () => {
   return new TextDecoder();
 });
 
-XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
-                                  "resource://gre/modules/NetUtil.jsm");
+ChromeUtils.defineModuleGetter(this, "NetUtil",
+                               "resource://gre/modules/NetUtil.jsm");
 
 this.EXPORTED_SYMBOLS = [
   "smileImMarkup", // used to add smile:// img tags into IM markup.
   "smileTextNode", // used to add smile:// img tags to the content of a textnode
   "smileString", // used to add smile:// img tags into a string without parsing it as HTML. Be sure the string doesn't contain HTML tags.
-  "getSmileRealURI", // used to retrive the chrome URI for a smile:// URI
+  "getSmileRealURI", // used to retrieve the chrome URI for a smile:// URI
   "getSmileyList" // used to display a list of smileys in the UI
 ];
 
 var kEmoticonsThemePref = "messenger.options.emoticonsTheme";
 var kThemeFile = "theme.js";
 
-this.__defineGetter__("gTheme", function() {
-  delete this.gTheme;
-  gPrefObserver.init();
-  return this.gTheme = getTheme();
+Object.defineProperty(this, "gTheme", {
+  configurable: true,
+  enumerable: true,
+
+  get() {
+    delete this.gTheme;
+    gPrefObserver.init();
+    return this.gTheme = getTheme();
+  }
 });
 
 var gPrefObserver = {
@@ -44,9 +49,9 @@ var gPrefObserver = {
 
 function getSmileRealURI(aSmile)
 {
-  aSmile = Components.classes["@mozilla.org/intl/texttosuburi;1"]
-                     .getService(Components.interfaces.nsITextToSubURI)
-                     .unEscapeURIForUI("UTF-8", aSmile);
+  aSmile = Cc["@mozilla.org/intl/texttosuburi;1"]
+             .getService(Ci.nsITextToSubURI)
+             .unEscapeURIForUI("UTF-8", aSmile);
   if (aSmile in gTheme.iconsHash)
     return gTheme.baseUri + gTheme.iconsHash[aSmile].filename;
 
@@ -89,8 +94,8 @@ function getTheme(aName)
     let channel = Services.io.newChannel2(theme.baseUri + kThemeFile, null, null, null,
                                           Services.scriptSecurityManager.getSystemPrincipal(),
                                           null,
-                                          Components.interfaces.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                          Components.interfaces.nsIContentPolicy.TYPE_IMAGE);
+                                          Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                          Ci.nsIContentPolicy.TYPE_IMAGE);
     let stream = channel.open();
     let bytes = NetUtil.readInputStream(stream, stream.available());
     theme.json = JSON.parse(gTextDecoder.decode(bytes));
@@ -101,7 +106,7 @@ function getTheme(aName)
         theme.iconsHash[textCode] = smiley;
     }
   } catch(e) {
-    Components.utils.reportError(e);
+    Cu.reportError(e);
   }
   return theme;
 }
@@ -118,9 +123,9 @@ function getRegexp()
     return null;
 
   if ("" in gTheme.iconsHash) {
-    Components.utils.reportError("Emoticon " +
-                                 gTheme.iconsHash[""].filename +
-                                 " matches the empty string!");
+    Cu.reportError("Emoticon " +
+                   gTheme.iconsHash[""].filename +
+                   " matches the empty string!");
     delete gTheme.iconsHash[""];
   }
 
@@ -201,10 +206,12 @@ function smileNode(aNode)
 {
   for (let i = 0; i < aNode.childNodes.length; ++i) {
     let node = aNode.childNodes[i];
-    if (node instanceof Components.interfaces.nsIDOMHTMLElement) {
+    if (node.nodeType == node.ELEMENT_NODE &&
+        node.namespaceURI == "http://www.w3.org/1999/xhtml") {
       // we are on a tag, recurse to process its children
       smileNode(node);
-    } else if (node instanceof Components.interfaces.nsIDOMText) {
+    } else if (node.nodeType == node.TEXT_NODE ||
+               node.nodeType == node.CDATA_SECTION_NODE) {
       // we are on a text node, process it
       smileTextNode(node);
     }

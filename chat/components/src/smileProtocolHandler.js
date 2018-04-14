@@ -2,11 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
-
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource:///modules/imSmileys.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/imSmileys.jsm");
 
 var kSmileRegexp = /^smile:\/\//;
 
@@ -20,11 +18,9 @@ smileProtocolHandler.prototype = {
                  Ci.nsIProtocolHandler.URI_IS_UI_RESOURCE |
                  Ci.nsIProtocolHandler.URI_IS_LOCAL_RESOURCE,
   newURI: function SPH_newURI(aSpec, aOriginCharset, aBaseURI) {
-    let uri = Cc["@mozilla.org/network/simple-uri;1"].createInstance(Ci.nsIURI);
-    uri.spec = aSpec;
-    uri.QueryInterface(Ci.nsIMutable);
-    uri.mutable = false;
-    return uri;
+    let mutator = Cc["@mozilla.org/network/simple-uri-mutator;1"]
+                    .createInstance(Ci.nsIURIMutator);
+    return mutator.setSpec(aSpec).finalize();
   },
   newChannel: function SPH_newChannel(aURI) {
     return this.newChannel2(aURI, null);

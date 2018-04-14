@@ -4,7 +4,7 @@
 
 // Test of message count changes in virtual folder views
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var dbviewContractId = "@mozilla.org/messenger/msgdbview;1?type=" + "quicksearch";
 var dbView = Cc[dbviewContractId].createInstance(Ci.nsIMsgDBView);
@@ -24,7 +24,7 @@ var tag1 = "istag";
 function run_test()
 {
   localAccountUtils.loadLocalMailAccount();
-    
+
   // Get messageCount messages into the local filestore.
   do_test_pending();
 
@@ -35,7 +35,7 @@ function run_test()
 }
 
 // nsIMsgCopyServiceListener implementation
-var copyListener = 
+var copyListener =
 {
   OnStartCopy: function() {},
   OnProgress: function(aProgress, aProgressMax) {},
@@ -58,7 +58,7 @@ var copyListener =
 };
 
 var virtualFolder;
-var numTotalMessages; 
+var numTotalMessages;
 var numUnreadMessages;
 
 // virtual folder setup
@@ -66,7 +66,7 @@ function setupVirtualFolder()
 {
   // add as valid tag tag1, though probably not really necessary
   MailServices.tags.addTagForKey(tag1, tag1, null, null);
-  
+
   // add tag1 to 4 messages
   var messages0to3 = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
   for (var i = 0; i <= 3; i++)
@@ -87,7 +87,7 @@ function setupVirtualFolder()
   // search will look for tag tag1 in the inbox folder
   var searchTerm = makeSearchTerm(localAccountUtils.inboxFolder, tag1,
     Ci.nsMsgSearchAttrib.Keywords, Ci.nsMsgSearchOp.Contains);
-    
+
   dump("creating virtual folder\n");
   var rootFolder = localAccountUtils.incomingServer.rootMsgFolder;
   virtualFolder = CreateVirtualFolder("VfTest", rootFolder,
@@ -95,7 +95,7 @@ function setupVirtualFolder()
   var count= new Object;
   // Setup search session. Execution continues with testVirtualFolder()
   // after search is done.
-  
+
   var searchSession = Cc["@mozilla.org/messenger/searchSession;1"]
                         .createInstance(Ci.nsIMsgSearchSession);
   searchSession.addScopeTerm(Ci.nsMsgSearchScope.offlineMail,
@@ -109,8 +109,8 @@ function setupVirtualFolder()
 // partially based on gSearchNotificationListener in searchBar.js
 // nsIMsgSearchNotify implementation
 var searchListener =
-{ 
-  onNewSearch: function() 
+{
+  onNewSearch: function()
   {
     dump("in onnewsearch\n");
     numTotalMessages = 0;
@@ -124,7 +124,7 @@ var searchListener =
       numUnreadMessages++;
   },
   onSearchDone: function(status)
-  { 
+  {
     print("Finished search hitCount = " + numTotalMessages);
     var db = virtualFolder.msgDatabase;
     var dbFolderInfo = db.dBFolderInfo;
@@ -139,12 +139,12 @@ var searchListener =
 function testVirtualFolder()
 {
   /*** basic functionality tests ***/
-  
+
   // total messages matching search
-  do_check_eq(4, virtualFolder.getTotalMessages(false));
-  
+  Assert.equal(4, virtualFolder.getTotalMessages(false));
+
   // total unread messages in search
-  do_check_eq(3, virtualFolder.getNumUnread(false));
+  Assert.equal(3, virtualFolder.getNumUnread(false));
 
   // change unread of one item in search to decrease count
   var message0 = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
@@ -152,18 +152,18 @@ function testVirtualFolder()
   localAccountUtils.inboxFolder.markMessagesRead(message0, true);
   virtualFolder.updateSummaryTotals(true);
 
-  do_check_eq(2, virtualFolder.getNumUnread(false));
-  
+  Assert.equal(2, virtualFolder.getNumUnread(false));
+
   /*** failures fixed in this bug ***/
-   
+
   // remove tag from one item to decrease count
   var message1 = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
   message1.appendElement(hdrs[1]);
 
   localAccountUtils.inboxFolder.removeKeywordsFromMessages(message1, tag1);
   virtualFolder.updateSummaryTotals(true);
-  do_check_eq(3, virtualFolder.getTotalMessages(false));
-  do_check_eq(1, virtualFolder.getNumUnread(false));
+  Assert.equal(3, virtualFolder.getTotalMessages(false));
+  Assert.equal(1, virtualFolder.getNumUnread(false));
 
   // End of test, so release our header references
   hdrs = null;
@@ -182,7 +182,7 @@ function CreateVirtualFolder(newName, parentFolder, searchFolderURIs, searchTerm
   var vfdb = newFolder.msgDatabase;
   var searchTerms = [];
   var searchTermString = getSearchTermString(searchTerm);
-  
+
   var dbFolderInfo = vfdb.dBFolderInfo;
   // set the view string as a property of the db folder info
   // set the original folder name as well.
@@ -202,10 +202,10 @@ function CreateVirtualFolder(newName, parentFolder, searchFolderURIs, searchTerm
 function getSearchTermString(term)
 {
   var condition = "";
-  
+
   if (condition.length > 1)
     condition += ' ';
-  
+
   if (term.matchAll)
     condition = "ALL";
   condition += (term.booleanAnd) ? "AND (" : "OR (";

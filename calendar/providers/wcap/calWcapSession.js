@@ -4,11 +4,11 @@
 
 /* exported getWcapSessionFor */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calIteratorUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 function calWcapTimezone(tzProvider, tzid_, component_) {
     this.wrappedJSObject = this;
@@ -81,8 +81,7 @@ function getWcapSessionFor(calendar, uri) {
                     let [spec, params] = splitUriParams(regCal.uri);
                     if (spec != defaultSpec) {
                         log("fixing url of subscribed calendar: " + regCal.calId, session);
-                        let caluri = regCal.uri.clone();
-                        caluri.spec = defaultSpec + params;
+                        let caluri = regCal.uri.mutate().setSpec(defaultSpec + params).finalize();
                         regCal.uri = caluri;
                         regCal.setProperty("uri", caluri.spec);
                     }
@@ -166,9 +165,9 @@ calWcapSession.prototype = {
     getTimezone: function(tzid) {
         switch (tzid) {
             case "floating":
-                return cal.floating();
+                return cal.dtz.floating;
             case "UTC":
-                return cal.UTC();
+                return cal.dtz.UTC;
             default:
                 if (this.m_serverTimezones) {
                     return this.m_serverTimezones[tzid];
@@ -567,9 +566,8 @@ calWcapSession.prototype = {
                         let calendar = cals[calId];
                         if (calendar === null) {
                             calendar = new calWcapCalendar(this);
-                            let uri = this.uri.clone();
-                            uri.pathQueryRef += "?calid=" + encodeURIComponent(calId);
-                            calendar.uri = uri;
+                            let newPath = this.uri.pathQueryRef + "?calid=" + encodeURIComponent(calId);
+                            calendar.uri = this.uri.mutate().setPathQueryRef(newPath).finalize();
                         }
                         if (calendar) {
                             calendar.m_calProps = node;
@@ -895,9 +893,8 @@ calWcapSession.prototype = {
                                     calendar.m_calProps = node; // update calprops
                                 } else {
                                     calendar = new calWcapCalendar(this, node);
-                                    let uri = this.uri.clone();
-                                    uri.pathQueryRef += "?calid=" + encodeURIComponent(calId);
-                                    calendar.uri = uri;
+                                    let newPath = this.uri.pathQueryRef + "?calid=" + encodeURIComponent(calId);
+                                    calendar.uri = this.uri.mutate().setPathQueryRef(newPath).finalize();
                                 }
                                 ret.push(calendar);
                             }
@@ -925,8 +922,8 @@ calWcapSession.prototype = {
 
     // calIFreeBusyProvider:
     getFreeBusyIntervals: function(calId, rangeStart, rangeEnd, busyTypes, listener) {
-        rangeStart = cal.ensureDateTime(rangeStart);
-        rangeEnd = cal.ensureDateTime(rangeEnd);
+        rangeStart = cal.dtz.ensureDateTime(rangeStart);
+        rangeEnd = cal.dtz.ensureDateTime(rangeEnd);
         let zRangeStart = getIcalUTC(rangeStart);
         let zRangeEnd = getIcalUTC(rangeEnd);
 

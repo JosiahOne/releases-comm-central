@@ -8,7 +8,7 @@
  If any color attribute is set in the body, mode is "Custom Colors",
   even if 1 or more (but not all) are actually null (= "use default")
  When in "Custom Colors" mode, all colors will be set on body tag,
-  even if they are just default colors, to assure compatable colors in page.
+  even if they are just default colors, to assure compatible colors in page.
  User cannot select "use default" for individual colors
 */
 
@@ -124,7 +124,7 @@ function InitDialog()
   customBackgroundColor  = GetHTMLOrCSSStyleValue(globalElement, bgcolorStr, cssBackgroundColorStr);
   customBackgroundColor  = ConvertRGBColorIntoHEXColor(customBackgroundColor);
 
-  var haveCustomColor = 
+  var haveCustomColor =
         customTextColor       ||
         customLinkColor       ||
         customVisitedColor    ||
@@ -148,7 +148,7 @@ function InitDialog()
     gDialog.PageColorGroup.selectedItem = gDialog.CustomColorsRadio;
     UseCustomColors();
   }
-  else 
+  else
   {
     gDialog.PageColorGroup.selectedItem = gDialog.DefaultColorsRadio;
     UseDefaultColors();
@@ -216,7 +216,7 @@ function GetColorAndUpdate(ColorWellID)
       break;
   }
 
-  setColorWell(ColorWellID, color); 
+  setColorWell(ColorWellID, color);
   SetColorPreview(ColorWellID, color);
 }
 
@@ -402,17 +402,35 @@ function ValidateData()
         globalElement.setAttribute(backgroundStr, gBackgroundImage);
       else
         editor.removeAttributeOrEquivalent(globalElement, backgroundStr, true);
-  
+
       return true;
-    }  
+    }
   } catch (e) {}
   return false;
 }
 
 function onAccept()
 {
-  if (ValidateData())
-  {
+  // If it's a file, convert to a data URL.
+  if (gBackgroundImage && /^file:/i.test(gBackgroundImage)) {
+    let nsFile = Services.io.newURI(gBackgroundImage)
+      .QueryInterface(Ci.nsIFileURL).file;
+    if (nsFile.exists()) {
+      let reader = new FileReader();
+      reader.addEventListener("load", function() {
+        gBackgroundImage = reader.result;
+        gDialog.BackgroundImageInput.value = reader.result;
+        if (onAccept()) {
+          window.close();
+        }
+      });
+      File.createFromNsIFile(nsFile).then(file => {
+        reader.readAsDataURL(file);
+      });
+      return false; // Don't close just yet...
+    }
+  }
+  if (ValidateData()) {
     // Copy attributes to element we are changing
     try {
       GetCurrentEditor().cloneAttributes(gBodyElement, globalElement);

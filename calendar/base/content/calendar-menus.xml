@@ -17,10 +17,10 @@
       <field name="mParentMenuPopup">null</field>
 
       <constructor><![CDATA[
-          Components.utils.import("resource://calendar/modules/calUtils.jsm");
+          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
           this.mPopupHandler = () => { this.changeMenuByPropertyName(); };
-          this.mParentMenuPopup = cal.getParentNodeOrThis(this, "menupopup");
+          this.mParentMenuPopup = cal.view.getParentNodeOrThis(this, "menupopup");
           this.mParentMenuPopup.addEventListener("popupshowing", this.mPopupHandler, true);
       ]]></constructor>
 
@@ -52,12 +52,11 @@
                 let tasks = getSelectedTasks();
                 let tasksSelected = (tasks != null) && (tasks.length > 0);
                 if (tasksSelected) {
-                    let task = tasks[0];
-                    if (cal.isPropertyValueSame(tasks, this.mType)) {
-                        propertyValue = task[this.mType];
+                    if (tasks.every(task => task[this.mType] == tasks[0][this.mType])) {
+                        propertyValue = tasks[0][this.mType];
                     }
                 } else {
-                    cal.applyAttributeToMenuChildren(this, "disabled", !tasksSelected);
+                    cal.view.applyAttributeToMenuChildren(this, "disabled", !tasksSelected);
                 }
             }
             if (propertyValue || propertyValue == 0) {

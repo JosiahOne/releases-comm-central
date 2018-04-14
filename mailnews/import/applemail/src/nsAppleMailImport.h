@@ -11,14 +11,7 @@
 #include "nsCOMPtr.h"
 #include "nsIStringBundle.h"
 #include "nsIImportMail.h"
-
-// logging facilities
-static mozilla::LazyLogModule APPLEMAILLOGMODULE("APPLEMAILIMPORTLOG");
-
-#define IMPORT_LOG0(x)          MOZ_LOG(APPLEMAILLOGMODULE, mozilla::LogLevel::Debug, (x))
-#define IMPORT_LOG1(x, y)       MOZ_LOG(APPLEMAILLOGMODULE, mozilla::LogLevel::Debug, (x, y))
-#define IMPORT_LOG2(x, y, z)    MOZ_LOG(APPLEMAILLOGMODULE, mozilla::LogLevel::Debug, (x, y, z))
-#define IMPORT_LOG3(a, b, c, d) MOZ_LOG(APPLEMAILLOGMODULE, mozilla::LogLevel::Debug, (a, b, c, d))
+#include "ImportDebug.h"
 
 #define NS_APPLEMAILIMPL_CID \
 { 0x9117a1ea, 0xe012, 0x43b5, { 0xa0, 0x20, 0xcb, 0x8a, 0x66, 0xcc, 0x09, 0xe1 } }
@@ -26,7 +19,7 @@ static mozilla::LazyLogModule APPLEMAILLOGMODULE("APPLEMAILIMPORTLOG");
 #define NS_APPLEMAILIMPORT_CID \
 { 0x6d3f101c, 0x70ec, 0x4e04, { 0xb6, 0x8d, 0x99, 0x08, 0xd1, 0xae, 0xdd, 0xf3 } }
 
-#define NS_APPLEMAILIMPL_CONTRACTID "@mozilla.org/import/import-appleMailImpl;1" 
+#define NS_APPLEMAILIMPL_CONTRACTID "@mozilla.org/import/import-appleMailImpl;1"
 
 #define kAppleMailSupportsString "mail"
 
@@ -38,13 +31,13 @@ class nsAppleMailImportModule : public nsIImportModule
   public:
 
   nsAppleMailImportModule();
-    
+
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIIMPORTMODULE
 
   private:
   virtual ~nsAppleMailImportModule();
-    
+
   nsCOMPtr<nsIStringBundle> mBundle;
 };
 
@@ -65,7 +58,7 @@ class nsAppleMailImportMail : public nsIImportMail
   void FindAccountMailDirs(nsIFile *aRoot, nsIMutableArray *aMailboxDescs, nsIImportService *aImportService);
   nsresult FindMboxDirs(nsIFile *aFolder, nsIMutableArray *aMailboxDescs, nsIImportService *aImportService);
   nsresult AddMboxDir(nsIFile *aFolder, nsIMutableArray *aMailboxDescs, nsIImportService *aImportService);
-    
+
   // aInfoString is the format to a "foo %s" string. It may be NULL if the error string needs no such format.
   void ReportStatus(const char16_t* aErrorName, nsString &aName, nsAString &aStream);
   static void SetLogs(const nsAString& success, const nsAString& error, char16_t **aOutErrorLog, char16_t **aSuccessLog);

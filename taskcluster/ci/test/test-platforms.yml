@@ -12,11 +12,15 @@
 # generation.
 
 
-##
 # Linux platforms (matching /linux.*/)
 
 linux64/opt:
     build-platform: linux64/opt
+    test-sets:
+        - common-tests
+
+linux64-nightly/opt:
+    build-platform: linux64-nightly/opt
     test-sets:
         - common-tests
 
@@ -30,13 +34,50 @@ linux32/opt:
     test-sets:
         - common-tests
 
+linux32-nightly/opt:
+    build-platform: linux-nightly/opt
+    test-sets:
+        - common-tests
+
 linux32/debug:
     build-platform: linux/debug
     test-sets:
         - common-tests
 
+# Windows platforms (matching /windows.*/)
 
-##
+# win32
+windows7-32/opt:
+    build-platform: win32/opt
+    test-sets:
+        - common-tests
+
+windows7-32-nightly/opt:
+    build-platform: win32-nightly/opt
+    test-sets:
+        - common-tests
+
+windows7-32/debug:
+    build-platform: win32/debug
+    test-sets:
+        - common-tests
+
+# win64
+windows10-64/opt:
+    build-platform: win64/opt
+    test-sets:
+        - common-tests
+
+windows10-64-nightly/opt:
+    build-platform: win64-nightly/opt
+    test-sets:
+        - common-tests
+
+windows10-64/debug:
+    build-platform: win64/debug
+    test-sets:
+        - common-tests
+
 # MacOS X platforms (matching /macosx.*/)
 
 macosx64/debug:
@@ -46,5 +87,10 @@ macosx64/debug:
 
 macosx64/opt:
     build-platform: macosx64/opt
+    test-sets:
+        - common-tests
+
+macosx64-nightly/opt:
+    build-platform: macosx64-nightly/opt
     test-sets:
         - common-tests

@@ -3,9 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "BookmarkJSONUtils",
-                                  "resource://gre/modules/BookmarkJSONUtils.jsm");
+ChromeUtils.defineModuleGetter(this, "BookmarkJSONUtils",
+                               "resource://gre/modules/BookmarkJSONUtils.jsm");
 
 var PlacesOrganizer = {
   _places: null,
@@ -66,11 +65,11 @@ var PlacesOrganizer = {
   },
 
   QueryInterface: function PO_QueryInterface(aIID) {
-    if (aIID.equals(Components.interfaces.nsIDOMEventListener) ||
-        aIID.equals(Components.interfaces.nsISupports))
+    if (aIID.equals(Ci.nsIDOMEventListener) ||
+        aIID.equals(Ci.nsISupports))
       return this;
 
-    throw Components.results.NS_NOINTERFACE;
+    throw Cr.NS_NOINTERFACE;
   },
 
   handleEvent: function PO_handleEvent(aEvent) {
@@ -325,35 +324,41 @@ var PlacesOrganizer = {
    * Open a file-picker and import the selected file into the bookmarks store
    */
   importFromFile: function PO_importFromFile() {
-    var fp = Components.classes["@mozilla.org/filepicker;1"]
-                       .createInstance(Components.interfaces.nsIFilePicker);
-    fp.init(window, PlacesUIUtils.getString("SelectImport"),
-            Components.interfaces.nsIFilePicker.modeOpen);
-    fp.appendFilters(Components.interfaces.nsIFilePicker.filterHTML);
-    if (fp.show() != Components.interfaces.nsIFilePicker.returnCancel) {
-      if (fp.fileURL) {
-        Components.utils.import("resource://gre/modules/BookmarkHTMLUtils.jsm");
+    let fp = Cc["@mozilla.org/filepicker;1"]
+               .createInstance(Ci.nsIFilePicker);
+    let fpCallback = function fpCallback_done(aResult) {
+      if (aResult != Ci.nsIFilePicker.returnCancel && fp.fileURL) {
+        ChromeUtils.import("resource://gre/modules/BookmarkHTMLUtils.jsm");
         BookmarkHTMLUtils.importFromURL(fp.fileURL.spec, false)
-                         .then(null, Components.utils.reportError);
+                         .catch(Cu.reportError);
       }
-    }
+    };
+
+    fp.init(window, PlacesUIUtils.getString("SelectImport"),
+            Ci.nsIFilePicker.modeOpen);
+    fp.appendFilters(Ci.nsIFilePicker.filterHTML);
+    fp.open(fpCallback);
   },
 
   /**
    * Allows simple exporting of bookmarks.
    */
   exportBookmarks: function PO_exportBookmarks() {
-    var fp = Components.classes["@mozilla.org/filepicker;1"]
-                       .createInstance(Components.interfaces.nsIFilePicker);
+    let fp = Cc["@mozilla.org/filepicker;1"]
+               .createInstance(Ci.nsIFilePicker);
+    let fpCallback = function fpCallback_done(aResult) {
+      if (aResult != Ci.nsIFilePicker.returnCancel) {
+        ChromeUtils.import("resource://gre/modules/BookmarkHTMLUtils.jsm");
+        BookmarkHTMLUtils.exportToFile(fp.file.path)
+                         .catch(Cu.reportError);
+      }
+    };
+
     fp.init(window, PlacesUIUtils.getString("EnterExport"),
-            Components.interfaces.nsIFilePicker.modeSave);
-    fp.appendFilters(Components.interfaces.nsIFilePicker.filterHTML);
+            Ci.nsIFilePicker.modeSave);
+    fp.appendFilters(Ci.nsIFilePicker.filterHTML);
     fp.defaultString = "bookmarks.html";
-    if (fp.show() != Components.interfaces.nsIFilePicker.returnCancel) {
-      Components.utils.import("resource://gre/modules/BookmarkHTMLUtils.jsm");
-      BookmarkHTMLUtils.exportToFile(fp.file)
-                       .then(null, Components.utils.reportError);
-    }
+    fp.open(fpCallback);
   },
 
   /**
@@ -362,9 +367,9 @@ var PlacesOrganizer = {
   populateRestoreMenu: function PO_populateRestoreMenu() {
     let restorePopup = document.getElementById("fileRestorePopup");
 
-    const locale = Components.classes["@mozilla.org/chrome/chrome-registry;1"]
-                             .getService(Components.interfaces.nsIXULChromeRegistry)
-                             .getSelectedLocale("global", true);
+    const locale = Cc["@mozilla.org/chrome/chrome-registry;1"]
+                     .getService(Ci.nsIXULChromeRegistry)
+                     .getSelectedLocale("global", true);
     const dtOptions = { year: 'numeric', month: 'long', day: 'numeric' };
     let dateFormatter = new Intl.DateTimeFormat(locale, dtOptions);
 
@@ -411,18 +416,21 @@ var PlacesOrganizer = {
    * Prompts for a file and restores bookmarks to those in the file.
    */
   onRestoreBookmarksFromFile: function PO_onRestoreBookmarksFromFile() {
-    var fp = Components.classes["@mozilla.org/filepicker;1"]
-                       .createInstance(Components.interfaces.nsIFilePicker);
+    let fp = Cc["@mozilla.org/filepicker;1"]
+               .createInstance(Ci.nsIFilePicker);
+    let fpCallback = aResult => {
+      if (aResult != Ci.nsIFilePicker.returnCancel) {
+        this.restoreBookmarksFromFile(fp.file);
+      }
+    };
+
     fp.init(window, PlacesUIUtils.getString("bookmarksRestoreTitle"),
-            Components.interfaces.nsIFilePicker.modeOpen);
+            Ci.nsIFilePicker.modeOpen);
     fp.appendFilter(PlacesUIUtils.getString("bookmarksRestoreFilterName"),
                     PlacesUIUtils.getString("bookmarksRestoreFilterExtension"));
-    fp.appendFilters(Components.interfaces.nsIFilePicker.filterAll);
-
+    fp.appendFilters(Ci.nsIFilePicker.filterAll);
     fp.displayDirectory = GetDesktopFolder();
-
-    if (fp.show() != Components.interfaces.nsIFilePicker.returnCancel)
-      this.restoreBookmarksFromFile(fp.file);
+    fp.open(fpCallback);
   },
 
   /**
@@ -459,22 +467,27 @@ var PlacesOrganizer = {
    * of those items.
    */
   backupBookmarks: function PO_backupBookmarks() {
-    var fp = Components.classes["@mozilla.org/filepicker;1"]
-                       .createInstance(Components.interfaces.nsIFilePicker);
+    let fp = Cc["@mozilla.org/filepicker;1"]
+               .createInstance(Ci.nsIFilePicker);
+    let fpCallback = function fpCallback_done(aResult) {
+      if (aResult != Ci.nsIFilePicker.returnCancel) {
+        // There is no OS.File version of the filepicker yet (Bug 937812).
+        PlacesBackups.saveBookmarksToJSONFile(fp.file.path);
+      }
+    };
+
     fp.init(window, PlacesUIUtils.getString("bookmarksBackupTitle"),
-            Components.interfaces.nsIFilePicker.modeSave);
+            Ci.nsIFilePicker.modeSave);
     fp.appendFilter(PlacesUIUtils.getString("bookmarksRestoreFilterName"),
                     PlacesUIUtils.getString("bookmarksRestoreFilterExtension"));
 
-    var dirSvc = Components.classes["@mozilla.org/file/directory_service;1"]
-                           .getService(Components.interfaces.nsIProperties);
-    var backupsDir = dirSvc.get("Desk", Components.interfaces.nsIFile);
+    var dirSvc = Cc["@mozilla.org/file/directory_service;1"]
+                   .getService(Ci.nsIProperties);
+    var backupsDir = dirSvc.get("Desk", Ci.nsIFile);
     fp.displayDirectory = backupsDir;
-
     fp.defaultString = PlacesBackups.getFilenameForDate();
-
-    if (fp.show() != Components.interfaces.nsIFilePicker.returnCancel)
-      PlacesBackups.saveBookmarksToJSONFile(fp.file);
+    fp.defaultExtension = "json";
+    fp.open(fpCallback);
   },
 
   _paneDisabled: false,
@@ -1189,7 +1202,7 @@ var ViewMenu = {
   setSortColumn: function VM_setSortColumn(aColumn, aDirection) {
     var result = document.getElementById("placeContent").result;
     if (!aColumn && !aDirection) {
-      result.sortingMode = Components.interfaces.nsINavHistoryQueryOptions.SORT_BY_NONE;
+      result.sortingMode = Ci.nsINavHistoryQueryOptions.SORT_BY_NONE;
       return;
     }
 
@@ -1239,6 +1252,6 @@ var ViewMenu = {
 
     var sortConst = "SORT_BY_" + colLookupTable[columnId].key + "_" + aDirection;
     result.sortingAnnotation = colLookupTable[columnId].anno || "";
-    result.sortingMode = Components.interfaces.nsINavHistoryQueryOptions[sortConst];
+    result.sortingMode = Ci.nsINavHistoryQueryOptions[sortConst];
   }
 };

@@ -5,8 +5,8 @@
  *   - Check that verifyLogon fails
  */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 load("../../../resources/alertTestUtils.js");
 
@@ -38,7 +38,7 @@ var urlListener =
   OnStartRunningUrl: function (url) {
   },
   OnStopRunningUrl: function (url, aResult) {
-    do_check_eq(Components.isSuccessCode(aResult), this.expectSuccess);
+    Assert.equal(Components.isSuccessCode(aResult), this.expectSuccess);
   }
 };
 

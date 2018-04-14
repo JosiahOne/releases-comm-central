@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calXMLUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
 
 /**
  * HTML Export Plugin
@@ -46,11 +46,11 @@ calHtmlExporter.prototype = {
 
         // Sort aItems
         aItems.sort((a, b) => {
-            let start_a = a[cal.calGetStartDateProp(a)];
+            let start_a = a[cal.dtz.startDateProp(a)];
             if (!start_a) {
                 return -1;
             }
-            let start_b = b[cal.calGetStartDateProp(b)];
+            let start_b = b[cal.dtz.startDateProp(b)];
             if (!start_b) {
                 return 1;
             }
@@ -68,15 +68,16 @@ calHtmlExporter.prototype = {
                     itemNode.querySelector("." + classKey).textContent = propValue;
                 } else {
                     let row = itemNode.querySelector("." + classKey + "row");
-                    if (row.nextSibling instanceof Components.interfaces.nsIDOMText) {
+                    if (row.nextSibling.nodeType == row.nextSibling.TEXT_NODE ||
+                        row.nextSibling.nodeType == row.nextSibling.CDATA_SECTION_NODE) {
                         row.nextSibling.remove();
                     }
                     row.remove();
                 }
             };
 
-            let startDate = item[cal.calGetStartDateProp(item)];
-            let endDate = item[cal.calGetEndDateProp(item)];
+            let startDate = item[cal.dtz.startDateProp(item)];
+            let endDate = item[cal.dtz.endDateProp(item)];
             if (startDate || endDate) {
                 // This is a task with a start or due date, format accordingly
                 let prefixWhen = cal.calGetString("calendar", "htmlPrefixWhen");
@@ -89,7 +90,8 @@ calHtmlExporter.prototype = {
             } else {
                 let row = itemNode.querySelector(".intervalrow");
                 row.remove();
-                if (row.nextSibling instanceof Components.interfaces.nsIDOMText) {
+                if (row.nextSibling.nodeType == row.nextSibling.TEXT_NODE ||
+                    row.nextSibling.nodeType == row.nextSibling.CDATA_SECTION_NODE) {
                     row.nextSibling.remove();
                 }
             }

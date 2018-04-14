@@ -61,7 +61,6 @@
 #include "nsIPK11TokenDB.h"
 #include "nsIPK11Token.h"
 #include "nsMsgLocalFolderHdrs.h"
-#include <algorithm>
 #define oneHour 3600000000U
 #include "nsMsgUtils.h"
 #include "nsIMsgFilterService.h"
@@ -71,6 +70,8 @@
 #include "nsIMsgFilter.h"
 #include "nsIConsoleService.h"
 #include "nsIScriptError.h"
+#include "mozilla/intl/LocaleService.h"
+#include "nsIURIMutator.h"
 
 static PRTime gtimeOfLastPurgeCheck;    //variable to know when to check for purge_threshhold
 
@@ -108,7 +109,6 @@ NS_NAMED_LITERAL_CSTRING(kDefaultServer, "DefaultServer");
 NS_NAMED_LITERAL_CSTRING(kFlagged, "Flagged");
 NS_NAMED_LITERAL_CSTRING(kFolderFlag, "FolderFlag");
 NS_NAMED_LITERAL_CSTRING(kFolderSize, "FolderSize");
-NS_NAMED_LITERAL_CSTRING(kInVFEditSearchScope, "inVFEditSearchScope");
 NS_NAMED_LITERAL_CSTRING(kIsDeferred, "isDeferred");
 NS_NAMED_LITERAL_CSTRING(kIsSecure, "isSecure");
 NS_NAMED_LITERAL_CSTRING(kJunkStatusChanged, "JunkStatusChanged");
@@ -161,8 +161,7 @@ nsMsgDBFolder::nsMsgDBFolder(void)
   mNumNewBiffMessages(0),
   mHaveParsedURI(false),
   mIsServerIsValid(false),
-  mIsServer(false),
-  mInVFEditSearchScope (false)
+  mIsServer(false)
 {
   if (mInstanceCount++ <=0) {
     initializeStrings();
@@ -2211,7 +2210,7 @@ nsMsgDBFolder::SetStringProperty(const char *propertyName, const nsACString& pro
   if(NS_SUCCEEDED(rv))
   {
     folderInfo->SetCharProperty(propertyName, propertyValue);
-    db->Commit(nsMsgDBCommitType::kLargeCommit);  //commiting the db also commits the cache
+    db->Commit(nsMsgDBCommitType::kLargeCommit);  //committing the db also commits the cache
   }
   return NS_OK;
 }
@@ -3114,7 +3113,7 @@ NS_IMETHODIMP nsMsgDBFolder::GetServer(nsIMsgIncomingServer ** aServer)
 {
   NS_ENSURE_ARG_POINTER(aServer);
   nsresult rv;
-  // short circut the server if we have it.
+  // short circuit the server if we have it.
   nsCOMPtr<nsIMsgIncomingServer> server = do_QueryReferent(mServer, &rv);
   if (NS_FAILED(rv))
   {
@@ -3131,12 +3130,9 @@ nsMsgDBFolder::parseURI(bool needServer)
 {
   nsresult rv;
   nsCOMPtr<nsIURL> url;
-
-  url = do_CreateInstance(NS_STANDARDURL_CONTRACTID, &rv);
+  rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(mURI).Finalize(url);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  rv = url->SetSpec(mURI);
-  NS_ENSURE_SUCCESS(rv, rv);
   // empty path tells us it's a server.
   if (!mIsServerIsValid)
   {
@@ -3193,7 +3189,8 @@ nsMsgDBFolder::parseURI(bool needServer)
         return NS_ERROR_FAILURE;
       }
 
-      url->SetScheme(serverType);
+      rv = NS_MutateURI(url).SetScheme(serverType).Finalize(url);
+      NS_ENSURE_SUCCESS(rv, rv);
       rv = accountManager->FindServerByURI(url, false,
                                       getter_AddRefs(server));
       NS_ENSURE_SUCCESS(rv, rv);
@@ -3405,6 +3402,25 @@ NS_IMETHODIMP nsMsgDBFolder::GetPrettyName(nsAString& name)
   return GetName(name);
 }
 
+static bool
+nonEnglishApp()
+{
+  nsAutoCString locale;
+  mozilla::intl::LocaleService::GetInstance()->GetAppLocaleAsLangTag(locale);
+
+  return !(locale.EqualsLiteral("en") ||
+           StringBeginsWith(locale, NS_LITERAL_CSTRING("en-")));
+}
+
+static bool
+hasTrashName(const nsAString& name)
+{
+  // Microsoft calls the folder "Deleted". If the application is non-English,
+  // we want to use the localised name instead.
+  return name.LowerCaseEqualsLiteral("trash") ||
+         (name.LowerCaseEqualsLiteral("deleted") && nonEnglishApp());
+}
+
 NS_IMETHODIMP nsMsgDBFolder::SetPrettyName(const nsAString& name)
 {
   nsresult rv;
@@ -3418,7 +3434,7 @@ NS_IMETHODIMP nsMsgDBFolder::SetPrettyName(const nsAString& name)
     rv = SetName(kLocalizedDraftsName);
   else if (mFlags & nsMsgFolderFlags::Templates && name.LowerCaseEqualsLiteral("templates"))
     rv = SetName(kLocalizedTemplatesName);
-  else if (mFlags & nsMsgFolderFlags::Trash && name.LowerCaseEqualsLiteral("trash"))
+  else if (mFlags & nsMsgFolderFlags::Trash && hasTrashName(name))
     rv = SetName(kLocalizedTrashName);
   else if (mFlags & nsMsgFolderFlags::Queue && name.LowerCaseEqualsLiteral("unsent messages"))
     rv = SetName(kLocalizedUnsentName);
@@ -3554,7 +3570,8 @@ NS_IMETHODIMP nsMsgDBFolder::GetPrettiestName(nsAString& name)
       nsCOMPtr<nsIScriptError> e = do_CreateInstance(NS_SCRIPTERROR_CONTRACTID);
       if (e && NS_SUCCEEDED(e->Init(NS_ConvertUTF8toUTF16(msg), EmptyString(),
                                     EmptyString(), 0, 0,
-                                    nsIScriptError::warningFlag, "mailnews"))) {
+                                    nsIScriptError::warningFlag, "mailnews",
+                                    false))) {
         cs->LogMessage(e);
       }
     }
@@ -5420,20 +5437,6 @@ NS_IMETHODIMP nsMsgDBFolder::CompareSortKeys(nsIMsgFolder *aFolder, int32_t *sor
   return rv;
 }
 
-NS_IMETHODIMP nsMsgDBFolder::GetInVFEditSearchScope (bool *aInVFEditSearchScope)
-{
-  *aInVFEditSearchScope = mInVFEditSearchScope;
-  return NS_OK;
-}
-
-NS_IMETHODIMP nsMsgDBFolder::SetInVFEditSearchScope (bool aInVFEditSearchScope, bool aSetOnSubFolders)
-{
-  bool oldInVFEditSearchScope = mInVFEditSearchScope;
-  mInVFEditSearchScope = aInVFEditSearchScope;
-  NotifyBoolPropertyChanged(kInVFEditSearchScope, oldInVFEditSearchScope, mInVFEditSearchScope);
-  return NS_OK;
-}
-
 NS_IMETHODIMP nsMsgDBFolder::FetchMsgPreviewText(nsMsgKey *aKeysToFetch, uint32_t aNumKeys,
                                                  bool aLocalOnly, nsIUrlListener *aUrlListener,
                                                  bool *aAsyncResults)
@@ -5679,9 +5682,7 @@ void nsMsgDBFolder::decodeMsgSnippet(const nsACString& aEncodingType, bool aIsCo
   }
   else if (MsgLowerCaseEqualsLiteral(aEncodingType, ENCODING_QUOTED_PRINTABLE))
   {
-    // giant hack - decode in place, and truncate string.
-    MsgStripQuotedPrintable((unsigned char *) aMsgSnippet.get());
-    aMsgSnippet.SetLength(strlen(aMsgSnippet.get()));
+    MsgStripQuotedPrintable(aMsgSnippet);
   }
 }
 
@@ -5704,7 +5705,7 @@ void nsMsgDBFolder::compressQuotesInMsgSnippet(const nsString& aMsgSnippet, nsAS
     {
       const nsAString& currentLine = Substring(aMsgSnippet, offset, lineFeedPos - offset);
       // this catches quoted text ("> "), nested quotes of any level (">> ", ">>> ", ...)
-      // it also catches empty line quoted text (">"). It might be over agressive and require
+      // it also catches empty line quoted text (">"). It might be over aggressive and require
       // tweaking later.
       // Try to strip the citation. If the current line ends with a ':' and the next line
       // looks like a quoted reply (starts with a ">") skip the current line

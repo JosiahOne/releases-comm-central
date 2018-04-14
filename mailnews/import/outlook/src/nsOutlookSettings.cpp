@@ -25,7 +25,7 @@
 #include "nsISmtpService.h"
 #include "nsISmtpServer.h"
 #include "nsOutlookStringBundle.h"
-#include "OutlookDebugLog.h"
+#include "ImportDebug.h"
 #include "nsIPop3IncomingServer.h"
 #include "nsMsgI18N.h"
 #include <windows.h>
@@ -545,7 +545,7 @@ nsresult OutlookSettings::SetSmtpServer(nsIMsgAccountManager *aMgr,
     SetSmtpServerKey(aId, smtpServer);
 
   // TODO SSL, auth method
-  IMPORT_LOG1("Ceated new SMTP server: %s\n",
+  IMPORT_LOG1("Created new SMTP server: %s\n",
               nativeServerName.get());
   return NS_OK;
 }

@@ -1,8 +1,8 @@
 
 var elementslib = {};
-Components.utils.import('resource://mozmill/modules/elementslib.js', elementslib);
+ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elementslib);
 var mozmill = {};
-Components.utils.import('resource://mozmill/modules/mozmill.js', mozmill);
+ChromeUtils.import("chrome://mozmill/content/modules/mozmill.js", mozmill);
 
 var test_assert = function(){
  var controller = mozmill.getBrowserController();

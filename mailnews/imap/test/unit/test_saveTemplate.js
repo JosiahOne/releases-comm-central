@@ -7,9 +7,9 @@
  * creation of folder.
  */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource:///modules/MailUtils.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/MailUtils.js");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -71,13 +71,12 @@ saveAsUrlListener.prototype = {
 function* saveAsTemplate() {
   let hdr = mailTestUtils.firstMsgHdr(IMAPPump.inbox);
   let uri = IMAPPump.inbox.getUriForMsg(hdr);
-  const Ci = Components.interfaces;
   let identity = MailServices.accounts
                   .getFirstIdentityForServer(IMAPPump.incomingServer);
   identity.stationeryFolder = IMAPPump.incomingServer.rootFolder.URI + "/Templates";
   let templates = MailUtils.getFolderForURI(identity.stationeryFolder, false);
   // Verify that Templates folder doesn't exist, and then create it.
-  do_check_eq(templates.parent, null);
+  Assert.equal(templates.parent, null);
   templates.setFlag(Ci.nsMsgFolderFlags.Templates);
   templates.createStorageIfMissing(new saveAsUrlListener(uri, identity));
   yield false;
@@ -89,7 +88,7 @@ var mfnListener =
   msgAdded: function msgAdded(aMsg)
   {
     // Check this is the templates folder.
-    do_check_eq(aMsg.folder.prettyName, "Templates");
+    Assert.equal(aMsg.folder.prettyName, "Templates");
     async_driver();
   },
 };

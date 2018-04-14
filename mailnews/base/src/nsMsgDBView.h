@@ -19,7 +19,6 @@
 #include "nsIMsgFolder.h"
 #include "nsIMsgThread.h"
 #include "DateTimeFormat.h"
-#include "nsIDOMElement.h"
 #include "nsIImapIncomingServer.h"
 #include "nsIWeakReference.h"
 #include "nsIMsgFilterPlugin.h"
@@ -165,7 +164,6 @@ protected:
                             nsACString & keywordString);
   nsresult FetchAccount(nsIMsgDBHdr * aHdr, nsAString& aAccount);
   bool IsOutgoingMsg(nsIMsgDBHdr * aHdr);
-  nsresult CycleThreadedColumn(nsIDOMElement * aElement);
 
   // The default enumerator is over the db, but things like
   // quick search views will enumerate just the displayed messages.
@@ -446,7 +444,7 @@ protected:
   // selection changed until the delete is done and we want to batch
   // notifications.
   bool m_deletingRows;
-  // For certain special folders and decendents of those folders
+  // For certain special folders and descendants of those folders
   // (like the "Sent" folder, "Sent/Old Sent").
   // The Sender column really shows recipients.
 

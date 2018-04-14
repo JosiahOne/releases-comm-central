@@ -7,13 +7,8 @@ this.EXPORTED_SYMBOLS = ['MsgHdrToMimeMessage',
                           'MimeBody', 'MimeUnknown',
                           'MimeMessageAttachment'];
 
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-var Cr = Components.results;
-var Cu = Components.utils;
-
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 var EMITTER_MIME_CODE = "application/x-js-mime-message";
 
@@ -162,7 +157,7 @@ function stripEncryptedParts(aPart) {
  * @param [aOptions] Optional options.
  * @param [aOptions.saneBodySize] Limit body sizes to a 'reasonable' size in
  *     order to combat corrupt offline/message stores creating pathological
- *     situtations where we have erroneously multi-megabyte messages.  This
+ *     situations where we have erroneously multi-megabyte messages.  This
  *     also likely reduces the impact of legitimately ridiculously large
  *     messages.
  * @param [aOptions.partsOnDemand] If this is a message stored on an IMAP
@@ -616,7 +611,7 @@ function MimeUnknown(aContentType) {
   this.partName = null;
   this.contentType = aContentType;
   this.headers = {};
-  // Looks like libmime does not always intepret us as an attachment, which
+  // Looks like libmime does not always interpret us as an attachment, which
   //  means we'll have to have a default size. Returning undefined would cause
   //  the recursive size computations to fail.
   this._size = 0;

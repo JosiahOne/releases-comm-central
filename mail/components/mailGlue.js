@@ -3,15 +3,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var Ci = Components.interfaces;
-var Cc = Components.classes;
-var Cu = Components.utils;
-
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/AddonManager.jsm");
-Cu.import("resource:///modules/distribution.js");
-Cu.import("resource:///modules/mailMigrator.js");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
+ChromeUtils.import("resource://gre/modules/LightweightThemeConsumer.jsm");
+ChromeUtils.import("resource:///modules/distribution.js");
+ChromeUtils.import("resource:///modules/mailMigrator.js");
+ChromeUtils.import("resource:///modules/extensionSupport.jsm");
+const { L10nRegistry, FileSource } = ChromeUtils.import("resource://gre/modules/L10nRegistry.jsm", {});
 
 /**
  * Glue code that should be executed before any windows are opened. Any
@@ -38,6 +37,7 @@ MailGlue.prototype = {
     Services.obs.addObserver(this, "mail-startup-done");
     Services.obs.addObserver(this, "handle-xul-text-link");
     Services.obs.addObserver(this, "profile-after-change");
+    Services.obs.addObserver(this, "chrome-document-global-created");
   },
 
   // cleanup (called at shutdown)
@@ -47,6 +47,7 @@ MailGlue.prototype = {
     Services.obs.removeObserver(this, "mail-startup-done");
     Services.obs.removeObserver(this, "handle-xul-text-link");
     Services.obs.removeObserver(this, "profile-after-change");
+    Services.obs.removeObserver(this, "chrome-document-global-created");
   },
 
   // nsIObserver implementation
@@ -64,6 +65,18 @@ MailGlue.prototype = {
     case "handle-xul-text-link":
       this._handleLink(aSubject, aData);
       break;
+    case "profile-after-change":
+      extensionDefaults(); // extensionSupport.jsm
+      break;
+    case "chrome-document-global-created":
+      // Set up lwt, but only if the "lightweightthemes" attr is set on the root
+      // (i.e. in messenger.xul).
+      aSubject.addEventListener("DOMContentLoaded", () => {
+        if (aSubject.document.documentElement.hasAttribute("lightweightthemes")) {
+          new LightweightThemeConsumer(aSubject.document);
+        }
+      }, {once: true});
+      break;
     }
   },
 
@@ -74,6 +87,10 @@ MailGlue.prototype = {
 
   _onProfileStartup: function MailGlue__onProfileStartup() {
     TBDistCustomizer.applyPrefDefaults();
+
+    let locales = Services.locale.getPackagedLocales();
+    const appSource = new FileSource("app", locales, "resource:///chrome/{locale}/locale/{locale}/");
+    L10nRegistry.registerSource(appSource);
 
     // handle any migration work that has to happen at profile startup
     MailMigrator.migrateAtProfileStartup();
@@ -90,7 +107,7 @@ MailGlue.prototype = {
     const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
     if (WINTASKBAR_CONTRACTID in Cc &&
         Cc[WINTASKBAR_CONTRACTID].getService(Ci.nsIWinTaskbar).available) {
-      Cu.import("resource:///modules/windowsJumpLists.js");
+      ChromeUtils.import("resource:///modules/windowsJumpLists.js");
       WinTaskbarJumpList.startup();
     }
 

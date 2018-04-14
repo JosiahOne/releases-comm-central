@@ -2,25 +2,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* exported do_calendar_startup, do_load_calmgr, do_load_timezoneservice,
- *          readJSONFile, ics_unfoldline, compareItemsSpecific, getStorageCal,
- *          getMemoryCal, createTodoFromIcalString, createEventFromIcalString,
- *          createDate, Cc, Ci, Cr, Cu
+/* exported do_calendar_startup, do_load_calmgr, do_load_timezoneservice, readJSONFile,
+ *          ics_unfoldline, dedent, compareItemsSpecific, getStorageCal, getMemoryCal,
+ *          createTodoFromIcalString, createEventFromIcalString, createDate, Cc, Ci, Cr, Cu
  */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.import("resource://gre/modules/FileUtils.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/FileUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
-Components.utils.import("resource://testing-common/AppInfo.jsm");
+ChromeUtils.import("resource://testing-common/AppInfo.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
-                                  "resource://gre/modules/NetUtil.jsm");
+ChromeUtils.defineModuleGetter(this, "NetUtil", "resource://gre/modules/NetUtil.jsm");
 
 updateAppInfo();
-
-var { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
 
 (function() {
     let bindir = Services.dirsvc.get("CurProcD", Components.interfaces.nsIFile);
@@ -31,7 +27,7 @@ var { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
     Components.manager.autoRegister(bindir);
 })();
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function createDate(aYear, aMonth, aDay, aHasTime, aHour, aMinute, aSecond, aTimezone) {
     let date = Cc["@mozilla.org/calendar/datetime;1"]
@@ -42,7 +38,7 @@ function createDate(aYear, aMonth, aDay, aHasTime, aHour, aMinute, aSecond, aTim
                aHour || 0,
                aMinute || 0,
                aSecond || 0,
-               aTimezone || cal.UTC());
+               aTimezone || cal.dtz.UTC);
     date.isDate = !aHasTime;
     return date;
 }
@@ -194,6 +190,43 @@ function ics_unfoldline(aLine) {
 }
 
 /**
+ * Dedent the template string tagged with this function to make indented data
+ * easier to read. Usage:
+ *
+ * let data = dedent`
+ *     This is indented data it will be unindented so that the first line has
+ *       no leading spaces and the second is indented by two spaces.
+ * `;
+ *
+ * @param strings       The string fragments from the template string
+ * @param ...values     The interpolated values
+ * @return              The interpolated, dedented string
+ */
+function dedent(strings, ...values) {
+    let parts = [];
+
+    // Perform variable interpolation
+    for (let [i, string] of strings.entries()) {
+        parts.push(string);
+        if (i < values.length) {
+            parts.push(values[i]);
+        }
+    }
+    let lines = parts.join("").split("\n");
+
+    // The first and last line is empty as in above example.
+    lines.shift();
+    lines.pop();
+
+    let minIndent = lines.reduce((min, line) => {
+        let match = line.match(/^(\s*)\S*/);
+        return Math.min(min, match[1].length);
+    }, Infinity);
+
+    return lines.map(line => line.substr(minIndent)).join("\n");
+}
+
+/**
  * Read a JSON file and return the JS object
  */
 function readJSONFile(aFile) {
@@ -236,7 +269,7 @@ function do_calendar_startup(callback) {
         observe: function() {
             Services.obs.removeObserver(this, "calendar-startup-done");
             do_test_finished();
-            do_execute_soon(callback);
+            executeSoon(callback);
         }
     };
 

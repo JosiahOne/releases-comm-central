@@ -14,10 +14,8 @@
  */
 this.EXPORTED_SYMBOLS = ["ircNonStandard"];
 
-var {interfaces: Ci, utils: Cu} = Components;
-
-Cu.import("resource:///modules/ircHandlers.jsm");
-Cu.import("resource:///modules/ircUtils.jsm");
+ChromeUtils.import("resource:///modules/ircHandlers.jsm");
+ChromeUtils.import("resource:///modules/ircUtils.jsm");
 
 var ircNonStandard = {
   name: "Non-Standard IRC Extensions",
@@ -70,7 +68,7 @@ var ircNonStandard = {
       }
 
       // Some servers, e.g. irc.umich.edu, use NOTICE during connection
-      // negotation to give directions to users, these MUST be shown to the
+      // negotiation to give directions to users, these MUST be shown to the
       // user. If the message starts with ***, we assume it is probably an AUTH
       // message, which falls through to normal NOTICE processing.
       // Note that if the user's nick is auth this COULD be a notice directed at

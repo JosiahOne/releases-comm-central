@@ -1,10 +1,10 @@
 // This file needs to contain glue to rephrase the Mocha testsuite framework in
 // a way that the xpcshell test suite can understand.
 
-Components.utils.import("resource://gre/modules/osfile.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Task.jsm");
-Components.utils.import("resource://testing-common/Assert.jsm");
+ChromeUtils.import("resource://gre/modules/osfile.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Task.jsm");
+ChromeUtils.import("resource://testing-common/Assert.jsm");
 var requireCache = new Map();
 
 // Preload an assert module
@@ -20,7 +20,6 @@ assert.doesNotThrow = function (block, message) {
 requireCache.set("assert", assert);
 
 // Preload an fs module
-var Cc = Components.classes, Ci = Components.interfaces;
 var fs = {
   readFile: function (filename, options, callback) {
     if (callback === undefined) {
@@ -97,12 +96,12 @@ function MochaSuite(name) {
 
 /// The real code for running a suite of tests, written as a generator.
 MochaSuite.prototype._runSuite = function *() {
-  do_print("Running suite " + this.name);
+  info("Running suite " + this.name);
   for (let setup of this.setup) {
     yield runFunction(setup);
   }
   for (let test of this.tests) {
-    do_print("Running test " + test.name);
+    info("Running test " + test.name);
     yield runFunction(test.test);
   }
   for (let suite of this.suites) {
@@ -111,7 +110,7 @@ MochaSuite.prototype._runSuite = function *() {
   for (let fn of this.teardown) {
     yield runFunction(fn);
   }
-  do_print("Finished suite " + this.name);
+  info("Finished suite " + this.name);
 };
 
 /// The outer call to run a test suite, which returns a promise of completion.

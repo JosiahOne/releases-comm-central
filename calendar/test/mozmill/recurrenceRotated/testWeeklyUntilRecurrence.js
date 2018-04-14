@@ -5,7 +5,7 @@
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["calendar-utils"];
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 var helpersForController, invokeEventDialog, createCalendar, deleteCalendars;
 var switchToView, goToDate, viewForward, handleOccurrencePrompt;
@@ -183,7 +183,7 @@ function setRecurrence(recurrence) {
 
     let dateFormatter = cal.getDateFormatter();
 
-    let endDateString = dateFormatter.formatDateShort(cal.jsDateToDateTime(ENDDATE, cal.floating()));
+    let endDateString = dateFormatter.formatDateShort(cal.dtz.jsDateToDateTime(ENDDATE, cal.dtz.floating));
 
     recurrence.type(reclookup(input), endDateString);
 

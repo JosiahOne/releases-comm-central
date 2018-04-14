@@ -18,16 +18,13 @@
 #include "nsIMsgFolder.h" // TO include biffState enum. Change to bool later...
 #include "nsMailHeaders.h"
 #include "nsIMsgAccountManager.h"
-#include "nsILineInputStream.h"
 #include "nsIPop3Protocol.h"
 #include "nsLocalMailFolder.h"
+#include "nsIInputStream.h"
 #include "nsIPrefBranch.h"
 #include "nsIPrefService.h"
 #include "nsDirectoryServiceDefs.h"
-#include "nsIPrompt.h"
 #include "nsIPromptService.h"
-#include "nsIInterfaceRequestor.h"
-#include "nsIInterfaceRequestorUtils.h"
 #include "nsIDocShell.h"
 #include "mozIDOMWindow.h"
 #include "nsEmbedCID.h"
@@ -41,9 +38,8 @@
 
 /* for logging to Error Console */
 #include "nsIScriptError.h"
-#include "nsIConsoleService.h"
 
-static mozilla::LazyLogModule POP3LOGMODULE("POP3");
+extern mozilla::LazyLogModule POP3LOGMODULE; //defined in nsPop3Protocol.cpp
 #define POP3LOG(str) "sink: [this=%p] " str, this
 
 NS_IMPL_ISUPPORTS(nsPop3Sink, nsIPop3Sink)
@@ -114,7 +110,7 @@ partialRecord::~partialRecord()
 }
 
 // Walk through all the messages in this folder and look for any
-// PARTIAL messages. For each of those, dig thru the mailbox and
+// PARTIAL messages. For each of those, dig through the mailbox and
 // find the Account that the message belongs to. If that Account
 // matches the current Account, then look for the Uidl and save
 // this message for later processing.
@@ -129,7 +125,7 @@ nsPop3Sink::FindPartialMessages()
   nsCOMPtr<nsIMsgLocalMailFolder> localFolder = do_QueryInterface(m_folder);
   m_folder->GetMsgDatabase(getter_AddRefs(db));
   if (!localFolder || !db)
-    return NS_ERROR_FAILURE;  // we need it to grub thru the folder
+    return NS_ERROR_FAILURE;  // we need it to grub through the folder
 
   nsresult rv = db->EnumerateMessages(getter_AddRefs(messages));
   if (messages)
@@ -702,7 +698,7 @@ nsresult nsPop3Sink::WriteLineToMailbox(const nsACString& buffer)
     // following line. See bug 1116055 for details.
 #define SEEK_TO_END
 #ifdef  SEEK_TO_END
-    // seek to the end in case someone else has seeked elsewhere in our stream.
+    // seek to the end in case someone else has sought elsewhere in our stream.
     nsCOMPtr <nsISeekableStream> seekableOutStream = do_QueryInterface(m_outFileStream);
 
     int64_t before_seek_pos;

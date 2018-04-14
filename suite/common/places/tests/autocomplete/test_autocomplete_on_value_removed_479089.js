@@ -24,7 +24,7 @@ add_task(async function test_autocomplete_on_value_removed()
 {
   // QI to nsIAutoCompleteSimpleResultListener
   var listener = Cc["@mozilla.org/autocomplete/search;1?name=history"].
-                 getService(Components.interfaces.nsIAutoCompleteSimpleResultListener);
+                 getService(Ci.nsIAutoCompleteSimpleResultListener);
 
   // add history visit
   var testUri = uri("http://foo.mozilla.com/");
@@ -44,11 +44,11 @@ add_task(async function test_autocomplete_on_value_removed()
   queryRes.root.containerOpen = true;
   // debug queries
   // dump_table("moz_places");
-  do_check_eq(queryRes.root.childCount, 1);
+  Assert.equal(queryRes.root.childCount, 1);
   // call the untested code path
   listener.onValueRemoved(null, testUri.spec, true);
   // make sure it is GONE from the DB
-  do_check_eq(queryRes.root.childCount, 0);
+  Assert.equal(queryRes.root.childCount, 0);
   // close the container
   queryRes.root.containerOpen = false;
 });

@@ -1,7 +1,7 @@
 /* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* Tests that an empty cache entry doesn't return an empty message for news. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 // The basic daemon to use for testing nntpd.js implementations
 var daemon = setupNNTPDaemon();
@@ -20,12 +20,12 @@ var streamListener =
   onStartRequest: function(aRequest, aContext) {
   },
   onStopRequest: function(aRequest, aContext, aStatusCode) {
-    do_check_eq(aStatusCode, 0);
+    Assert.equal(aStatusCode, 0);
 
     // Reduce any \r\n to just \n so we can do a good comparison on any
     // platform.
     var reduced = this._data.replace(/\r\n/g, "\n");
-    do_check_eq(reduced, kSimpleNewsArticle);
+    Assert.equal(reduced, kSimpleNewsArticle);
 
     // We must finish closing connections and tidying up after a timeout
     // so that the thread has time to unwrap itself.
@@ -60,9 +60,7 @@ function run_test() {
   server = makeServer(NNTP_RFC977_handler, daemon);
   server.start();
   localserver = setupLocalServer(server.port);
-  var uri = Cc["@mozilla.org/network/standard-url;1"]
-              .createInstance(Ci.nsIURI);
-  uri.spec = "news://localhost:" + server.port + "/TSS1%40nntp.test";
+  var uri = Services.io.newURI("news://localhost:" + server.port + "/TSS1%40nntp.test");
 
   try {
     // Add an empty message to the cache
@@ -70,7 +68,7 @@ function run_test() {
                 .cacheStorage
                 .asyncOpenURI(uri, "", Ci.nsICacheStorage.OPEN_NORMALLY, {
       onCacheEntryAvailable: function(cacheEntry, isNew, appCache, status) {
-        do_check_eq(status, Components.results.NS_OK);
+        Assert.equal(status, Cr.NS_OK);
 
         cacheEntry.markValid();
 
@@ -81,8 +79,8 @@ function run_test() {
           OnStopRunningUrl: function () { localserver.closeCachedConnections(); }});
         server.performTest();
 
-        do_check_eq(folder.getTotalMessages(false), 1);
-        do_check_true(folder.hasNewMessages);
+        Assert.equal(folder.getTotalMessages(false), 1);
+        Assert.ok(folder.hasNewMessages);
 
         server.resetTest();
 

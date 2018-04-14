@@ -6,26 +6,26 @@
 /* ****************************************************************************
  * ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION!
  * ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION!
- * 
+ *
  * ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION!
  * ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION!
- * 
+ *
  * Dear Mortals,
- * 
+ *
  * Please be advised that if you are adding something here, you should also
  * strongly consider adding it to the other place it goes too!  These can be
  * found in paths like so: mailnews/.../build/WhateverFactory.cpp
- * 
+ *
  * If you do not, your (static) release builds will be quite pleasant, but
  * (dynamic) debug builds will disappoint you by not having your component in
  * them.
- * 
+ *
  * Yours truly,
  * The ghost that haunts the MailNews codebase.
- * 
+ *
  * ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION!
  * ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION!
- * 
+ *
  * ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION!
  * ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION! ATTENTION!
  * ****************************************************************************/
@@ -59,8 +59,6 @@
 #include "nsMsgAccountManager.h"
 #include "nsMsgIdentity.h"
 #include "nsMsgIncomingServer.h"
-#include "nsMsgFolderDataSource.h"
-#include "nsMsgAccountManagerDS.h"
 #include "nsMsgBiffManager.h"
 #include "nsMsgPurgeService.h"
 #include "nsStatusBarBiffManager.h"
@@ -105,7 +103,7 @@
 #ifdef XP_MACOSX
 #include "nsMessengerOSXIntegration.h"
 #endif
-#if defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_GTK2)
+#if defined(MOZ_WIDGET_GTK)
 #include "nsMessengerUnixIntegration.h"
 #endif
 #include "nsCURILoader.h"
@@ -329,11 +327,6 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsMessenger)
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMsgAccountManager, Init)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgAccount)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgIdentity)
-NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMsgFolderDataSource, Init)
-NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMsgUnreadFoldersDataSource, Init)
-NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMsgFavoriteFoldersDataSource, Init)
-NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMsgRecentFoldersDataSource, Init)
-NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMsgAccountManagerDataSource, Init)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgSearchSession)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgSearchTerm)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgSearchValidityManager)
@@ -376,7 +369,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMessengerWinIntegration, Init)
 #ifdef XP_MACOSX
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMessengerOSXIntegration, Init)
 #endif
-#if defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_GTK2)
+#if defined(MOZ_WIDGET_GTK)
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMessengerUnixIntegration, Init)
 #endif
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMessengerContentHandler)
@@ -391,11 +384,6 @@ NS_DEFINE_NAMED_CID(NS_MESSENGER_CID);
 NS_DEFINE_NAMED_CID(NS_MSGACCOUNTMANAGER_CID);
 NS_DEFINE_NAMED_CID(NS_MSGACCOUNT_CID);
 NS_DEFINE_NAMED_CID(NS_MSGIDENTITY_CID);
-NS_DEFINE_NAMED_CID(NS_MAILNEWSFOLDERDATASOURCE_CID);
-NS_DEFINE_NAMED_CID(NS_MAILNEWSUNREADFOLDERDATASOURCE_CID);
-NS_DEFINE_NAMED_CID(NS_MAILNEWSFAVORITEFOLDERDATASOURCE_CID);
-NS_DEFINE_NAMED_CID(NS_MAILNEWSRECENTFOLDERDATASOURCE_CID);
-NS_DEFINE_NAMED_CID(NS_MSGACCOUNTMANAGERDATASOURCE_CID);
 NS_DEFINE_NAMED_CID(NS_MSGFILTERSERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_MSGSEARCHSESSION_CID);
 NS_DEFINE_NAMED_CID(NS_MSGSEARCHTERM_CID);
@@ -436,7 +424,7 @@ NS_DEFINE_NAMED_CID(NS_MESSENGERWININTEGRATION_CID);
 #ifdef XP_MACOSX
 NS_DEFINE_NAMED_CID(NS_MESSENGEROSXINTEGRATION_CID);
 #endif
-#if defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_GTK2)
+#if defined(MOZ_WIDGET_GTK)
 NS_DEFINE_NAMED_CID(NS_MESSENGERUNIXINTEGRATION_CID);
 #endif
 NS_DEFINE_NAMED_CID(NS_MESSENGERCONTENTHANDLER_CID);
@@ -862,11 +850,6 @@ const mozilla::Module::CIDEntry kMailNewsCIDs[] = {
   { &kNS_MSGACCOUNTMANAGER_CID, false, NULL, nsMsgAccountManagerConstructor},
   { &kNS_MSGACCOUNT_CID, false, NULL, nsMsgAccountConstructor},
   { &kNS_MSGIDENTITY_CID, false, NULL, nsMsgIdentityConstructor},
-  { &kNS_MAILNEWSFOLDERDATASOURCE_CID, false, NULL, nsMsgFolderDataSourceConstructor},
-  { &kNS_MAILNEWSUNREADFOLDERDATASOURCE_CID, false, NULL, nsMsgUnreadFoldersDataSourceConstructor},
-  { &kNS_MAILNEWSFAVORITEFOLDERDATASOURCE_CID, false, NULL, nsMsgFavoriteFoldersDataSourceConstructor},
-  { &kNS_MAILNEWSRECENTFOLDERDATASOURCE_CID, false, NULL, nsMsgRecentFoldersDataSourceConstructor},
-  { &kNS_MSGACCOUNTMANAGERDATASOURCE_CID, false, NULL, nsMsgAccountManagerDataSourceConstructor},
   { &kNS_MSGFILTERSERVICE_CID, false, NULL, nsMsgFilterServiceConstructor},
   { &kNS_MSGSEARCHSESSION_CID, false, NULL, nsMsgSearchSessionConstructor},
   { &kNS_MSGSEARCHTERM_CID, false, NULL, nsMsgSearchTermConstructor},
@@ -908,7 +891,7 @@ const mozilla::Module::CIDEntry kMailNewsCIDs[] = {
 #ifdef XP_MACOSX
   { &kNS_MESSENGEROSXINTEGRATION_CID, false, NULL, nsMessengerOSXIntegrationConstructor},
 #endif
-#if defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_GTK2)
+#if defined(MOZ_WIDGET_GTK)
   { &kNS_MESSENGERUNIXINTEGRATION_CID, false, NULL, nsMessengerUnixIntegrationConstructor},
 #endif
   { &kNS_MESSENGERCONTENTHANDLER_CID, false, NULL, nsMessengerContentHandlerConstructor},
@@ -1077,11 +1060,6 @@ const mozilla::Module::ContractIDEntry kMailNewsContracts[] = {
   { NS_MSGACCOUNTMANAGER_CONTRACTID, &kNS_MSGACCOUNTMANAGER_CID },
   { NS_MSGACCOUNT_CONTRACTID, &kNS_MSGACCOUNT_CID },
   { NS_MSGIDENTITY_CONTRACTID, &kNS_MSGIDENTITY_CID },
-  { NS_MAILNEWSFOLDERDATASOURCE_CONTRACTID, &kNS_MAILNEWSFOLDERDATASOURCE_CID },
-  { NS_MAILNEWSUNREADFOLDERDATASOURCE_CONTRACTID, &kNS_MAILNEWSUNREADFOLDERDATASOURCE_CID },
-  { NS_MAILNEWSFAVORITEFOLDERDATASOURCE_CONTRACTID, &kNS_MAILNEWSFAVORITEFOLDERDATASOURCE_CID },
-  { NS_MAILNEWSRECENTFOLDERDATASOURCE_CONTRACTID, &kNS_MAILNEWSRECENTFOLDERDATASOURCE_CID },
-  { NS_RDF_DATASOURCE_CONTRACTID_PREFIX "msgaccountmanager", &kNS_MSGACCOUNTMANAGERDATASOURCE_CID },
   { NS_MSGFILTERSERVICE_CONTRACTID, &kNS_MSGFILTERSERVICE_CID },
   { NS_MSGSEARCHSESSION_CONTRACTID, &kNS_MSGSEARCHSESSION_CID },
   { NS_MSGSEARCHTERM_CONTRACTID, &kNS_MSGSEARCHTERM_CID },
@@ -1122,7 +1100,7 @@ const mozilla::Module::ContractIDEntry kMailNewsContracts[] = {
 #ifdef XP_MACOSX
   { NS_MESSENGEROSINTEGRATION_CONTRACTID, &kNS_MESSENGEROSXINTEGRATION_CID },
 #endif
-#if defined(MOZ_WIDGET_GTK) || defined(MOZ_WIDGET_GTK2)
+#if defined(MOZ_WIDGET_GTK)
   { NS_MESSENGEROSINTEGRATION_CONTRACTID, &kNS_MESSENGERUNIXINTEGRATION_CID },
 #endif
   { NS_MESSENGERCONTENTHANDLER_CONTRACTID, &kNS_MESSENGERCONTENTHANDLER_CID },

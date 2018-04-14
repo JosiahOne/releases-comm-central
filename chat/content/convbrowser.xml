@@ -10,8 +10,7 @@
 
   <binding id="browser" role="outerdoc">
     <implementation type="application/javascript"
-                    implements="nsIDOMEventListener,
-                                nsIWebProgressListener, nsIController,
+                    implements="nsIWebProgressListener, nsIController,
                                 nsISelectionListener, nsIObserver">
       <property name="autoscrollEnabled">
         <getter>
@@ -81,18 +80,29 @@
       <field name="_docShell">null</field>
 
       <property name="docShell"
-                onget="return this._docShell || (this._docShell = this.boxObject.docShell);"
-                readonly="true"/>
+                readonly="true">
+        <getter>
+          <![CDATA[
+            if (this._docShell) {
+              return this._docShell;
+            }
+            if (!this.frameLoader) {
+              return null;
+            }
+            this._docShell = this.frameLoader.docShell;
+            return this._docShell;
+          ]]>
+        </getter>
+      </property>
 
       <property name="messageManager"
                 readonly="true">
         <getter>
           <![CDATA[
-            var owner = this.QueryInterface(Components.interfaces.nsIFrameLoaderOwner);
-            if (!owner.frameLoader) {
+            if (!this.frameLoader) {
               return null;
             }
-            return owner.frameLoader.messageManager;
+            return this.frameLoader.messageManager;
           ]]>
         </getter>
       </property>
@@ -100,7 +110,7 @@
       <field name="_webNavigation">null</field>
 
       <property name="webNavigation"
-                onget="return this._webNavigation || (this._webNavigation = this.docShell.QueryInterface(Components.interfaces.nsIWebNavigation));"
+                onget="return this._webNavigation || (this._webNavigation = this.docShell.QueryInterface(Ci.nsIWebNavigation));"
                 readonly="true"/>
 
       <field name="_finder">null</field>
@@ -111,7 +121,7 @@
             if (!this.docShell)
               return null;
 
-            let Finder = Components.utils.import("resource://gre/modules/Finder.jsm", {}).Finder;
+            let Finder = ChromeUtils.import("resource://gre/modules/Finder.jsm", {}).Finder;
             this._finder = new Finder(this.docShell);
           }
           return this._finder;
@@ -124,14 +134,14 @@
         <getter>
         <![CDATA[
           if (!this._fastFind) {
-            if (!("@mozilla.org/typeaheadfind;1" in Components.classes))
+            if (!("@mozilla.org/typeaheadfind;1" in Cc))
               return null;
 
             if (!this.docShell)
               return null;
 
-            this._fastFind = Components.classes["@mozilla.org/typeaheadfind;1"]
-                                       .createInstance(Components.interfaces.nsITypeAheadFind);
+            this._fastFind = Cc["@mozilla.org/typeaheadfind;1"]
+                               .createInstance(Ci.nsITypeAheadFind);
             this._fastFind.init(this.docShell);
           }
           return this._fastFind;
@@ -144,13 +154,13 @@
 
       <property name="webProgress"
                 readonly="true"
-                onget="return this.docShell.QueryInterface(Components.interfaces.nsIInterfaceRequestor).getInterface(Components.interfaces.nsIWebProgress);"/>
+                onget="return this.docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIWebProgress);"/>
 
       <field name="_contentWindow">null</field>
 
       <property name="contentWindow"
                 readonly="true"
-                onget="return this._contentWindow || (this._contentWindow = this.docShell.QueryInterface(Components.interfaces.nsIInterfaceRequestor).getInterface(Components.interfaces.nsIDOMWindow));"/>
+                onget="return this._contentWindow || (this._contentWindow = this.docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIDOMWindow));"/>
 
       <property name="contentWindowAsCPOW"
                 readonly="true"
@@ -200,7 +210,7 @@
             Services.prefs.getBoolPref("clipboard.autocopy");
           if (this.autoCopyEnabled) {
             this.contentWindow.getSelection()
-                .QueryInterface(Components.interfaces.nsISelectionPrivate)
+                .QueryInterface(Ci.nsISelectionPrivate)
                 .addSelectionListener(this);
           }
           ]]>
@@ -213,7 +223,7 @@
           this.contentWindow.controllers.removeController(this);
           if (this.autoCopyEnabled) {
              this.contentWindow.getSelection()
-                 .QueryInterface(Components.interfaces.nsISelectionPrivate)
+                 .QueryInterface(Ci.nsISelectionPrivate)
                  .removeSelectionListener(this);
           }
           ]]>
@@ -257,7 +267,7 @@
         <parameter name="aListener"/>
         <body>
           <![CDATA[
-            this.webProgress.addProgressListener(aListener, Components.interfaces.nsIWebProgress.NOTIFY_ALL);
+            this.webProgress.addProgressListener(aListener, Ci.nsIWebProgress.NOTIFY_ALL);
           ]]>
         </body>
       </method>
@@ -279,11 +289,11 @@
           this.addEventListener("resize", this.browserResize);
 
           if (!("cleanupImMarkup" in window))
-            Components.utils.import("resource:///modules/imContentSink.jsm");
+            ChromeUtils.import("resource:///modules/imContentSink.jsm");
           if (!("smileImMarkup" in window))
-            Components.utils.import("resource:///modules/imSmileys.jsm");
+            ChromeUtils.import("resource:///modules/imSmileys.jsm");
           if (!("getCurrentTheme" in window))
-            Components.utils.import("resource:///modules/imThemes.jsm");
+            ChromeUtils.import("resource:///modules/imThemes.jsm");
 
           this.onContentElementLoad = this._onContentElementLoad.bind(this);
         ]]>
@@ -515,8 +525,8 @@
                 return;
             }
 
-            let cs = Components.classes["@mozilla.org/txttohtmlconv;1"]
-                               .getService(Ci.mozITXTToHTMLConv);
+            let cs = Cc["@mozilla.org/txttohtmlconv;1"]
+                       .getService(Ci.mozITXTToHTMLConv);
             /*
              * kStructPhrase creates tags for plaintext-markup like *bold*,
              * /italics/, etc. We always use this; the content filter will
@@ -759,7 +769,7 @@
         <body>
           <![CDATA[
             if (this._scrollingIntoView) {
-              // We have explicitely requested a scrollIntoView, ignore the event
+              // We have explicitly requested a scrollIntoView, ignore the event.
               this._scrollingIntoView = false;
               this._lastScrollHeight = this.scrollHeight;
               this._lastScrollWidth = this.scrollWidth;
@@ -868,9 +878,9 @@
             if (selection.isCollapsed)
               return;
 
-            Components.classes["@mozilla.org/widget/clipboardhelper;1"]
-                      .getService(Ci.nsIClipboardHelper)
-                      .copyString(serializeSelection(selection));
+            Cc["@mozilla.org/widget/clipboardhelper;1"]
+              .getService(Ci.nsIClipboardHelper)
+              .copyString(serializeSelection(selection));
           ]]>
         </body>
       </method>
@@ -891,9 +901,9 @@
                   aReason & Ci.nsISelectionListener.KEYPRESS_REASON))
               return; // we are still dragging, don't bother with the selection
 
-            Components.classes["@mozilla.org/widget/clipboardhelper;1"]
-                      .getService(Ci.nsIClipboardHelper)
-                      .copyStringToClipboard(serializeSelection(aSelection),
+            Cc["@mozilla.org/widget/clipboardhelper;1"]
+              .getService(Ci.nsIClipboardHelper)
+              .copyStringToClipboard(serializeSelection(aSelection),
                                              Ci.nsIClipboard.kSelectionClipboard);
           ]]>
         </body>
@@ -918,14 +928,14 @@
         <parameter name="aStatus"/>
         <body>
           <![CDATA[
-            const WPL = Components.interfaces.nsIWebProgressListener;
+            const WPL = Ci.nsIWebProgressListener;
             if ((aStateFlags & WPL.STATE_IS_DOCUMENT) &&
                 (aStateFlags & WPL.STATE_STOP)) {
               if (!this._loadState) {
                 try {
                   initHTMLDocument(this._conv, this.theme, this.contentDocument);
                 } catch(e) {
-                  Components.utils.reportError(e);
+                  Cu.reportError(e);
                 }
                 this._loadState = 1;
 
@@ -1245,8 +1255,7 @@
             ourFieldValues[field] = this[field];
             otherFieldValues[field] = aOtherBrowser[field];
           }
-          this.QueryInterface(Components.interfaces.nsIFrameLoaderOwner)
-              .swapFrameLoaders(aOtherBrowser);
+          this.swapFrameLoaders(aOtherBrowser);
           for (var field of fieldsToSwap) {
             this[field] = otherFieldValues[field];
             aOtherBrowser[field] = ourFieldValues[field];
@@ -1295,18 +1304,18 @@
             event.stopPropagation();
 
             // loadURI can throw if the default browser is misconfigured.
-            Components.classes["@mozilla.org/uriloader/external-protocol-service;1"]
-                      .getService(Components.interfaces.nsIExternalProtocolService)
-                      .loadURI(uri);
+            Cc["@mozilla.org/uriloader/external-protocol-service;1"]
+              .getService(Ci.nsIExternalProtocolService)
+              .loadURI(uri);
           }
         ]]>
       </handler>
 
       <handler event="keypress" modifiers="shift" keycode="VK_PAGE_UP"
-               action="this.docShell.QueryInterface(Components.interfaces.nsITextScroll).scrollByPages(-1);"/>
+               action="this.docShell.QueryInterface(Ci.nsITextScroll).scrollByPages(-1);"/>
 
       <handler event="keypress" modifiers="shift" keycode="VK_PAGE_DOWN"
-               action="this.docShell.QueryInterface(Components.interfaces.nsITextScroll).scrollByPages(1);"/>
+               action="this.docShell.QueryInterface(Ci.nsITextScroll).scrollByPages(1);"/>
 
       <handler event="keypress" modifiers="alt" keycode="VK_PAGE_UP"
                action="this.scrollToPreviousSection();"/>

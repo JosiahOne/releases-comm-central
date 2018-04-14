@@ -3,7 +3,7 @@
  * Server which advertises CRAM-MD5, but fails when it's tried.
  * This reportedly happens for some misconfigured servers.
  */
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var server;
 var daemon;
@@ -17,7 +17,7 @@ var urlListener =
   },
   OnStopRunningUrl: function (url, result) {
     try {
-      do_check_eq(result, 0);
+      Assert.equal(result, 0);
 
       var transaction = server.playTransaction();
       do_check_transaction(transaction, expectedTransaction);

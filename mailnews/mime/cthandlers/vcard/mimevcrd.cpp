@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mimevcrd.h"
- 
+
 #include "mimecth.h"
 #include "mimexpcom.h"
 #include "nsIMsgVCardService.h"
@@ -177,7 +177,7 @@ MimeInlineTextVCard_parse_eof (MimeObject *obj, bool abort_p)
     while (v && status >= 0) {
       /* write out html */
       status = WriteOutVCard (obj, v);
-      /* parse next vcard incase they're embedded */
+      /* parse next vcard in case they're embedded */
       v = vCardService->NextVObjectInList(v);
     }
 

@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 //
 // constructor
@@ -78,7 +78,7 @@ calTodo.prototype = {
     set isCompleted(completed) {
         if (completed) {
             if (!this.completedDate) {
-                this.completedDate = cal.jsDateToDateTime(new Date());
+                this.completedDate = cal.dtz.jsDateToDateTime(new Date());
             }
             this.status = "COMPLETED";
             this.percentComplete = 100;
@@ -124,7 +124,7 @@ calTodo.prototype = {
 
     get icalString() {
         let calcomp = cal.getIcsService().createIcalComponent("VCALENDAR");
-        cal.calSetProdidVersion(calcomp);
+        cal.item.setStaticProps(calcomp);
         calcomp.addSubcomponent(this.icalComponent);
         return calcomp.serializeToICS();
     },

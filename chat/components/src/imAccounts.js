@@ -2,10 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
-Cu.import("resource:///modules/imXPCOMUtils.jsm");
-Cu.import("resource:///modules/imServices.jsm");
-Cu.import("resource:///modules/jsProtoHelper.jsm");
+ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/imServices.jsm");
+ChromeUtils.import("resource:///modules/jsProtoHelper.jsm");
 
 var kPrefAutologinPending = "messenger.accounts.autoLoginPending";
 var kPrefMessengerAccounts = "messenger.accounts";
@@ -375,7 +374,7 @@ imAccount.prototype = {
     }
 
     /* If the last successful connection is older than 10 seconds, reset the
-       number of reconnection attemps. */
+       number of reconnection attempts. */
     const kTimeBeforeSuccessfulConnection = 10;
     if (this.timeOfLastConnect &&
         this.timeOfLastConnect + kTimeBeforeSuccessfulConnection * 1000 < Date.now()) {
@@ -568,7 +567,7 @@ imAccount.prototype = {
     this._sendUpdateNotification();
   },
   _handleMasterPasswordException: function(aException) {
-    if (aException.result != Components.results.NS_ERROR_ABORT)
+    if (aException.result != Cr.NS_ERROR_ABORT)
       throw aException;
 
     gUserCanceledMasterPasswordPrompt = true;
@@ -807,12 +806,6 @@ imAccount.prototype = {
   get noFontSizes() { return this._ensurePrplAccount.noFontSizes; },
   get noUrlDesc() { return this._ensurePrplAccount.noUrlDesc; },
   get noImages() { return this._ensurePrplAccount.noImages; },
-
-  get proxyInfo() { return this._ensurePrplAccount.proxyInfo; },
-  set proxyInfo(val) {
-    this._ensurePrplAccount.proxyInfo = val;
-    this._connectionInfoChanged();
-  }
 };
 
 var gAccountsService = null;

@@ -84,7 +84,7 @@
 
 /* When attaching an HTML document, one must indicate the original URL of
    that document, if the receiver is to have any chance of being able to
-   retreive and display the inline images, or to click on any links in the
+   retrieve and display the inline images, or to click on any links in the
    HTML.
 
    The way we have done this in the past is by inserting a <BASE> tag as the
@@ -118,7 +118,6 @@
 #include "nsMsgAttachmentHandler.h"
 #include "nsMsgCompFields.h"
 #include "nsIMsgSendListener.h"
-#include "nsIDOMNode.h"
 #include "nsIEditor.h"
 #include "nsIUrlListener.h"
 #include "nsIMsgStatusFeedback.h"
@@ -134,6 +133,7 @@
 #include "nsIMsgFilterService.h"
 #include "nsIMsgOperationListener.h"
 #include "nsMsgIncomingServer.h"
+#include "mozilla/dom/Element.h"
 
 //
 // Some necessary defines...
@@ -255,7 +255,7 @@ public:
 
   // Deal with multipart related data
   nsresult    ProcessMultipartRelated(int32_t *aMailboxCount, int32_t *aNewsCount);
-  nsresult    GetEmbeddedObjectInfo(nsIDOMNode *node, nsMsgAttachmentData *attachment, bool *acceptObject);
+  nsresult    GetEmbeddedObjectInfo(mozilla::dom::Element *domElement, nsMsgAttachmentData *attachment, bool *acceptObject);
   uint32_t    GetMultipartRelatedCount(bool forceToBeCalculated = false);
   nsCOMPtr<nsIArray> mEmbeddedObjectList; // it's initialized when calling GetMultipartRelatedCount
 

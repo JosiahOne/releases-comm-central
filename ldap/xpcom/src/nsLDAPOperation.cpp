@@ -18,7 +18,6 @@
 #include "nsIAuthModule.h"
 #include "nsArrayUtils.h"
 #include "nsMemory.h"
-#include "mozilla/Logging.h"
 
 // Helper function
 static nsresult TranslateLDAPErrorToNSError(const int ldapError)
@@ -76,7 +75,7 @@ NS_INTERFACE_MAP_BEGIN(nsLDAPOperation)
   NS_INTERFACE_MAP_ENTRY(nsILDAPOperation)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsILDAPOperation)
   NS_IMPL_QUERY_CLASSINFO(nsLDAPOperation)
-NS_INTERFACE_MAP_END_THREADSAFE
+NS_INTERFACE_MAP_END
 NS_IMPL_CI_INTERFACE_GETTER(nsLDAPOperation, nsILDAPOperation)
 
 /**

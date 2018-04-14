@@ -4,8 +4,8 @@
  * it drop the connection when it's attempted.
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/alertTestUtils.js");
@@ -14,7 +14,7 @@ load("../../../resources/asyncTestUtils.js");
 var gGotAlert = false;
 
 function alert(aDialogTitle, aText) {
-  do_check_true(aText.startsWith("Server localhost has disconnected"));
+  Assert.ok(aText.startsWith("Server localhost has disconnected"));
   gGotAlert = true;
 }
 
@@ -57,11 +57,11 @@ function* setup() {
 }
 
 asyncUrlListener.callback = function(aUrl, aExitCode) {
-  do_check_false(Components.isSuccessCode(aExitCode));
+  Assert.ok(!Components.isSuccessCode(aExitCode));
 };
 
 function check_alert() {
-  do_check_true(gGotAlert);
+  Assert.ok(gGotAlert);
 }
 
 function teardown() {

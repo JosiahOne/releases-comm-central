@@ -7,9 +7,9 @@
  *          changeAllDay, onNextSlot, onPreviousSlot
  */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 var gStartDate = null;
 var gEndDate = null;
@@ -178,7 +178,7 @@ function zoomWithButtons(aZoomOut) {
  */
 function loadDateTime(aStartDate, aEndDate) {
     gDuration = aEndDate.subtractDate(aStartDate);
-    let kDefaultTimezone = cal.calendarDefaultTimezone();
+    let kDefaultTimezone = cal.dtz.defaultTimezone;
     gStartTimezone = aStartDate.timezone;
     gEndTimezone = aEndDate.timezone;
     gStartDate = aStartDate.getInTimezone(kDefaultTimezone);
@@ -220,7 +220,7 @@ function propagateDateTime() {
     }
 
     // Expand to 24hrs if the new range is outside of the default range.
-    let kDefaultTimezone = cal.calendarDefaultTimezone();
+    let kDefaultTimezone = cal.dtz.defaultTimezone;
     let startTime = gStartDate.getInTimezone(kDefaultTimezone);
     let endTime = gEndDate.getInTimezone(kDefaultTimezone);
     if ((startTime.hour < gStartHour) ||
@@ -254,7 +254,7 @@ function updateDateTime() {
         // the timezone of the endtime is "UTC", we convert
         // the endtime into the timezone of the starttime.
         if (startTime && endTime) {
-            if (!cal.compareObjects(startTime.timezone, endTime.timezone)) {
+            if (!cal.data.compareObjects(startTime.timezone, endTime.timezone)) {
                 if (endTime.timezone.isUTC) {
                     endTime = endTime.getInTimezone(startTime.timezone);
                 }
@@ -264,13 +264,13 @@ function updateDateTime() {
         // Before feeding the date/time value into the control we need
         // to set the timezone to 'floating' in order to avoid the
         // automatic conversion back into the OS timezone.
-        startTime.timezone = cal.floating();
-        endTime.timezone = cal.floating();
+        startTime.timezone = cal.dtz.floating;
+        endTime.timezone = cal.dtz.floating;
 
-        document.getElementById("event-starttime").value = cal.dateTimeToJsDate(startTime);
-        document.getElementById("event-endtime").value = cal.dateTimeToJsDate(endTime);
+        document.getElementById("event-starttime").value = cal.dtz.dateTimeToJsDate(startTime);
+        document.getElementById("event-endtime").value = cal.dtz.dateTimeToJsDate(endTime);
     } else {
-        let kDefaultTimezone = cal.calendarDefaultTimezone();
+        let kDefaultTimezone = cal.dtz.defaultTimezone;
 
         let startTime = gStartDate.getInTimezone(kDefaultTimezone);
         let endTime = gEndDate.getInTimezone(kDefaultTimezone);
@@ -283,11 +283,11 @@ function updateDateTime() {
         // Before feeding the date/time value into the control we need
         // to set the timezone to 'floating' in order to avoid the
         // automatic conversion back into the OS timezone.
-        startTime.timezone = cal.floating();
-        endTime.timezone = cal.floating();
+        startTime.timezone = cal.dtz.floating;
+        endTime.timezone = cal.dtz.floating;
 
-        document.getElementById("event-starttime").value = cal.dateTimeToJsDate(startTime);
-        document.getElementById("event-endtime").value = cal.dateTimeToJsDate(endTime);
+        document.getElementById("event-starttime").value = cal.dtz.dateTimeToJsDate(startTime);
+        document.getElementById("event-endtime").value = cal.dtz.dateTimeToJsDate(endTime);
     }
 
     updateTimezone();
@@ -307,7 +307,7 @@ function updateTimezone() {
         let endTimezone = gEndTimezone;
         let equalTimezones = false;
         if (startTimezone && endTimezone &&
-            (cal.compareObjects(startTimezone, endTimezone) || endTimezone.isUTC)) {
+            (cal.data.compareObjects(startTimezone, endTimezone) || endTimezone.isUTC)) {
             equalTimezones = true;
         }
 
@@ -352,8 +352,8 @@ function updateStartTime() {
     // jsDate is always in OS timezone, thus we create a calIDateTime
     // object from the jsDate representation and simply set the new
     // timezone instead of converting.
-    let timezone = gDisplayTimezone ? gStartTimezone : cal.calendarDefaultTimezone();
-    let start = cal.jsDateToDateTime(startWidget.value, timezone);
+    let timezone = gDisplayTimezone ? gStartTimezone : cal.dtz.defaultTimezone;
+    let start = cal.dtz.jsDateToDateTime(startWidget.value, timezone);
 
     gStartDate = start.clone();
     start.addDuration(gDuration);
@@ -385,18 +385,18 @@ function updateEndTime() {
 
     let saveStartTime = gStartDate;
     let saveEndTime = gEndDate;
-    let kDefaultTimezone = cal.calendarDefaultTimezone();
+    let kDefaultTimezone = cal.dtz.defaultTimezone;
 
-    gStartDate = cal.jsDateToDateTime(startWidget.value,
-                                  gDisplayTimezone ? gStartTimezone : cal.calendarDefaultTimezone());
+    gStartDate = cal.dtz.jsDateToDateTime(startWidget.value,
+                                  gDisplayTimezone ? gStartTimezone : cal.dtz.defaultTimezone);
 
     let timezone = gEndTimezone;
     if (timezone.isUTC &&
         gStartDate &&
-        !cal.compareObjects(gStartTimezone, gEndTimezone)) {
+        !cal.data.compareObjects(gStartTimezone, gEndTimezone)) {
         timezone = gStartTimezone;
     }
-    gEndDate = cal.jsDateToDateTime(endWidget.value,
+    gEndDate = cal.dtz.jsDateToDateTime(endWidget.value,
                                     gDisplayTimezone ? timezone : kDefaultTimezone);
 
     let allDayElement = document.getElementById("all-day");
@@ -447,7 +447,7 @@ function editStartTimezone() {
     args.onOk = function(datetime) {
         let equalTimezones = false;
         if (gStartTimezone && gEndTimezone &&
-            cal.compareObjects(gStartTimezone, gEndTimezone)) {
+            cal.data.compareObjects(gStartTimezone, gEndTimezone)) {
             equalTimezones = true;
         }
         gStartTimezone = datetime.timezone;
@@ -481,7 +481,7 @@ function editEndTimezone() {
     args.time = gEndTime.getInTimezone(gEndTimezone);
     args.onOk = function(datetime) {
         if (gStartTimezone && gEndTimezone &&
-            cal.compareObjects(gStartTimezone, gEndTimezone)) {
+            cal.data.compareObjects(gStartTimezone, gEndTimezone)) {
             gStartTimezone = datetime.timezone;
         }
         gEndTimezone = datetime.timezone;

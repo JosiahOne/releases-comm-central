@@ -25,21 +25,20 @@ GlodaMsgIndexer._original_indexerGetEnumerator =
 /**
  * Wrapper for GlodaMsgIndexer._indexerGetEnumerator to cause explosions.
  */
-GlodaMsgIndexer._indexerGetEnumerator = function() {
+GlodaMsgIndexer._indexerGetEnumerator = function(...aArgs) {
   if (explode_enumeration_after && !(--explode_enumeration_after))
     throw asyncExpectedEarlyAbort;
 
-  return GlodaMsgIndexer._original_indexerGetEnumerator.apply(
-    GlodaMsgIndexer, arguments);
+  return GlodaMsgIndexer._original_indexerGetEnumerator(...aArgs);
 };
 
 /**
  * Create a folder indexing job for the given injection folder handle and
  * run it until completion.
  */
-function spin_folder_indexer() {
+function spin_folder_indexer(...aArgs) {
   return async_run({func: _spin_folder_indexer_gen,
-                    args: arguments});
+                    args: aArgs});
 }
 function* _spin_folder_indexer_gen(aFolderHandle, aExpectedJobGoal) {
   let msgFolder = get_real_injection_folder(aFolderHandle);
@@ -62,7 +61,7 @@ function* _spin_folder_indexer_gen(aFolderHandle, aExpectedJobGoal) {
   }
 
   if (aExpectedJobGoal !== undefined)
-    do_check_eq(job.goal, aExpectedJobGoal);
+    Assert.equal(job.goal, aExpectedJobGoal);
 }
 
 /**
@@ -97,7 +96,7 @@ function* test_propagate_filthy_from_folder_to_messages() {
   yield spin_folder_indexer(folder);
 
   // the folder should only be dirty
-  do_check_eq(glodaFolder.dirtyStatus, glodaFolder.kFolderDirty);
+  Assert.equal(glodaFolder.dirtyStatus, glodaFolder.kFolderDirty);
   // make sure the database sees it as dirty
   yield sqlExpectCount(1,
     "SELECT COUNT(*) FROM folderLocations WHERE id = ? " +
@@ -106,8 +105,8 @@ function* test_propagate_filthy_from_folder_to_messages() {
   // The messages should be filthy per the headers (we force a commit of the
   //  database.)
   for (let msgHdr of msgSet.msgHdrs()) {
-    do_check_eq(msgHdr.getUint32Property("gloda-dirty"),
-                GlodaMsgIndexer.kMessageFilthy);
+    Assert.equal(msgHdr.getUint32Property("gloda-dirty"),
+                 GlodaMsgIndexer.kMessageFilthy);
   }
 }
 

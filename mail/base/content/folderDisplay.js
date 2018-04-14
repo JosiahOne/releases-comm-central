@@ -2,16 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource:///modules/dbViewWrapper.js");
-Components.utils.import("resource:///modules/jsTreeSelection.js");
-Components.utils.import("resource:///modules/MailUtils.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/dbViewWrapper.js");
+ChromeUtils.import("resource:///modules/jsTreeSelection.js");
+ChromeUtils.import("resource:///modules/MailUtils.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gFolderDisplay = null;
 var gMessageDisplay = null;
 
-var nsMsgFolderFlags = Components.interfaces.nsMsgFolderFlags;
-var nsMsgMessageFlags = Components.interfaces.nsMsgMessageFlags;
+var nsMsgFolderFlags = Ci.nsMsgFolderFlags;
+var nsMsgMessageFlags = Ci.nsMsgMessageFlags;
 
 /**
  * Maintains a list of listeners for all FolderDisplayWidget instances in this
@@ -69,8 +69,8 @@ var FolderDisplayListenerManager = {
           listener[aEventName].apply(listener, aArgs);
         }
         catch(e) {
-          Components.utils.reportError(aEventName + " event listener FAILED; " +
-                                       e + " at: " + e.stack);
+          Cu.reportError(aEventName + " event listener FAILED; " +
+                         e + " at: " + e.stack);
         }
       }
     }
@@ -213,7 +213,7 @@ FolderDisplayWidget.prototype = {
    */
   get summarizeSelectionInFolder() {
     return Services.prefs.getBoolPref("mail.operate_on_msgs_in_collapsed_threads") &&
-      !(this.displayedFolder instanceof Components.interfaces.nsIMsgNewsFolder);
+      !(this.displayedFolder instanceof Ci.nsIMsgNewsFolder);
   },
 
   /**
@@ -364,10 +364,10 @@ FolderDisplayWidget.prototype = {
 
     if (this.view._threadExpandAll &&
         !(this.view.dbView.viewFlags & nsMsgViewFlagsType.kExpandAll))
-      this.view.dbView.doCommand(Components.interfaces.nsMsgViewCommandType.expandAll);
+      this.view.dbView.doCommand(Ci.nsMsgViewCommandType.expandAll);
     if (!this.view._threadExpandAll &&
         this.view.dbView.viewFlags & nsMsgViewFlagsType.kExpandAll)
-      this.view.dbView.doCommand(Components.interfaces.nsMsgViewCommandType.collapseAll);
+      this.view.dbView.doCommand(Ci.nsMsgViewCommandType.collapseAll);
   },
   //@}
 
@@ -526,7 +526,7 @@ FolderDisplayWidget.prototype = {
     let dbFolderInfo = msgDatabase.dBFolderInfo;
     dbFolderInfo.setCharProperty(this.PERSISTED_COLUMN_PROPERTY_NAME,
                                  JSON.stringify(aState));
-    msgDatabase.Commit(Components.interfaces.nsMsgDBCommitType.kLargeCommit);
+    msgDatabase.Commit(Ci.nsMsgDBCommitType.kLargeCommit);
   },
 
   /**
@@ -547,7 +547,7 @@ FolderDisplayWidget.prototype = {
    *  figure out the best column state for the current folder.
    */
   _getDefaultColumnsForCurrentFolder: function(aDoNotInherit) {
-    const InboxFlag = Components.interfaces.nsMsgFolderFlags.Inbox;
+    const InboxFlag = Ci.nsMsgFolderFlags.Inbox;
 
     // If the view is synthetic, try asking it for its default columns. If it
     // fails, just return nothing, since most synthetic views don't care about
@@ -605,7 +605,7 @@ FolderDisplayWidget.prototype = {
         }
         catch (ex) {
           shouldShowColumn = false;
-          Components.utils.reportError(ex);
+          Cu.reportError(ex);
         }
       }
       state[colId] = {visible: shouldShowColumn};
@@ -788,7 +788,7 @@ FolderDisplayWidget.prototype = {
       this._nonViewFolder = null;
       this.view.close();
     }
-    else if (aFolder instanceof Components.interfaces.nsIMsgFolder) {
+    else if (aFolder instanceof Ci.nsIMsgFolder) {
       if (aFolder.isServer) {
         this._nonViewFolder = aFolder;
         this._showServer();
@@ -1002,7 +1002,7 @@ FolderDisplayWidget.prototype = {
     // if we have no view, no messages could be loaded.
     this._allMessagesLoaded = false;
 
-    // but the actual tree view selection (based on view indicies) is a goner no
+    // but the actual tree view selection (based on view indices) is a goner no
     //  matter what, make everyone forget.
     this.view.dbView.selection = null;
     this._savedFirstVisibleRow = null;
@@ -1084,7 +1084,7 @@ FolderDisplayWidget.prototype = {
   },
 
   /**
-   * Indictes whether we are done loading the messages that should be in this
+   * Indicates whether we are done loading the messages that should be in this
    *  folder.  This is being surfaced for testing purposes, but could be useful
    *  to other code as well.  But don't poll this property; ask for an event
    *  that you can hook.
@@ -1744,7 +1744,7 @@ FolderDisplayWidget.prototype = {
     // oh yeah, 'pref' is a global all right.
     var acctCentralPage =
       Services.prefs.getComplexValue(prefName,
-                                     Components.interfaces.nsIPrefLocalizedString).data;
+                                     Ci.nsIPrefLocalizedString).data;
     window.frames["accountCentralPane"].location.href = acctCentralPage;
   },
 
@@ -2022,7 +2022,7 @@ FolderDisplayWidget.prototype = {
   get selectedMessageIsExternal() {
     let message = this.selectedMessage;
     // Dummy messages currently lack a folder.  This is not a great heuristic.
-    // I have annotated msgHdrViewOverlay.js which provides the dummy header to
+    // I have annotated msgHdrView.js which provides the dummy header to
     //  express this implementation dependency.
     // (Currently, since external mails can only be opened in standalone windows
     //  which subclass us, we could always return false, and have the subclass
@@ -2160,7 +2160,7 @@ FolderDisplayWidget.prototype = {
           this.displayedFolder.server
         );
 
-        const nsIMsgIdentity = Components.interfaces.nsIMsgIdentity;
+        const nsIMsgIdentity = Ci.nsIMsgIdentity;
         let allEnabled = undefined;
         for (let identity of fixIterator(serverIdentities, nsIMsgIdentity)) {
           if (allEnabled === undefined) {
@@ -2265,7 +2265,7 @@ FolderDisplayWidget.prototype = {
    *  threads as required.  If we were not able to find all of the messages,
    *  update our saved selection to want to display the messages.  The messages
    *  will then be selected when we are made active or all messages in the
-   *  folder complete loading.  This is to accomodate the use-case where we
+   *  folder complete loading.  This is to accommodate the use-case where we
    *  are backed by an in-progress search and no
    *
    * @param aMessages An array of nsIMsgDBHdr instances.
@@ -2472,7 +2472,7 @@ FolderDisplayWidget.prototype = {
       // Something's gone wrong elsewhere, and we likely have bigger problems.
       topPadding = 0;
       bottomPadding = 0;
-      Components.utils.reportError(
+      Cu.reportError(
           "Unable to get height of folder pane (treeBox is null)");
     }
 
@@ -2504,7 +2504,7 @@ FolderDisplayWidget.prototype = {
     }
 
     let treeBox = this.treeBox;
-    if (!treeBox)
+    if (!treeBox || !treeBox.view)
       return;
 
     // try and trigger a reflow...
@@ -2705,10 +2705,10 @@ FakeTreeBoxObject.prototype = {
     return this.domNode.boxObject.removeProperty(propertyName);
   },
   QueryInterface: function FakeTreeBoxObject_QueryInterface(aIID) {
-    if (!aIID.equals(Components.interfaces.nsISupports) &&
-        !aIID.equals(Components.interfaces.nsIBoxObject) &&
-        !aIID.equals(Components.interfaces.nsITreeBoxObject))
-      throw Components.results.NS_ERROR_NO_INTERFACE;
+    if (!aIID.equals(Ci.nsISupports) &&
+        !aIID.equals(Ci.nsIBoxObject) &&
+        !aIID.equals(Ci.nsITreeBoxObject))
+      throw Cr.NS_ERROR_NO_INTERFACE;
     return this;
   }
 };

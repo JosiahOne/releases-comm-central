@@ -2,13 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var {classes: Cc, interfaces: Ci, results: Cr, utils: Cu} = Components;
-
-Cu.import("resource://gre/modules/Http.jsm");
-Cu.import("resource:///modules/imServices.jsm");
-Cu.import("resource:///modules/imXPCOMUtils.jsm");
-Cu.import("resource:///modules/jsProtoHelper.jsm");
-Cu.import("resource:///modules/twitter-text.jsm");
+ChromeUtils.import("resource://gre/modules/Http.jsm");
+ChromeUtils.import("resource:///modules/imServices.jsm");
+ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/jsProtoHelper.jsm");
+ChromeUtils.import("resource:///modules/twitter-text.jsm");
 
 var NS_PREFBRANCH_PREFCHANGE_TOPIC_ID = "nsPref:changed";
 var kMaxMessageLength = 140;
@@ -154,7 +152,7 @@ var GenericTwitterConversation = {
     this.writeMessage("twitter.com", aMessage, flags);
   },
   onSentCallback: function(aMsg, aData) {
-    // The conversation may have been unitialized in the time it takes for
+    // The conversation may have been uninitialized in the time it takes for
     // the async callback to fire.  Use `_observers` as a proxy for uninit'd.
     if (!this._observers)
       return;
@@ -1150,7 +1148,7 @@ Account.prototype = {
       time_zone: null,
       protected: normalizeBool,
       created_at: function(aDate) {
-        const dateFormatter = Services.intl.createDateTimeFormat(undefined, {
+        const dateFormatter = new Services.intl.DateTimeFormat(undefined, {
           dateStyle: "short"
         });
         return dateFormatter.format(new Date(aDate));

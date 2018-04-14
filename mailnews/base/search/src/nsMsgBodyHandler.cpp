@@ -78,8 +78,10 @@ void nsMsgBodyHandler::Initialize()
   m_partIsHtml = false;
   m_base64part = false;
   m_isMultipart = false;
-  m_partIsText = true; // default is text/plain
-  m_pastHeaders = false;
+  m_partIsText = true; // Default is text/plain, maybe proven otherwise later.
+  m_pastMsgHeaders = false;
+  m_pastPartHeaders = false;
+  m_inMessageAttachment = false;
   m_headerBytesRead = 0;
 }
 
@@ -87,7 +89,7 @@ nsMsgBodyHandler::~nsMsgBodyHandler()
 {
 }
 
-int32_t nsMsgBodyHandler::GetNextLine (nsCString &buf)
+int32_t nsMsgBodyHandler::GetNextLine (nsCString &buf, nsCString &charset)
 {
   int32_t length = -1;          // length of incoming line or -1 eof
   int32_t outLength = -1;       // length of outgoing line or -1 eof
@@ -128,6 +130,7 @@ int32_t nsMsgBodyHandler::GetNextLine (nsCString &buf)
     outLength = ApplyTransformations(buf, buf.Length(), eatThisLine, buf);
   }
 
+  charset = m_partCharset;
   return outLength;
 }
 
@@ -186,7 +189,7 @@ int32_t nsMsgBodyHandler::GetNextLocalLine(nsCString &buf)
     // I the line count is in body lines, only decrement once we have
     // processed all the headers.  Otherwise the line is not in body
     // lines and we want to decrement for every line.
-    if (m_pastHeaders || !m_lineCountInBodyLines)
+    if (m_pastMsgHeaders || !m_lineCountInBodyLines)
       m_numLocalLines--;
     // do we need to check the return value here?
     if (m_fileLineStream)
@@ -206,13 +209,13 @@ int32_t nsMsgBodyHandler::GetNextLocalLine(nsCString &buf)
  *
  * It applies the following sequences in order
  * * Removes headers if the searcher doesn't want them
- *   (sets m_pastHeaders)
+ *   (sets m_past*Headers)
  * * Determines the current MIME type.
  *   (via SniffPossibleMIMEHeader)
  * * Strips any HTML if the searcher doesn't want it
  * * Strips non-text parts
  * * Decodes any base64 part
- *   (resetting part variables: m_base64part, m_pastHeaders, m_partIsHtml,
+ *   (resetting part variables: m_base64part, m_pastPartHeaders, m_partIsHtml,
  *    m_partIsText)
  *
  * @param line        (in)    the current line
@@ -226,10 +229,9 @@ int32_t nsMsgBodyHandler::GetNextLocalLine(nsCString &buf)
 int32_t nsMsgBodyHandler::ApplyTransformations (const nsCString &line, int32_t length,
                                                 bool &eatThisLine, nsCString &buf)
 {
-  int32_t newLength = length;
   eatThisLine = false;
 
-  if (!m_pastHeaders)  // line is a line from the message headers
+  if (!m_pastPartHeaders)  // line is a line from the part headers
   {
     if (m_stripHeaders)
       eatThisLine = true;
@@ -240,14 +242,38 @@ int32_t nsMsgBodyHandler::ApplyTransformations (const nsCString &line, int32_t l
 
     SniffPossibleMIMEHeader(buf);
 
-    m_pastHeaders = buf.IsEmpty() || buf.First() == '\r' ||
-      buf.First() == '\n';
+    if (buf.IsEmpty() || buf.First() == '\r' || buf.First() == '\n') {
+      if (!m_inMessageAttachment) {
+        m_pastPartHeaders = true;
+      } else {
+        // We're in a message attachment and have just read past the
+        // part header for the attached message. We now need to read
+        // the message headers and any part headers.
+        // We can now forget about the special handling of attached messages.
+        m_inMessageAttachment = false;
+      }
+    }
+
+    // We set m_pastMsgHeaders to 'true' only once.
+    if (m_pastPartHeaders)
+      m_pastMsgHeaders = true;
 
     return length;
   }
 
-  // Check to see if this is the boundary string
-  if (m_isMultipart && StringBeginsWith(line, boundary))
+  // Check to see if this is one of our boundary strings.
+  bool matchedBoundary = false;
+  if (m_isMultipart && m_boundaries.Length() > 0) {
+    for (int32_t i = (int32_t)m_boundaries.Length() - 1; i >= 0; i--) {
+      if (StringBeginsWith(line, m_boundaries[i])) {
+        matchedBoundary = true;
+        // If we matched a boundary, we won't need the nested/later ones any more.
+        m_boundaries.SetLength(i+1);
+        break;
+      }
+    }
+  }
+  if (matchedBoundary)
   {
     if (m_base64part && m_partIsText)
     {
@@ -260,7 +286,9 @@ int32_t nsMsgBodyHandler::ApplyTransformations (const nsCString &line, int32_t l
       }
       else
       {
-        ApplyTransformations(buf, buf.Length(), eatThisLine, buf);
+        // It is wrong to call ApplyTransformations() here since this will
+        // lead to the buffer being doubled-up at |buf.Append(line.get());| below.
+        // ApplyTransformations(buf, buf.Length(), eatThisLine, buf);
         // Avoid spurious failures
         eatThisLine = false;
       }
@@ -273,9 +301,13 @@ int32_t nsMsgBodyHandler::ApplyTransformations (const nsCString &line, int32_t l
 
     // Reset all assumed headers
     m_base64part = false;
-    m_pastHeaders = false;
+    // Get ready to sniff new part headers, but do not reset m_pastMsgHeaders
+    // since it will screw the body line count.
+    m_pastPartHeaders = false;
     m_partIsHtml = false;
-    m_partIsText = true;
+    // If we ever see a multipart message, each part needs to set 'm_partIsText',
+    // so no more defaulting to 'true' when the part is done.
+    m_partIsText = false;
 
     return buf.Length();
   }
@@ -301,10 +333,9 @@ int32_t nsMsgBodyHandler::ApplyTransformations (const nsCString &line, int32_t l
   if (m_stripHtml && m_partIsHtml)
   {
     StripHtml (buf);
-    newLength = buf.Length();
   }
 
-  return newLength;
+  return buf.Length();
 }
 
 void nsMsgBodyHandler::StripHtml (nsCString &pBufInOut)
@@ -342,7 +373,7 @@ void nsMsgBodyHandler::StripHtml (nsCString &pBufInOut)
  *
  * @param line        (in)    a header line that may contain a MIME header
  */
-void nsMsgBodyHandler::SniffPossibleMIMEHeader(nsCString &line)
+void nsMsgBodyHandler::SniffPossibleMIMEHeader(const nsCString &line)
 {
   // Some parts of MIME are case-sensitive and other parts are case-insensitive;
   // specifically, the headers are all case-insensitive and the values we care
@@ -354,47 +385,73 @@ void nsMsgBodyHandler::SniffPossibleMIMEHeader(nsCString &line)
   if (StringBeginsWith(lowerCaseLine, NS_LITERAL_CSTRING("content-type:")))
   {
     if (lowerCaseLine.Find("text/html", /* ignoreCase = */ true) != -1)
+    {
+      m_partIsText = true;
       m_partIsHtml = true;
-    // Strenuous edge case: a message/rfc822 is equivalent to the content type
-    // of whatever the message is. Headers should be ignored here. Even more
-    // strenuous are message/partial and message/external-body, where the first
-    // case requires reassembly across messages and the second is actually an
-    // external source. And of course, there are other message types to handle.
-    // RFC 3798 complicates things with the message/disposition-notification
-    // MIME type. message/rfc822 is best treated as a multipart with no proper
-    // boundary; since we only use boundaries for retriggering the headers,
-    // the lack of one can safely be ignored.
-    else if (lowerCaseLine.Find("multipart/", /* ignoreCase = */ true) != -1 ||
-             lowerCaseLine.Find("message/", /* ignoreCase = */ true) != -1)
+    }
+    else if (lowerCaseLine.Find("multipart/", /* ignoreCase = */ true) != -1)
     {
       if (m_isMultipart)
       {
-        // This means we have a nested multipart tree. Since we currently only
-        // handle the first children, we are probably better off assuming that
-        // this nested part is going to have text/* children. After all, the
-        // biggest usage that I've seen is multipart/signed.
-        m_partIsText = true;
+        // Nested multipart, get ready for new headers.
+        m_base64part = false;
+        m_pastPartHeaders = false;
+        m_partIsHtml = false;
+        m_partIsText = false;
       }
       m_isMultipart = true;
+      m_partCharset.Truncate();
     }
+    else if (lowerCaseLine.Find("message/", /* ignoreCase = */ true) != -1)
+    {
+      // Initialise again.
+      m_base64part = false;
+      m_pastPartHeaders = false;
+      m_partIsHtml = false;
+      m_partIsText = true;  // Default is text/plain, maybe proven otherwise later.
+      m_inMessageAttachment = true;
+    }
+    else if (lowerCaseLine.Find("text/", /* ignoreCase = */ true) != -1)
+      m_partIsText = true;
     else if (lowerCaseLine.Find("text/", /* ignoreCase = */ true) == -1)
-      m_partIsText = false; // We have disproved our assumption
+      m_partIsText = false; // We have disproven our assumption.
   }
 
-  // TODO: make this work for nested multiparts (requires some redesign)
-  if (m_isMultipart && boundary.IsEmpty() &&
-      lowerCaseLine.Find("boundary=", /* ignoreCase = */ true) != -1)
+  int32_t start;
+  if (m_isMultipart &&
+      (start = lowerCaseLine.Find("boundary=", /* ignoreCase = */ true)) != -1)
   {
-    int32_t start = lowerCaseLine.Find("boundary=", /* ignoreCase = */ true);
-    start += 9;
+    start += 9;  // strlen("boundary=")
     if (line[start] == '\"')
       start++;
     int32_t end = line.RFindChar('\"');
     if (end == -1)
       end = line.Length();
 
+    // Collect all boundaries. Since we only react to crossing a boundary,
+    // we can simply collect the boundaries instead of forming a tree
+    // structure from the message. Keep it simple ;-)
+    nsCString boundary;
     boundary.AssignLiteral("--");
-    boundary.Append(Substring(line,start,end-start));
+    boundary.Append(Substring(line, start, end-start));
+    if (!m_boundaries.Contains(boundary))
+      m_boundaries.AppendElement(boundary);
+  }
+
+  if (m_isMultipart &&
+      (start = lowerCaseLine.Find("charset=", /* ignoreCase = */ true)) != -1)
+  {
+    start += 8;  // strlen("charset=")
+    bool foundQuote = false;
+    if (line[start] == '\"') {
+      start++;
+      foundQuote = true;
+    }
+    int32_t end = line.FindChar(foundQuote ? '\"' : ';', start);
+    if (end == -1)
+      end = line.Length();
+
+    m_partCharset.Assign(Substring(line, start, end-start));
   }
 
   if (StringBeginsWith(lowerCaseLine,

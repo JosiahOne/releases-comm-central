@@ -33,14 +33,9 @@
 const EXPORTED_SYMBOLS = ["JSAccountUtils"];
 var JSAccountUtils = {};
 
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-var Cu = Components.utils;
-var Cr = Components.results;
-
-Cu.import("resource://gre/modules/Log.jsm");
-Cu.import("resource://gre/modules/Preferences.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Log.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 // Logger definitions.
 const LOGGER_NAME = "JsAccount";
@@ -81,7 +76,7 @@ var log = configureLogging();
  *                       created by the factory, where CID is a string uuid.
  *      }
  *
- *   @param aJsDelegateConstructor: a JS contructor class, called using new,
+ *   @param aJsDelegateConstructor: a JS constructor class, called using new,
  *                                  that will create the JS object to which
  *                                  XPCOM methods calls will be delegated.
  */

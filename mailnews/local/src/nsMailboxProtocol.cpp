@@ -7,13 +7,12 @@
 
 #include "nsMailboxProtocol.h"
 #include "nscore.h"
-#include "nsIOutputStream.h"
 #include "nsIInputStreamPump.h"
-#include "nsIMsgDatabase.h"
 #include "nsIMsgHdr.h"
 #include "nsMsgLineBuffer.h"
 #include "nsMsgDBCID.h"
 #include "nsIMsgMailNewsUrl.h"
+#include "nsIMsgFolder.h"
 #include "nsICopyMsgStreamListener.h"
 #include "nsMsgMessageFlags.h"
 #include "prtime.h"
@@ -22,23 +21,17 @@
 #include "prerror.h"
 #include "prprf.h"
 #include "nspr.h"
-#include "nsIFileStreams.h"
 #include "nsIStreamTransportService.h"
 #include "nsIStreamConverterService.h"
-#include "nsIIOService.h"
 #include "nsNetUtil.h"
 #include "nsMsgUtils.h"
 #include "nsIMsgWindow.h"
-#include "nsIMimeHeaders.h"
-#include "nsIMsgPluggableStore.h"
 #include "nsISeekableStream.h"
 #include "nsStreamUtils.h"
 
-#include "nsIMsgMdnGenerator.h"
-
 using namespace mozilla;
 
-static LazyLogModule MAILBOX("MAILBOX");
+static LazyLogModule MAILBOX("Mailbox");
 
 /* the output_buffer_size must be larger than the largest possible line
  * 2000 seems good for news
@@ -222,7 +215,7 @@ nsresult nsMailboxProtocol::Initialize(nsIURI * aURL)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-// we suppport the nsIStreamListener interface
+// we support the nsIStreamListener interface
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 NS_IMETHODIMP nsMailboxProtocol::OnStartRequest(nsIRequest *request, nsISupports *ctxt)

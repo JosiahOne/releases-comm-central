@@ -11,17 +11,12 @@
 
 var EXPORTED_SYMBOLS = ["MailMigrator"];
 
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-var Cu = Components.utils;
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/IOUtils.js");
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource:///modules/mailServices.js");
-Cu.import("resource:///modules/IOUtils.js");
-
-XPCOMUtils.defineLazyModuleGetter(this, "LoginHelper",
-                                  "resource://gre/modules/LoginHelper.jsm");
+ChromeUtils.defineModuleGetter(this, "LoginHelper",
+                               "resource://gre/modules/LoginHelper.jsm");
 
 var MailMigrator = {
   /**
@@ -66,7 +61,7 @@ var MailMigrator = {
    */
   migrateToClearTypeFonts: function MailMigrator_migrateToClearTypeFonts() {
     // Windows...
-    if ("@mozilla.org/windows-registry-key;1" in Components.classes) {
+    if ("@mozilla.org/windows-registry-key;1" in Cc) {
       // Only migrate on Vista (Windows version 6.0) and above
       if (Services.sysinfo.getPropertyAsDouble("version") >= 6.0) {
         let fontPrefVersion =
@@ -102,7 +97,7 @@ var MailMigrator = {
   _migrateUI: function() {
     // The code for this was ported from
     // mozilla/browser/components/nsBrowserGlue.js
-    const UI_VERSION = 15;
+    const UI_VERSION = 16;
     const MESSENGER_DOCURL = "chrome://messenger/content/messenger.xul";
     const UI_VERSION_PREF = "mail.ui-rdf.version";
     let currentUIVersion = 0;
@@ -119,7 +114,7 @@ var MailMigrator = {
     try {
       // Initially, we checked if currentUIVersion < 1, and stripped the
       // persisted "collapsed" property from folderPaneBox if it wasn't.
-      // However, the inital implementation of migrateUI swallowed up
+      // However, the initial implementation of migrateUI swallowed up
       // exceptions, and bumped the value of UI_VERSION_PREF regardless.
       // Now, instead, we fail to bump the UI_VERSION_PREF if something goes
       // wrong, and we've moved the folderPaneBox operation into
@@ -324,7 +319,7 @@ var MailMigrator = {
       // encoded as chrome URIs.
       if (currentUIVersion < 14) {
         let permissionsDB =
-          Services.dirsvc.get("ProfD",Components.interfaces.nsIFile);
+          Services.dirsvc.get("ProfD",Ci.nsIFile);
         permissionsDB.append("permissions.sqlite");
         let db = Services.storage.openDatabase(permissionsDB);
 
@@ -350,8 +345,8 @@ var MailMigrator = {
 
           // Sadly we still need to clear the database manually. Experiments
           // showed that the permissions manager deleted only one record.
-          db.beginTransactionAs(Components.interfaces.mozIStorageConnection
-                                                     .TRANSACTION_EXCLUSIVE);
+          db.defaultTransactionType = Ci.mozIStorageConnection.TRANSACTION_EXCLUSIVE;
+          db.beginTransaction();
           try {
             db.executeSimpleSQL("delete from moz_perms where " +
               "substr(origin, 1, 28)='chrome://messenger/content/?';");
@@ -367,7 +362,7 @@ var MailMigrator = {
 
       // Changed notification sound behaviour on OS X.
       if (currentUIVersion < 15) {
-        Cu.import("resource://gre/modules/AppConstants.jsm");
+        ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
         if (AppConstants.platform == "macosx") {
           // For people updating from versions < 52 who had "Play system sound"
           // selected for notifications. As TB no longer plays system sounds,
@@ -377,6 +372,29 @@ var MailMigrator = {
               Services.prefs.getIntPref(soundPref + ".type") == 0) {
             Services.prefs.setBoolPref(soundPref, false);
           }
+        }
+      }
+
+      if (currentUIVersion < 16) {
+        // Migrate the old requested locales prefs to use the new model
+        const SELECTED_LOCALE_PREF = "general.useragent.locale";
+        const MATCHOS_LOCALE_PREF = "intl.locale.matchOS";
+
+        if (Services.prefs.prefHasUserValue(MATCHOS_LOCALE_PREF) ||
+            Services.prefs.prefHasUserValue(SELECTED_LOCALE_PREF)) {
+          if (Services.prefs.getBoolPref(MATCHOS_LOCALE_PREF, false)) {
+            Services.locale.setRequestedLocales([]);
+          } else {
+            let locale = Services.prefs.getComplexValue(SELECTED_LOCALE_PREF,
+              Ci.nsIPrefLocalizedString);
+            if (locale) {
+              try {
+                Services.locale.setRequestedLocales([locale.data]);
+              } catch (e) { /* Don't panic if the value is not a valid locale code. */ }
+            }
+          }
+          Services.prefs.clearUserPref(SELECTED_LOCALE_PREF);
+          Services.prefs.clearUserPref(MATCHOS_LOCALE_PREF);
         }
       }
 

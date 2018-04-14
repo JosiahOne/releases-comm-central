@@ -59,7 +59,7 @@
 
     <implementation>
       <constructor><![CDATA[
-          Components.utils.import("resource://calendar/modules/calUtils.jsm");
+          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
       ]]></constructor>
 
       <field name="mItem">null</field>
@@ -85,13 +85,13 @@
             let dateLabel = document.getAnonymousElementByAttribute(this, "anonid", "alarm-date-label");
 
             // Dates
-            if (cal.isEvent(this.mItem)) {
+            if (cal.item.isEvent(this.mItem)) {
                 dateLabel.textContent = formatter.formatItemInterval(this.mItem);
-            } else if (cal.isToDo(this.mItem)) {
+            } else if (cal.item.isToDo(this.mItem)) {
                 let startDate = this.mItem.entryDate || this.mItem.dueDate;
                 if (startDate) {
                     // A Task with a start or due date, show with label
-                    startDate = startDate.getInTimezone(cal.calendarDefaultTimezone());
+                    startDate = startDate.getInTimezone(cal.dtz.defaultTimezone);
                     dateLabel.textContent = cal.calGetString("calendar",
                                                              "alarmStarts",
                                                              [formatter.formatDateTime(startDate)]);
@@ -113,6 +113,23 @@
 
             document.getAnonymousElementByAttribute(this, "anonid", "alarm-location-label").hidden =
                 (locationDescription.textContent.length < 1);
+
+            // hide snooze button if read-only
+            let snoozeButton = document.getAnonymousElementByAttribute(
+                this,
+                "anonid",
+                "alarm-snooze-button"
+            );
+            if (!cal.acl.isCalendarWritable(this.mItem.calendar) ||
+                !cal.acl.userCanModifyItem(this.mItem)) {
+                let tooltip = "reminderDisabledSnoozeButtonTooltip";
+                snoozeButton.disabled = true;
+                snoozeButton.setAttribute("tooltiptext",
+                                          cal.calGetString("calendar-alarms", tooltip));
+            } else {
+                snoozeButton.disabled = false;
+                snoozeButton.removeAttribute("tooltiptext");
+            }
         ]]></body>
       </method>
 
@@ -122,10 +139,10 @@
             let item = this.mItem;
             let relativeDateLabel = document.getAnonymousElementByAttribute(this, "anonid", "alarm-relative-date-label");
             let relativeDateString;
-            let startDate = item[cal.calGetStartDateProp(item)] || item[cal.calGetEndDateProp(item)];
+            let startDate = item[cal.dtz.startDateProp(item)] || item[cal.dtz.endDateProp(item)];
             if (startDate) {
-                startDate = startDate.getInTimezone(cal.calendarDefaultTimezone());
-                let currentDate = cal.now();
+                startDate = startDate.getInTimezone(cal.dtz.defaultTimezone);
+                let currentDate = cal.dtz.now();
                 let sinceDayStart = (currentDate.hour * 3600) + (currentDate.minute * 60);
 
                 currentDate.second = 0;
@@ -168,7 +185,7 @@
         <body><![CDATA[
             if (event.type == "click" ||
                 (event.type == "keypress" &&
-                 event.keyCode == event.DOM_VK_RETURN)) {
+                 event.key == "Enter")) {
                 let detailsEvent = document.createEvent("Events");
                 detailsEvent.initEvent("itemdetails", true, false);
                 this.dispatchEvent(detailsEvent);
@@ -221,7 +238,7 @@
                      type="number"
                      size="3"/>
         <xul:menulist anonid="snooze-unit-menulist"
-                      class="snooze-unit-menulist menuitem-non-iconic"
+                      class="snooze-unit-menulist"
                       allowevents="true">
          <xul:menupopup anonid="snooze-unit-menupopup"
                         position="after_start"
@@ -243,8 +260,8 @@
     </content>
     <implementation>
       <constructor><![CDATA[
-          Components.utils.import("resource://gre/modules/Preferences.jsm");
-          Components.utils.import("resource://calendar/modules/calUtils.jsm");
+          ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
           let snoozePref = Preferences.get("calendar.alarms.defaultsnoozelength", 0);
           if (snoozePref <= 0) {

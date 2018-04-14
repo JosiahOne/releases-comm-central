@@ -4,9 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "msgCore.h"    // precompiled header...
 #include "nsString.h"
-#include "nsIIOService.h"
 
-#include "nsIStreamListener.h"
 #include "nsAddbookProtocolHandler.h"
 
 #include "nsAddbookUrl.h"
@@ -21,7 +19,6 @@
 #include "nsIAbView.h"
 #include "nsITreeView.h"
 #include "nsIStringBundle.h"
-#include "nsIServiceManager.h"
 #include "mozilla/Services.h"
 #include "nsIAsyncInputStream.h"
 #include "nsIAsyncOutputStream.h"
@@ -63,13 +60,10 @@ NS_IMETHODIMP nsAddbookProtocolHandler::NewURI(const nsACString &aSpec,
                                                nsIURI **_retval)
 {
   nsresult rv;
-  nsCOMPtr<nsIAddbookUrl> addbookUrl = do_CreateInstance(NS_ADDBOOKURL_CONTRACTID, &rv);
-  NS_ENSURE_SUCCESS(rv,rv);
-
-  rv = addbookUrl->SetSpec(aSpec);
-  NS_ENSURE_SUCCESS(rv,rv);
-
-  nsCOMPtr<nsIURI> uri = do_QueryInterface(addbookUrl, &rv);
+  nsCOMPtr<nsIURI> uri;
+  rv = NS_MutateURI(new nsAddbookUrl::Mutator())
+         .SetSpec(aSpec)
+         .Finalize(uri);
   NS_ENSURE_SUCCESS(rv,rv);
 
   uri.forget(_retval);

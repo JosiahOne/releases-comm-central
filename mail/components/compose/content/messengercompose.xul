@@ -3,15 +3,11 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+<?xml-stylesheet href="chrome://messenger/content/bindings.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/messengercompose/messengercompose.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/attachmentList.css" type="text/css"?>
-<?xul-overlay href="chrome://editor/content/editorOverlay.xul"?>
-#ifdef XP_MACOSX
-<?xul-overlay href="chrome://messenger/content/macMenuOverlay.xul"?>
-#endif
-<?xul-overlay href="chrome://messenger/content/baseMenuOverlay.xul"?>
-<?xul-overlay href="chrome://communicator/content/charsetOverlay.xul"?>
+<?xml-stylesheet href="chrome://messenger/skin/smime/msgCompSMIMEOverlay.css" type="text/css"?>
 
 <!DOCTYPE window [
   <!ENTITY % messengercomposeDTD SYSTEM "chrome://messenger/locale/messengercompose/messengercompose.dtd" >
@@ -20,12 +16,21 @@
   %brandDTD;
   <!ENTITY % charsetDTD SYSTEM "chrome://global/locale/charsetMenu.dtd" >
   %charsetDTD;
-  <!ENTITY % customizeToolbarDTD SYSTEM "chrome://global/locale/customizeToolbar.dtd">
+  <!ENTITY % customizeToolbarDTD SYSTEM "chrome://messenger/locale/customizeToolbar.dtd">
   %customizeToolbarDTD;
   <!ENTITY % textcontextDTD SYSTEM "chrome://global/locale/textcontext.dtd">
   %textcontextDTD;
   <!ENTITY % viewZoomOverlayDTD SYSTEM "chrome://messenger/locale/viewZoomOverlay.dtd">
   %viewZoomOverlayDTD;
+  <!ENTITY % baseMenuOverlayDTD SYSTEM "chrome://messenger/locale/baseMenuOverlay.dtd">
+  %baseMenuOverlayDTD;
+  <!ENTITY % msgCompSMIMEDTD SYSTEM "chrome://messenger-smime/locale/msgCompSMIMEOverlay.dtd">
+  %msgCompSMIMEDTD;
+  <!ENTITY % editorOverlayDTD SYSTEM "chrome://editor/locale/editorOverlay.dtd">
+  %editorOverlayDTD;
+  <!ENTITY % utilityOverlayDTD SYSTEM
+    "chrome://communicator/locale/utilityOverlay.dtd">
+  %utilityOverlayDTD;
 ]>
 
 <window id="msgcomposeWindow"
@@ -47,6 +52,8 @@
   <stringbundle id="bundle_composeMsgs" src="chrome://messenger/locale/messengercompose/composeMsgs.properties"/>
   <stringbundle id="bundle_messenger"   src="chrome://messenger/locale/messenger.properties"/>
   <stringbundle id="brandBundle"        src="chrome://branding/locale/brand.properties"/>
+  <stringbundle id="bundle_comp_smime"  src="chrome://messenger-smime/locale/msgCompSMIMEOverlay.properties"/>
+  <stringbundle id="charsetBundle"      src="chrome://communicator/content/labelsencodings.properties"/>
 </stringbundleset>
 
 <script type="application/javascript" src="chrome://global/content/printUtils.js"/>
@@ -54,6 +61,8 @@
 <script type="application/javascript" src="chrome://messenger/content/mailCore.js"/>
 <script type="application/javascript" src="chrome://communicator/content/contentAreaClick.js"/>
 <script type="application/javascript" src="chrome://editor/content/editor.js"/>
+<script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
+<script type="application/javascript" src="chrome://editor/content/ComposerCommands.js"/>
 <script type="application/javascript" src="chrome://messenger/content/messengercompose/MsgComposeCommands.js"/>
 <script type="application/javascript" src="chrome://messenger/content/messengercompose/bigFileObserver.js"/>
 <script type="application/javascript" src="chrome://messenger/content/messengercompose/cloudAttachmentLinkManager.js"/>
@@ -67,8 +76,12 @@
 <script type="application/javascript" src="chrome://global/content/globalOverlay.js"/>
 <script type="application/javascript" src="chrome://global/content/contentAreaUtils.js"/>
 <script type="application/javascript" src="chrome://global/content/viewZoomOverlay.js"/>
+#ifdef XP_MACOSX
+<script type="application/javascript" src="chrome://global/content/macWindowMenu.js"/>
+#endif
 <script type="application/javascript" src="chrome://communicator/content/utilityOverlay.js"/>
 <script type="application/javascript" src="chrome://messenger/content/toolbarIconColor.js"/>
+<script type="application/javascript" src="chrome://messenger-smime/content/msgCompSMIMEOverlay.js"/>
 
 <commandset id="composeCommands">
   <commandset id="msgComposeCommandUpdate"
@@ -92,20 +105,179 @@
               events="clipboard"
               oncommandupdate="goUpdatePasteMenuItems()"/>
 
-  <commandset id="commonEditorMenuItems"/>
-  <commandset id="composerMenuItems"/>
-  <commandset id="composerEditMenuItems"/>
-  <commandset id="composerStyleMenuItems"/>
-  <commandset id="composerTableMenuItems"/>
-  <commandset id="composerListMenuItems"/>
+  <!-- commands updated when the editor gets created -->
+  <commandset id="commonEditorMenuItems"
+              commandupdater="true"
+              events="create"
+              oncommandupdate="goUpdateComposerMenuItems(this)">
+    <command id="cmd_printSetup" oncommand="goDoCommand('cmd_printSetup')"/>
+    <command id="cmd_print" oncommand="goDoCommand('cmd_print')"/>
+    <command id="cmd_quit" oncommand="goDoCommand('cmd_quit')"/>
+  </commandset>
+
+  <commandset id="composerMenuItems"
+              commandupdater="true"
+              events="create, mode_switch"
+              oncommandupdate="goUpdateComposerMenuItems(this)">
+    <!-- format menu -->
+    <command id="cmd_listProperties" oncommand="goDoCommand('cmd_listProperties')"/>
+    <command id="cmd_colorProperties" oncommand="goDoCommand('cmd_colorProperties')"/>
+
+    <command id="cmd_link" oncommand="goDoCommand('cmd_link')"/>
+    <command id="cmd_anchor" oncommand="goDoCommand('cmd_anchor')"/>
+    <command id="cmd_image" oncommand="goDoCommand('cmd_image')"/>
+    <command id="cmd_hline" oncommand="goDoCommand('cmd_hline')"/>
+    <command id="cmd_table" oncommand="goDoCommand('cmd_table')"/>
+    <command id="cmd_form" oncommand="goDoCommand('cmd_form')"/>
+    <command id="cmd_inputtag" oncommand="goDoCommand('cmd_inputtag')"/>
+    <command id="cmd_inputimage" oncommand="goDoCommand('cmd_inputimage')"/>
+    <command id="cmd_textarea" oncommand="goDoCommand('cmd_textarea')"/>
+    <command id="cmd_select" oncommand="goDoCommand('cmd_select')"/>
+    <command id="cmd_button" oncommand="goDoCommand('cmd_button')"/>
+    <command id="cmd_label" oncommand="goDoCommand('cmd_label')"/>
+    <command id="cmd_fieldset" oncommand="goDoCommand('cmd_fieldset')"/>
+    <command id="cmd_isindex" oncommand="goDoCommand('cmd_isindex')"/>
+    <command id="cmd_objectProperties" oncommand="goDoCommand('cmd_objectProperties')"/>
+    <command id="cmd_insertChars" oncommand="goDoCommand('cmd_insertChars')" label="&insertCharsCmd.label;"/>
+    <command id="cmd_insertHTMLWithDialog" oncommand="goDoCommand('cmd_insertHTMLWithDialog')" label="&insertHTMLCmd.label;"/>
+    <command id="cmd_insertMathWithDialog" oncommand="goDoCommand('cmd_insertMathWithDialog')" label="&insertMathCmd.label;"/>
+
+    <command id="cmd_insertBreak" oncommand="goDoCommand('cmd_insertBreak')"/>
+    <command id="cmd_insertBreakAll" oncommand="goDoCommand('cmd_insertBreakAll')"/>
+
+    <!-- only used in context popup menu -->
+    <command id="cmd_editLink" oncommand="goDoCommand('cmd_editLink')"/>
+
+    <!-- dummy command used just to disable things in non-HTML modes -->
+    <command id="cmd_renderedHTMLEnabler"/>
+  </commandset>
+
+  <!-- edit menu commands. These get updated by code in globalOverlay.js -->
+  <commandset id="composerEditMenuItems"
+          commandupdater="true"
+          events="create, mode_switch"
+          oncommandupdate="goUpdateComposerMenuItems(this)">
+    <command id="cmd_pasteNoFormatting" oncommand="goDoCommand('cmd_pasteNoFormatting')"
+             label="&pasteNoFormatting.label;" accesskey="&pasteNoFormatting.accesskey;"/>
+    <command id="cmd_preferences" oncommand="goDoCommand('cmd_preferences')"/>
+    <command id="cmd_findReplace" oncommand="goDoCommand('cmd_findReplace')"/>
+    <command id="cmd_find" oncommand="goDoCommand('cmd_find')"/>
+    <command id="cmd_findNext" oncommand="goDoCommand('cmd_findNext');"/>
+    <command id="cmd_findPrev" oncommand="goDoCommand('cmd_findPrev');"/>
+    <command id="cmd_spelling" oncommand="goDoCommand('cmd_spelling')"/>
+    <command id="cmd_pasteQuote" oncommand="goDoCommand('cmd_pasteQuote')" label="&pasteAsQuotationCmd.label;"/>
+  </commandset>
+
+  <!-- style related commands that update on creation, and on selection change -->
+  <commandset id="composerStyleMenuItems"
+              commandupdater="true"
+              events="create, style, mode_switch"
+              oncommandupdate="goUpdateComposerMenuItems(this)">
+    <command id="cmd_bold" state="false" oncommand="doStyleUICommand('cmd_bold')"/>
+    <command id="cmd_italic" state="false" oncommand="doStyleUICommand('cmd_italic')"/>
+    <command id="cmd_underline" state="false" oncommand="doStyleUICommand('cmd_underline')"/>
+    <command id="cmd_tt" state="false" oncommand="doStyleUICommand('cmd_tt')"/>
+    <command id="cmd_smiley"/>
+
+    <command id="cmd_strikethrough" state="false" oncommand="doStyleUICommand('cmd_strikethrough');"/>
+    <command id="cmd_superscript" state="false" oncommand="doStyleUICommand('cmd_superscript');"/>
+    <command id="cmd_subscript" state="false" oncommand="doStyleUICommand('cmd_subscript');"/>
+    <command id="cmd_nobreak" state="false" oncommand="doStyleUICommand('cmd_nobreak');"/>
+
+    <command id="cmd_em" state="false" oncommand="doStyleUICommand('cmd_em')"/>
+    <command id="cmd_strong" state="false" oncommand="doStyleUICommand('cmd_strong')"/>
+    <command id="cmd_cite" state="false" oncommand="doStyleUICommand('cmd_cite')"/>
+    <command id="cmd_abbr" state="false" oncommand="doStyleUICommand('cmd_abbr')"/>
+    <command id="cmd_acronym" state="false" oncommand="doStyleUICommand('cmd_acronym')"/>
+    <command id="cmd_code" state="false" oncommand="doStyleUICommand('cmd_code')"/>
+    <command id="cmd_samp" state="false" oncommand="doStyleUICommand('cmd_samp')"/>
+    <command id="cmd_var" state="false" oncommand="doStyleUICommand('cmd_var')"/>
+
+    <command id="cmd_ul" state="false" oncommand="doStyleUICommand('cmd_ul')"/>
+    <command id="cmd_ol" state="false" oncommand="doStyleUICommand('cmd_ol')"/>
+
+    <command id="cmd_indent" oncommand="goDoCommand('cmd_indent')"/>
+    <command id="cmd_outdent" oncommand="goDoCommand('cmd_outdent')"/>
+
+    <!-- the state attribute gets filled with the paragraph format before the command is executed -->
+    <command id="cmd_paragraphState" state="" oncommand="doStatefulCommand('cmd_paragraphState', event.target.value)"/>
+    <command id="cmd_fontFace" state="" oncommand="doStatefulCommand('cmd_fontFace', event.target.value)"/>
+
+    <!-- No "oncommand", use EditorSelectColor() to bring up color dialog -->
+    <command id="cmd_fontColor" state="" disabled="false"/>
+    <command id="cmd_backgroundColor" state="" disabled="false"/>
+    <command id="cmd_highlight" state="transparent" oncommand="EditorSelectColor('Highlight', event);"/>
+
+    <command id="cmd_fontSize" oncommand="goDoCommand('cmd_fontSize')"/>
+    <command id="cmd_align" state=""/>
+
+    <command id="cmd_absPos" state="" oncommand="goDoCommand('cmd_absPos')"/>
+    <command id="cmd_increaseZIndex" state="" oncommand="goDoCommand('cmd_increaseZIndex')"/>
+    <command id="cmd_decreaseZIndex" state="" oncommand="goDoCommand('cmd_decreaseZIndex')"/>
+
+    <command id="cmd_advancedProperties" oncommand="goDoCommand('cmd_advancedProperties')"/>
+
+    <command id="cmd_increaseFontStep" oncommand="goDoCommand('cmd_increaseFontStep')"/>
+    <command id="cmd_decreaseFontStep" oncommand="goDoCommand('cmd_decreaseFontStep')"/>
+
+    <command id="cmd_removeStyles" oncommand="goDoCommand('cmd_removeStyles')"/>
+    <command id="cmd_removeLinks" oncommand="goDoCommand('cmd_removeLinks')"/>
+    <command id="cmd_removeNamedAnchors" oncommand="goDoCommand('cmd_removeNamedAnchors')"/>
+  </commandset>
+
+  <commandset id="composerTableMenuItems"
+              commandupdater="true"
+              events="create, mode_switch"
+              oncommandupdate="goUpdateTableMenuItems(this)">
+    <!-- Table menu -->
+    <command id="cmd_SelectTable" oncommand="goDoCommand('cmd_SelectTable')"/>
+    <command id="cmd_SelectRow" oncommand="goDoCommand('cmd_SelectRow')"/>
+    <command id="cmd_SelectColumn" oncommand="goDoCommand('cmd_SelectColumn')"/>
+    <command id="cmd_SelectCell" oncommand="goDoCommand('cmd_SelectCell')"/>
+    <command id="cmd_SelectAllCells" oncommand="goDoCommand('cmd_SelectAllCells')"/>
+    <command id="cmd_InsertTable" oncommand="goDoCommand('cmd_InsertTable')"/>
+    <command id="cmd_InsertRowAbove" oncommand="goDoCommand('cmd_InsertRowAbove')"/>
+    <command id="cmd_InsertRowBelow" oncommand="goDoCommand('cmd_InsertRowBelow')"/>
+    <command id="cmd_InsertColumnBefore" oncommand="goDoCommand('cmd_InsertColumnBefore')"/>
+    <command id="cmd_InsertColumnAfter" oncommand="goDoCommand('cmd_InsertColumnAfter')"/>
+    <command id="cmd_InsertCellBefore" oncommand="goDoCommand('cmd_InsertCellBefore')"/>
+    <command id="cmd_InsertCellAfter" oncommand="goDoCommand('cmd_InsertCellAfter')"/>
+    <command id="cmd_DeleteTable" oncommand="goDoCommand('cmd_DeleteTable')"/>
+    <command id="cmd_DeleteRow" oncommand="goDoCommand('cmd_DeleteRow')"/>
+    <command id="cmd_DeleteColumn" oncommand="goDoCommand('cmd_DeleteColumn')"/>
+    <command id="cmd_DeleteCell" oncommand="goDoCommand('cmd_DeleteCell')"/>
+    <command id="cmd_DeleteCellContents" oncommand="goDoCommand('cmd_DeleteCellContents')"/>
+    <command id="cmd_NormalizeTable" oncommand="goDoCommand('cmd_NormalizeTable')"/>
+    <command id="cmd_JoinTableCells" oncommand="goDoCommand('cmd_JoinTableCells')"/>
+    <command id="cmd_SplitTableCell" oncommand="goDoCommand('cmd_SplitTableCell')"/>
+    <command id="cmd_ConvertToTable" oncommand="goDoCommand('cmd_ConvertToTable')"/>
+    <command id="cmd_TableOrCellColor" oncommand="goDoCommand('cmd_TableOrCellColor')"/>
+    <command id="cmd_editTable" oncommand="goDoCommand('cmd_editTable')"/>
+  </commandset>
+
+  <!-- commands updated only when the menu gets created -->
+  <commandset id="composerListMenuItems"
+              commandupdater="true"
+              events="create, mode_switch"
+              oncommandupdate="goUpdateComposerMenuItems(this)">
+    <!-- List menu  -->
+    <command id="cmd_dt" oncommand="doStyleUICommand('cmd_dt')"/>
+    <command id="cmd_dd" oncommand="doStyleUICommand('cmd_dd')"/>
+    <command id="cmd_removeList" oncommand="goDoCommand('cmd_removeList')"/>
+    <!-- cmd_ul and cmd_ol are shared with toolbar and are in composerStyleMenuItems commandset -->
+  </commandset>
 
   <!-- File Menu -->
   <command id="cmd_new" oncommand="goDoCommand('cmd_newMessage')"/>
   <command id="cmd_attachFile" oncommand="goDoCommand('cmd_attachFile')"/>
-  <command id="cmd_attachCloud" oncommand="attachToCloud(event.target.cloudProvider); event.stopPropagation();"/>
+  <command id="cmd_attachCloud"
+           oncommand="attachToCloud(event.target.cloudProvider);
+                      event.stopPropagation();"/>
   <command id="cmd_attachPage" oncommand="goDoCommand('cmd_attachPage')"/>
-  <command id="cmd_attachVCard" checked="false" oncommand="ToggleAttachVCard(event.target)"/>
-  <command id="cmd_remindLater" checked="false" oncommand="toggleAttachmentReminder()"/>
+  <command id="cmd_attachVCard" checked="false"
+           oncommand="ToggleAttachVCard(event.target)"/>
+  <command id="cmd_remindLater" checked="false"
+           oncommand="toggleAttachmentReminder()"/>
   <command id="cmd_close" oncommand="goDoCommand('cmd_close')"/>
   <command id="cmd_saveDefault" oncommand="goDoCommand('cmd_saveDefault')"/>
   <command id="cmd_saveAsFile" oncommand="goDoCommand('cmd_saveAsFile')"/>
@@ -137,12 +309,17 @@
            disabled="true"/>
   <command id="cmd_selectAll"
            oncommand="goDoCommand('cmd_selectAll')" disabled="true"/>
+  <command id="cmd_removeAllAttachments"
+           oncommand="goDoCommand('cmd_removeAllAttachments')"/>
   <command id="cmd_openAttachment"
            oncommand="goDoCommand('cmd_openAttachment')" disabled="true"/>
   <command id="cmd_renameAttachment"
            oncommand="goDoCommand('cmd_renameAttachment')" disabled="true"/>
   <command id="cmd_reorderAttachments"
            oncommand="goDoCommand('cmd_reorderAttachments')" disabled="true"/>
+  <command id="cmd_toggleAttachmentPane"
+           checked="false"
+           oncommand="goDoCommand('cmd_toggleAttachmentPane')"/>
   <command id="cmd_account"
            oncommand="goDoCommand('cmd_account')"/>
 
@@ -160,7 +337,7 @@
   <command id="cmd_moveAttachmentBottom"
            oncommand="goDoCommand('cmd_moveAttachmentBottom')" disabled="true"/>
   <command id="cmd_sortAttachmentsToggle"
-           data-sortdirection="ascending"
+           sortdirection="ascending"
            oncommand="goDoCommand('cmd_sortAttachmentsToggle')" disabled="true"/>
 
   <!-- View Menu -->
@@ -184,6 +361,8 @@
   <!-- Options Menu -->
   <command id="cmd_quoteMessage" oncommand="goDoCommand('cmd_quoteMessage')"/>
   <command id="cmd_insert"/>
+  <command id="cmd_viewSecurityStatus"
+           oncommand="showMessageComposeSecurityStatus();"/>
 
 #ifdef XP_MACOSX
   <!-- Mac Window menu -->
@@ -208,7 +387,11 @@
 <broadcasterset id="composeBroadcasters">
   <broadcaster id="args" value="editorType=default"/>
   <broadcaster id="viewAddressPicker" autoCheck="false" type="checkbox" oncommand="toggleAddressPicker();"/>
+  <broadcaster id="securityStatus" crypto="" signing=""/>
 </broadcasterset>
+
+<observes element="securityStatus" attribute="crypto" />
+<observes element="securityStatus" attribute="signing" />
 
 <keyset id="tasksKeys">
   <!-- File Menu -->
@@ -256,6 +439,9 @@
   <key id="key_reorderAttachments"
        key="&reorderAttachmentsCmd.key;" modifiers="control"
        command="cmd_reorderAttachments"/>
+  <key id="key_toggleAttachmentPane"
+       key="&toggleAttachmentPaneCmd.key;" modifiers="control"
+       command="cmd_toggleAttachmentPane"/>
 #else
   <key id="key_delete" keycode="VK_DELETE" command="cmd_delete"/>
   <key id="key_renameAttachment" keycode="VK_F2"
@@ -263,6 +449,9 @@
   <key id="key_reorderAttachments"
        key="&reorderAttachmentsCmd.key;" modifiers="alt"
        command="cmd_reorderAttachments"/>
+  <key id="key_toggleAttachmentPane"
+       key="&toggleAttachmentPaneCmd.key;" modifiers="alt"
+       command="cmd_toggleAttachmentPane"/>
 #endif
   <key id="key_selectAll" key="&selectAllCmd.key;" modifiers="accel"/>
   <key id="key_find" key="&findBarCmd.key;" command="cmd_find" modifiers="accel"/>
@@ -275,20 +464,6 @@
   <key keycode="&findPrevCmd.key2;"  command="cmd_findPrev" modifiers="shift"/>
 
   <!-- Reorder Attachments Panel -->
-#ifdef XP_MACOSX
-  <key id="key_moveAttachmentUp" keycode="VK_UP" modifiers="accel"
-       command="cmd_moveAttachmentUp"/>
-  <key id="key_moveAttachmentDown" keycode="VK_DOWN" modifiers="accel"
-       command="cmd_moveAttachmentDown"/>
-  <key id="key_moveAttachmentBundleUp" keycode="VK_LEFT" modifiers="accel alt"
-       command="cmd_moveAttachmentBundleUp"/>
-  <key id="key_moveAttachmentBundleDown" keycode="VK_RIGHT" modifiers="accel alt"
-       command="cmd_moveAttachmentBundleDown"/>
-  <key id="key_moveAttachmentTop" keycode="VK_UP" modifiers="accel alt"
-       command="cmd_moveAttachmentTop"/>
-  <key id="key_moveAttachmentBottom" keycode="VK_DOWN" modifiers="accel alt"
-       command="cmd_moveAttachmentBottom"/>
-#else
   <key id="key_moveAttachmentUp" keycode="VK_UP" modifiers="alt"
        command="cmd_moveAttachmentUp"/>
   <key id="key_moveAttachmentDown" keycode="VK_DOWN" modifiers="alt"
@@ -297,11 +472,23 @@
        command="cmd_moveAttachmentBundleUp"/>
   <key id="key_moveAttachmentBundleDown" keycode="VK_RIGHT" modifiers="alt"
        command="cmd_moveAttachmentBundleDown"/>
+#ifdef XP_MACOSX
+  <key id="key_moveAttachmentTop" keycode="VK_UP" modifiers="accel alt"
+       command="cmd_moveAttachmentTop"/>
+  <key id="key_moveAttachmentBottom" keycode="VK_DOWN" modifiers="accel alt"
+       command="cmd_moveAttachmentBottom"/>
+  <key id="key_moveAttachmentTop2" keycode="VK_Home" modifiers="alt"
+       command="cmd_moveAttachmentTop"/>
+  <key id="key_moveAttachmentBottom2" keycode="VK_End" modifiers="alt"
+       command="cmd_moveAttachmentBottom"/>
+#else
   <key id="key_moveAttachmentTop" keycode="VK_Home" modifiers="alt"
        command="cmd_moveAttachmentTop"/>
   <key id="key_moveAttachmentBottom" keycode="VK_End" modifiers="alt"
        command="cmd_moveAttachmentBottom"/>
 #endif
+  <key id="key_sortAttachmentsToggle" key="&sortAttachmentsPanelBtn.key;"
+       modifiers="alt" command="cmd_sortAttachmentsToggle"/>
 
   <!-- View Menu -->
   <key id="key_addressSidebar" keycode="VK_F9" oncommand="toggleAddressPicker();"/>
@@ -348,14 +535,36 @@
 #ifdef XP_MACOSX
   <!-- Mac Window Menu -->
   <key id="key_minimizeWindow" command="minimizeWindow" key="&minimizeWindow.key;" modifiers="accel"/>
+  <key id="key_openHelp" oncommand="openSupportURL();" key="&openHelpMac2.commandkey;" modifiers="&openHelpMac2.modifiers;"/>
+#else
+  <key id="key_openHelp" oncommand="openSupportURL();" keycode="&openHelp.commandkey;"/>
 #endif
-
   <key keycode="VK_ESCAPE" oncommand="handleEsc();"/>
 </keyset>
 
-<keyset id="baseMenuKeyset"/>
+<keyset id="editorKeys">
+  <key id="boldkb" key="&styleBoldCmd.key;" observes="cmd_bold" modifiers="accel"/>
+  <key id="italickb" key="&styleItalicCmd.key;" observes="cmd_italic" modifiers="accel"/>
+  <key id="underlinekb" key="&styleUnderlineCmd.key;" observes="cmd_underline" modifiers="accel"/>
+  <key id="fixedwidthkb" key="&fontFixedWidth.key;" observes="cmd_tt" modifiers="accel"/>
 
-<keyset id="editorKeys"/>
+  <key id="increaseindentkb" key="&increaseIndent.key;" observes="cmd_indent" modifiers="accel"/>
+  <key id="decreaseindentkb" key="&decreaseIndent.key;" observes="cmd_outdent" modifiers="accel"/>
+
+  <key id="removestyleskb" key="&formatRemoveStyles.key;" observes="cmd_removeStyles" modifiers="accel, shift"/>
+  <key id="removestyleskb2" key=" " observes="cmd_removeStyles" modifiers="accel"/>
+  <key id="removelinkskb" key="&formatRemoveLinks.key;" observes="cmd_removeLinks" modifiers="accel, shift"/>
+  <key id="removenamedanchorskb" key="&formatRemoveNamedAnchors2.key;" observes="cmd_removeNamedAnchors"  modifiers="accel, shift"/>
+  <key id="decreasefontsizekb" key="&decrementFontSize.key;" observes="cmd_decreaseFontStep" modifiers="accel"/>
+  <key key="&decrementFontSize.key;" observes="cmd_decreaseFontStep" modifiers="accel, shift"/>
+  <key key="&decrementFontSize.key2;" observes="cmd_decreaseFontStep" modifiers="accel"/>
+
+  <key id="increasefontsizekb" key="&incrementFontSize.key;" observes="cmd_increaseFontStep" modifiers="accel"/>
+  <key key="&incrementFontSize.key;" observes="cmd_increaseFontStep" modifiers="accel, shift"/>
+  <key key="&incrementFontSize.key2;" observes="cmd_increaseFontStep" modifiers="accel"/>
+
+  <key id="insertlinkkb" key="&insertLinkCmd2.key;" observes="cmd_link" modifiers="accel"/>
+</keyset>
 
 <!-- Reorder Attachments Panel -->
 <panel id="reorderAttachmentsPanel"
@@ -370,41 +579,36 @@
   <toolbarbutton id="btn_moveAttachmentTop"
                  class="panelButton"
                  label="&moveAttachmentTopPanelBtn.label;"
-                 accesskey="&moveAttachmentTopPanelBtn.accesskey;"
                  key="key_moveAttachmentTop"
                  command="cmd_moveAttachmentTop"/>
   <toolbarbutton id="btn_moveAttachmentUp"
                  class="panelButton"
                  label="&moveAttachmentUpPanelBtn.label;"
-                 accesskey="&moveAttachmentUpPanelBtn.accesskey;"
                  key="key_moveAttachmentUp"
                  command="cmd_moveAttachmentUp"/>
   <toolbarbutton id="btn_moveAttachmentBundleUp"
                  class="panelButton"
                  label="&moveAttachmentBundleUpPanelBtn.label;"
-                 accesskey="&moveAttachmentBundleUpPanelBtn.accesskey;"
                  key="key_moveAttachmentBundleUp"
                  command="cmd_moveAttachmentBundleUp"/>
   <toolbarbutton id="btn_moveAttachmentDown"
                  class="panelButton"
                  label="&moveAttachmentDownPanelBtn.label;"
-                 accesskey="&moveAttachmentDownPanelBtn.accesskey;"
                  key="key_moveAttachmentDown"
                  command="cmd_moveAttachmentDown"/>
   <toolbarbutton id="btn_moveAttachmentBottom"
                  class="panelButton"
                  label="&moveAttachmentBottomPanelBtn.label;"
-                 accesskey="&moveAttachmentBottomPanelBtn.accesskey;"
                  key="key_moveAttachmentBottom"
                  command="cmd_moveAttachmentBottom"/>
   <toolbarbutton id="btn_sortAttachmentsToggle"
                  class="panelButton"
-                 label="&sortAttachmentsTogglePanelBtn.AZ.label;"
-                 accesskey="&sortAttachmentsTogglePanelBtn.AZ.accesskey;"
-                 data-labelAZ="&sortAttachmentsTogglePanelBtn.AZ.label;"
-                 data-accesskeyAZ="&sortAttachmentsTogglePanelBtn.AZ.accesskey;"
-                 data-labelZA="&sortAttachmentsTogglePanelBtn.ZA.label;"
-                 data-accesskeyZA="&sortAttachmentsTogglePanelBtn.ZA.accesskey;"
+                 label="&sortAttachmentsPanelBtn.Sort.AZ.label;"
+                 label-AZ="&sortAttachmentsPanelBtn.Sort.AZ.label;"
+                 label-ZA="&sortAttachmentsPanelBtn.Sort.ZA.label;"
+                 label-selection-AZ="&sortAttachmentsPanelBtn.SortSelection.AZ.label;"
+                 label-selection-ZA="&sortAttachmentsPanelBtn.SortSelection.ZA.label;"
+                 key="key_sortAttachmentsToggle"
                  command="cmd_sortAttachmentsToggle"/>
 </panel>
 
@@ -530,6 +734,20 @@
             label="&reorderAttachments.label;"
             accesskey="&reorderAttachments.accesskey;"
             command="cmd_reorderAttachments"/>
+  <menuseparator id="attachmentListContext_removeAllSeparator"/>
+  <menuitem id="attachmentListContext_removeAllItem"
+            label="&removeAllAttachments.label;"
+            accesskey="&removeAllAttachments.accesskey;"
+            command="cmd_removeAllAttachments"/>
+</menupopup>
+
+<menupopup id="attachmentHeaderContext"
+           onpopupshowing="attachmentHeaderContextOnPopupShowing();">
+  <menuitem id="attachmentHeaderContext_initiallyShowItem"
+            type="checkbox"
+            label="&initiallyShowAttachmentPane.label;"
+            accesskey="&initiallyShowAttachmentPane.accesskey;"
+            oncommand="toggleInitiallyShowAttachmentPane(this);"/>
 </menupopup>
 
 <menupopup id="toolbar-context-menu"
@@ -592,7 +810,7 @@
            context="toolbar-context-menu" mode="full">
 
      <toolbaritem id="menubar-items" align="center">
-      <menubar id="mail-menubar" style="border:0px;padding:0px;margin:0px;-moz-appearance:none">
+      <menubar id="mail-menubar">
       <menu id="menu_File" label="&fileMenu.label;" accesskey="&fileMenu.accesskey;">
         <menupopup id="menu_FilePopup">
           <menu id="menu_New" label="&newMenu.label;" accesskey="&newMenu.accesskey;">
@@ -655,6 +873,7 @@
         </menupopup>
       </menu>
 
+      <!-- Edit Menu -->
       <menu id="menu_Edit" label="&editMenu.label;" accesskey="&editMenu.accesskey;">
         <menupopup id="menu_EditPopup" onpopupshowing="updateEditItems();">
           <menuitem id="menu_undo" label="&undoCmd.label;" key="key_undo" accesskey="&undoCmd.accesskey;" command="cmd_undo"/>
@@ -665,7 +884,10 @@
           <menuitem id="menu_paste" label="&pasteCmd.label;" key="key_paste" accesskey="&pasteCmd.accesskey;" command="cmd_paste"/>
           <menuitem id="menu_pasteNoFormatting" command="cmd_pasteNoFormatting"
                     key="pastenoformattingkb"/>
-          <menuitem id="menu_pasteQuote"/>
+          <menuitem id="menu_pasteQuote"
+                    accesskey="&pasteAsQuotationCmd.accesskey;"
+                    command="cmd_pasteQuote"
+                    key="pastequotationkb"/>
           <menuitem id="menu_delete"
                     label="&deleteCmd.label;"
                     accesskey="&deleteCmd.accesskey;"
@@ -735,8 +957,9 @@
         </menupopup>
       </menu>
 
+      <!-- View Menu -->
       <menu id="menu_View" label="&viewMenu.label;" accesskey="&viewMenu.accesskey;">
-        <menupopup id="menu_View_Popup">
+        <menupopup id="menu_View_Popup" onpopupshowing="updateViewItems();">
           <menu id="menu_ToolbarsNew"
                 label="&viewToolbarsMenuNew.label;"
                 accesskey="&viewToolbarsMenuNew.accesskey;"
@@ -786,22 +1009,607 @@
           <menuitem id="menu_AddressSidebar"
                     label="&addressSidebar.label;" accesskey="&addressSidebar.accesskey;"
                     key="key_addressSidebar" observes="viewAddressPicker"/>
+          <menuitem id="menu_toggleAttachmentPane"
+                    label="&toggleAttachmentPaneCmd.label;"
+                    accesskey="&toggleAttachmentPaneCmd.accesskey;"
+                    type="checkbox"
+                    key="key_toggleAttachmentPane"
+                    command="cmd_toggleAttachmentPane"/>
+          <menuseparator id="viewMenuBeforeSecurityStatusSeparator"/>
+          <menuitem id="menu_viewSecurityStatus"
+                    label="&menu_viewSecurityStatus.label;"
+                    accesskey="&menu_viewSecurityStatus.accesskey;"
+                    command="cmd_viewSecurityStatus"/>
         </menupopup>
       </menu>
 
-      <menu id="insertMenu" command="cmd_renderedHTMLEnabler"/>
+      <menu id="insertMenu" label="&insertMenu.label;"
+            accesskey="&insertMenu.accesskey;" command="cmd_renderedHTMLEnabler">
+        <menupopup id="insertMenuPopup">
+          <menuitem id="insertImage"
+                    label="&insertImageCmd.label;"
+                    accesskey="&insertImageCmd.accesskey;"
+                    observes="cmd_image"/>
+          <menuitem id="insertTable"
+                    label="&insertTableCmd.label;"
+                    accesskey="&insertTableCmd.accesskey;"
+                    observes="cmd_InsertTable"/>
+          <menuitem id="insertLink"
+                    label="&insertLinkCmd2.label;"
+                    accesskey="&insertLinkCmd2.accesskey;"
+                    key="insertlinkkb"
+                    observes="cmd_link"/>
+          <menuitem id="insertAnchor"
+                    label="&insertAnchorCmd.label;"
+                    accesskey="&insertAnchorCmd.accesskey;"
+                    observes="cmd_anchor"/>
+          <menuitem id="insertHline"
+                    label="&insertHLineCmd.label;"
+                    accesskey="&insertHLineCmd.accesskey;"
+                    observes="cmd_hline"/>
+          <menuitem id="insertHTMLSource"
+                    accesskey="&insertHTMLCmd.accesskey;"
+                    observes="cmd_insertHTMLWithDialog"/>
+          <menuitem id="insertMath"
+                    accesskey="&insertMathCmd.accesskey;"
+                    observes="cmd_insertMathWithDialog"/>
+          <menuitem id="insertChars"
+                    accesskey="&insertCharsCmd.accesskey;"
+                    command="cmd_insertChars"/>
+
+          <menu id="insertTOC" label="&tocMenu.label;" accesskey="&tocMenu.accesskey;">
+            <menupopup id="insertTOCPopup" onpopupshowing="InitTOCMenu()">
+              <menuitem id="insertTOCMenuitem"
+                        label="&insertTOC.label;"
+                        accesskey="&insertTOC.accesskey;"
+                        oncommand="UpdateTOC()"/>
+              <menuitem id="updateTOCMenuitem"
+                        label="&updateTOC.label;"
+                        accesskey="&updateTOC.accesskey;"
+                        oncommand="UpdateTOC()"/>
+              <menuitem id="removeTOCMenuitem"
+                        label="&removeTOC.label;"
+                        accesskey="&removeTOC.accesskey;"
+                        oncommand="RemoveTOC()"/>
+            </menupopup>
+          </menu>
+          <menuseparator id="insertMenuSeparator"/>
+          <menuitem id="insertBreakAll" accesskey="&insertBreakAllCmd.accesskey;"   observes="cmd_insertBreakAll"   label="&insertBreakAllCmd.label;"/>
+        </menupopup>
+      </menu>
 
       <menu id="formatMenu" label="&formatMenu.label;" accesskey="&formatMenu.accesskey;" command="cmd_renderedHTMLEnabler">
-        <menupopup id="formatMenuPopup">
-          <menu id="tableMenu"/>
+        <menupopup id="formatMenuPopup" onpopupshowing="EditorInitFormatMenu()">
+          <!-- Font face submenu -->
+          <menu id="fontFaceMenu" label="&fontfaceMenu.label;" accesskey="&fontfaceMenu.accesskey;"
+                position="1">
+            <menupopup id="fontFaceMenuPopup"
+                       oncommand="if (event.target.localName == 'menuitem')
+                                    doStatefulCommand('cmd_fontFace', event.target.getAttribute('value'));"
+                       onpopupshowing="initFontFaceMenu(this);">
+              <menuitem id="menu_fontFaceVarWidth"
+                        label="&fontVarWidth.label;"
+                        accesskey="&fontVarWidth.accesskey;"
+                        value=""
+                        type="radio"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_fontFaceFixedWidth"
+                        label="&fontFixedWidth.label;"
+                        accesskey="&fontFixedWidth.accesskey;"
+                        value="tt"
+                        type="radio"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuseparator id="fontFaceMenuAfterGenericFontsSeparator"/>
+              <menuitem id="menu_fontFaceHelvetica"
+                        label="&fontHelvetica.label;"
+                        accesskey="&fontHelvetica.accesskey;"
+                        value="Helvetica, Arial, sans-serif"
+                        value_parsed="helvetica,arial,sans-serif"
+                        type="radio"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_fontFaceTimes"
+                        label="&fontTimes.label;"
+                        accesskey="&fontTimes.accesskey;"
+                        value="Times New Roman, Times, serif"
+                        value_parsed="times new roman,times,serif"
+                        type="radio"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_fontFaceCourier"
+                        label="&fontCourier.label;"
+                        accesskey="&fontCourier.accesskey;"
+                        value="Courier New, Courier, monospace"
+                        value_parsed="courier new,courier,monospace"
+                        type="radio"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuseparator id="fontFaceMenuAfterDefaultFontsSeparator"
+                             class="fontFaceMenuAfterDefaultFonts"/>
+              <menuseparator id="fontFaceMenuAfterUsedFontsSeparator"
+                             class="fontFaceMenuAfterUsedFonts"
+                             hidden="true"/>
+                <!-- Local font face items added here by initLocalFontFaceMenu() -->
+            </menupopup>
+          </menu>
+
+          <!-- Font size submenu -->
+          <menu id="fontSizeMenu" label="&fontSizeMenu.label;"
+                accesskey="&fontSizeMenu.accesskey;"
+                position="2">
+            <menupopup id="fontSizeMenuPopup" onpopupshowing="initFontSizeMenu(this, true)">
+              <menuitem id="menu_decreaseFontSize"
+                        label="&decreaseFontSize.label;"
+                        accesskey="&decreaseFontSize.accesskey;"
+                        key="decreasefontsizekb"
+                        observes="cmd_decreaseFontStep"
+                        type="radio" name="1" autocheck="false"/>
+              <menuitem id="menu_increaseFontSize"
+                        label="&increaseFontSize.label;"
+                        accesskey="&increaseFontSize.accesskey;"
+                        key="increasefontsizekb"
+                        observes="cmd_increaseFontStep"
+                        type="radio" name="1" autocheck="false"/>
+              <menuseparator id="fontSizeMenuAfterIncreaseFontSizeSeparator"/>
+              <menuitem id="menu_size-x-small"
+                        label="&size-tinyCmd.label;"
+                        accesskey="&size-tinyCmd.accesskey;"
+                        oncommand="EditorSetFontSize('x-small')"
+                        type="radio" name="1"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_size-small"
+                        label="&size-smallCmd.label;"
+                        accesskey="&size-smallCmd.accesskey;"
+                        oncommand="EditorSetFontSize('small')"
+                        type="radio" name="1"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_size-medium"
+                        label="&size-mediumCmd.label;"
+                        accesskey="&size-mediumCmd.accesskey;"
+                        oncommand="EditorSetFontSize('medium')"
+                        type="radio" name="1"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_size-large"
+                        label="&size-largeCmd.label;"
+                        accesskey="&size-largeCmd.accesskey;"
+                        oncommand="EditorSetFontSize('large')"
+                        type="radio" name="1"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_size-x-large"
+                        label="&size-extraLargeCmd.label;"
+                        accesskey="&size-extraLargeCmd.accesskey;"
+                        oncommand="EditorSetFontSize('x-large')"
+                        type="radio" name="1"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_size-xx-large"
+                        label="&size-hugeCmd.label;"
+                        accesskey="&size-hugeCmd.accesskey;"
+                        oncommand="EditorSetFontSize('xx-large')"
+                        type="radio" name="1"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="fontSizeMenu_smallBigInfo"
+                        type="checkbox" name="2" disabled="true" hidden="true"/>
+            </menupopup>
+          </menu>
+
+          <!-- Font style submenu -->
+          <menu id="fontStyleMenu" label="&fontStyleMenu.label;"
+                accesskey="&fontStyleMenu.accesskey;"
+                position="3">
+          <menupopup id="fontStyleMenuPopup" onpopupshowing="initFontStyleMenu(this)">
+            <menuitem id="menu_styleBold"
+                      label="&styleBoldCmd.label;"
+                      accesskey="&styleBoldCmd.accesskey;"
+                      observes="cmd_bold"
+                      type="checkbox"
+                      key="boldkb"/>
+            <menuitem id="menu_styleItalic"
+                      label="&styleItalicCmd.label;"
+                      accesskey="&styleItalicCmd.accesskey;"
+                      observes="cmd_italic"
+                      type="checkbox"
+                      key="italickb"/>
+            <menuitem id="menu_styleUnderline"
+                      label="&styleUnderlineCmd.label;"
+                      accesskey="&styleUnderlineCmd.accesskey;"
+                      observes="cmd_underline"
+                      type="checkbox"
+                      key="underlinekb"/>
+            <menuitem id="menu_styleStrikeThru"
+                      label="&styleStrikeThruCmd.label;"
+                      accesskey="&styleStrikeThruCmd.accesskey;"
+                      observes="cmd_strikethrough"
+                      type="checkbox"/>
+            <menuitem id="menu_styleSuperscript"
+                      label="&styleSuperscriptCmd.label;"
+                      accesskey="&styleSuperscriptCmd.accesskey;"
+                      observes="cmd_superscript"
+                      type="checkbox"/>
+            <menuitem id="menu_styleSubscript"
+                      label="&styleSubscriptCmd.label;"
+                      accesskey="&styleSubscriptCmd.accesskey;"
+                      observes="cmd_subscript"
+                      type="checkbox"/>
+            <menuitem id="menu_fontFixedWidth"
+                      label="&fontFixedWidth.label;"
+                      accesskey="&fontFixedWidth.accesskey;"
+                      observes="cmd_tt"
+                      type="checkbox"
+                      key="fixedwidthkb"/>
+            <menuitem id="menu_styleNonbreaking"
+                      label="&styleNonbreakingCmd.label;"
+                      accesskey="&styleNonbreakingCmd.accesskey;"
+                      observes="cmd_nobreak"
+                      type="checkbox"/>
+            <menuseparator id="fontStyleMenuAfterNonbreakingSeparator"/>
+            <menuitem id="menu_styleEm"
+                      label="&styleEm.label;"
+                      accesskey="&styleEm.accesskey;"
+                      observes="cmd_em"
+                      type="checkbox"/>
+            <menuitem id="menu_styleStrong"
+                      label="&styleStrong.label;"
+                      accesskey="&styleStrong.accesskey;"
+                      observes="cmd_strong"
+                      type="checkbox"/>
+            <menuitem id="menu_styleCite"
+                      label="&styleCite.label;"
+                      accesskey="&styleCite.accesskey;"
+                      observes="cmd_cite"
+                      type="checkbox"/>
+            <menuitem id="menu_styleAbbr"
+                      label="&styleAbbr.label;"
+                      accesskey="&styleAbbr.accesskey;"
+                      observes="cmd_abbr"
+                      type="checkbox"/>
+            <menuitem id="menu_styleAcronym"
+                      label="&styleAcronym.label;"
+                      accesskey="&styleAcronym.accesskey;"
+                      observes="cmd_acronym"
+                      type="checkbox"/>
+            <menuitem id="menu_styleCode"
+                      label="&styleCode.label;"
+                      accesskey="&styleCode.accesskey;"
+                      observes="cmd_code"
+                      type="checkbox"/>
+            <menuitem id="menu_styleSamp"
+                      label="&styleSamp.label;"
+                      accesskey="&styleSamp.accesskey;"
+                      observes="cmd_samp"
+                      type="checkbox"/>
+            <menuitem id="menu_styleVar"
+                      label="&styleVar.label;"
+                      accesskey="&styleVar.accesskey;"
+                      observes="cmd_var"
+                      type="checkbox"/>
+          </menupopup>
+          </menu>
+
+          <!-- Note: "cmd_fontColor" only monitors color state, it doesn't execute the command
+               (We should use "cmd_fontColorState" and "cmd_backgroundColorState" ?) -->
+          <menuitem id="fontColor" label="&formatFontColor.label;"
+                accesskey="&formatFontColor.accesskey;"
+                observes="cmd_fontColor"
+                oncommand="EditorSelectColor('Text', null);"
+                position="4"/>
+          <menuseparator id="removeSep" position="5"/>
+
+          <!-- label and accesskey set at runtime from strings -->
+          <menuitem id="removeStylesMenuitem" key="removestyleskb"
+                observes="cmd_removeStyles"
+                position="6"/>
+          <menuitem id="removeLinksMenuitem" key="removelinkskb"
+                observes="cmd_removeLinks"
+                position="7"/>
+          <menuitem id="removeNamedAnchorsMenuitem"  label="&formatRemoveNamedAnchors.label;"
+                key="removenamedanchorskb"
+                accesskey="&formatRemoveNamedAnchors.accesskey;"
+                observes="cmd_removeNamedAnchors"
+                position="8"/>
+          <menuseparator id="tabSep" position="9"/>
+
+          <!-- Note: the 'Init' menu methods for Paragraph, List, and Align
+               assume that the id = 'menu_'+tagName (the 'value' label),
+               except for the first ('none') item
+           -->
+          <!-- Paragraph Style submenu -->
+          <menu id="paragraphMenu" label="&paragraphMenu.label;"
+                accesskey="&paragraphMenu.accesskey;"
+                position="10" onpopupshowing="InitParagraphMenu()">
+            <menupopup id="paragraphMenuPopup"
+                       oncommand="doStatefulCommand('cmd_paragraphState', event.target.getAttribute('value'))">
+              <menuitem id="menu_bodyText"
+                        type="radio"
+                        name="1"
+                        label="&bodyTextCmd.label;"
+                        accesskey="&bodyTextCmd.accesskey;"
+                        value=""
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_p"
+                        type="radio"
+                        name="1"
+                        label="&paragraphParagraphCmd.label;"
+                        accesskey="&paragraphParagraphCmd.accesskey;"
+                        value="p"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_h1"
+                        type="radio"
+                        name="1"
+                        label="&heading1Cmd.label;"
+                        accesskey="&heading1Cmd.accesskey;"
+                        value="h1"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_h2"
+                        type="radio"
+                        name="1"
+                        label="&heading2Cmd.label;"
+                        accesskey="&heading2Cmd.accesskey;"
+                        value="h2"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_h3"
+                        type="radio"
+                        name="1"
+                        label="&heading3Cmd.label;"
+                        accesskey="&heading3Cmd.accesskey;"
+                        value="h3"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_h4"
+                        type="radio"
+                        name="1"
+                        label="&heading4Cmd.label;"
+                        accesskey="&heading4Cmd.accesskey;"
+                        value="h4"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_h5"
+                        type="radio"
+                        name="1"
+                        label="&heading5Cmd.label;"
+                        accesskey="&heading5Cmd.accesskey;"
+                        value="h5"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_h6"
+                        type="radio"
+                        name="1"
+                        label="&heading6Cmd.label;"
+                        accesskey="&heading6Cmd.accesskey;"
+                        value="h6"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_address"
+                        type="radio"
+                        name="1"
+                        label="&paragraphAddressCmd.label;"
+                        accesskey="&paragraphAddressCmd.accesskey;"
+                        value="address"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_pre"
+                        type="radio"
+                        name="1"
+                        label="&paragraphPreformatCmd.label;"
+                        accesskey="&paragraphPreformatCmd.accesskey;"
+                        value="pre"
+                        observes="cmd_renderedHTMLEnabler"/>
+            </menupopup>
+          </menu>
+
+          <!-- List Style submenu -->
+          <menu id="listMenu" label="&formatlistMenu.label;"
+                accesskey="&formatlistMenu.accesskey;"
+                position="11" onpopupshowing="InitListMenu()">
+            <menupopup id="listMenuPopup">
+              <menuitem id="menu_noList"
+                        type="radio"
+                        name="1"
+                        label="&noneCmd.label;"
+                        accesskey="&noneCmd.accesskey;"
+                        observes="cmd_removeList"/>
+              <menuitem id="menu_ul"
+                        type="radio"
+                        name="1"
+                        label="&listBulletCmd.label;"
+                        accesskey="&listBulletCmd.accesskey;"
+                        observes="cmd_ul"/>
+              <menuitem id="menu_ol"
+                        type="radio"
+                        name="1"
+                        label="&listNumberedCmd.label;"
+                        accesskey="&listNumberedCmd.accesskey;"
+                        observes="cmd_ol"/>
+              <menuitem id="menu_dt"
+                        type="radio"
+                        name="1"
+                        label="&listTermCmd.label;"
+                        accesskey="&listTermCmd.accesskey;"
+                        observes="cmd_dt"/>
+              <menuitem id="menu_dd"
+                        type="radio"
+                        name="1"
+                        label="&listDefinitionCmd.label;"
+                        accesskey="&listDefinitionCmd.accesskey;"
+                        observes="cmd_dd"/>
+              <menuseparator/>
+              <menuitem id="listProps"
+                        label="&listPropsCmd.label;"
+                        accesskey="&listPropsCmd.accesskey;"
+                        observes="cmd_listProperties"/>
+            </menupopup>
+          </menu>
+          <menuseparator id="identingSep" position="12"/>
+
+          <menuitem id="increaseIndent"
+                    label="&increaseIndent.label;"
+                    accesskey="&increaseIndent.accesskey;"
+                    key="increaseindentkb"
+                    observes="cmd_indent"
+                    position="13"/>
+          <menuitem id="decreaseIndent"
+                    label="&decreaseIndent.label;"
+                    accesskey="&decreaseIndent.accesskey;"
+                    key="decreaseindentkb"
+                    observes="cmd_outdent"
+                    position="14"/>
+
+          <menu id="alignMenu" label="&alignMenu.label;" accesskey="&alignMenu.accesskey;"
+              onpopupshowing="InitAlignMenu()"
+              position="15">
+            <!-- Align submenu -->
+            <menupopup id="alignMenuPopup"
+                       oncommand="doStatefulCommand('cmd_align', event.target.getAttribute('value'))">
+              <menuitem id="menu_left"
+                        label="&alignLeft.label;"
+                        accesskey="&alignLeft.accesskey;"
+                        type="radio"
+                        name="1"
+                        value="left"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_center"
+                        label="&alignCenter.label;"
+                        accesskey="&alignCenter.accesskey;"
+                        type="radio"
+                        name="1"
+                        value="center"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_right"
+                        label="&alignRight.label;"
+                        accesskey="&alignRight.accesskey;"
+                        type="radio"
+                        name="1"
+                        value="right"
+                        observes="cmd_renderedHTMLEnabler"/>
+              <menuitem id="menu_justify"
+                        label="&alignJustify.label;"
+                        accesskey="&alignJustify.accesskey;"
+                        type="radio"
+                        name="1"
+                        value="justify"
+                        observes="cmd_renderedHTMLEnabler"/>
+            </menupopup>
+          </menu>
+          <menuseparator id="tableSep" position="16"/>
+          <menu id="tableMenu" label="&tableMenu.label;" accesskey="&tableMenu.accesskey;">
+            <menupopup id="tableMenuPopup" onpopupshowing="EditorInitTableMenu()">
+              <menu id="tableInsertMenu" label="&tableInsertMenu.label;" accesskey="&tableInsertMenu.accesskey;">
+                <menupopup id="tableMenuPopup">
+                  <menuitem id="menu_insertTable"
+                            label="&insertTableCmd.label;"
+                            accesskey="&insertTableCmd.accesskey;"
+                            observes="cmd_InsertTable"/>
+                  <menuseparator id="tableMenuAfterInsertTableSeparator"/>
+                  <menuitem id="menu_tableRowAbove"
+                            label="&tableRowAbove.label;"
+                            accesskey="&tableRowAbove.accesskey;"
+                            observes="cmd_InsertRowAbove"/>
+                  <menuitem id="menu_tableRowBelow"
+                            label="&tableRowBelow.label;"
+                            accesskey="&tableRowBelow.accesskey;"
+                            observes="cmd_InsertRowBelow"/>
+                  <menuseparator id="tableMenuAfterTableRowSeparator"/>
+                  <menuitem id="menu_tableColumnBefore"
+                            label="&tableColumnBefore.label;"
+                            accesskey="&tableColumnBefore.accesskey;"
+                            observes="cmd_InsertColumnBefore"/>
+                  <menuitem id="menu_tableColumnAfter"
+                            label="&tableColumnAfter.label;"
+                            accesskey="&tableColumnAfter.accesskey;"
+                            observes="cmd_InsertColumnAfter"/>
+                  <menuseparator id="tableMenuAfterInsertColumnSeparator"/>
+                  <menuitem id="menu_tableCellBefore"
+                            label="&tableCellBefore.label;"
+                            accesskey="&tableCellBefore.accesskey;"
+                            observes="cmd_InsertCellBefore"/>
+                  <menuitem id="menu_tableCellAfter"
+                            label="&tableCellAfter.label;"
+                            accesskey="&tableCellAfter.accesskey;"
+                            observes="cmd_InsertCellAfter"/>
+                </menupopup>
+              </menu>
+              <menu id="tableSelectMenu"
+                    label="&tableSelectMenu.label;"
+                    accesskey="&tableSelectMenu.accesskey;" >
+                <menupopup id="tableSelectPopup">
+                  <menuitem id="menu_SelectTable"
+                            label="&tableTable.label;"
+                            accesskey="&tableTable.accesskey;"
+                            observes="cmd_SelectTable"/>
+                  <menuitem id="menu_SelectRow"
+                            label="&tableRow.label;"
+                            accesskey="&tableRow.accesskey;"
+                            observes="cmd_SelectRow"/>
+                  <menuitem id="menu_SelectColumn"
+                            label="&tableColumn.label;"
+                            accesskey="&tableColumn.accesskey;"
+                            observes="cmd_SelectColumn"/>
+                  <menuitem id="menu_SelectCell"
+                            label="&tableCell.label;"
+                            accesskey="&tableCell.accesskey;"
+                            observes="cmd_SelectCell"/>
+                  <menuitem id="menu_SelectAllCells"
+                            label="&tableAllCells.label;"
+                            accesskey="&tableAllCells.accesskey;"
+                            observes="cmd_SelectAllCells"/>
+                </menupopup>
+              </menu>
+              <menu id="tableDeleteMenu"
+                    label="&tableDeleteMenu.label;"
+                    accesskey="&tableDeleteMenu.accesskey;">
+                <menupopup id="tableDeletePopup">
+                  <menuitem id="menu_DeleteTable"
+                            label="&tableTable.label;"
+                            accesskey="&tableTable.accesskey;"
+                            observes="cmd_DeleteTable"/>
+                  <menuitem id="menu_DeleteRow"
+                            label="&tableRows.label;"
+                            accesskey="&tableRow.accesskey;"
+                            observes="cmd_DeleteRow"/>
+                  <menuitem id="menu_DeleteColumn"
+                            label="&tableColumns.label;"
+                            accesskey="&tableColumn.accesskey;"
+                            observes="cmd_DeleteColumn"/>
+                  <menuitem id="menu_DeleteCell"
+                            label="&tableCells.label;"
+                            accesskey="&tableCell.accesskey;"
+                            observes="cmd_DeleteCell"/>
+                  <menuitem id="menu_DeleteCellContents"
+                            label="&tableCellContents.label;"
+                            accesskey="&tableCellContents.accesskey;"
+                            observes="cmd_DeleteCellContents"/>
+                </menupopup>
+              </menu>
+              <menuseparator/>
+              <!-- menu label is set in InitTableMenu -->
+              <menuitem id="menu_JoinTableCells"
+                        label="&tableJoinCells.label;"
+                        accesskey="&tableJoinCells.accesskey;"
+                        observes="cmd_JoinTableCells"/>
+              <menuitem id="menu_SlitTableCell"
+                        label="&tableSplitCell.label;"
+                        accesskey="&tableSplitCell.accesskey;"
+                        observes="cmd_SplitTableCell"/>
+              <menuitem id="menu_ConvertToTable"
+                        label="&convertToTable.label;"
+                        accesskey="&convertToTable.accesskey;"
+                        observes="cmd_ConvertToTable"/>
+              <menuseparator/>
+              <menuitem id="menu_TableOrCellColor"
+                        label="&tableOrCellColor.label;"
+                        accesskey="&tableOrCellColor.accesskey;"
+                        observes="cmd_TableOrCellColor"/>
+              <menuitem id="menu_tableProperties"
+                        label="&tableProperties.label;"
+                        accesskey="&tableProperties.accesskey;"
+                        observes="cmd_editTable"/>
+            </menupopup>
+          </menu>
           <menuseparator/>
-          <menuitem id="objectProperties"/>
-          <menuitem id="colorsAndBackground"/>
+          <!-- label and accesskey filled in during menu creation -->
+          <menuitem id="objectProperties" command="cmd_objectProperties"/>
+          <!-- Don't use 'observes', must call command correctly -->
+          <menuitem id="colorsAndBackground"
+                    label="&colorsAndBackground.label;"
+                    accesskey="&colorsAndBackground.accesskey;"
+                    oncommand="goDoCommand('cmd_colorProperties')"
+                    observes="cmd_renderedHTMLEnabler"/>
         </menupopup>
       </menu>
 
       <menu id="optionsMenu" label="&optionsMenu.label;" accesskey="&optionsMenu.accesskey;">
-        <menupopup id="optionsMenuPopup">
+        <menupopup id="optionsMenuPopup" onpopupshowing="setSecuritySettings(1);">
           <menuitem label="&checkSpellingCmd2.label;" id="menu_checkspelling" accesskey="&checkSpellingCmd2.accesskey;" key="key_checkspelling" command="cmd_spelling"/>
           <menuitem label="&enableInlineSpellChecker.label;" id="menu_inlineSpellCheck"
                            accesskey="&enableInlineSpellChecker.accesskey;" checked="false"
@@ -812,8 +1620,13 @@
           <menuitem id="returnReceiptMenu" type="checkbox" label="&returnReceiptMenu.label;" accesskey="&returnReceiptMenu.accesskey;" checked="false" oncommand="ToggleReturnReceipt(event.target)"/>
           <menuitem id="dsnMenu" type="checkbox" label="&dsnMenu.label;" accesskey="&dsnMenu.accesskey;" oncommand="ToggleDSN(event.target)"/>
           <menuseparator/>
-          <menu id="charsetMenu" oncommand="SetDocumentCharacterSet(event.target.getAttribute('charset'));" onpopupshowing="UpdateCharsetMenu(gMsgCompose.compFields.characterSet, this);">
-            <menupopup id="charsetPopup" detectors="false"/>
+          <menu id="charsetMenu"
+                label="&charsetMenu2.label;"
+                accesskey="&charsetMenu2.accesskey;"
+                oncommand="SetDocumentCharacterSet(event.target.getAttribute('charset'));"
+                onpopupshowing="UpdateCharsetMenu(gMsgCompose.compFields.characterSet, this);">
+            <menupopup id="charsetPopup" detectors="false"
+                       onpopupshowing="CharsetMenu.build(this, true, this.getAttribute('detectors') != 'false');"/>
           </menu>
           <menu id="outputFormatMenu" label="&deliveryFormatMenu.label;" accesskey="&deliveryFormatMenu.accesskey;" oncommand="OutputFormatMenuSelect(event.target)">
             <menupopup id="outputFormatMenuPopup">
@@ -841,6 +1654,18 @@
           <menuseparator/>
           <menuitem type="checkbox" command="cmd_customizeFromAddress"
                     accesskey="&customizeFromAddress.accesskey;"/>
+          <menuseparator id="smimeOptionsSeparator"/>
+
+          <menuitem id="menu_securityEncryptRequire1"
+                    type="checkbox"
+                    label="&menu_securityEncryptRequire.label;"
+                    accesskey="&menu_securityEncryptRequire.accesskey;"
+                    oncommand="toggleEncryptMessage();"/>
+          <menuitem id="menu_securitySign1"
+                    type="checkbox"
+                    label="&menu_securitySign.label;"
+                    accesskey="&menu_securitySign.accesskey;"
+                    oncommand="toggleSignMessage();"/>
         </menupopup>
       </menu>
 
@@ -874,12 +1699,11 @@
       </menu>
 
 #ifdef XP_MACOSX
-<!-- Mac window menu -->
-#includesubst @TOOLKIT_DIR@/content/macWindowMenu.inc
+#include ../../../base/content/macWindowMenu.inc
 #endif
 
       <!-- Help -->
-      <menu id="helpMenu"/>
+#include ../../../base/content/helpMenu.inc
     </menubar>
    </toolbaritem>
   </toolbar>
@@ -903,7 +1727,7 @@
 
     <toolbarbutton class="toolbarbutton-1" type="menu-button"
                id="button-attach" label="&attachButton.label;"
-               tooltiptext="&attachButton.tooltip;"
+               tooltiptext="&attachButton.tooltip2;"
                command="cmd_attachFile"
                ondragover="nsDragAndDrop.dragOver(event, envelopeDragObserver);"
                ondrop="nsDragAndDrop.drop(event, envelopeDragObserver);"
@@ -938,13 +1762,39 @@
       </menupopup>
     </toolbarbutton>
 
+    <toolbarbutton id="button-security"
+                   type="menu-button"
+                   class="toolbarbutton-1"
+                   label="&securityButton.label;"
+                   tooltiptext="&securityButton.tooltip;"
+                   oncommand="doSecurityButton();">
+      <menupopup onpopupshowing="setSecuritySettings(2);">
+        <menuitem id="menu_securityEncryptRequire2"
+                  type="checkbox"
+                  label="&menu_securityEncryptRequire.label;"
+                  accesskey="&menu_securityEncryptRequire.accesskey;"
+                  oncommand="setNextCommand('encryptMessage');"/>
+        <menuitem id="menu_securitySign2"
+                  type="checkbox"
+                  label="&menu_securitySign.label;"
+                  accesskey="&menu_securitySign.accesskey;"
+                  oncommand="setNextCommand('signMessage');"/>
+        <menuseparator id="smimeToolbarButtonSeparator"/>
+        <menuitem id="menu_securityStatus2"
+                  label="&menu_securityStatus.label;"
+                  accesskey="&menu_securityStatus.accesskey;"
+                  oncommand="setNextCommand('show');"/>
+      </menupopup>
+    </toolbarbutton>
+
     <toolbarbutton class="toolbarbutton-1" type="menu-button"
                id="spellingButton" label="&spellingButton.label;"
                tooltiptext="&spellingButton.tooltip;"
                command="cmd_spelling">
       <!-- workaround for the bug that split menu doesn't take popup="popupID" -->
       <menupopup onpopupshowing="event.preventDefault();
-                                 showLanguagePopup('spellingButton');"/>
+                                 showPopupById('languageMenuList',
+                                               'spellingButton');"/>
     </toolbarbutton>
 
     <toolbarbutton class="toolbarbutton-1" type="menu-button"
@@ -1028,7 +1878,7 @@
     </toolbaritem>
 
   </toolbarpalette>
-  <toolbar id="composeToolbar2" class="toolbar-primary chromeclass-toolbar"
+  <toolbar id="composeToolbar2" class="chromeclass-toolbar"
            toolbarname="&showCompositionToolbarCmd.label;"
            accesskey="&showCompositionToolbarCmd.accesskey;"
            fullscreentoolbar="true" mode="full"
@@ -1042,7 +1892,7 @@
   </toolbar>
 
   <toolbarset id="customToolbars" context="toolbar-context-menu"/>
-  </toolbox>
+</toolbox>
 
   <hbox flex="1" id="composeContentBox">
     <vbox id="sidebar-box" persist="sidebarVisible width" hidden="true">
@@ -1086,7 +1936,7 @@
               <listcol id="textcol-addressingWidget" flex="1"/>
             </listcols>
             <listitem class="addressingWidgetItem" allowevents="true">
-              <listcell class="addressingWidgetCell" align="stretch">
+              <listcell class="addressingWidgetCell">
                 <menulist id="addressCol1#1" disableonsend="true"
                           class="aw-menulist" flex="1"
                           oncommand="onAddressColCommand(this.id);">
@@ -1099,6 +1949,8 @@
                     <menuitem value="addr_followup" label="&followupAddr.label;"/>
                   </menupopup>
                 </menulist>
+                <image class="deleteAddress close-icon"
+                       onclick="awDeleteHit(this.parentNode.nextSibling.querySelector('textbox.textbox-addressingWidget'));"/>
               </listcell>
               <listcell class="addressingWidgetCell">
                 <textbox id="addressCol2#1" class="plain textbox-addressingWidget uri-element"
@@ -1130,90 +1982,52 @@
                      onkeypress="subjectKeyPress(event);" />
           </hbox>
         </vbox>
-        <splitter id="attachmentbucket-sizer" collapsed="true" collapse="after"/>
+        <splitter id="attachmentbucket-sizer"
+                  collapsed="true"
+                  collapse="after"
+                  onmouseup="attachmentBucketSizerOnMouseUp();"/>
         <vbox id="attachments-box" collapsed="true" persist="width">
-          <hbox id="attachments-header-box" align="center">
-            <label id="attachmentBucketCount" control="attachmentBucket"
-                   crop="right" accesskey="&attachments.accesskey;" flex="1"/>
-            <label id="attachmentBucketSize"/>
+          <hbox id="attachments-header-box"
+                align="center"
+                tooltiptext="&attachmentBucketHeader.tooltip;"
+                onclick="attachmentBucketHeaderOnClick();"
+                context="attachmentHeaderContext">
+            <label id="attachmentBucketCount"
+                   accesskey="&attachments.accesskey;"
+                   flex="1" crop="end"
+                   context=""
+                   control="attachmentBucket"/>
+            <toolbarspring/>
+            <label id="attachmentBucketSize"
+                   context=""/>
+            <toolbarbutton id="attachmentBucketCloseButton"
+                           class="ab-closebutton close-icon"
+                           tooltiptext="&attachmentBucketCloseButton.tooltip;"
+                           context=""
+                           oncommand="toggleAttachmentPane('hide');"/>
           </hbox>
-          <attachmentlist orient="vertical" id="attachmentBucket"
+          <attachmentlist id="attachmentBucket"
+                          tooltiptext=""
                           disableonsend="true"
-                          seltype="multiple" flex="1" height="0"
+                          seltype="multiple"
+                          orient="vertical"
+                          flex="1"
+                          height="0"
                           context="msgComposeAttachmentListContext"
                           itemcontext="msgComposeAttachmentItemContext"
-                          ondblclick="AttachmentBucketDoubleClicked(event);"
-                          onkeyup="attachmentBucketOnKeyUp(event);"
-                          onselect="updateAttachmentItems();"
+                          onclick="attachmentBucketOnClick(event);"
+                          onkeypress="attachmentBucketOnKeyPress(event);"
+                          onselect="attachmentBucketOnSelect();"
                           ondragstart="nsDragAndDrop.startDrag(event, attachmentBucketDNDObserver);"
                           onblur="attachmentBucketOnBlur();"/>
         </vbox>
       </hbox>
     </toolbar>
 
-    <!-- These toolbar items get filled out from the editorOverlay -->
     <toolbox id="FormatToolbox" mode="icons">
       <toolbar class="chromeclass-toolbar" id="FormatToolbar" persist="collapsed"
                customizable="true" nowindowdrag="true">
-        <toolbaritem id="paragraph-select-container"/>
-        <toolbaritem id="font-face-select-container"/>
-        <toolbaritem id="color-buttons-container"
-                     disableoncustomize="true"/>
-        <toolbarbutton id="AbsoluteFontSizeButton"/>
-        <toolbarbutton id="DecreaseFontSizeButton"/>
-        <toolbarbutton id="IncreaseFontSizeButton"/>
-        <toolbarseparator class="toolbarseparator-standard"/>
-        <toolbarbutton id="boldButton"/>
-        <toolbarbutton id="italicButton"/>
-        <toolbarbutton id="underlineButton"/>
-        <toolbarseparator class="toolbarseparator-standard"/>
-        <toolbarbutton id="ulButton"/>
-        <toolbarbutton id="olButton"/>
-        <toolbarbutton id="outdentButton"/>
-        <toolbarbutton id="indentButton"/>
-        <toolbarseparator class="toolbarseparator-standard"/>
-        <toolbarbutton id="AlignPopupButton"/>
-        <toolbarbutton id="InsertPopupButton"/>
-        <toolbarbutton id="smileButtonMenu"
-                       class="formatting-button"
-                       tooltiptext="&SmileButton.tooltip;"
-                       type="menu"
-                       observes="cmd_smiley">
-          <menupopup id="smilyPopup">
-            <menuitem id="smileySmile" class="menuitem-iconic" label="&smiley1Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-)'  )"/>
-            <menuitem id="smileyFrown" class="menuitem-iconic" label="&smiley2Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-('  )"/>
-            <menuitem id="smileyWink" class="menuitem-iconic" label="&smiley3Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ';-)'  )"/>
-            <menuitem id="smileyTongue" class="menuitem-iconic" label="&smiley4Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-P'  )"/>
-            <menuitem id="smileyLaughing" class="menuitem-iconic" label="&smiley5Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-D'  )"/>
-            <menuitem id="smileyEmbarassed" class="menuitem-iconic" label="&smiley6Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-['  )"/>
-            <menuitem id="smileyUndecided" class="menuitem-iconic" label="&smiley7Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-\\' )"/>
-            <menuitem id="smileySurprise" class="menuitem-iconic" label="&smiley8Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', '=-O' )"/>
-            <menuitem id="smileyKiss" class="menuitem-iconic" label="&smiley9Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-*' )"/>
-            <menuitem id="smileyYell" class="menuitem-iconic" label="&smiley10Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', '>:o' )"/>
-            <menuitem id="smileyCool" class="menuitem-iconic" label="&smiley11Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', '8-)' )"/>
-            <menuitem id="smileyMoney" class="menuitem-iconic" label="&smiley12Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-$' )"/>
-            <menuitem id="smileyFoot" class="menuitem-iconic" label="&smiley13Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-!' )"/>
-            <menuitem id="smileyInnocent" class="menuitem-iconic" label="&smiley14Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', 'O:-)' )"/>
-            <menuitem id="smileyCry" class="menuitem-iconic" label="&smiley15Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':\'(' )"/>
-            <menuitem id="smileySealed" class="menuitem-iconic" label="&smiley16Cmd.label;"
-                      oncommand="doStatefulCommand('cmd_smiley', ':-X' )"/>
-          </menupopup>
-        </toolbarbutton>
+#include editFormatButtons.inc
         <spacer flex="1"/>
       </toolbar>
     </toolbox>
@@ -1256,11 +2070,25 @@
                     collapsed="true">
       <progressmeter id="compose-progressmeter" class="progressmeter-statusbar" mode="normal" value="0"/>
     </statusbarpanel>
+    <statusbarpanel class="statusbarpanel-iconic"
+                    collapsed="true"
+                    id="signing-status"
+                    oncommand="showMessageComposeSecurityStatus();">
+      <image/>
+    </statusbarpanel>
+    <statusbarpanel class="statusbarpanel-iconic"
+                    collapsed="true"
+                    id="encryption-status"
+                    oncommand="showMessageComposeSecurityStatus();">
+      <image/>
+    </statusbarpanel>
     <statusbarpanel id="encodingStatusPanel" tooltiptext="&encodingStatusPanel.tooltip;"/>
     <statusbarpanel id="spellCheckStatusPanel">
       <toolbarbutton id="languageStatusButton"
                      tooltiptext="&languageStatusButton.tooltip;"
-                     oncommand="showLanguagePopup('languageStatusButton','before_start');">
+                     oncommand="showPopupById('languageMenuList',
+                                              'languageStatusButton',
+                                              'before_start');">
       </toolbarbutton>
     </statusbarpanel>
   </statusbar>

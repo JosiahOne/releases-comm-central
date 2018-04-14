@@ -17,8 +17,13 @@
   padding: 0;
 }
 
+#tabs-toolbar {
+  -moz-binding: url("chrome://messenger/content/toolbar.xml#toolbar-drag");
+}
+
 #tabs-toolbar:not(:-moz-lwtheme) {
-  -moz-binding: url("chrome://global/content/bindings/toolbar.xml#toolbar-drag");
+  -moz-appearance: menubar;
+  color: -moz-menubartext;
 }
 
 #tabpanelcontainer:-moz-lwtheme {

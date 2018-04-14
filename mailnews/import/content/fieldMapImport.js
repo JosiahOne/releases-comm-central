@@ -16,8 +16,8 @@ var gSkipFirstRecordButton;
 
 function OnLoadFieldMapImport()
 {
-  top.importService = Components.classes["@mozilla.org/import/import-service;1"]
-                                .getService(Components.interfaces.nsIImportService);
+  top.importService = Cc["@mozilla.org/import/import-service;1"]
+                        .getService(Ci.nsIImportService);
 
   // We need a field map object...
   // assume we have one passed in? or just make one?
@@ -77,22 +77,29 @@ function ListFields() {
   }
 }
 
-function CreateField( name, index, on)
+function CreateField(name, index, on)
 {
-  var item = document.createElement('listitem');
-  item.setAttribute('field-index', index);
-  item.setAttribute('type', "checkbox");
-  var cell = document.createElement('listcell');
-  var cCell = document.createElement( 'listcell');  
-  cCell.setAttribute('type', "checkbox");
-  cCell.setAttribute( 'label', name);
-  if (on == true)
-    cCell.setAttribute( 'checked', "true");
-  item.appendChild( cCell);
-  cell.setAttribute( "class", "importsampledata");
-  cell.setAttribute( 'label', "");
-  item.appendChild( cell);
-  return( item);
+  var item = document.createElement("listitem");
+  item.setAttribute("field-index", index);
+  item.setAttribute("allowevents", "true");
+
+  var checkboxCell = document.createElement("listcell");
+  checkboxCell.setAttribute("type", "checkbox");
+  checkboxCell.addEventListener("click", cellClicked);
+  if (on)
+    checkboxCell.setAttribute("checked", "true");
+
+  var firstCell = document.createElement("listcell");
+  firstCell.setAttribute("label", name);
+
+  var secondCell = document.createElement("listcell");
+  secondCell.setAttribute("class", "importsampledata");
+  secondCell.setAttribute("label", "");
+
+  item.appendChild(checkboxCell);
+  item.appendChild(firstCell);
+  item.appendChild(secondCell);
+  return item;
 }
 
 function AddFieldToList(name, index, on)
@@ -101,7 +108,7 @@ function AddFieldToList(name, index, on)
   gListbox.appendChild(item);
 }
 
-function itemClicked(event)
+function cellClicked(event)
 {
   if (event.button == 0) {
     var on = gListbox.selectedItem.firstChild.getAttribute('checked');
@@ -147,10 +154,10 @@ function FetchSampleData(num)
     return false;
 
   var data = top.addInterface.GetData( "sampleData-" + num);
-  if (!(data instanceof Components.interfaces.nsISupportsString))
+  if (!(data instanceof Ci.nsISupportsString))
     return false;
   ShowSampleData( data.data);
-  return true;  
+  return true;
 }
 
 function Browse(step)

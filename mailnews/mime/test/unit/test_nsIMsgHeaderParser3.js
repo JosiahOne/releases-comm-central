@@ -3,7 +3,7 @@
  * Test suite for nsIMsgHeaderParser function removeDuplicateAddresses:
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 function run_test() {
   const checks =
@@ -59,15 +59,15 @@ function run_test() {
 
   // Test - empty strings
 
-  do_check_eq(MailServices.headerParser.removeDuplicateAddresses("", ""), "");
-  do_check_eq(MailServices.headerParser.removeDuplicateAddresses("", "test@foo.invalid"), "");
+  Assert.equal(MailServices.headerParser.removeDuplicateAddresses("", ""), "");
+  Assert.equal(MailServices.headerParser.removeDuplicateAddresses("", "test@foo.invalid"), "");
 
   // Test - removeDuplicateAddresses
 
   for (let i = 0; i < checks.length; ++i) {
     dump("Test " + i + "\n");
-    do_check_eq(MailServices.headerParser.removeDuplicateAddresses(checks[i].addrs,
-                checks[i].otherAddrs),
+    Assert.equal(MailServices.headerParser.removeDuplicateAddresses(checks[i].addrs,
+                 checks[i].otherAddrs),
     checks[i].expectedResult);
   }
 }

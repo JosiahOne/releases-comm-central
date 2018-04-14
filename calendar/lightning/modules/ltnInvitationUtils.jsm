@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calXMLUtils.jsm");
-Components.utils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.import("resource://calendar/modules/ltnUtils.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://calendar/modules/ltnUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 this.EXPORTED_SYMBOLS = ["ltn"]; // even though it's defined in ltnUtils.jsm, import needs this
 ltn.invitation = {
@@ -41,7 +41,7 @@ ltn.invitation = {
                     // falls through
                 case "REPLY": {
                     let attendees = item.getAttendees({});
-                    let sender = cal.getAttendeesBySender(attendees, aItipItem.sender);
+                    let sender = cal.itip.getAttendeesBySender(attendees, aItipItem.sender);
                     if (sender.length == 1) {
                         if (aItipItem.responseMethod == "COUNTER") {
                             header = cal.calGetString("lightning",
@@ -136,7 +136,7 @@ ltn.invitation = {
         let dateString = formatter.formatItemInterval(aEvent);
 
         if (aEvent.recurrenceInfo) {
-            let kDefaultTimezone = cal.calendarDefaultTimezone();
+            let kDefaultTimezone = cal.dtz.defaultTimezone;
             let startDate = aEvent.startDate;
             let endDate = aEvent.endDate;
             startDate = startDate ? startDate.getInTimezone(kDefaultTimezone) : null;
@@ -163,7 +163,7 @@ ltn.invitation = {
                     } else {
                         // This is an RDATE, close enough to a modified occurrence
                         let excItem = aEvent.recurrenceInfo.getOccurrenceFor(exc.date);
-                        cal.binaryInsert(modifiedOccurrences, excItem, dateComptor, true);
+                        cal.data.binaryInsert(modifiedOccurrences, excItem, dateComptor, true);
                     }
                 }
             }
@@ -181,7 +181,7 @@ ltn.invitation = {
                 if (exc.startDate.compare(exc.recurrenceId) != 0 ||
                     exc.duration.compare(aEvent.duration) != 0 ||
                     excLocation != aEvent.getProperty("LOCATION")) {
-                    cal.binaryInsert(modifiedOccurrences, exc, dateComptor, true);
+                    cal.data.binaryInsert(modifiedOccurrences, exc, dateComptor, true);
                 }
             }
 
@@ -236,7 +236,7 @@ ltn.invitation = {
             row.removeAttribute("hidden");
 
             // resolve delegatees/delegators to display also the CN
-            let del = cal.resolveDelegation(aAttendee, attendees);
+            let del = cal.itip.resolveDelegation(aAttendee, attendees);
             if (del.delegators != "") {
                 del.delegators = " " + ltn.getString("lightning", "imipHtml.attendeeDelegatedFrom",
                                                      [del.delegators]);
@@ -369,7 +369,7 @@ ltn.invitation = {
                 } else {
                     content = doc.getElementById(aElement + "-table");
                     oldContent = aOldDoc.getElementById(aElement + "-table");
-                    let excludeAddress = cal.removeMailTo(aIgnoreId);
+                    let excludeAddress = cal.email.removeMailTo(aIgnoreId);
                     if (content && oldContent && !content.isEqualNode(oldContent)) {
                         // extract attendees
                         let attendees = _getAttendees(doc, aElement);
@@ -430,7 +430,7 @@ ltn.invitation = {
      */
     getHeaderSection: function(aMessageId, aIdentity, aToList, aSubject) {
         let recipient = aIdentity.fullName + " <" + aIdentity.email + ">";
-        let from = aIdentity.fullName.length ? cal.validateRecipientList(recipient)
+        let from = aIdentity.fullName.length ? cal.email.validateRecipientList(recipient)
                                              : aIdentity.email;
         let header = "MIME-version: 1.0\r\n" +
                      (aIdentity.replyTo ? "Return-path: " +
@@ -447,13 +447,13 @@ ltn.invitation = {
                                       .encodeMimeHeader(aSubject.replace(/(\n|\r\n)/, "|")) + "\r\n";
         let validRecipients;
         if (aIdentity.doCc) {
-            validRecipients = cal.validateRecipientList(aIdentity.doCcList);
+            validRecipients = cal.email.validateRecipientList(aIdentity.doCcList);
             if (validRecipients != "") {
                 header += "Cc: " + ltn.invitation.encodeMimeHeader(validRecipients, true) + "\r\n";
             }
         }
         if (aIdentity.doBcc) {
-            validRecipients = cal.validateRecipientList(aIdentity.doBccList);
+            validRecipients = cal.email.validateRecipientList(aIdentity.doBccList);
             if (validRecipients != "") {
                 header += "Bcc: " + ltn.invitation.encodeMimeHeader(validRecipients, true) + "\r\n";
             }
@@ -474,7 +474,7 @@ ltn.invitation = {
                                "$1, $3 $2 $4 $5 $6$7");
         // according to section 3.3 of RfC5322, +0000 should be used for defined timezones using
         // UTC time, while -0000 should indicate a floating time instead
-        let timezone = cal.calendarDefaultTimezone();
+        let timezone = cal.dtz.defaultTimezone;
         if (timezone && timezone.isFloating) {
             str.replace(/\+0000$/, "-0000");
         }
@@ -534,7 +534,7 @@ ltn.invitation = {
      * @return {String} JsObject.comment           A comment of the attendee, if any
      */
     parseCounter: function(aProposedItem, aExistingItem) {
-        let isEvent = cal.isEvent(aProposedItem);
+        let isEvent = cal.item.isEvent(aProposedItem);
         // atm we only support a subset of properties, for a full list see RfC 5546 section 3.2.7
         let properties = ["SUMMARY", "LOCATION", "DTSTART", "DTEND", "COMMENT"];
         if (!isEvent) {

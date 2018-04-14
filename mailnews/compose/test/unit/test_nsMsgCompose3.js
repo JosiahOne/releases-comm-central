@@ -4,7 +4,7 @@
  * expandMailingLists.
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var MsgComposeContractID = "@mozilla.org/messengercompose/compose;1";
 var MsgComposeParamsContractID = "@mozilla.org/messengercompose/composeparams;1";
@@ -51,9 +51,9 @@ function checkPopulate(aTo, aCheckTo)
 
   msgCompose.initialize(params);
 
-  do_check_eq(msgCompose.expandMailingLists());
+  Assert.ok(!msgCompose.expandMailingLists());
 
-  do_check_eq(fields.to, aCheckTo);
+  Assert.equal(fields.to, aCheckTo);
 }
 
 function run_test() {
@@ -68,21 +68,21 @@ function run_test() {
 
   for (let i = 0; i < TESTS.length; ++i) {
     let card = AB.cardForEmailAddress(TESTS[i].email);
-    do_check_true(!!card);
+    Assert.ok(!!card);
 
     // Thunderbird 2 stored its popularityIndexes as hex, hence when we read it
     // now we're going to get a hex value. The AB has a value of "a".
-    do_check_eq(card.getProperty("PopularityIndex", -1), TESTS[i].prePopularity);
+    Assert.equal(card.getProperty("PopularityIndex", -1), TESTS[i].prePopularity);
 
     // Call the check populate function.
     checkPopulate(TESTS[i].email, TESTS[i].email);
 
     // Now we've run check populate, check the popularityIndex has increased.
     card = AB.cardForEmailAddress(TESTS[i].email);
-    do_check_true(!!card);
+    Assert.ok(!!card);
 
     // Thunderbird 2 stored its popularityIndexes as hex, hence when we read it
     // now we're going to get a hex value. The AB has a value of "a".
-    do_check_eq(card.getProperty("PopularityIndex", -1), TESTS[i].postPopularity);
+    Assert.equal(card.getProperty("PopularityIndex", -1), TESTS[i].postPopularity);
   }
 };

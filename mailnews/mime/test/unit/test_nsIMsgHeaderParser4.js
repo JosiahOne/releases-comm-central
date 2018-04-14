@@ -3,7 +3,7 @@
  * Test suite for nsIMsgHeaderParser::makeFromDisplayAddress
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 function run_test() {
   const checks =
@@ -58,10 +58,10 @@ function run_test() {
     dump("Test " + i + "\n");
     let addrs = MailServices.headerParser.makeFromDisplayAddress(checks[i].displayString, {});
     let checkaddrs = checks[i].addresses;
-    do_check_eq(addrs.length, checkaddrs.length);
+    Assert.equal(addrs.length, checkaddrs.length);
     for (let j = 0; j < addrs.length; j++) {
-      do_check_eq(addrs[j].name, checkaddrs[j][0]);
-      do_check_eq(addrs[j].email, checkaddrs[j][1]);
+      Assert.equal(addrs[j].name, checkaddrs[j][0]);
+      Assert.equal(addrs[j].email, checkaddrs[j][1]);
     }
   }
 }

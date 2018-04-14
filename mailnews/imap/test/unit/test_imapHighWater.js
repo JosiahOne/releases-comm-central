@@ -4,9 +4,9 @@
  * marks.
  */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 load("../../../resources/logHelper.js");
 load("../../../resources/alertTestUtils.js");
 load("../../../resources/asyncTestUtils.js");
@@ -68,7 +68,7 @@ function run_test()
 }
 
 function* setupFolders() {
-  // make 10 messges
+  // make 10 messages
   let messageGenerator = new MessageGenerator();
   let scenarioFactory = new MessageScenarioFactory(messageGenerator);
 
@@ -96,7 +96,7 @@ function* doMoves() {
   gIMAPInbox.updateFolderWithListener(null, UrlListener);
   yield false;
   gFolder1 = gRootFolder.getChildNamed("folder 1")
-               .QueryInterface(Components.interfaces.nsIMsgImapMailFolder);
+               .QueryInterface(Ci.nsIMsgImapMailFolder);
   gFolder1.updateFolderWithListener(null, UrlListener);
   yield false;
   // get five messages to move from Inbox to folder 1.
@@ -106,7 +106,7 @@ function* doMoves() {
   for (let i = 0; i < 5 && msgEnumerator.hasMoreElements(); i++)
   {
     let header = msgEnumerator.getNext();
-    if (header instanceof Components.interfaces.nsIMsgDBHdr)
+    if (header instanceof Ci.nsIMsgDBHdr)
       headers1.appendElement(header);
   }
   // this will add dummy headers with keys > 0xffffff80
@@ -119,14 +119,14 @@ function* doMoves() {
   yield false;
   // Check that playing back offline events gets rid of dummy
   // headers, and thus highWater is recalculated.
-  do_check_eq(gFolder1.msgDatabase.dBFolderInfo.highWater, 6);
+  Assert.equal(gFolder1.msgDatabase.dBFolderInfo.highWater, 6);
   headers1 = Cc["@mozilla.org/array;1"]
                 .createInstance(Ci.nsIMutableArray);
   msgEnumerator = gIMAPInbox.msgDatabase.EnumerateMessages();
   for (let i = 0; i < 5 && msgEnumerator.hasMoreElements(); i++)
   {
     let header = msgEnumerator.getNext();
-    if (header instanceof Components.interfaces.nsIMsgDBHdr)
+    if (header instanceof Ci.nsIMsgDBHdr)
       headers1.appendElement(header);
   }
   // Check that CopyMessages will handle having a high highwater mark.
@@ -145,7 +145,7 @@ function* doMoves() {
   gFolder1.updateFolderWithListener(gDummyMsgWindow, UrlListener);
   yield false;
   let serverSink = gIMAPIncomingServer.QueryInterface(Ci.nsIImapServerSink);
-  do_check_eq(gFolder1.msgDatabase.dBFolderInfo.highWater, 11);
+  Assert.equal(gFolder1.msgDatabase.dBFolderInfo.highWater, 11);
   yield true;
 }
 
@@ -155,20 +155,20 @@ var UrlListener =
   OnStopRunningUrl: function(url, rc)
   {
     // Check for ok status.
-    do_check_eq(rc, 0);
+    Assert.equal(rc, 0);
     async_driver();
   }
 };
 
 // nsIMsgCopyServiceListener implementation
-var CopyListener = 
+var CopyListener =
 {
   OnStartCopy: function() {},
   OnProgress: function(aProgress, aProgressMax) {},
   SetMessageKey: function(aKey){},
   SetMessageId: function(aMessageId) {},
   OnStopCopy: function(aStatus){
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     async_driver();
   }
 };

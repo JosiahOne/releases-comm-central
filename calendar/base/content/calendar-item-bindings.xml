@@ -34,7 +34,7 @@
       <field name="mItem">null</field>
 
       <constructor><![CDATA[
-          Components.utils.import("resource://calendar/modules/calUtils.jsm");
+          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
       ]]></constructor>
 
       <property name="mode"
@@ -57,10 +57,10 @@
             let itemDateTimeLabel = document.getAnonymousElementByAttribute(this, "anonid", "item-datetime-value");
             let date;
             if (this.mode == "start") {
-                date = this.mItem[cal.calGetStartDateProp(this.mItem)];
+                date = this.mItem[cal.dtz.startDateProp(this.mItem)];
                 if (date) {
                     let label;
-                    if (cal.isToDo(this.mItem)) {
+                    if (cal.item.isToDo(this.mItem)) {
                         label = this.getAttribute("taskStartLabel");
                     } else {
                         label = this.getAttribute("eventStartLabel");
@@ -68,10 +68,10 @@
                     headerLabel.value = label;
                 }
             } else {
-                date = this.mItem[cal.calGetEndDateProp(this.mItem)];
+                date = this.mItem[cal.dtz.endDateProp(this.mItem)];
                 if (date) {
                     let label;
-                    if (cal.isToDo(this.mItem)) {
+                    if (cal.item.isToDo(this.mItem)) {
                         label = this.getAttribute("taskDueLabel");
                     } else {
                         label = this.getAttribute("eventEndLabel");
@@ -83,7 +83,7 @@
             if (hideLabels) {
                 this.setAttribute("hidden", "true");
             } else {
-                const kDefaultTimezone = cal.calendarDefaultTimezone();
+                const kDefaultTimezone = cal.dtz.defaultTimezone;
                 let localTime = date.getInTimezone(kDefaultTimezone);
                 let formatter = cal.getDateFormatter();
                 itemDateTimeLabel.value = formatter.formatDateTime(localTime);

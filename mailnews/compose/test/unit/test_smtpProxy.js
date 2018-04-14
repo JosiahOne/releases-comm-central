@@ -2,8 +2,8 @@
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 // Tests that SMTP over a SOCKS proxy works.
 
-Components.utils.import("resource://testing-common/mailnews/NetworkTestUtils.jsm");
-Components.utils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+ChromeUtils.import("resource://testing-common/mailnews/NetworkTestUtils.jsm");
+ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 const PORT = 25;
 var daemon, localserver, server;
@@ -25,6 +25,7 @@ add_task(function* sendMessage() {
   var testFile = do_get_file("data/message1.eml");
   var urlListener = new PromiseTestUtils.PromiseUrlListener();
   MailServices.smtp.sendMailMessage(testFile, "somebody@example.org", identity,
+                                    "me@example.org",
                                     null, urlListener, null, null,
                                     false, {}, {});
   yield urlListener.promise;

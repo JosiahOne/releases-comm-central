@@ -4,6 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+
 function Startup()
 {
   gApplicationsPane.init();
@@ -13,28 +15,28 @@ function Startup()
 // Constants & Enumeration Values
 
 // constants for interfaces we need multiple times
-const nsIHandlerApp = Components.interfaces.nsIHandlerApp;
-const nsIHandlerInfo = Components.interfaces.nsIHandlerInfo;
-const nsILocalHandlerApp = Components.interfaces.nsILocalHandlerApp;
-const nsIWebHandlerApp = Components.interfaces.nsIWebHandlerApp;
-const nsIWebContentHandlerInfo = Components.interfaces.nsIWebContentHandlerInfo;
-const nsIFilePicker = Components.interfaces.nsIFilePicker;
-const nsIMIMEInfo = Components.interfaces.nsIMIMEInfo;
-const nsIPropertyBag = Components.interfaces.nsIPropertyBag;
+const nsIHandlerApp = Ci.nsIHandlerApp;
+const nsIHandlerInfo = Ci.nsIHandlerInfo;
+const nsILocalHandlerApp = Ci.nsILocalHandlerApp;
+const nsIWebHandlerApp = Ci.nsIWebHandlerApp;
+const nsIWebContentHandlerInfo = Ci.nsIWebContentHandlerInfo;
+const nsIFilePicker = Ci.nsIFilePicker;
+const nsIMIMEInfo = Ci.nsIMIMEInfo;
+const nsIPropertyBag = Ci.nsIPropertyBag;
 
 // global services
-var handlerSvc = Components.classes["@mozilla.org/uriloader/handler-service;1"]
-                           .getService(Components.interfaces.nsIHandlerService);
-var categoryMgr = Components.classes["@mozilla.org/categorymanager;1"]
-                            .getService(Components.interfaces.nsICategoryManager);
-var mimeSvc = Components.classes["@mozilla.org/mime;1"]
-                        .getService(Components.interfaces.nsIMIMEService);
-var converterSvc = Components.classes["@mozilla.org/embeddor.implemented/web-content-handler-registrar;1"]
-                             .getService(Components.interfaces.nsIWebContentConverterService);
+var handlerSvc = Cc["@mozilla.org/uriloader/handler-service;1"]
+                   .getService(Ci.nsIHandlerService);
+var categoryMgr = Cc["@mozilla.org/categorymanager;1"]
+                    .getService(Ci.nsICategoryManager);
+var mimeSvc = Cc["@mozilla.org/mime;1"]
+                .getService(Ci.nsIMIMEService);
+var converterSvc = Cc["@mozilla.org/embeddor.implemented/web-content-handler-registrar;1"]
+                     .getService(Ci.nsIWebContentConverterService);
 var shellSvc = null;
-if ("@mozilla.org/suite/shell-service;1" in Components.classes)
-  shellSvc = Components.classes["@mozilla.org/suite/shell-service;1"]
-                       .getService(Components.interfaces.nsIShellService);
+if ("@mozilla.org/suite/shell-service;1" in Cc)
+  shellSvc = Cc["@mozilla.org/suite/shell-service;1"]
+               .getService(Ci.nsIShellService);
 
 const TYPE_MAYBE_FEED = "application/vnd.mozilla.maybe.feed";
 const TYPE_MAYBE_VIDEO_FEED = "application/vnd.mozilla.maybe.video.feed";
@@ -97,14 +99,14 @@ const kActionManageApp = -1;
 // Utilities
 
 function getFileDisplayName(aFile) {
-  if ("nsILocalFileWin" in Components.interfaces &&
-      aFile instanceof Components.interfaces.nsILocalFileWin) {
+  if ("nsILocalFileWin" in Ci &&
+      aFile instanceof Ci.nsILocalFileWin) {
     try {
       return aFile.getVersionInfoField("FileDescription");
     } catch (e) {}
   }
-  else if ("nsILocalFileMac" in Components.interfaces &&
-           aFile instanceof Components.interfaces.nsILocalFileMac) {
+  else if ("nsILocalFileMac" in Ci &&
+           aFile instanceof Ci.nsILocalFileMac) {
     try {
       return aFile.bundleDisplayName;
     } catch (e) {}
@@ -113,8 +115,8 @@ function getFileDisplayName(aFile) {
 }
 
 function getLocalHandlerApp(aFile) {
-  var localHandlerApp = Components.classes["@mozilla.org/uriloader/local-handler-app;1"]
-                                  .createInstance(nsILocalHandlerApp);
+  var localHandlerApp = Cc["@mozilla.org/uriloader/local-handler-app;1"]
+                          .createInstance(nsILocalHandlerApp);
   localHandlerApp.name = getFileDisplayName(aFile);
   localHandlerApp.executable = aFile;
 
@@ -522,12 +524,12 @@ FeedHandlerInfo.prototype = {
       _removed: [],
 
       QueryInterface: function(aIID) {
-        if (aIID.equals(Components.interfaces.nsIMutableArray) ||
-            aIID.equals(Components.interfaces.nsIArray) ||
-            aIID.equals(Components.interfaces.nsISupports))
+        if (aIID.equals(Ci.nsIMutableArray) ||
+            aIID.equals(Ci.nsIArray) ||
+            aIID.equals(Ci.nsISupports))
           return this;
 
-        throw Components.results.NS_ERROR_NO_INTERFACE;
+        throw Cr.NS_ERROR_NO_INTERFACE;
       },
 
       get length() {
@@ -594,8 +596,8 @@ FeedHandlerInfo.prototype = {
     }
 
     if (defaultFeedReader) {
-      let handlerApp = Components.classes["@mozilla.org/uriloader/local-handler-app;1"]
-                                 .createInstance(nsIHandlerApp);
+      let handlerApp = Cc["@mozilla.org/uriloader/local-handler-app;1"]
+                         .createInstance(nsIHandlerApp);
       handlerApp.name = getFileDisplayName(defaultFeedReader);
       handlerApp.QueryInterface(nsILocalHandlerApp);
       handlerApp.executable = defaultFeedReader;
@@ -893,12 +895,12 @@ var gApplicationsPane = {
   // nsISupports
 
   QueryInterface: function(aIID) {
-    if (aIID.equals(Components.interfaces.nsIObserver) ||
-        aIID.equals(Components.interfaces.nsIDOMEventListener ||
-        aIID.equals(Components.interfaces.nsISupports)))
+    if (aIID.equals(Ci.nsIObserver) ||
+        aIID.equals(Ci.nsIDOMEventListener ||
+        aIID.equals(Ci.nsISupports)))
       return this;
 
-    throw Components.results.NS_ERROR_NO_INTERFACE;
+    throw Cr.NS_ERROR_NO_INTERFACE;
   },
 
 
@@ -1007,8 +1009,8 @@ var gApplicationsPane = {
    * we'd still need to check the pref ourselves to find out if it's enabled.
    */
   _loadPluginHandlers: function() {
-    let pluginHost = Components.classes["@mozilla.org/plugin/host;1"]
-                               .getService(Components.interfaces.nsIPluginHost);
+    let pluginHost = Cc["@mozilla.org/plugin/host;1"]
+                       .getService(Ci.nsIPluginHost);
     for (let pluginTag of pluginHost.getPluginTags()) {
       for (let type of pluginTag.getMimeTypes()) {
         let handlerInfoWrapper;
@@ -1244,7 +1246,7 @@ var gApplicationsPane = {
 
   _isValidHandlerExecutable: function(aExecutable) {
     var file = Services.dirsvc.get("XREExeF",
-                                   Components.interfaces.nsIFile);
+                                   Ci.nsIFile);
     return aExecutable &&
            aExecutable.exists() &&
            aExecutable.isExecutable() &&
@@ -1571,77 +1573,83 @@ var gApplicationsPane = {
 
   chooseApp: function() {
     var handlerApp;
+    let onSelectionDone = function() {
+      // Rebuild the actions menu whether the user picked an app or canceled.
+      // If they picked an app, we want to add the app to the menu and select it.
+      // If they canceled, we want to go back to their previous selection.
+      this.rebuildActionsMenu();
 
-#ifdef XP_WIN
-    var params = {};
-    var handlerInfo = this._handledTypes[this._list.selectedItem.type];
-
-    if (isFeedType(handlerInfo.type)) {
-      // MIME info will be null, create a temp object.
-      params.mimeInfo = mimeSvc.getFromTypeAndExtension(handlerInfo.type,
-                                                 handlerInfo.primaryExtension);
-    } else {
-      params.mimeInfo = handlerInfo.wrappedHandlerInfo;
-    }
-
-    params.title         = this._prefsBundle.getString("fpTitleChooseApp");
-    params.description   = handlerInfo.description;
-    params.filename      = null;
-    params.handlerApp    = null;
-
-    window.openDialog("chrome://global/content/appPicker.xul", null,
-                      "chrome,modal,centerscreen,titlebar,dialog=yes",
-                      params);
-
-    if (this.isValidHandlerApp(params.handlerApp)) {
-      handlerApp = params.handlerApp;
-
-      // Add the app to the type's list of possible handlers.
-      handlerInfo.addPossibleApplicationHandler(handlerApp);
-    }
-#else
-    var fp = Components.classes["@mozilla.org/filepicker;1"]
-                       .createInstance(nsIFilePicker);
-    var winTitle = this._prefsBundle.getString("fpTitleChooseApp");
-    fp.init(window, winTitle, nsIFilePicker.modeOpen);
-    fp.appendFilters(nsIFilePicker.filterApps);
-
-    // Prompt the user to pick an app.  If they pick one, and it's a valid
-    // selection, then add it to the list of possible handlers.
-    if (fp.show() == nsIFilePicker.returnOK && fp.file &&
-        this._isValidHandlerExecutable(fp.file)) {
-      handlerApp = Components.classes["@mozilla.org/uriloader/local-handler-app;1"]
-                             .createInstance(nsILocalHandlerApp);
-      handlerApp.name = getFileDisplayName(fp.file);
-      handlerApp.executable = fp.file;
-
-      // Add the app to the type's list of possible handlers.
-      let handlerInfo = this._handledTypes[this._list.selectedItem.type];
-      handlerInfo.addPossibleApplicationHandler(handlerApp);
-    }
-#endif
-
-    // Rebuild the actions menu whether the user picked an app or canceled.
-    // If they picked an app, we want to add the app to the menu and select it.
-    // If they canceled, we want to go back to their previous selection.
-    this.rebuildActionsMenu();
-
-    // If the user picked a new app from the menu, select it.
-    if (handlerApp) {
-      let typeItem = this._list.selectedItem;
-      var actionsCell =
-        document.getAnonymousElementByAttribute(typeItem, "anonid", "action-cell");
-      var actionsMenu =
-        document.getAnonymousElementByAttribute(actionsCell, "anonid", "action-menu");
-      let menuItems = actionsMenu.menupopup.childNodes;
-      for (let i = 0; i < menuItems.length; i++) {
-        let menuItem = menuItems[i];
-        if (menuItem.handlerApp && menuItem.handlerApp.equals(handlerApp)) {
-          actionsMenu.selectedIndex = i;
-          this.onSelectAction(menuItem);
-          break;
+      // If the user picked a new app from the menu, select it.
+      if (handlerApp) {
+        let typeItem = this._list.selectedItem;
+        var actionsCell =
+          document.getAnonymousElementByAttribute(typeItem, "anonid", "action-cell");
+        var actionsMenu =
+          document.getAnonymousElementByAttribute(actionsCell, "anonid", "action-menu");
+        let menuItems = actionsMenu.menupopup.childNodes;
+        for (let i = 0; i < menuItems.length; i++) {
+          let menuItem = menuItems[i];
+          if (menuItem.handlerApp && menuItem.handlerApp.equals(handlerApp)) {
+            actionsMenu.selectedIndex = i;
+            this.onSelectAction(menuItem);
+            break;
+          }
         }
       }
+    }.bind(this);
+
+    if (AppConstants.platform == "win") {
+      let params = {};
+      let handlerInfo = this._handledTypes[this._list.selectedItem.type];
+
+      if (isFeedType(handlerInfo.type)) {
+        // MIME info will be null, create a temp object.
+        params.mimeInfo = mimeSvc.getFromTypeAndExtension(handlerInfo.type,
+                                                   handlerInfo.primaryExtension);
+      } else {
+        params.mimeInfo = handlerInfo.wrappedHandlerInfo;
+      }
+
+      params.title         = this._prefsBundle.getString("fpTitleChooseApp");
+      params.description   = handlerInfo.description;
+      params.filename      = null;
+      params.handlerApp    = null;
+
+      window.openDialog("chrome://global/content/appPicker.xul", null,
+                        "chrome,modal,centerscreen,titlebar,dialog=yes",
+                        params);
+
+      if (this.isValidHandlerApp(params.handlerApp)) {
+        handlerApp = params.handlerApp;
+
+        // Add the app to the type's list of possible handlers.
+        handlerInfo.addPossibleApplicationHandler(handlerApp);
+      }
+      onSelectionDone();
+    } else {
+      const nsIFilePicker = Ci.nsIFilePicker;
+      let fp = Cc["@mozilla.org/filepicker;1"]
+                 .createInstance(nsIFilePicker);
+      let winTitle = this._prefsBundle.getString("fpTitleChooseApp");
+      fp.init(window, winTitle, nsIFilePicker.modeOpen);
+      fp.appendFilters(nsIFilePicker.filterApps);
+
+      // Prompt the user to pick an app.  If they pick one, and it's a valid
+      // selection, then add it to the list of possible handlers.
+      fp.open(rv => {
+        if (rv == nsIFilePicker.returnOK && fp.file &&
+            this._isValidHandlerExecutable(fp.file)) {
+          handlerApp = Cc["@mozilla.org/uriloader/local-handler-app;1"]
+                         .createInstance(Ci.nsILocalHandlerApp);
+          handlerApp.name = getDisplayNameForFile(fp.file);
+          handlerApp.executable = fp.file;
+
+          // Add the app to the type's list of possible handlers.
+          let handlerInfo = this._handledTypes[this._list.selectedItem.type];
+          handlerInfo.addPossibleApplicationHandler(handlerApp);
+        }
+        onSelectionDone();
+      });
     }
   },
 
@@ -1710,7 +1718,7 @@ var gApplicationsPane = {
 
   _getIconURLForFile: function(aFile) {
     var fph = Services.io.getProtocolHandler("file")
-                         .QueryInterface(Components.interfaces.nsIFileProtocolHandler);
+                         .QueryInterface(Ci.nsIFileProtocolHandler);
     var urlSpec = fph.getURLSpecFromFile(aFile);
 
     return "moz-icon://" + urlSpec + "?size=16";

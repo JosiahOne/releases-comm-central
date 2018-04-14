@@ -414,15 +414,15 @@ nsresult nsMailboxUrl::ParseUrl()
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMailboxUrl::SetSpec(const nsACString &aSpec)
+nsresult nsMailboxUrl::SetSpecInternal(const nsACString &aSpec)
 {
-  nsresult rv = nsMsgMailNewsUrl::SetSpec(aSpec);
+  nsresult rv = nsMsgMailNewsUrl::SetSpecInternal(aSpec);
   if (NS_SUCCEEDED(rv))
     rv = ParseUrl();
   return rv;
 }
 
-NS_IMETHODIMP nsMailboxUrl::SetQuery(const nsACString &aQuery)
+nsresult nsMailboxUrl::SetQuery(const nsACString &aQuery)
 {
   nsresult rv = nsMsgMailNewsUrl::SetQuery(aQuery);
   if (NS_SUCCEEDED(rv))

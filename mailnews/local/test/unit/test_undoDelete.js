@@ -2,8 +2,8 @@
 //
 // Original Author: David Bienvenu <dbienvenu@mozilla.com>
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 // Globals
 var gMsg1;
@@ -14,7 +14,7 @@ var gMsgId1;
 var gTestFolder;
 
 load("../../../resources/asyncTestUtils.js");
-Components.utils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 load("../../../resources/messageModifier.js");
 load("../../../resources/messageGenerator.js");
 load("../../../resources/messageInjection.js");
@@ -36,7 +36,7 @@ var gTestArray =
   function verifyFolders() {
     let msgRestored = gTestFolder.msgDatabase.getMsgHdrForMessageID(gMsgId1);
     let msg = mailTestUtils.loadMessageToString(gTestFolder, msgRestored);
-    do_check_eq(msg, gMsg1.toMboxString());
+    Assert.equal(msg, gMsg1.toMboxString());
     doTest(++gCurTestNum);
   },
 ];
@@ -46,7 +46,7 @@ function run_test()
   configure_message_injection({mode: "local"});
 
   gMsgWindow = Cc["@mozilla.org/messenger/msgwindow;1"]
-                  .createInstance(Components.interfaces.nsIMsgWindow);
+                  .createInstance(Ci.nsIMsgWindow);
 
   var messageGenerator = new MessageGenerator();
   gMsg1 = messageGenerator.makeMessage();
@@ -103,7 +103,7 @@ var CopyListener =
   {
     dump("in OnStopCopy " + gCurTestNum + "\n");
     // Check: message successfully copied.
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     // Ugly hack: make sure we don't get stuck in a JS->C++->JS->C++... call stack
     // This can happen with a bunch of synchronous functions grouped together, and
     // can even cause tests to fail because they're still waiting for the listener
@@ -120,7 +120,7 @@ var URLListener =
   OnStopRunningUrl: function(aURL, aStatus)
   {
     dump("in OnStopRunningURL " + gCurTestNum + "\n");
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     do_timeout(0, function(){doTest(++gCurTestNum);});
   }
 }

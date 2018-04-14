@@ -95,41 +95,6 @@ nsMsgCreateTempFile(const char *tFileName, nsIFile **tFile)
   return rv;
 }
 
-//
-// Create a file spec for the a unique temp file
-// on the local machine. Caller must free memory
-// returned
-//
-char *
-nsMsgCreateTempFileName(const char *tFileName)
-{
-  if ((!tFileName) || (!*tFileName))
-    tFileName = "nsmail.tmp";
-
-  nsCOMPtr<nsIFile> tmpFile;
-
-  nsresult rv = GetSpecialDirectoryWithFileName(NS_OS_TEMP_DIR,
-                                                tFileName,
-                                                getter_AddRefs(tmpFile));
-  if (NS_FAILED(rv))
-    return nullptr;
-
-  rv = tmpFile->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 00600);
-  if (NS_FAILED(rv))
-    return nullptr;
-
-  nsCString tempString;
-  rv = tmpFile->GetNativePath(tempString);
-  if (NS_FAILED(rv))
-    return nullptr;
-
-  char *tString = ToNewCString(tempString);
-  if (!tString)
-    return PL_strdup("mozmail.tmp");  // No need to I18N
-
-  return tString;
-}
-
 // This is the value a caller will Get if they don't Set first (like MDN
 // sending a return receipt), so init to the default value of the
 // mail.strictly_mime_headers preference.
@@ -306,7 +271,7 @@ nsresult mime_generate_headers(nsIMsgCompFields *fields,
   /* Use PR_FormatTimeUSEnglish() to format the date in US English format,
      then figure out what our local GMT offset is, and append it (since
      PR_FormatTimeUSEnglish() can't do that.) Generate four digit years as
-     per RFC 1123 (superceding RFC 822.)
+     per RFC 1123 (superseding RFC 822.)
    */
   char dateString[130];
   PR_FormatTimeUSEnglish(dateString, sizeof(dateString),
@@ -458,7 +423,7 @@ nsresult mime_generate_headers(nsIMsgCompFields *fields,
   }
 
   // We don't want to emit a Bcc header to the output. If we are saving this to
-  // Drafts/Sent, this is readded later in nsMsgSend.cpp.
+  // Drafts/Sent, this is re-added later in nsMsgSend.cpp.
   finalHeaders->DeleteHeader("bcc");
 
   // Skip no or empty priority.
@@ -966,7 +931,7 @@ inline static bool is7bitCharset(const nsCString& charset)
   return Substring(charset, 0, 8).EqualsLiteral("ISO-2022-");
 }
 
-#define PR_MAX_FOLDING_LEN 75     // this is to gurantee the folded line will
+#define PR_MAX_FOLDING_LEN 75     // this is to guarantee the folded line will
                                   // never be greater than 78 = 75 + CRLFLWSP
 /*static */ char *
 RFC2231ParmFolding(const char *parmName, const nsCString& charset,
@@ -1257,7 +1222,7 @@ mime_type_requires_b64_p (const char *type)
   {
     /* The following types are application/ or image/ types that are actually
      known to contain textual data (meaning line-based, not binary, where
-     CRLF conversion is desired rather than disasterous.)  So, if the type
+     CRLF conversion is desired rather than disastrous.)  So, if the type
      is any of these, it does not *require* base64, and if we do need to
      encode it for other reasons, we'll probably use quoted-printable.
      But, if it's not one of these types, then we assume that any subtypes

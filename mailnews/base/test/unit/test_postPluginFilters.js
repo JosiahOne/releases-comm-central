@@ -45,7 +45,7 @@ var gTests =
     command: kClass,
     fileName: kGoodFile,
     test: function testClassGood() {
-      do_check_eq(kPriorityHigh, gMsgHdr.priority);
+      Assert.equal(kPriorityHigh, gMsgHdr.priority);
     }
   },
   // test a filter that acts on JUNK messages
@@ -53,7 +53,7 @@ var gTests =
     command: kClass,
     fileName: kJunkFile,
     test: function testClassJunk() {
-      do_check_eq(kPriorityLow, gMsgHdr.priority);
+      Assert.equal(kPriorityLow, gMsgHdr.priority);
     }
   },
   /**/
@@ -250,6 +250,6 @@ function getSpec(aFileName)
 {
   var file = do_get_file(aFileName);
   var uri = Services.io.newFileURI(file).QueryInterface(Ci.nsIURL);
-  uri.query = "type=application/x-message-display";
+  uri = uri.mutate().setQuery("type=application/x-message-display").finalize();
   return uri.spec;
 }

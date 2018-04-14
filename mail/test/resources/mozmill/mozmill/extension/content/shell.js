@@ -1,17 +1,17 @@
-var controller = {};  Components.utils.import('resource://mozmill/modules/controller.js', controller);
-var events = {}; Components.utils.import('resource://mozmill/modules/events.js', events);
-var utils = {}; Components.utils.import('resource://mozmill/modules/utils.js', utils);
-var elementslib = {}; Components.utils.import('resource://mozmill/modules/elementslib.js', elementslib);
-var frame = {}; Components.utils.import('resource://mozmill/modules/frame.js', frame);
+var controller = {};  ChromeUtils.import("chrome://mozmill/content/modules/controller.js", controller);
+var events = {}; ChromeUtils.import("chrome://mozmill/content/modules/events.js", events);
+var utils = {}; ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
+var elementslib = {}; ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elementslib);
+var frame = {}; ChromeUtils.import("chrome://mozmill/content/modules/frame.js", frame);
 
 var that = this;
 
-var hwindow = Components.classes["@mozilla.org/appshell/appShellService;1"]
-                .getService(Components.interfaces.nsIAppShellService)
+var hwindow = Cc["@mozilla.org/appshell/appShellService;1"]
+                .getService(Ci.nsIAppShellService)
                 .hiddenDOMWindow;
 
-var wm = Components.classes["@mozilla.org/appshell/window-mediator;1"]
-           .getService(Components.interfaces.nsIWindowMediator);
+var wm = Cc["@mozilla.org/appshell/window-mediator;1"]
+           .getService(Ci.nsIWindowMediator);
 
 var dir = function(obj){
  for (let prop in obj){
@@ -65,8 +65,8 @@ var shell = new function(){
   };
 
   this.getWindows = function(){
-     var enumerator = Components.classes["@mozilla.org/appshell/window-mediator;1"]
-                      .getService(Components.interfaces.nsIWindowMediator)
+     var enumerator = Cc["@mozilla.org/appshell/window-mediator;1"]
+                      .getService(Ci.nsIWindowMediator)
                       .getEnumerator("");
       var s = "";
       //define an array we can access
@@ -135,7 +135,7 @@ var shell = new function(){
       }
       this.sendCmd(cmd);
       break;
-    //defaut is to eval
+    //default is to eval
     default:
        try {
          var res = eval.call(that,cmd);

@@ -24,7 +24,7 @@
   *
   */
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 Services.prefs.setCharPref("mail.serverDefaultStoreContractID",
                            "@mozilla.org/msgstore/berkeleystore;1");
@@ -44,20 +44,20 @@ function setColumnStates(folder) {
   let msgDatabase = folder.msgDatabase;
   let dbFolderInfo = msgDatabase.dBFolderInfo;
   dbFolderInfo.setCharProperty(this.PERSISTED_COLUMN_PROPERTY_NAME, columnJSON);
-  msgDatabase.Commit(Components.interfaces.nsMsgDBCommitType.kLargeCommit);
+  msgDatabase.Commit(Ci.nsMsgDBCommitType.kLargeCommit);
 }
 
 function checkPersistentState(folder) {
   let msgDatabase = folder.msgDatabase;
   let dbFolderInfo = msgDatabase.dBFolderInfo;
   let state = dbFolderInfo.getCharProperty(this.PERSISTED_COLUMN_PROPERTY_NAME);
-  do_check_eq(state, columnJSON);
+  Assert.equal(state, columnJSON);
   do_timeout(0, function(){doTest(++gCurTestNum);});
 }
 
 
 // nsIMsgCopyServiceListener implementation
-var copyListener = 
+var copyListener =
 {
   OnStartCopy: function() {},
   OnProgress: function(aProgress, aProgressMax) {},
@@ -75,7 +75,7 @@ var copyListener =
   OnStopCopy: function(aStatus)
   {
     // Check: message successfully copied.
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     // Ugly hack: make sure we don't get stuck in a JS->C++->JS->C++... call stack
     // This can happen with a bunch of synchronous functions grouped together, and
     // can even cause tests to fail because they're still waiting for the listener
@@ -90,7 +90,7 @@ var urlListener =
   },
   OnStopRunningUrl: function (aUrl, aExitCode) {
     // Check: message successfully copied.
-    do_check_eq(aExitCode, 0);
+    Assert.equal(aExitCode, 0);
     // Ugly hack: make sure we don't get stuck in a JS->C++->JS->C++... call stack
     // This can happen with a bunch of synchronous functions grouped together, and
     // can even cause tests to fail because they're still waiting for the listener
@@ -110,7 +110,7 @@ function deleteMessages(srcFolder, items)
   items.forEach(function (item) {
     array.appendElement(item);
   });
-  
+
   srcFolder.deleteMessages(array, null, false, true, copyListener, true);
 }
 

@@ -16,9 +16,10 @@
 #include "prprf.h"
 #include "prsystem.h"
 #include "nsIArray.h"
-#include "nsIServiceManager.h"
+#include "nsTArray.h"
+#include "nsArrayUtils.h"
 #include "nsINntpService.h"
-#include "nsIFolderListener.h"
+#include "nsIMsgFilterService.h"
 #include "nsCOMPtr.h"
 #include "nsIRDFService.h"
 #include "nsRDFCID.h"
@@ -35,7 +36,6 @@
 #include "nsILineInputStream.h"
 
 #include "nsIMsgWindow.h"
-#include "nsIDocShell.h"
 #include "nsIPrompt.h"
 #include "nsIWindowWatcher.h"
 
@@ -46,25 +46,22 @@
 #include "nsINntpUrl.h"
 
 #include "nsIInterfaceRequestor.h"
-#include "nsIInterfaceRequestorUtils.h"
 #include "nsArrayEnumerator.h"
 #include "nsNewsDownloader.h"
 #include "nsIStringBundle.h"
 #include "nsMsgI18N.h"
 #include "nsNativeCharsetUtils.h"
-#include "nsIMsgAccountManager.h"
-#include "nsArrayUtils.h"
-#include "nsIMsgAsyncPrompter.h"
+
 #include "nsIMsgFolderNotificationService.h"
 #include "nsIMutableArray.h"
 #include "nsILoginInfo.h"
 #include "nsILoginManager.h"
-#include "nsIPromptService.h"
 #include "nsEmbedCID.h"
-#include "nsIDOMWindow.h"
 #include "mozilla/Services.h"
 #include "nsAutoPtr.h"
 #include "nsIInputStream.h"
+#include "nsMemory.h"
+#include "nsIURIMutator.h"
 
 static NS_DEFINE_CID(kRDFServiceCID, NS_RDFSERVICE_CID);
 
@@ -992,7 +989,7 @@ nsMsgNewsFolder::HandleNewsrcLine(const char * line, uint32_t line_size)
   if (*line == '\0')
     return 0;
 
-  // previous versions of Communicator poluted the
+  // previous versions of Communicator polluted the
   // newsrc files with articles
   // (this would happen when you clicked on a link like
   // news://news.mozilla.org/3746EF3F.6080309@netscape.com)
@@ -1086,8 +1083,6 @@ nsresult nsMsgNewsFolder::CreateNewsgroupUrlForSignon(const char *ref,
     nsAString &result)
 {
   nsresult rv;
-  nsCOMPtr<nsIURL> url = do_CreateInstance(NS_STANDARDURL_CONTRACTID, &rv);
-  NS_ENSURE_SUCCESS(rv,rv);
 
   nsCOMPtr<nsIMsgIncomingServer> server;
   rv = GetServer(getter_AddRefs(server));
@@ -1100,18 +1095,19 @@ nsresult nsMsgNewsFolder::CreateNewsgroupUrlForSignon(const char *ref,
   bool singleSignon = true;
   rv = nntpServer->GetSingleSignon(&singleSignon);
 
+  nsCOMPtr<nsIURL> url;
   if (singleSignon)
   {
     nsCString serverURI;
     rv = server->GetServerURI(serverURI);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = url->SetSpec(serverURI);
+    rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(serverURI).Finalize(url);
     NS_ENSURE_SUCCESS(rv, rv);
   }
   else
   {
-    rv = url->SetSpec(mURI);
+    rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(mURI).Finalize(url);
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
@@ -1134,7 +1130,7 @@ nsresult nsMsgNewsFolder::CreateNewsgroupUrlForSignon(const char *ref,
     // password manager "blanks" those out.
     if (socketType == nsMsgSocketType::SSL)
     {
-      rv = url->SetPort(nsINntpUrl::DEFAULT_NNTPS_PORT);
+      rv = NS_MutateURI(url).SetPort(nsINntpUrl::DEFAULT_NNTPS_PORT).Finalize(url);
       NS_ENSURE_SUCCESS(rv, rv);
     }
   }
@@ -1142,7 +1138,7 @@ nsresult nsMsgNewsFolder::CreateNewsgroupUrlForSignon(const char *ref,
   nsCString rawResult;
   if (ref)
   {
-    rv = url->SetRef(nsDependentCString(ref));
+    rv = NS_MutateURI(url).SetRef(nsDependentCString(ref)).Finalize(url);
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = url->GetSpec(rawResult);

@@ -8,7 +8,6 @@
 #include "nsAbQueryStringToExpression.h"
 
 #include "nsAbBaseCID.h"
-#include "nsIAbManager.h"
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
 #include "nsNetCID.h"
@@ -18,6 +17,8 @@
 #include "nsEnumeratorUtils.h"
 #include "nsIAbLDAPAttributeMap.h"
 #include "nsIAbMDBDirectory.h"
+#include "nsIAbManager.h"
+#include "nsIAddrDatabase.h"
 #include "nsILDAPURL.h"
 #include "nsILDAPConnection.h"
 #include "nsAppDirectoryServiceDefs.h"
@@ -502,7 +503,7 @@ NS_IMETHODIMP nsAbLDAPDirectory::UseForAutocomplete(const nsACString &aIdentityK
     }
 
     // If the preference name is still empty but useDirectory is false, then
-    // the global one is not available, nor is the overriden one.
+    // the global one is not available, nor is the overridden one.
     if (prefName.IsEmpty() && !useDirectory)
       return NS_OK;
   }

@@ -1,14 +1,39 @@
 trust-domain: comm
+project-repo-param-prefix: comm_
 treeherder:
     group-names:
-        'tc': 'Executed by TaskCluster'
-        'tc-X': 'Xpcshell tests executed by TaskCluster'
-        'tc-Z': 'MozMill tests executed by TaskCluster'
+        'X': 'Xpcshell tests'
+        'Z': 'MozMill tests'
         'I': 'Docker Image Builds'
         'TL': 'Toolchain builds for Linux 64-bits'
         'TM': 'Toolchain builds for OSX'
         'TMW': 'Toolchain builds for Windows MinGW'
         'TW32': 'Toolchain builds for Windows 32-bits'
         'TW64': 'Toolchain builds for Windows 64-bits'
+        'Deb7': 'Packages for Debian 7'
+        'L10n': 'Localised Repacks'
+        'L10n-Rpk': 'Localized Repackaged Repacks'
+        'rs': 'Repackage signing'
+        'BMR-L10n': 'Beetmover repackages for locales'
+        'c-Up': 'Balrog submission of complete updates'
 
-try: {}
+index:
+    products:
+        - thunderbird
+
+try:
+    ridealong-builds: {}
+
+scriptworker:
+    scope-prefix: 'project:comm:thunderbird:releng'
+
+    worker-types:
+        'scriptworker-prov-v1/tb-depsigning':
+            - 'project:comm:thunderbird:releng:signing:cert:dep-signing'
+        'scriptworker-prov-v1/tb-signing-v1':
+            - 'project:comm:thunderbird:releng:signing:cert:nightly-signing'
+            - 'project:comm:thunderbird:releng:signing:cert:release-signing'
+        'scriptworker-prov-v1/tb-beetmover-dev':
+            - 'project:comm:thunderbird:releng:beetmover:bucket:dep'
+        'scriptworker-prov-v1/tb-balrog-dev':
+            - 'project:comm:thunderbird:releng:balrog:server:dep'

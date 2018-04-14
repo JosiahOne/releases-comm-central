@@ -6,9 +6,9 @@
  *         removeWidgetFor, onSelectAlarm, ensureCalendarVisible
  */
 
-Components.utils.import("resource://gre/modules/PluralForm.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 /**
  * Helper function to get the alarm service and cache it.
@@ -56,6 +56,7 @@ function onDismissAllAlarms() {
     // removes widgets on the fly:
     let alarmRichlist = document.getElementById("alarm-richlist");
     let parentItems = {};
+    let widgets = [];
 
     // Make a copy of the child nodes as they get modified live
     for (let node of alarmRichlist.childNodes) {
@@ -64,8 +65,11 @@ function onDismissAllAlarms() {
             !(node.item.parentItem.hashId in parentItems)) {
             // We only need to acknowledge one occurrence for repeating items
             parentItems[node.item.parentItem.hashId] = node.item.parentItem;
-            getAlarmService().dismissAlarm(node.item, node.alarm);
+            widgets.push({ item: node.item, alarm: node.alarm });
         }
+    }
+    for (let widget of widgets) {
+        getAlarmService().dismissAlarm(widget.item, widget.alarm);
     }
 }
 
@@ -78,7 +82,7 @@ function onDismissAllAlarms() {
 function onItemDetails(event) {
     // We want this to happen in a calendar window if possible. Otherwise open
     // it using our window.
-    let calWindow = cal.getCalendarWindow();
+    let calWindow = cal.window.getCalendarWindow();
     if (calWindow) {
         calWindow.modifyEventWithDialog(event.target.item, null, true);
     } else {
@@ -172,12 +176,17 @@ function snoozeAllItems(aDurationMinutes) {
     for (let node of alarmRichlist.childNodes) {
         // Check if the node is a valid alarm and is still part of DOM
         if (node.parentNode && node.item && node.alarm &&
+            cal.acl.isCalendarWritable(node.item.calendar) &&
+            cal.acl.userCanModifyItem(node.item) &&
             !(node.item.parentItem.hashId in parentItems)) {
             // We only need to acknowledge one occurrence for repeating items
             parentItems[node.item.parentItem.hashId] = node.item.parentItem;
             getAlarmService().snoozeAlarm(node.item, node.alarm, duration);
         }
     }
+    // we need to close the widget here explicitely because the dialog will stay
+    // opened if there a still not snoozable alarms
+    document.getElementById("alarm-snooze-all-button").firstChild.hidePopup();
 }
 
 /**
@@ -210,7 +219,7 @@ function getDuration(aMinutes) {
 function aboveSnoozeLimit(aDuration) {
     const LIMIT = Components.interfaces.calIAlarmService.MAX_SNOOZE_MONTHS;
 
-    let currentTime = cal.now().getInTimezone(cal.UTC());
+    let currentTime = cal.dtz.now().getInTimezone(cal.dtz.UTC);
     let limitTime = currentTime.clone();
     limitTime.month += LIMIT;
 
@@ -239,7 +248,7 @@ function setupTitle() {
  * the start date of a calendar-alarm-widget.
  *
  * @param aItem                 A calendar item for the comparison of the start date property
- * @param calAlarmWidget        The alarm widget item for the start date comparison with the given calendar item
+ * @param aWidgetItem           The alarm widget item for the start date comparison with the given calendar item
  * @return                      1 - if the calendar item starts before the calendar-alarm-widget
  *                             -1 - if the calendar-alarm-widget starts before the calendar item
  *                              0 - otherwise
@@ -250,8 +259,8 @@ function widgetAlarmComptor(aItem, aWidgetItem) {
     }
 
     // Get the dates to compare
-    let aDate = aItem[cal.calGetStartDateProp(aItem)];
-    let bDate = aWidgetItem[cal.calGetStartDateProp(aWidgetItem)];
+    let aDate = aItem[cal.dtz.startDateProp(aItem)];
+    let bDate = aWidgetItem[cal.dtz.startDateProp(aWidgetItem)];
 
     return aDate.compare(bDate);
 }
@@ -267,7 +276,7 @@ function addWidgetFor(aItem, aAlarm) {
     let alarmRichlist = document.getElementById("alarm-richlist");
 
     // Add widgets sorted by start date ascending
-    cal.binaryInsertNode(alarmRichlist, widget, aItem, widgetAlarmComptor, false);
+    cal.data.binaryInsertNode(alarmRichlist, widget, aItem, widgetAlarmComptor, false);
 
     widget.item = aItem;
     widget.alarm = aAlarm;
@@ -276,6 +285,7 @@ function addWidgetFor(aItem, aAlarm) {
     widget.addEventListener("itemdetails", onItemDetails);
 
     setupTitle();
+    doReadOnlyChecks();
 
     if (!alarmRichlist.userSelectedWidget) {
         // Always select first widget of the list.
@@ -316,6 +326,7 @@ function removeWidgetFor(aItem, aAlarm) {
             widget.removeEventListener("itemdetails", onItemDetails);
 
             widget.remove();
+            doReadOnlyChecks();
             closeIfEmpty();
             notfound = false;
         }
@@ -323,6 +334,50 @@ function removeWidgetFor(aItem, aAlarm) {
 
     // Update the title
     setupTitle();
+    closeIfEmpty();
+}
+
+/**
+ * Enables/disables the 'snooze all' button and displays or removes a r/o
+ * notification based on the readability of the calendars of the alarms visible
+ * in the alarm list
+ */
+function doReadOnlyChecks() {
+    let countRO = 0;
+    let alarmRichlist = document.getElementById("alarm-richlist");
+    for (let node of alarmRichlist.childNodes) {
+        if (!cal.acl.isCalendarWritable(node.item.calendar) ||
+            !cal.acl.userCanModifyItem(node.item)) {
+            countRO++;
+        }
+    }
+
+    // we disable the button if there are only alarms for not-writable items
+    let snoozeAllButton = document.getElementById("alarm-snooze-all-button");
+    snoozeAllButton.disabled = (countRO && countRO == alarmRichlist.childNodes.length);
+    if (snoozeAllButton.disabled) {
+        let tooltip = cal.calGetString("calendar-alarms",
+                                       "reminderDisabledSnoozeButtonTooltip");
+        snoozeAllButton.setAttribute("tooltiptext", tooltip);
+    } else {
+        snoozeAllButton.removeAttribute("tooltiptext");
+    }
+
+    let nBox = document.getElementById("readonly-notification");
+    let notification = nBox.getNotificationWithValue("calendar-readonly");
+    if (countRO && !notification) {
+        let message = cal.calGetString("calendar-alarms",
+                                       "reminderReadonlyNotification",
+                                       [snoozeAllButton.label]);
+        nBox.appendNotification(message,
+                                "calendar-readonly",
+                                null,
+                                nBox.PRIORITY_WARNING_MEDIUM,
+                                null,
+                                null);
+    } else if (notification && !countRO) {
+        nBox.removeNotification(notification);
+    }
 }
 
 /**

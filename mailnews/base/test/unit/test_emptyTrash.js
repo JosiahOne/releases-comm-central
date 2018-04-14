@@ -16,7 +16,7 @@
   */
 
 // Globals
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var gMsgFile1;
 var gLocalTrashFolder;
@@ -28,7 +28,7 @@ var nsIMFNService = Ci.nsIMsgFolderNotificationService;
 var nsIMFListener = Ci.nsIMsgFolderListener;
 
 // nsIMsgCopyServiceListener implementation
-var copyListener = 
+var copyListener =
 {
   OnStartCopy: function() {},
   OnProgress: function(aProgress, aProgressMax) {},
@@ -41,7 +41,7 @@ var copyListener =
   OnStopCopy: function(aStatus)
   {
     // Check: message successfully copied.
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     // Ugly hack: make sure we don't get stuck in a JS->C++->JS->C++... call stack
     // This can happen with a bunch of synchronous functions grouped together, and
     // can even cause tests to fail because they're still waiting for the listener
@@ -56,7 +56,7 @@ var urlListener =
   },
   OnStopRunningUrl: function (aUrl, aExitCode) {
     // Check: message successfully copied.
-    do_check_eq(aExitCode, 0);
+    Assert.equal(aExitCode, 0);
     // Ugly hack: make sure we don't get stuck in a JS->C++->JS->C++... call stack
     // This can happen with a bunch of synchronous functions grouped together, and
     // can even cause tests to fail because they're still waiting for the listener
@@ -76,7 +76,7 @@ function deleteMessages(srcFolder, items)
   items.forEach(function (item) {
     array.appendElement(item);
   });
-  
+
   srcFolder.deleteMessages(array, null, false, true, copyListener, true);
 }
 
@@ -113,10 +113,10 @@ var gTestArray =
     gLocalTrashFolder.emptyTrash(null, null);
     // check that the trash folder is 0 size, that the db has a 0 message count
     // and has no messages.
-    do_check_eq(0, gLocalTrashFolder.filePath.fileSize);
-    do_check_eq(0, gLocalTrashFolder.msgDatabase.dBFolderInfo.numMessages);
+    Assert.equal(0, gLocalTrashFolder.filePath.fileSize);
+    Assert.equal(0, gLocalTrashFolder.msgDatabase.dBFolderInfo.numMessages);
     let enumerator = gLocalTrashFolder.msgDatabase.EnumerateMessages();
-    do_check_eq(false, enumerator.hasMoreElements());
+    Assert.equal(false, enumerator.hasMoreElements());
     urlListener.OnStopRunningUrl(null, 0);
   }
 ];
@@ -153,7 +153,7 @@ function doTest(test)
   if (test <= gTestArray.length)
   {
     gCurTestNum = test;
-    
+
     var testFn = gTestArray[test-1];
     // Set a limit of three seconds; if the notifications haven't arrived by then there's a problem.
     do_timeout(10000, function(){

@@ -3,9 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calIteratorUtils.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 /**
  * Constructor of calItipItem object
@@ -128,6 +128,20 @@ calItipItem.prototype = {
                 att.deleteProperty("RECEIVED-SEQUENCE");
                 att.deleteProperty("RECEIVED-DTSTAMP");
             });
+
+            // according to RfC 6638, the following items must not be exposed in client side
+            // email scheduling messages, so let's remove it if present
+            let removeSchedulingParams = (aCalUser) => {
+                aCalUser.deleteProperty("SCHEDULE-AGENT");
+                aCalUser.deleteProperty("SCHEDULE-FORCE-SEND");
+                aCalUser.deleteProperty("SCHEDULE-STATUS");
+            };
+            item.getAttendees({}).forEach(removeSchedulingParams);
+            // we're graceful here as some PUBLISHed events may violate RfC by having no organizer
+            if (item.organizer) {
+                removeSchedulingParams(item.organizer);
+            }
+
             item.setProperty("DTSTAMP", stamp);
             item.setProperty("LAST-MODIFIED", lastModified); // need to be last to undirty the item
         }

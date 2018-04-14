@@ -7,36 +7,42 @@
   ======================================================================= */
 
 @import url("chrome://messenger/skin/");
+@import url("chrome://messenger/skin/shared/messengercompose.css");
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 
-#attachmentBucket {
-  width: 15em;
-  min-width: 15em;
-}
-
-#attachmentBucket:focus {
+#attachmentBucket[empty]:focus {
   box-shadow: 0 0 2px Highlight inset, 0 0 2px Highlight inset;
 }
 
-#attachmentBucket > scrollbox > .scrollbox-innerbox {
-  padding: 1px;
+#attachmentBucket attachmentitem {
+  border-top: 1px solid transparent;
+}
+
+#attachmentBucket attachmentitem:last-child {
+  border-bottom: 1px solid transparent;
+}
+
+#attachmentBucket attachmentitem[dropOn="top"] {
+  border-top-color: Highlight;
+}
+
+#attachmentBucket attachmentitem[dropOn="bottom"] {
+  border-bottom-color: Highlight;
 }
 
 #compose-toolbox {
   -moz-appearance: none;
   background-color: var(--toolbar-bgcolor);
-  border-bottom: 1px solid ThreeDShadow;
+  border-bottom: 1px solid var(--toolbox-border-bottom-color);
 }
 
 #compose-toolbox:-moz-lwtheme {
   background-color: var(--toolbar-bgcolor);
   color: var(--toolbar-color, inherit);
-}
-
-#compose-toolbox > toolbar {
-  /* force iconsize="small" on these toolbars */
-  counter-reset: smallicons;
+  /* Uses a background image instead of a border to avoid jumping of the toolbar
+     when a theme is enabled. */
+  background-image: linear-gradient(to bottom, var(--tabs-border-color, transparent) 1px, transparent 1px);
 }
 
 /** Stock icons for the menu items. */
@@ -76,53 +82,6 @@
 
 #menu_styleStrikeThru {
   list-style-image: url("moz-icon://stock/gtk-strikethrough?size=menu");
-}
-
-/* ::::: primary toolbar buttons ::::: */
-
-#button-send {
-  list-style-image: url("chrome://messenger/skin/icons/send.svg");
-}
-
-#button-contacts {
-  list-style-image: url("chrome://messenger/skin/icons/address.svg");
-  -moz-image-region: auto !important;
-}
-
-#spellingButton {
-  list-style-image: url("chrome://messenger/skin/icons/spelling.svg");
-}
-
-#button-attach {
-  list-style-image: url("chrome://messenger/skin/icons/attach.svg");
-}
-
-#button-security {
-  list-style-image: url("chrome://messenger/skin/icons/security.svg");
-}
-
-#button-save {
-  list-style-image: url("chrome://messenger/skin/icons/save.svg");
-}
-
-#quoteButton {
-  list-style-image: url("chrome://messenger/skin/icons/quote.svg");
-}
-
-#cut-button {
-  list-style-image: url("chrome://messenger/skin/icons/cut.svg");
-}
-
-#copy-button {
-  list-style-image: url("chrome://messenger/skin/icons/copy.svg");
-}
-
-#paste-button {
-  list-style-image: url("chrome://messenger/skin/icons/paste.svg");
-}
-
-#button-print {
-  list-style-image: url("chrome://messenger/skin/icons/print.svg");
 }
 
 /* ::::: menulists on toolbar ::::: */
@@ -177,42 +136,16 @@ menulist:-moz-locale-dir(rtl) > .menulist-label-box {
 }
 
 #attachments-header-box {
-  height: 24px;
-  margin-top: 1px;
-}
-
-#attachmentBucketCount {
-  margin-top: 0;
-  margin-bottom: 0;
+  min-height: 28px;
 }
 
 #attachmentBucketSize {
   color: GrayText;
-  margin-top: 0;
-  margin-bottom: 0;
-  padding-inline-end: 1px;
+  padding-inline-end: 2px;
 }
 
-/* ::::: attachment reminder ::::: */
-
-#attachmentNotificationBox b {
-  font-weight: bold;
-}
-
-#attachmentNotificationBox > notification[image="null"] .messageImage {
-  background-image: url("chrome://messenger/skin/icons/attach.svg");
-}
-
-#attachmentReminderText {
-  margin-inline-start: 0px;
-  cursor: pointer;
-}
-
-#attachmentKeywords {
-  font-weight: bold;
-  margin-inline-start: 0px;
-  text-decoration: underline;
-  cursor: pointer;
+#attachmentBucketCloseButton {
+  padding: 0 1px;
 }
 
 /* XXX I should really have a selector rule here to select just .listcell-icon objects underneath the attachmentList listbox */
@@ -252,36 +185,17 @@ menulist:-moz-locale-dir(rtl) > .menulist-label-box {
 
 /* ::::: autocomplete icons ::::: */
 
-treechildren::-moz-tree-image(local-abook) {
-  margin-inline-start: 3px;
-  margin-inline-end: 2px;
-  list-style-image: url("chrome://messenger/skin/addressbook/icons/addrbook.png");
+.ac-site-icon {
+  display: -moz-box;
+  margin: 1px 5px;
 }
 
-treechildren::-moz-tree-image(remote-abook) {
-  margin-inline-start: 3px;
-  margin-inline-end: 2px;
-  list-style-image: url("chrome://messenger/skin/addressbook/icons/remote-addrbook.png");
-}
-
-treechildren::-moz-tree-image(remote-err) {
-  margin-inline-start: 3px;
-  margin-inline-end: 2px;
-  list-style-image: url("chrome://messenger/skin/addressbook/icons/remote-addrbook-error.png");
-}
-
-treechildren::-moz-tree-image(subscribed-news) {
-  margin-inline-start: 3px;
-  margin-inline-end: 2px;
+.autocomplete-richlistitem[type="subscribed-news"] > .ac-site-icon {
   list-style-image: url("chrome://messenger/skin/icons/folder-pane.png");
-  -moz-image-region: rect(208px 16px 224px 0px);
+  -moz-image-region: rect(208px 16px 224px 0);
 }
 
 /* ::::: addressing widget ::::: */
-
-.autocomplete-treebody::-moz-tree-cell-text(comment) {
-  color: #555566;
-}
 
 #addressingWidget {
   -moz-user-focus: none;
@@ -307,6 +221,7 @@ treechildren::-moz-tree-image(subscribed-news) {
 .textbox-addressingWidget,
 .dummy-row-cell:not(:first-child) {
   padding: 4px 2px !important;
+  padding-inline-start: 5px !important;
   border: solid 1px transparent !important;
   border-bottom-color: var(--toolbarbutton-hover-bordercolor) !important;
   transition: border .2s, background-color .2s;
@@ -321,6 +236,23 @@ treechildren::-moz-tree-image(subscribed-news) {
 .textbox-addressingWidget:hover {
   background-color: -moz-field;
   border-color: var(--toolbarbutton-hover-bordercolor) !important;
+}
+
+.deleteAddress {
+  -moz-box-ordinal-group: 0;
+  cursor: default;
+  margin-inline-start: 0;
+  margin-bottom: 1px;
+  width: 0;
+  height: 18px;
+  transition-property: width, margin-inline-start;
+  transition-duration: 50ms, 50ms;
+  transition-timing-function: ease-in-out, ease-in-out;
+}
+
+.addressingWidgetCell:hover > .aw-menulist:not([open="true"]) + .deleteAddress {
+  margin-inline-start: 5px;
+  width: 18px;
 }
 
 .aw-menulist {
@@ -368,18 +300,7 @@ treechildren::-moz-tree-image(subscribed-news) {
 
 #composeContentBox {
   background-color: -moz-dialog;
-  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.4) inset;
-
-  /*
-   * In order to remove the shadow border on left/right edges elegantly,
-   * use left/right margins of -3px. We make up for this by adding 3px
-   * of padding instead.
-   */
-
-  margin-right: -3px;
-  margin-left: -3px;
-  padding-right: 3px;
-  padding-left: 3px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4) inset;
 }
 
 #composeContentBox:-moz-window-inactive {
@@ -396,6 +317,10 @@ treechildren::-moz-tree-image(subscribed-news) {
   text-shadow: none;
   background-image: url("chrome://messenger/skin/messengercompose/linux-noise.png");
   padding-top: 3px;
+}
+
+#addresses-box {
+  padding-top: 4px;
 }
 
 #identityLabel-box {
@@ -448,11 +373,6 @@ treechildren::-moz-tree-image(subscribed-news) {
   display: none;
 }
 
-#msgIdentityPopup > menuitem[_moz-menuactive="true"] > .menu-description {
-  color: HighlightText;
-  opacity: .7;
-}
-
 /* ::::: format toolbar ::::: */
 
 #FormatToolbar {
@@ -463,16 +383,8 @@ treechildren::-moz-tree-image(subscribed-news) {
   background-image: url("chrome://messenger/skin/messengercompose/linux-noise.png");
 }
 
-#FontFaceSelect {
-  max-width: 35ch;
-}
-
 toolbarbutton.formatting-button {
   list-style-image: url("chrome://messenger/skin/messengercompose/format-buttons.png");
-}
-
-#FormatToolbar > toolbarbutton > .toolbarbutton-text {
-  display: none;
 }
 
 #AbsoluteFontSizeButton {
@@ -559,7 +471,6 @@ toolbarbutton.formatting-button {
   -moz-image-region: rect(64px 16px 80px 0px);
 }
 
-
 #smileButtonMenu {
   -moz-image-region: rect(32px 16px 48px 0px);
 }
@@ -620,82 +531,82 @@ toolbarbutton.formatting-button {
 
 #smileySmile > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-smile.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyFrown > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-frown.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyWink > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-wink.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyTongue > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-tongue-out.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyLaughing > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-laughing.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyEmbarassed > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-embarassed.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyUndecided > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-undecided.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileySurprise > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-surprised.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyKiss > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-kiss.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyYell > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-yell.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyCool > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-cool.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyMoney > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-money-mouth.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyFoot > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-foot-in-mouth.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyInnocent > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-innocent.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileyCry > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-cry.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 #smileySealed > .menu-iconic-left {
   list-style-image: url("chrome://communicator/skin/icons/smileys/smiley-sealed.png");
-  -moz-image-region: auto; /* cut off inheritance */
+  -moz-image-region: auto;
 }
 
 /* ..... fg/bg color picker ..... */
@@ -722,44 +633,6 @@ toolbarbutton.formatting-button {
 .color-button[disabled="true"]:hover {
   border: 1px inset ThreeDFace;
   opacity: 0.5;
-}
-
-#TextColorButton {
-  margin-top: 2px;
-  margin-bottom: 9px;
-  margin-inline-start: 2px;
-  margin-inline-end: 9px;
-}
-
-#TextColorButton[color="mixed"] {
-  background-image: url("chrome://messenger/skin/icons/multicolor.png");
-  background-size: cover;
-}
-
-#BackgroundColorButton {
-  margin-top: 9px;
-  margin-bottom: 2px;
-  margin-inline-start: 9px;
-  margin-inline-end: 2px;
-}
-
-#HighlightColorButton {
-  -moz-image-region: rect(260px 16px 272px 0px);
-  background-color: transparent;
-}
-
-#HighlightColorButton:hover {
-  -moz-image-region: rect(260px 32px 272px 16px);
-}
-
-#HighlightColorButton:hover:active {
-  -moz-image-region: rect(260px 48px 272px 32px);
-}
-
-#HighlightColorButton[disabled="true"],
-#HighlightColorButton[disabled="true"]:hover,
-#HighlightColorButton[disabled="true"]:hover:active {
-  -moz-image-region: rect(260px 64px 272px 48px);
 }
 
 /* ::::: address book sidebar ::::: */
@@ -799,10 +672,6 @@ toolbarbutton.formatting-button {
   list-style-image: url("moz-icon://stock/gtk-spell-check?size=menu");
 }
 
-#msgIdentityPopup > menuitem {
-  -moz-binding: url("chrome://global/content/bindings/menu.xml#menuitem-iconic-desc-noaccel");
-}
-
 #tasksMenuAddressBook {
   list-style-image: url("chrome://messenger/skin/addressbook/icons/addrbook.png");
 }
@@ -824,38 +693,4 @@ menu[command="cmd_convertCloud"] .menu-iconic-left {
   /* Ensure that the provider icons are visible even if the Gnome theme says
      menus shouldn't have icons. */
   visibility: visible;
-}
-
-/* ::::: Reorder Attachments Panel ::::: */
-
-#reorderAttachmentsPanel > .panel-arrowcontainer > .panel-arrowcontent {
-  --arrowpanel-padding: 4px;
-}
-
-#btn_moveAttachmentTop {
-  list-style-image: url("chrome://messenger/skin/icons/move-top.svg");
-}
-
-#btn_moveAttachmentUp {
-  list-style-image: url("chrome://messenger/skin/icons/move-up.svg");
-}
-
-#btn_moveAttachmentDown {
-  list-style-image: url("chrome://messenger/skin/icons/move-down.svg");
-}
-
-#btn_moveAttachmentBottom {
-  list-style-image: url("chrome://messenger/skin/icons/move-bottom.svg");
-}
-
-#btn_moveAttachmentBundleUp {
-  list-style-image: url("chrome://messenger/skin/icons/move-together.svg");
-}
-
-#btn_sortAttachmentsToggle {
-  list-style-image: url("chrome://messenger/skin/icons/sort.svg");
-}
-
-#btn_sortAttachmentsToggle[data-sortdirection="descending"] > .toolbarbutton-icon {
-  transform: scaleY(-1);
 }

@@ -8,7 +8,7 @@
  *   - Message with mix of attachment types.
  */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -45,7 +45,7 @@ var streamListener =
   onStartRequest: function(aRequest, aContext) {
   },
   onStopRequest: function(aRequest, aContext, aStatusCode) {
-    do_check_eq(aStatusCode, 0);
+    Assert.equal(aStatusCode, 0);
   },
 
   // nsIStreamListener
@@ -60,20 +60,14 @@ var streamListener =
 };
 
 // Adds some messages directly to a mailbox (eg new mail)
-function addMessagesToServer(messages, mailbox, localFolder)
+function addMessagesToServer(messages, mailbox)
 {
   // For every message we have, we need to convert it to a file:/// URI
   messages.forEach(function (message)
   {
-    let URI =
-      Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL);
-    message.spec = URI.spec;
-  });
-
-  // Create the imapMessages and store them on the mailbox
-  messages.forEach(function (message)
-  {
-    mailbox.addMessage(new imapMessage(message.spec, mailbox.uidnext++, []));
+    let URI = Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL);
+    // Create the imapMessage and store it on the mailbox.
+    mailbox.addMessage(new imapMessage(URI.spec, mailbox.uidnext++, []));
   });
 }
 
@@ -81,7 +75,7 @@ function setup() {
   // We aren't interested in downloading messages automatically
   Services.prefs.setBoolPref("mail.server.server1.autosync_offline_stores", false);
   Services.prefs.setBoolPref("mail.server.server1.offline_download", true);
-  // make small threshhold for mpod so our test messages don't have to be big.
+  // make small threshold for mpod so our test messages don't have to be big.
   // XXX We can't set this pref until the fake server supports body structure.
   // So for now, we'll leave it at the default value, which is larger than any of
   // our test messages.
@@ -100,11 +94,10 @@ function setup() {
   // Add a couple of messages to the INBOX
   // this is synchronous, afaik
   addMessagesToServer([{file: gMsgFile1, messageId: gMsgId1},
-                        {file: gMsgFile2, messageId: gMsgId2},
-                        {file: gMsgFile3, messageId: gMsgId3},
-//                         {file: gMsgFile5, messageId: gMsgId5},
+                       {file: gMsgFile2, messageId: gMsgId2},
+                       {file: gMsgFile3, messageId: gMsgId3},
                       ],
-                        IMAPPump.daemon.getMailbox("INBOX"), IMAPPump.inbox);
+                      IMAPPump.daemon.getMailbox("INBOX"));
 }
 
 var gIMAPService;
@@ -134,7 +127,7 @@ var tests = [
   },
   function* select2ndMsg() {
     let msg1 = IMAPPump.inbox.msgDatabase.getMsgHdrForMessageID(gMsgId1);
-    do_check_neq(msg1.flags & nsMsgMessageFlags.Offline, 0);
+    Assert.notEqual(msg1.flags & nsMsgMessageFlags.Offline, 0);
     let db = IMAPPump.inbox.msgDatabase;
     let msg2 = db.getMsgHdrForMessageID(gMsgId2);
     let url = new Object;
@@ -148,7 +141,7 @@ var tests = [
   },
   function* select3rdMsg() {
     let msg2 = IMAPPump.inbox.msgDatabase.getMsgHdrForMessageID(gMsgId2);
-    do_check_neq(msg2.flags & nsMsgMessageFlags.Offline, 0);
+    Assert.notEqual(msg2.flags & nsMsgMessageFlags.Offline, 0);
     let db = IMAPPump.inbox.msgDatabase;
     let msg3 = db.getMsgHdrForMessageID(gMsgId3);
     let url = new Object;
@@ -167,7 +160,7 @@ var tests = [
   },
   function* addNewMsgs() {
     let mbox = IMAPPump.daemon.getMailbox("INBOX")
-    // make a couple messges
+    // make a couple of messages
     let messages = [];
     let bodyString = "";
     for (let i = 0; i < 100; i++)
@@ -192,7 +185,7 @@ var tests = [
   function* testQueuedOfflineDownload()
   {
     // Make sure that streaming the same message and then trying to download
-    // it for offline use doesn't end up in it getting added to the offline 
+    // it for offline use doesn't end up in it getting added to the offline
     // store twice.
     gImapInboxOfflineStoreSize = IMAPPump.inbox.filePath.fileSize + gFirstMsgSize;
     let newMsgHdr = IMAPPump.inbox.GetMessageHeader(gFirstNewMsg);
@@ -205,7 +198,7 @@ var tests = [
   function* firstStreamFinished()
   {
     // nsIMsgFolder.DownloadMessagesForOffline does not take a listener, so
-    // we invoke nsIImapService.downloadMessagesForOffline directly with a 
+    // we invoke nsIImapService.downloadMessagesForOffline directly with a
     // listener.
     MailServices.imap.downloadMessagesForOffline(gFirstNewMsg,
                                                  IMAPPump.inbox,
@@ -216,7 +209,7 @@ var tests = [
   function checkOfflineStoreSize()
   {
     dump("checking offline store size\n");
-    do_check_true(IMAPPump.inbox.filePath.fileSize <= gImapInboxOfflineStoreSize);
+    Assert.ok(IMAPPump.inbox.filePath.fileSize <= gImapInboxOfflineStoreSize);
   },
   teardown
 ]
@@ -241,7 +234,7 @@ var gStreamListener = {
 };
 
 asyncUrlListener.callback = function(aUrl, aExitCode) {
-  do_check_eq(aExitCode, 0);
+  Assert.equal(aExitCode, 0);
 };
 
 function teardown() {

@@ -3,11 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "InlineSpellCheckerUI", function() {
   let tmp = {};
-  Components.utils.import("resource://gre/modules/InlineSpellChecker.jsm", tmp);
+  ChromeUtils.import("resource://gre/modules/InlineSpellChecker.jsm", tmp);
   return new tmp.InlineSpellChecker();
 });
 
@@ -62,7 +62,7 @@ nsContextMenu.prototype.initEditorItems = function (aShow)
     this.hideDisabledItem("context-copy", true);
     this.hideDisabledItem("context-paste", true);
     this.hideDisabledItem("context-delete", true);
-    
+
     this.showItem("context-sep-undo",
                   this.shouldShowSeparator("context-sep-undo"));
     this.showItem("context-sep-paste",

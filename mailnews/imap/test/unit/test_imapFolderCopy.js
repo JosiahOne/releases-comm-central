@@ -8,9 +8,9 @@ load("../../../resources/messageGenerator.js");
 
 var gEmptyLocal1, gEmptyLocal2, gEmptyLocal3, gNotEmptyLocal4;
 
-Components.utils.import("resource:///modules/folderUtils.jsm");
-Components.utils.import("resource:///modules/iteratorUtils.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/folderUtils.jsm");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var tests = [
   setup,
@@ -45,9 +45,9 @@ var tests = [
     dump("found folder2\n");
     let folder3 = IMAPPump.inbox.getChildNamed("empty 3");
     dump("found folder3\n");
-    do_check_true(folder1 !== null);
-    do_check_true(folder2 !== null);
-    do_check_true(folder3 !== null);
+    Assert.ok(folder1 !== null);
+    Assert.ok(folder2 !== null);
+    Assert.ok(folder3 !== null);
   },
   function* moveImapFolder1() {
     let folders = new Array;
@@ -74,9 +74,9 @@ var tests = [
     dump("found folder2\n");
     let folder3 = folder1.getChildNamed("empty 3");
     dump("found folder3\n");
-    do_check_true(folder1 !== null);
-    do_check_true(folder2 !== null);
-    do_check_true(folder3 !== null);
+    Assert.ok(folder1 !== null);
+    Assert.ok(folder2 !== null);
+    Assert.ok(folder3 !== null);
   },
   function* testImapFolderCopyFailure() {
     let folders = new Array;
@@ -127,7 +127,7 @@ var CopyListener = {
   SetMessageId: function(aMessageId) {},
   OnStopCopy: function(aStatus) {
     // Check: message successfully copied.
-    do_check_eq(aStatus, this._expectedStatus);
+    Assert.equal(aStatus, this._expectedStatus);
     async_driver();
   }
 };

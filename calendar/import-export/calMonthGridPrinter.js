@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calXMLUtils.jsm");
-Components.utils.import("resource://calendar/modules/calPrintUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calPrintUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 /**
  * Prints a rough month-grid of events/tasks
@@ -33,7 +33,7 @@ calMonthPrinter.prototype = {
 
     formatToHtml: function(aStream, aStart, aEnd, aCount, aItems, aTitle) {
         let document = cal.xml.parseFile("chrome://calendar-common/skin/printing/calMonthGridPrinter.html");
-        let defaultTimezone = cal.calendarDefaultTimezone();
+        let defaultTimezone = cal.dtz.defaultTimezone;
 
         // Set page title
         document.getElementById("title").textContent = aTitle;
@@ -56,8 +56,8 @@ calMonthPrinter.prototype = {
         }
 
         for (let item of aItems) {
-            let itemStartDate = item[cal.calGetStartDateProp(item)] || item[cal.calGetEndDateProp(item)];
-            let itemEndDate = item[cal.calGetEndDateProp(item)] || item[cal.calGetStartDateProp(item)];
+            let itemStartDate = item[cal.dtz.startDateProp(item)] || item[cal.dtz.endDateProp(item)];
+            let itemEndDate = item[cal.dtz.endDateProp(item)] || item[cal.dtz.startDateProp(item)];
 
             if (!itemStartDate && !itemEndDate) {
                 cal.print.addItemToDayboxNodate(document, item);
@@ -182,7 +182,7 @@ calMonthPrinter.prototype = {
             return !a || !b ? -1 : a.compare(b);
         }
 
-        cal.binaryInsertNode(monthContainer, currentMonth, currentMonth.item, compareDates);
+        cal.data.binaryInsertNode(monthContainer, currentMonth, currentMonth.item, compareDates);
     },
 
     setupWeek: function(document, weekContainer, startOfWeek, mainMonth, dayTable) {

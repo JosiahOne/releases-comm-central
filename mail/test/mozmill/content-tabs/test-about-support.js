@@ -8,7 +8,7 @@ var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['folder-display-helpers', 'content-tab-helpers',
                        'compose-helpers', 'window-helpers'];
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var warningText = new Map();
 
@@ -47,8 +47,8 @@ const ABOUT_SUPPORT_STRINGS = ["Application Basics", "Mail and News Accounts",
  * Strings that if found in the about:support text or HTML usually indicate an
  * error.
  */
-const ABOUT_SUPPORT_ERROR_STRINGS = new Map([[ "text/html",["undefined", "null"] ],
-                                             [ "text/unicode",["undefined"] ]]);
+const ABOUT_SUPPORT_ERROR_STRINGS = new Map([[ "text/html", ["undefined", "null"] ],
+                                             [ "text/unicode", ["undefined"] ]]);
 
 
 /*
@@ -89,7 +89,7 @@ function open_send_via_email(aTab) {
  */
 function find_private_element(aTab) {
   // We use the identity name as an example of a private-only element.
-  // It is currenly the second td element with class="data-private" in the table.
+  // It is currently the second td element with class="data-private" in the table.
   // The content string must be something unique that is not found anywhere else.
   let elem = aTab.browser.contentDocument
                  .querySelector("#accounts-table td.data-private~td.data-private");
@@ -261,8 +261,8 @@ function test_copy_to_clipboard_public() {
     let text = data.value.QueryInterface(Ci.nsISupportsString).data;
     let contentBody;
     if (flavor == "text/html") {
-      let parser = Components.classes["@mozilla.org/xmlextras/domparser;1"]
-                             .createInstance(Ci.nsIDOMParser);
+      let parser = Cc["@mozilla.org/xmlextras/domparser;1"]
+                     .createInstance(Ci.nsIDOMParser);
       contentBody = parser.parseFromString(text, "text/html").body;
     } else {
       contentBody = text;
@@ -305,8 +305,8 @@ function test_copy_to_clipboard_private() {
     let text = data.value.QueryInterface(Ci.nsISupportsString).data;
     let contentBody;
     if (flavor == "text/html") {
-      let parser = Components.classes["@mozilla.org/xmlextras/domparser;1"]
-                             .createInstance(Ci.nsIDOMParser);
+      let parser = Cc["@mozilla.org/xmlextras/domparser;1"]
+                     .createInstance(Ci.nsIDOMParser);
       contentBody = parser.parseFromString(text, "text/html").body;
     } else {
       contentBody = text;

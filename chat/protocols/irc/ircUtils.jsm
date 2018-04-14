@@ -5,9 +5,7 @@
 this.EXPORTED_SYMBOLS = ["_", "_conv", "ctcpFormatToText", "ctcpFormatToHTML",
                           "conversationErrorMessage", "kListRefreshInterval"];
 
-var {classes: Cc, interfaces: Ci} = Components;
-
-Components.utils.import("resource:///modules/imXPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "_", () =>
   l10nHelper("chrome://chat/locale/irc.properties")
@@ -234,7 +232,7 @@ function conversationErrorMessage(aAccount, aMessage, aError,
 
   // Channels have a couple extra things that can be done to them.
   if (aAccount.isMUCName(aMessage.params[1])) {
-    // If a value for joining is explictly given, mark it.
+    // If a value for joining is explicitly given, mark it.
     if (aJoinFailed)
       conv.joining = false;
     // If the conversation cannot be rejoined automatically, delete

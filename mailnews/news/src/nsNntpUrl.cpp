@@ -5,7 +5,6 @@
 
 #include "msgCore.h"    // precompiled header...
 
-#include "nsIURL.h"
 #include "nsNntpUrl.h"
 
 #include "nsString.h"
@@ -15,7 +14,6 @@
 #include "nntpCore.h"
 
 #include "nsCOMPtr.h"
-#include "nsIMsgDatabase.h"
 #include "nsMsgDBCID.h"
 #include "nsMsgNewsCID.h"
 #include "nsIMsgFolder.h"
@@ -72,7 +70,7 @@ NS_INTERFACE_MAP_END_INHERITING(nsMsgMailNewsUrl)
  * canonicalization.
  */
 
-NS_IMETHODIMP nsNntpUrl::SetSpec(const nsACString &aSpec)
+nsresult nsNntpUrl::SetSpecInternal(const nsACString &aSpec)
 {
   // For [s]news: URIs, we need to munge the spec if it is no authority, because
   // the URI parser guesses the wrong thing otherwise
@@ -93,7 +91,7 @@ NS_IMETHODIMP nsNntpUrl::SetSpec(const nsACString &aSpec)
     parseSpec += Substring(aSpec, colon + 1);
   }
 
-  nsresult rv = nsMsgMailNewsUrl::SetSpec(parseSpec);
+  nsresult rv = nsMsgMailNewsUrl::SetSpecInternal(parseSpec);
   NS_ENSURE_SUCCESS(rv,rv);
 
   nsAutoCString scheme;

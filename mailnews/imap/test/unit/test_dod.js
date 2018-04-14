@@ -6,12 +6,12 @@
  * Prepend to the filename 'bodystructure' and save in the database
  * See current test files for examples.
  */
- 
+
  // async support
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gServer, gIMAPIncomingServer, gIMAPDaemon;
 
@@ -31,7 +31,7 @@ function run_test()
   Services.prefs.setBoolPref("mail.biff.animate_dock_icon", false);
 
   // Force bodypart fetching as best as we can.
-  // It would be adviseable to enable log and check to be sure body[] is not
+  // It would be advisable to enable log and check to be sure body[] is not
   // being fetched in lieu of parts. There may be conditions that bypass
   // bodypart fetch.
   Services.prefs.setBoolPref("mail.inline_attachments",     false);
@@ -79,8 +79,7 @@ function* streamMessages() {
 
     for (let i = 1; i < inbox.uidnext ; i++) {
       let uri = {};
-      imapS.GetUrlForUri("imap-message://user@localhost/INBOX#" + i,uri,null);
-      uri.value.spec += "?header=quotebody";
+      imapS.GetUrlForUri("imap-message://user@localhost/INBOX#" + i, uri, null);
       let channel = Services.io.newChannelFromURI2(uri.value,
                                                    null,
                                                    Services.scriptSecurityManager.getSystemPrincipal(),
@@ -96,7 +95,7 @@ function* streamMessages() {
            "##########\nTesting--->" + fileNames[i-1] +
            "; 'prefer plain text': " + isPlain + "\n");
       try {
-        do_check_true(buf.includes(marker));
+        Assert.ok(buf.includes(marker));
       }
       catch(e){}
     }

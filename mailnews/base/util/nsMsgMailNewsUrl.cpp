@@ -25,7 +25,6 @@
 #include <time.h>
 #include "nsMsgUtils.h"
 #include "mozilla/Services.h"
-#include <algorithm>
 #include "nsProxyRelease.h"
 #include "mozilla/BasePrincipal.h"
 #include "mozilla/Encoding.h"
@@ -33,14 +32,12 @@
 nsMsgMailNewsUrl::nsMsgMailNewsUrl()
 {
   // nsIURI specific state
-  m_errorMessage = nullptr;
   m_runningUrl = false;
   m_updatingFolder = false;
   m_msgIsInLocalCache = false;
   m_suppressErrorMsgs = false;
   m_isPrincipalURL = false;
   mMaxProgress = -1;
-  m_baseURL = do_CreateInstance(NS_STANDARDURL_CONTRACTID);
 }
 
 #define NOTIFY_URL_LISTENERS(propertyfunc_, params_)                   \
@@ -54,8 +51,6 @@ nsMsgMailNewsUrl::nsMsgMailNewsUrl()
 
 nsMsgMailNewsUrl::~nsMsgMailNewsUrl()
 {
-  PR_FREEIF(m_errorMessage);
-
   // In IMAP this URL is created and destroyed on the imap thread,
   // so we must ensure that releases of XPCOM objects (which might be
   // implemented by non-threadsafe JS components) are released on the
@@ -200,45 +195,45 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetServer(nsIMsgIncomingServer ** aIncomingServe
   // we can look at caching it later.
 
   nsresult rv;
+
   nsAutoCString urlstr;
-  nsAutoCString scheme;
-
-  nsCOMPtr<nsIURL> url = do_CreateInstance(NS_STANDARDURL_CONTRACTID, &rv);
-  if (NS_FAILED(rv)) return rv;
-
   rv = m_baseURL->GetSpec(urlstr);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = url->SetSpec(urlstr);
-  if (NS_FAILED(rv)) return rv;
+
+  nsCOMPtr<nsIURL> url;
+  rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(urlstr).Finalize(url);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsAutoCString scheme;
   rv = GetScheme(scheme);
-    if (NS_SUCCEEDED(rv))
+  if (NS_SUCCEEDED(rv))
+  {
+    if (scheme.EqualsLiteral("pop"))
+      scheme.AssignLiteral("pop3");
+    // we use "nntp" in the server list so translate it here.
+    if (scheme.EqualsLiteral("news"))
+      scheme.AssignLiteral("nntp");
+    rv = NS_MutateURI(url).SetScheme(scheme).Finalize(url);
+    NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsIMsgAccountManager> accountManager =
+      do_GetService(NS_MSGACCOUNTMANAGER_CONTRACTID, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsCOMPtr<nsIMsgIncomingServer> server;
+    rv = accountManager->FindServerByURI(url, false, aIncomingServer);
+    if (!*aIncomingServer && scheme.EqualsLiteral("imap"))
     {
-        if (scheme.EqualsLiteral("pop"))
-          scheme.AssignLiteral("pop3");
-        // we use "nntp" in the server list so translate it here.
-        if (scheme.EqualsLiteral("news"))
-          scheme.AssignLiteral("nntp");
-        url->SetScheme(scheme);
-        nsCOMPtr<nsIMsgAccountManager> accountManager =
-                 do_GetService(NS_MSGACCOUNTMANAGER_CONTRACTID, &rv);
-        if (NS_FAILED(rv)) return rv;
-
-        nsCOMPtr<nsIMsgIncomingServer> server;
-        rv = accountManager->FindServerByURI(url, false,
-                                        aIncomingServer);
-        if (!*aIncomingServer && scheme.EqualsLiteral("imap"))
-        {
-          // look for any imap server with this host name so clicking on
-          // other users folder urls will work. We could override this method
-          // for imap urls, or we could make caching of servers work and
-          // just set the server in the imap code for this case.
-          url->SetUserPass(EmptyCString());
-          rv = accountManager->FindServerByURI(url, false,
-                                          aIncomingServer);
-        }
+      // look for any imap server with this host name so clicking on
+      // other users folder urls will work. We could override this method
+      // for imap urls, or we could make caching of servers work and
+      // just set the server in the imap code for this case.
+      rv = NS_MutateURI(url).SetUserPass(EmptyCString()).Finalize(url);
+      NS_ENSURE_SUCCESS(rv, rv);
+      rv = accountManager->FindServerByURI(url, false, aIncomingServer);
     }
+  }
 
-    return rv;
+  return rv;
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetMsgWindow(nsIMsgWindow **aMsgWindow)
@@ -399,7 +394,7 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetSpec(nsACString &aSpec)
 
 #define FILENAME_PART_LEN 10
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetSpec(const nsACString &aSpec)
+nsresult nsMsgMailNewsUrl::SetSpecInternal(const nsACString &aSpec)
 {
   nsAutoCString spec(aSpec);
   // Parse out "filename" attribute if present.
@@ -421,7 +416,7 @@ NS_IMETHODIMP nsMsgMailNewsUrl::SetSpec(const nsACString &aSpec)
   }
 
   // Now, set the rest.
-  nsresult rv = m_baseURL->SetSpec(aSpec);
+  nsresult rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(aSpec).Finalize(m_baseURL);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Check whether the URL is in normalised form.
@@ -448,9 +443,9 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetScheme(nsACString &aScheme)
   return m_baseURL->GetScheme(aScheme);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetScheme(const nsACString &aScheme)
+nsresult nsMsgMailNewsUrl::SetScheme(const nsACString &aScheme)
 {
-  return m_baseURL->SetScheme(aScheme);
+  return NS_MutateURI(m_baseURL).SetScheme(aScheme).Finalize(m_baseURL);
 }
 
 
@@ -459,9 +454,9 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetUserPass(nsACString &aUserPass)
   return m_baseURL->GetUserPass(aUserPass);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetUserPass(const nsACString &aUserPass)
+nsresult nsMsgMailNewsUrl::SetUserPass(const nsACString &aUserPass)
 {
-  return m_baseURL->SetUserPass(aUserPass);
+  return NS_MutateURI(m_baseURL).SetUserPass(aUserPass).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetUsername(nsACString &aUsername)
@@ -470,9 +465,14 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetUsername(nsACString &aUsername)
   return m_baseURL->GetUsername(aUsername);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetUsername(const nsACString &aUsername)
+nsresult nsMsgMailNewsUrl::SetUsername(const nsACString &aUsername)
 {
-  return m_baseURL->SetUsername(aUsername);
+  return NS_MutateURI(m_baseURL).SetUsername(aUsername).Finalize(m_baseURL);
+}
+
+nsresult nsMsgMailNewsUrl::SetUsernameInternal(const nsACString &aUsername)
+{
+  return NS_MutateURI(m_baseURL).SetUsername(aUsername).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetPassword(nsACString &aPassword)
@@ -480,9 +480,9 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetPassword(nsACString &aPassword)
   return m_baseURL->GetPassword(aPassword);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetPassword(const nsACString &aPassword)
+nsresult nsMsgMailNewsUrl::SetPassword(const nsACString &aPassword)
 {
-  return m_baseURL->SetPassword(aPassword);
+  return NS_MutateURI(m_baseURL).SetPassword(aPassword).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetHostPort(nsACString &aHostPort)
@@ -490,14 +490,9 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetHostPort(nsACString &aHostPort)
   return m_baseURL->GetHostPort(aHostPort);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetHostPort(const nsACString &aHostPort)
+nsresult nsMsgMailNewsUrl::SetHostPort(const nsACString &aHostPort)
 {
-  return m_baseURL->SetHostPort(aHostPort);
-}
-
-NS_IMETHODIMP nsMsgMailNewsUrl::SetHostAndPort(const nsACString &aHostPort)
-{
-  return m_baseURL->SetHostAndPort(aHostPort);
+  return NS_MutateURI(m_baseURL).SetHostPort(aHostPort).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetHost(nsACString &aHost)
@@ -505,9 +500,9 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetHost(nsACString &aHost)
   return m_baseURL->GetHost(aHost);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetHost(const nsACString &aHost)
+nsresult nsMsgMailNewsUrl::SetHost(const nsACString &aHost)
 {
-  return m_baseURL->SetHost(aHost);
+  return NS_MutateURI(m_baseURL).SetHost(aHost).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetPort(int32_t *aPort)
@@ -515,9 +510,14 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetPort(int32_t *aPort)
   return m_baseURL->GetPort(aPort);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetPort(int32_t aPort)
+nsresult nsMsgMailNewsUrl::SetPort(int32_t aPort)
 {
-  return m_baseURL->SetPort(aPort);
+  return NS_MutateURI(m_baseURL).SetPort(aPort).Finalize(m_baseURL);
+}
+
+nsresult nsMsgMailNewsUrl::SetPortInternal(int32_t aPort)
+{
+  return NS_MutateURI(m_baseURL).SetPort(aPort).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetPathQueryRef(nsACString &aPath)
@@ -525,9 +525,9 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetPathQueryRef(nsACString &aPath)
   return m_baseURL->GetPathQueryRef(aPath);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetPathQueryRef(const nsACString &aPath)
+nsresult nsMsgMailNewsUrl::SetPathQueryRef(const nsACString &aPath)
 {
-  return m_baseURL->SetPathQueryRef(aPath);
+  return NS_MutateURI(m_baseURL).SetPathQueryRef(aPath).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetAsciiHost(nsACString &aHostA)
@@ -625,26 +625,28 @@ nsMsgMailNewsUrl::CloneInternal(uint32_t aRefHandlingMode,
   NS_ENSURE_TRUE(ioService, NS_ERROR_UNEXPECTED);
   rv = GetSpec(urlSpec);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = ioService->NewURI(urlSpec, nullptr, nullptr, _retval);
+  nsCOMPtr<nsIURI> newUri;
+  rv = ioService->NewURI(urlSpec, nullptr, nullptr, getter_AddRefs(newUri));
   NS_ENSURE_SUCCESS(rv, rv);
 
   // add the msg window to the cloned url
   nsCOMPtr<nsIMsgWindow> msgWindow(do_QueryReferent(m_msgWindowWeak));
   if (msgWindow)
   {
-    nsCOMPtr<nsIMsgMailNewsUrl> msgMailNewsUrl = do_QueryInterface(*_retval, &rv);
+    nsCOMPtr<nsIMsgMailNewsUrl> msgMailNewsUrl = do_QueryInterface(newUri, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
     msgMailNewsUrl->SetMsgWindow(msgWindow);
   }
 
   if (aRefHandlingMode == nsIMsgMailNewsUrl::REPLACE_REF) {
-    rv = (*_retval)->SetRef(newRef);
+    rv = NS_MutateURI(newUri).SetRef(newRef).Finalize(newUri);
     NS_ENSURE_SUCCESS(rv, rv);
   } else if (aRefHandlingMode == nsIMsgMailNewsUrl::IGNORE_REF) {
-    rv = (*_retval)->SetRef(EmptyCString());
+    rv = NS_MutateURI(newUri).SetRef(EmptyCString()).Finalize(newUri);
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
+  newUri.forget(_retval);
   return rv;
 }
 
@@ -710,12 +712,6 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetDirectory(nsACString &aDirectory)
   return m_baseURL->GetDirectory(aDirectory);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetDirectory(const nsACString &aDirectory)
-{
-
-  return m_baseURL->SetDirectory(aDirectory);
-}
-
 NS_IMETHODIMP nsMsgMailNewsUrl::GetFileName(nsACString &aFileName)
 {
   if (!mAttachmentFileName.IsEmpty())
@@ -731,11 +727,6 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetFileBaseName(nsACString &aFileBaseName)
   return m_baseURL->GetFileBaseName(aFileBaseName);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetFileBaseName(const nsACString &aFileBaseName)
-{
-  return m_baseURL->SetFileBaseName(aFileBaseName);
-}
-
 NS_IMETHODIMP nsMsgMailNewsUrl::GetFileExtension(nsACString &aFileExtension)
 {
   if (!mAttachmentFileName.IsEmpty())
@@ -748,12 +739,7 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetFileExtension(nsACString &aFileExtension)
   return m_baseURL->GetFileExtension(aFileExtension);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetFileExtension(const nsACString &aFileExtension)
-{
-  return m_baseURL->SetFileExtension(aFileExtension);
-}
-
-NS_IMETHODIMP nsMsgMailNewsUrl::SetFileName(const nsACString &aFileName)
+nsresult nsMsgMailNewsUrl::SetFileNameInternal(const nsACString &aFileName)
 {
   mAttachmentFileName = aFileName;
   return NS_OK;
@@ -764,15 +750,19 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetQuery(nsACString &aQuery)
   return m_baseURL->GetQuery(aQuery);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetQuery(const nsACString &aQuery)
+nsresult nsMsgMailNewsUrl::SetQuery(const nsACString &aQuery)
 {
-  return m_baseURL->SetQuery(aQuery);
+  return NS_MutateURI(m_baseURL).SetQuery(aQuery).Finalize(m_baseURL);
 }
 
-NS_IMETHODIMP
-nsMsgMailNewsUrl::SetQueryWithEncoding(const nsACString &aQuery, const mozilla::Encoding* aEncoding)
+nsresult nsMsgMailNewsUrl::SetQueryInternal(const nsACString &aQuery)
 {
-  return m_baseURL->SetQueryWithEncoding(aQuery, aEncoding);
+  return NS_MutateURI(m_baseURL).SetQuery(aQuery).Finalize(m_baseURL);
+}
+
+nsresult nsMsgMailNewsUrl::SetQueryWithEncoding(const nsACString &aQuery, const mozilla::Encoding* aEncoding)
+{
+  return NS_MutateURI(m_baseURL).SetQueryWithEncoding(aQuery, aEncoding).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetRef(nsACString &aRef)
@@ -780,9 +770,9 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetRef(nsACString &aRef)
   return m_baseURL->GetRef(aRef);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetRef(const nsACString &aRef)
+nsresult nsMsgMailNewsUrl::SetRef(const nsACString &aRef)
 {
-  return m_baseURL->SetRef(aRef);
+  return NS_MutateURI(m_baseURL).SetRef(aRef).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetFilePath(nsACString &o_DirFile)
@@ -790,9 +780,9 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetFilePath(nsACString &o_DirFile)
   return m_baseURL->GetFilePath(o_DirFile);
 }
 
-NS_IMETHODIMP nsMsgMailNewsUrl::SetFilePath(const nsACString &i_DirFile)
+nsresult nsMsgMailNewsUrl::SetFilePath(const nsACString &i_DirFile)
 {
-  return m_baseURL->SetFilePath(i_DirFile);
+  return NS_MutateURI(m_baseURL).SetFilePath(i_DirFile).Finalize(m_baseURL);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::GetCommonBaseSpec(nsIURI *uri2, nsACString &result)

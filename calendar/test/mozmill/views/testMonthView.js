@@ -5,7 +5,7 @@
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["calendar-utils"];
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 var helpersForController, invokeEventDialog, createCalendar, deleteCalendars;
 var CALENDARNAME;
@@ -115,7 +115,7 @@ function testMonthView() {
         event.waitForElement(startTimeInput);
         event.assertValue(startTimeInput, startTime);
 
-        let someTime = cal.now();
+        let someTime = cal.dtz.now();
         someTime.resetTo(2009, 1, 1);
         let date = dateFormatter.formatDateShort(someDate);
         event.assertValue(eventlookup(`

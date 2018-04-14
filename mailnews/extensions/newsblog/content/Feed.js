@@ -36,7 +36,8 @@ var FeedCache =
     try
     {
       let normalizedUrl = Services.io.newURI(aUrl);
-      normalizedUrl.host = normalizedUrl.host.toLowerCase();
+      let newHost = normalizedUrl.host.toLowerCase();
+      normalizedUrl = normalizedUrl.mutate().setHost(newHost).finalize();
       return normalizedUrl.spec
     }
     catch (ex)
@@ -92,7 +93,7 @@ Feed.prototype =
 
   get name()
   {
-    // Used for the feed's title in Subcribe dialog and opml export.
+    // Used for the feed's title in Subscribe dialog and opml export.
     let name = this.title || this.description || this.url;
     return name.replace(/[\n\r\t]+/g, " ").replace(/[\x00-\x1F]+/g, "");
   },

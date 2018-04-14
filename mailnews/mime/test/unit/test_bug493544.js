@@ -1,8 +1,8 @@
-﻿//
+//
 // Tests if a multi-line MIME header is parsed even if it violates RFC 2047
 //
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 function run_test() {
   const headers = [
@@ -81,6 +81,6 @@ function run_test() {
                                                               headers[i].defaultCharset,
                                                               headers[i].overrideCharset,
                                                               headers[i].eatContinuation);
-    do_check_eq(decoded, headers[i].decoded);
+    Assert.equal(decoded, headers[i].decoded);
   }
 }

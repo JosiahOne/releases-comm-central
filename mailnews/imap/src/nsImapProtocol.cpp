@@ -38,11 +38,11 @@
 #include "nsTextFormatter.h"
 #include "nsIMsgHdr.h"
 #include "nsMsgI18N.h"
-#include <algorithm>
 // for the memory cache...
 #include "nsICacheEntry.h"
 #include "nsICacheStorage.h"
 #include "nsICacheEntryOpenCallback.h"
+#include "nsIURIMutator.h"
 
 #include "nsIPrompt.h"
 #include "nsIDocShell.h"
@@ -57,8 +57,6 @@
 #include "nsXPCOMCIDInternal.h"
 #include "nsIXULAppInfo.h"
 #include "nsSyncRunnableHelpers.h"
-
-static mozilla::LazyLogModule IMAP("IMAP");
 
 // netlib required files
 #include "nsIStreamListener.h"
@@ -75,7 +73,6 @@ static mozilla::LazyLogModule IMAP("IMAP");
 #include "nsDebug.h"
 #include "nsMsgCompressIStream.h"
 #include "nsMsgCompressOStream.h"
-#include "nsAlgorithm.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/SlicedInputStream.h"
@@ -83,6 +80,8 @@ static mozilla::LazyLogModule IMAP("IMAP");
 #include "nsContentSecurityManager.h"
 
 using namespace mozilla;
+
+LazyLogModule IMAP("IMAP");
 
 #define ONE_SECOND ((uint32_t)1000)    // one second
 
@@ -304,7 +303,7 @@ NS_INTERFACE_MAP_BEGIN(nsImapProtocol)
    NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
    NS_INTERFACE_MAP_ENTRY(nsIImapProtocolSink)
    NS_INTERFACE_MAP_ENTRY(nsIMsgAsyncPromptListener)
-NS_INTERFACE_MAP_END_THREADSAFE
+NS_INTERFACE_MAP_END
 
 static int32_t gTooFastTime = 2;
 static int32_t gIdealTime = 4;
@@ -326,11 +325,11 @@ static nsTArray<nsCString> gForceSelectServersArray;
 
 // let delete model control expunging, i.e., don't ever expunge when the
 // user chooses the imap delete model, otherwise, expunge when over the
-// threshhold. This is the normal TB behavior.
+// threshold. This is the normal TB behavior.
 static const int32_t kAutoExpungeDeleteModel = 0;
 // Expunge whenever the folder is opened
 static const int32_t kAutoExpungeAlways = 1;
-// Expunge when over the threshhold, independent of the delete model.
+// Expunge when over the threshold, independent of the delete model.
 static const int32_t kAutoExpungeOnThreshold = 2;
 static int32_t gExpungeOption = kAutoExpungeDeleteModel;
 static int32_t gExpungeThreshold = 20;
@@ -800,9 +799,9 @@ nsresult nsImapProtocol::SetupWithUrl(nsIURI * aURL, nsISupports* aConsumer)
     imapServer->GetFetchByChunks(&m_fetchByChunks);
     imapServer->GetSendID(&m_sendID);
 
-    nsAutoString trashFolderName;
-    if (NS_SUCCEEDED(imapServer->GetTrashFolderName(trashFolderName)))
-      CopyUTF16toMUTF7(trashFolderName, m_trashFolderName);
+    nsAutoString trashFolderPath;
+    if (NS_SUCCEEDED(imapServer->GetTrashFolderName(trashFolderPath)))
+      CopyUTF16toMUTF7(trashFolderPath, m_trashFolderPath);
 
     nsCOMPtr<nsIPrefBranch> prefBranch(do_GetService(NS_PREFSERVICE_CONTRACTID));
     if (prefBranch)
@@ -3136,7 +3135,7 @@ nsresult nsImapProtocol::BeginMessageDownLoad(
       return NS_OK;
     }
     // if we have a mock channel, that means we have a channel listener who wants the
-    // message. So set up a pipe. We'll write the messsage into one end of the pipe
+    // message. So set up a pipe. We'll write the message into one end of the pipe
     // and they will read it out of the other end.
     if (m_channelListener)
     {
@@ -4183,8 +4182,8 @@ void nsImapProtocol::ProcessMailboxUpdate(bool handlePossibleUndo)
         // Don't do expunge when we are lite selecting folder because we
         // could be doing undo.
         // Expunge if we're always expunging, or the number of deleted messages
-        // is over the threshhold, and we're either always respecting the
-        // threshhold, or we're expunging based on the delete model, and
+        // is over the threshold, and we're either always respecting the
+        // threshold, or we're expunging based on the delete model, and
         // the delete model is not the imap delete model.
         if (m_imapAction != nsIImapUrl::nsImapLiteSelectFolder &&
             (gExpungeOption == kAutoExpungeAlways ||
@@ -4487,7 +4486,7 @@ void nsImapProtocol::Log(const char *logSubName, const char *extraInfo, const ch
     static const char nonAuthStateName[] = "NA";
     static const char authStateName[] = "A";
     static const char selectedStateName[] = "S";
-    const nsCString& hostName = GetImapHostName();  // initilize to empty string
+    const nsCString& hostName = GetImapHostName();  // initialize to empty string
 
     int32_t logDataLen = PL_strlen(logData); // PL_strlen checks for null
     nsCString logDataLines;
@@ -4998,27 +4997,22 @@ nsImapProtocol::DiscoverMailboxSpec(nsImapMailboxSpec * adoptedBoxSpec)
 
         // Don't set the Trash flag if not using the Trash model
         if (GetDeleteIsMoveToTrash() && !onlineTrashFolderExists &&
-            adoptedBoxSpec->mAllocatedPathName.Find(m_trashFolderName, /* ignoreCase = */ true) != -1)
+            adoptedBoxSpec->mAllocatedPathName.Find(m_trashFolderPath, /* ignoreCase = */ true) != -1)
         {
           bool trashExists = false;
-          nsCString trashMatch(CreatePossibleTrashName(nsPrefix));
-          nsCString serverTrashName;
-          m_runningUrl->AllocateCanonicalPath(trashMatch.get(),
-                                              ns->GetDelimiter(),
-                                              getter_Copies(serverTrashName));
-          if (StringBeginsWith(serverTrashName,
+          if (StringBeginsWith(m_trashFolderPath,
                                NS_LITERAL_CSTRING("INBOX/"),
                                nsCaseInsensitiveCStringComparator()))
           {
             nsAutoCString pathName(adoptedBoxSpec->mAllocatedPathName.get() + 6);
             trashExists =
               StringBeginsWith(adoptedBoxSpec->mAllocatedPathName,
-                               serverTrashName,
+                               m_trashFolderPath,
                                nsCaseInsensitiveCStringComparator()) && /* "INBOX/" */
-              pathName.Equals(Substring(serverTrashName, 6), nsCaseInsensitiveCStringComparator());
+              pathName.Equals(Substring(m_trashFolderPath, 6), nsCaseInsensitiveCStringComparator());
           }
           else
-            trashExists = adoptedBoxSpec->mAllocatedPathName.Equals(serverTrashName, nsCaseInsensitiveCStringComparator());
+            trashExists = adoptedBoxSpec->mAllocatedPathName.Equals(m_trashFolderPath, nsCaseInsensitiveCStringComparator());
 
           if (m_hostSessionList)
             m_hostSessionList->SetOnlineTrashFolderExistsForHost(GetImapServerKey(), trashExists);
@@ -5689,7 +5683,7 @@ nsresult nsImapProtocol::ChooseAuthMethod()
         serverCaps, m_prefAuthMethods, m_failedAuthMethods, availCaps));
   MOZ_LOG(IMAP, LogLevel::Debug, ("(GSSAPI = 0x%" PRIx64 ", CRAM = 0x%" PRIx64
         ", NTLM = 0x%" PRIx64 ", MSN = 0x%" PRIx64 ", PLAIN = 0x%" PRIx64
-        ",\n  LOGIN = 0x%" PRIx64 ", old-style IMAP login = 0x%" PRIx64
+        ", LOGIN = 0x%" PRIx64 ", old-style IMAP login = 0x%" PRIx64
         ", auth external IMAP login = 0x%" PRIx64 ", OAUTH2 = 0x%" PRIx64 ")",
         kHasAuthGssApiCapability, kHasCRAMCapability, kHasAuthNTLMCapability,
         kHasAuthMSNCapability, kHasAuthPlainCapability, kHasAuthLoginCapability,
@@ -6150,7 +6144,7 @@ void nsImapProtocol::UploadMessageFromFile (nsIFile* file,
       /* Use PR_FormatTimeUSEnglish() to format the date in US English format,
         then figure out what our local GMT offset is, and append it (since
         PR_FormatTimeUSEnglish() can't do that.) Generate four digit years as
-        per RFC 1123 (superceding RFC 822.)
+        per RFC 1123 (superseding RFC 822.)
         */
       char szDateTime[64];
       char dateStr[100];
@@ -6181,7 +6175,7 @@ void nsImapProtocol::UploadMessageFromFile (nsIFile* file,
     command.AppendInt((int32_t)fileSize);
 
     // Set useLiteralPlus to true if server has capability LITERAL+ and
-    // LITERAL+ useage is enabled in the config editor,
+    // LITERAL+ usage is enabled in the config editor,
     // i.e., "mail.imap.use_literal_plus" = true.
     bool useLiteralPlus = (GetServerStateParser().GetCapabilityFlag() &
                           kLiteralPlusCapability) && gUseLiteralPlus;
@@ -6935,12 +6929,12 @@ bool nsImapProtocol::RenameHierarchyByHand(const char *oldParentMailboxName,
         // calculate the new name and do the rename
         nsCString newChildName(newParentMailboxName);
         newChildName += (currentName + PL_strlen(oldParentMailboxName));
-        RenameMailboxRespectingSubscriptions(currentName,
-                                             newChildName.get(),
-                                             nonHierarchicalRename);
-        // pass in xNonHierarchicalRename to determine if we should really
-        // reanme, or just move subscriptions
-        renameSucceeded = GetServerStateParser().LastCommandSuccessful();
+        // Pass in 'nonHierarchicalRename' to determine if we should really
+        // reanme, or just move subscriptions.
+        renameSucceeded =
+          RenameMailboxRespectingSubscriptions(currentName,
+                                               newChildName.get(),
+                                               nonHierarchicalRename);
         PR_FREEIF(currentName);
     }
 
@@ -7311,38 +7305,13 @@ void nsImapProtocol::DiscoverAllAndSubscribedBoxes()
         nsAutoCString allPattern(prefix);
         allPattern += '*';
 
-        nsAutoCString topLevelPattern(prefix);
-        topLevelPattern += '%';
-
-        nsAutoCString secondLevelPattern;
-
-        char delimiter = ns->GetDelimiter();
-        if (delimiter)
-        {
-          // Hierarchy delimiter might be NIL, in which case there's no hierarchy anyway
-          secondLevelPattern = prefix;
-          secondLevelPattern += '%';
-          secondLevelPattern += delimiter;
-          secondLevelPattern += '%';
-        }
-
         if (!m_imapServerSink) return;
 
-        if (!allPattern.IsEmpty())
-        {
-          m_imapServerSink->SetServerDoingLsub(true);
-          Lsub(allPattern.get(), true);	// LSUB all the subscribed
-        }
-        if (!topLevelPattern.IsEmpty())
-        {
-          m_imapServerSink->SetServerDoingLsub(false);
-          List(topLevelPattern.get(), true);	// LIST the top level
-        }
-        if (!secondLevelPattern.IsEmpty())
-        {
-          m_imapServerSink->SetServerDoingLsub(false);
-          List(secondLevelPattern.get(), true);	// LIST the second level
-        }
+        m_imapServerSink->SetServerDoingLsub(true);
+        Lsub(allPattern.get(), true);	// LSUB all the subscribed
+
+        m_imapServerSink->SetServerDoingLsub(false);
+        List(allPattern.get(), true); // LIST all folders
       }
     }
   }
@@ -7571,9 +7540,8 @@ void nsImapProtocol::MailboxDiscoveryFinished()
       // maybe we're not subscribed to the Trash folder
       if (personalDir)
       {
-        nsCString originalTrashName(CreatePossibleTrashName(personalDir));
         m_hierarchyNameState = kDiscoverTrashFolderInProgress;
-        List(originalTrashName.get(), true);
+        List(m_trashFolderPath.get(), true);
         m_hierarchyNameState = kNoOperationInProgress;
       }
     }
@@ -7582,9 +7550,8 @@ void nsImapProtocol::MailboxDiscoveryFinished()
     // Delete-is-move-to-Trash model, and there is a personal namespace
     if (!trashFolderExists && GetDeleteIsMoveToTrash() && ns)
     {
-      nsCString trashName(CreatePossibleTrashName(ns->GetPrefix()));
       nsCString onlineTrashName;
-      m_runningUrl->AllocateServerPath(trashName.get(), ns->GetDelimiter(),
+      m_runningUrl->AllocateServerPath(m_trashFolderPath.get(), ns->GetDelimiter(),
                                        getter_Copies(onlineTrashName));
 
       GetServerStateParser().SetReportingErrors(false);
@@ -7725,13 +7692,6 @@ void nsImapProtocol::RenameMailbox(const char *existingName,
   nsresult rv = SendData(command.get());
   if (NS_SUCCEEDED(rv))
     ParseIMAPandCheckForNewMail();
-}
-
-nsCString nsImapProtocol::CreatePossibleTrashName(const char *prefix)
-{
-  nsCString returnTrash(prefix);
-  returnTrash += m_trashFolderName;
-  return returnTrash;
 }
 
 bool nsImapProtocol::GetListSubscribedIsBrokenOnServer()
@@ -8605,7 +8565,7 @@ bool nsImapProtocol::TryToLogon()
       rv = ChooseAuthMethod();
       if (NS_FAILED(rv)) // all methods failed
       {
-        MOZ_LOG(IMAP, LogLevel::Error, ("huch? there are auth methods, and we resetted failed ones, but ChooseAuthMethod still fails."));
+        MOZ_LOG(IMAP, LogLevel::Error, ("huch? there are auth methods, and we reset failed ones, but ChooseAuthMethod still fails."));
         return false;
       }
     }
@@ -8717,7 +8677,7 @@ bool nsImapProtocol::TryToLogon()
             m_hostSessionList->SetPasswordForHost(GetImapServerKey(), EmptyString());
             m_imapServerSink->ForgetPassword();
             m_password.Truncate();
-            MOZ_LOG(IMAP, LogLevel::Warning, ("password resetted (nulled)"));
+            MOZ_LOG(IMAP, LogLevel::Warning, ("password reset (nulled)"));
             newPasswordRequested = true;
             // Will call GetPassword() in beginning of next loop
 
@@ -9347,10 +9307,8 @@ nsresult nsImapMockChannel::OpenCacheEntry()
   extension.AppendInt(uidValidity, 16);
 
   // Open a cache entry where the key is the potentially modified URL.
-  nsCOMPtr<nsIURI> newUri;
-  m_url->Clone(getter_AddRefs(newUri));
   nsAutoCString path;
-  newUri->GetPathQueryRef(path);
+  m_url->GetPathQueryRef(path);
 
   // First we need to "normalise" the URL by extracting ?part= and &filename.
   // The path should only contain: ?part=x.y&filename=file.ext
@@ -9377,10 +9335,12 @@ nsresult nsImapMockChannel::OpenCacheEntry()
   if (ind != kNotFound)
     path.SetLength(ind);
 
+  nsCOMPtr<nsIURI> newUri;
   if (partQuery.IsEmpty())
   {
     // Not looking for a part. That's the easy part.
-    newUri->SetPathQueryRef(path);
+    rv = NS_MutateURI(m_url).SetPathQueryRef(path).Finalize(newUri);
+    NS_ENSURE_SUCCESS(rv, rv);
     return cacheStorage->AsyncOpenURI(newUri, extension, cacheAccess, this);
   }
 
@@ -9396,7 +9356,8 @@ nsresult nsImapMockChannel::OpenCacheEntry()
     mTryingToReadPart = false;
 
     // Note that part extraction was already set the first time.
-    newUri->SetPathQueryRef(path + partQuery + filenameQuery);
+    rv = NS_MutateURI(m_url).SetPathQueryRef(path + partQuery + filenameQuery).Finalize(newUri);
+    NS_ENSURE_SUCCESS(rv, rv);
     return cacheStorage->AsyncOpenURI(newUri, extension, cacheAccess, this);
   }
 
@@ -9405,7 +9366,8 @@ nsresult nsImapMockChannel::OpenCacheEntry()
 
   // Check whether part is in the cache.
   bool exists = false;
-  newUri->SetPathQueryRef(path + partQuery + filenameQuery);
+  rv = NS_MutateURI(m_url).SetPathQueryRef(path + partQuery + filenameQuery).Finalize(newUri);
+  NS_ENSURE_SUCCESS(rv, rv);
   rv = cacheStorage->Exists(newUri, extension, &exists);
   NS_ENSURE_SUCCESS(rv, rv);
   if (exists) {
@@ -9413,13 +9375,15 @@ nsresult nsImapMockChannel::OpenCacheEntry()
   }
 
   // Let's see whether we have the entire message instead.
-  newUri->SetPathQueryRef(path);
+  rv = NS_MutateURI(m_url).SetPathQueryRef(path).Finalize(newUri);
+  NS_ENSURE_SUCCESS(rv, rv);
   rv = cacheStorage->Exists(newUri, extension, &exists);
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (!exists) {
     // The entire message is not in the cache. Request the part.
-    newUri->SetPathQueryRef(path + partQuery + filenameQuery);
+    rv = NS_MutateURI(m_url).SetPathQueryRef(path + partQuery + filenameQuery).Finalize(newUri);
+    NS_ENSURE_SUCCESS(rv, rv);
     return cacheStorage->AsyncOpenURI(newUri, extension, cacheAccess, this);
   }
 

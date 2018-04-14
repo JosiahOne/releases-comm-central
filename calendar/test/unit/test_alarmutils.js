@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calAlarmUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calXMLUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
 
 function run_test() {
     do_calendar_startup(run_next_test);
@@ -66,9 +66,9 @@ add_task(function* test_setDefaultValues_events() {
 
 add_task(function* test_setDefaultValues_tasks() {
     let item, alarm;
-    let calnow = cal.now;
+    let calnow = cal.dtz.now;
     let nowDate = cal.createDateTime("20150815T120000");
-    cal.now = function() {
+    cal.dtz.now = function() {
         return nowDate;
     };
 
@@ -122,7 +122,7 @@ add_task(function* test_setDefaultValues_tasks() {
     Preferences.reset("calendar.alarms.onfortodos");
     Preferences.reset("calendar.alarms.todoalarmunit");
     Preferences.reset("calendar.alarms.todoalarmlen");
-    cal.now = calnow;
+    cal.dtz.now = calnow;
 });
 
 add_task(function* test_calculateAlarmDate() {

@@ -17,7 +17,7 @@ var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                          "account-manager-helpers"];
 
 var elib = {};
-Components.utils.import("resource://mozmill/modules/elementslib.js", elib);
+ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
 
 var gPopAccount, gImapAccount, gOriginalAccountCount;
 
@@ -32,7 +32,7 @@ function setupModule(module) {
   // Create a POP server
   let popServer = MailServices.accounts
     .createIncomingServer("nobody", "pop.invalid", "pop3")
-    .QueryInterface(Components.interfaces.nsIPop3IncomingServer);
+    .QueryInterface(Ci.nsIPop3IncomingServer);
 
   let identity = MailServices.accounts.createIdentity();
   identity.email = "tinderbox@pop.invalid";
@@ -44,7 +44,7 @@ function setupModule(module) {
   // Create an IMAP server
   let imapServer = MailServices.accounts
     .createIncomingServer("nobody", "imap.invalid", "imap")
-    .QueryInterface(Components.interfaces.nsIImapIncomingServer);
+    .QueryInterface(Ci.nsIImapIncomingServer);
 
   identity = MailServices.accounts.createIdentity();
   identity.email = "tinderbox@imap.invalid";
@@ -389,7 +389,7 @@ function subtest_check_onchange_handler(amc)
   autoSync.select();
   amc.type(new elib.Elem(autoSync), "35");
 
-  // Immediatelly switch to another pane and back.
+  // Immediately switch to another pane and back.
   accountRow = get_account_tree_row(gImapAccount.key, "am-junk.xul", amc);
   click_account_tree_row(amc, accountRow);
 

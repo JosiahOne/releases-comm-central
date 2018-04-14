@@ -200,11 +200,11 @@ function UpdateHomePageList(aSingleURL)
 
 function SelectFile()
 {
-  const nsIFilePicker = Components.interfaces.nsIFilePicker;
-  var fp = Components.classes["@mozilla.org/filepicker;1"]
-                     .createInstance(nsIFilePicker);
-  var prefutilitiesBundle = document.getElementById("bundle_prefutilities");
-  var title = prefutilitiesBundle.getString("choosehomepage");
+  const nsIFilePicker = Ci.nsIFilePicker;
+  let fp = Cc["@mozilla.org/filepicker;1"]
+             .createInstance(nsIFilePicker);
+  let title = document.getElementById("bundle_prefutilities")
+                      .getString("choosehomepage");
   fp.init(window, title, nsIFilePicker.modeOpen);
   fp.appendFilters(nsIFilePicker.filterAll  |
                    nsIFilePicker.filterText |
@@ -212,8 +212,12 @@ function SelectFile()
                    nsIFilePicker.filterHTML |
                    nsIFilePicker.filterImages);
 
-  if (fp.show() == nsIFilePicker.returnOK)
-    UpdateHomePageList(fp.fileURL.spec);
+  fp.open(rv => {
+    if (rv == nsIFilePicker.returnOK && fp.fileURL.spec && 
+        fp.fileURL.spec.length > 0) {
+      UpdateHomePageList(fp.fileURL.spec);
+    }
+  });
 }
 
 function SetHomePageToCurrentPage()
@@ -263,9 +267,9 @@ function WriteConcurrentTabs()
 
 function ApplySetAsDefaultBrowser()
 {
-  const nsIShellService = Components.interfaces.nsIShellService;
-  var shellSvc = Components.classes["@mozilla.org/suite/shell-service;1"]
-                           .getService(nsIShellService);
+  const nsIShellService = Ci.nsIShellService;
+  var shellSvc = Cc["@mozilla.org/suite/shell-service;1"]
+                   .getService(nsIShellService);
 
   shellSvc.setDefaultClient(false, false, nsIShellService.BROWSER);
   shellSvc.shouldBeDefaultClientFor |= nsIShellService.BROWSER;
@@ -273,9 +277,9 @@ function ApplySetAsDefaultBrowser()
 
 function IsDefaultBrowser()
 {
-  const nsIShellService = Components.interfaces.nsIShellService;
-  var shellSvc = Components.classes["@mozilla.org/suite/shell-service;1"]
-                           .getService(nsIShellService);
+  const nsIShellService = Ci.nsIShellService;
+  var shellSvc = Cc["@mozilla.org/suite/shell-service;1"]
+                   .getService(nsIShellService);
 
   return shellSvc.isDefaultClient(false, nsIShellService.BROWSER);
 }
@@ -284,7 +288,7 @@ function InitPlatformIntegration()
 {
   const NS_SHELLSERVICE_CID = "@mozilla.org/suite/shell-service;1";
 
-  if (NS_SHELLSERVICE_CID in Components.classes) try {
+  if (NS_SHELLSERVICE_CID in Cc) try {
     var desc = document.getElementById("defaultBrowserDesc");
     if (IsDefaultBrowser())
       desc.textContent = desc.getAttribute("desc1");

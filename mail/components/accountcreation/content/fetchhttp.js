@@ -15,7 +15,7 @@
  * but not for bigger file downloads.
  */
 
-Components.utils.import("resource:///modules/JXON.js");
+ChromeUtils.import("resource:///modules/JXON.js");
 
 /**
  * Set up a fetch.
@@ -36,7 +36,7 @@ Components.utils.import("resource:///modules/JXON.js");
  *
  * @param successCallback {Function(result {String})}
  *   Called when the server call worked (no errors).
- *   |result| will contain the body of the HTTP reponse, as string.
+ *   |result| will contain the body of the HTTP response, as string.
  * @param errorCallback {Function(ex)}
  *   Called in case of error. ex contains the error
  *   with a user-displayable but not localized |.message| and maybe a

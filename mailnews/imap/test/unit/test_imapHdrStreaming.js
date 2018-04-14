@@ -5,7 +5,7 @@
  * because that's not implemented yet, and it's unclear if anyone will want it.
  */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -37,8 +37,8 @@ var streamListener =
   onStartRequest: function(aRequest, aContext) {
   },
   onStopRequest: function(aRequest, aContext, aStatusCode) {
-    do_check_eq(aStatusCode, 0);
-    do_check_true(this._data.includes("Content-Type"));
+    Assert.equal(aStatusCode, 0);
+    Assert.ok(this._data.includes("Content-Type"));
     async_driver();
   },
 
@@ -58,15 +58,9 @@ function addMessagesToServer(messages, mailbox)
   // For every message we have, we need to convert it to a file:/// URI
   messages.forEach(function (message)
   {
-    let URI =
-      Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL);
-    message.spec = URI.spec;
-  });
-
-  // Create the imapMessages and store them on the mailbox
-  messages.forEach(function (message)
-  {
-    mailbox.addMessage(new imapMessage(message.spec, mailbox.uidnext++, []));
+    let URI = Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL);
+    // Create the imapMessage and store it on the mailbox.
+    mailbox.addMessage(new imapMessage(URI.spec, mailbox.uidnext++, []));
   });
 }
 

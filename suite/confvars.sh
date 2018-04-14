@@ -9,9 +9,6 @@ MOZ_APP_BASENAME=SeaMonkey
 MOZ_APP_VENDOR=Mozilla
 MOZ_APP_NAME=seamonkey
 MOZ_APP_DISPLAYNAME=SeaMonkey
-MOZ_LDAP_XPCOM=1
-MOZ_COMPOSER=1
-MOZ_SUITE=1
 MOZ_BRANDING_DIRECTORY=$commreltopsrcdir/suite/branding/nightly
 MOZ_OFFICIAL_BRANDING_DIRECTORY=$commreltopsrcdir/suite/branding/nightly
 MOZ_UPDATER=1
@@ -29,7 +26,6 @@ SEAMONKEY_VERSION=$MOZ_APP_VERSION
 
 MOZ_APP_ID={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
 MOZ_PROFILE_MIGRATOR=1
-MOZ_SEPARATE_MANIFEST_FOR_THEME_OVERRIDES=1
 
 if test "$NIGHTLY_BUILD"; then
   MOZ_RUST_URLPARSE=1
@@ -43,12 +39,12 @@ fi
 # Include the DevTools client, not just the server (which is the default)
 MOZ_DEVTOOLS=all
 
-# Bundled extensions Lightning Chatzilla DOM Inspector and debugQA
-MOZ_IRC=1
-MOZ_DOMINSPECTOR=1
+# Bundled extensions ChatZilla DOM Inspector and debugQA
+MOZ_IRC=
+MOZ_DOMINSPECTOR=
 
 if [[ $MOZ_APP_VERSION == *a* ]]; then
-  MOZ_DEBUGQA=1
+  MOZ_DEBUGQA=
 fi
 
 if [[ $MOZ_IRC == 1 ]]; then

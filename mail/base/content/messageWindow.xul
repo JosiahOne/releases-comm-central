@@ -5,21 +5,47 @@
 
 #filter substitution
 
+<?xml-stylesheet href="chrome://messenger/content/bindings.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/messageWindow.css" type="text/css"?>
-
-<?xul-overlay href="chrome://communicator/content/utilityOverlay.xul"?>
-<?xul-overlay href="chrome://messenger/content/msgHdrViewOverlay.xul"?>
-<?xul-overlay href="chrome://messenger/content/mailWindowOverlay.xul"?>
-<?xul-overlay href="chrome://messenger/content/mailOverlay.xul"?>
-<?xul-overlay href="chrome://messenger/content/editContactOverlay.xul"?>
+<?xml-stylesheet href="chrome://messenger/skin/editContactOverlay.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/messageHeader.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/attachmentList.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/smime/msgHdrViewSMIMEOverlay.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/smime/msgReadSMIMEOverlay.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/searchBox.css" type="text/css"?>
 
 <!DOCTYPE window [
 <!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd" >
 %brandDTD;
+<!ENTITY % msgHdrViewOverlayDTD SYSTEM "chrome://messenger/locale/msgHdrViewOverlay.dtd">
+%msgHdrViewOverlayDTD;
 <!ENTITY % messengerDTD SYSTEM "chrome://messenger/locale/messenger.dtd" >
 %messengerDTD;
-<!ENTITY % customizeToolbarDTD SYSTEM "chrome://global/locale/customizeToolbar.dtd">
+<!ENTITY % editContactOverlayDTD SYSTEM "chrome://messenger/locale/editContactOverlay.dtd">
+%editContactOverlayDTD;
+<!ENTITY % customizeToolbarDTD SYSTEM "chrome://messenger/locale/customizeToolbar.dtd">
 %customizeToolbarDTD;
+<!ENTITY % utilityDTD SYSTEM "chrome://communicator/locale/utilityOverlay.dtd">
+%utilityDTD;
+<!ENTITY % msgViewPickerDTD SYSTEM "chrome://messenger/locale/msgViewPickerOverlay.dtd" >
+%msgViewPickerDTD;
+<!ENTITY % textcontextDTD SYSTEM "chrome://global/locale/textcontext.dtd">
+%textcontextDTD;
+<!ENTITY % baseMenuOverlayDTD SYSTEM "chrome://messenger/locale/baseMenuOverlay.dtd">
+%baseMenuOverlayDTD;
+<!ENTITY % utilityDTD SYSTEM "chrome://communicator/locale/utilityOverlay.dtd">
+%utilityDTD;
+<!ENTITY % charsetDTD SYSTEM "chrome://global/locale/charsetMenu.dtd">
+%charsetDTD;
+<!ENTITY % viewZoomOverlayDTD SYSTEM "chrome://messenger/locale/viewZoomOverlay.dtd">
+%viewZoomOverlayDTD;
+<!ENTITY % msgReadSMIMEDTD SYSTEM "chrome://messenger-smime/locale/msgReadSMIMEOverlay.dtd">
+%msgReadSMIMEDTD;
+<!ENTITY % quickFilterBarDTD SYSTEM "chrome://messenger/locale/quickFilterBar.dtd">
+%quickFilterBarDTD;
+<!ENTITY % msgViewPickerDTD SYSTEM "chrome://messenger/locale/msgViewPickerOverlay.dtd" >
+%msgViewPickerDTD;
 ]>
 
 <!--
@@ -41,7 +67,12 @@
 
   <stringbundleset id="stringbundleset">
     <stringbundle id="bundle_brand" src="chrome://branding/locale/brand.properties"/>
+    <stringbundle id="bundle_messenger" src="chrome://messenger/locale/messenger.properties"/>
     <stringbundle id="bundle_offlinePrompts" src="chrome://messenger/locale/offline.properties"/>
+    <stringbundle id="bundle_editContact"
+                  src="chrome://messenger/locale/editContactOverlay.properties"/>
+    <stringbundle id="charsetBundle" src="chrome://communicator/content/labelsencodings.properties"/>
+    <stringbundle id="bundle_read_smime" src="chrome://messenger-smime/locale/msgReadSMIMEOverlay.properties"/>
   </stringbundleset>
 
   <script type="application/javascript" src="chrome://global/content/globalOverlay.js"/>
@@ -59,27 +90,52 @@
   <script type="application/javascript" src="chrome://communicator/content/contentAreaClick.js"/>
   <script type="application/javascript" src="chrome://global/content/nsDragAndDrop.js"/>
   <script type="application/javascript" src="chrome://messenger/content/msgViewNavigation.js"/>
-  <script type="application/javascript" src="chrome://messenger/content/editContactOverlay.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/editContactPanel.js"/>
   <script type="application/javascript" src="chrome://messenger/content/toolbarIconColor.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/msgHdrView.js"/>
+  <script type="application/javascript" src="chrome://global/content/nsDragAndDrop.js"/>
+  <script type="application/javascript" src="chrome://messenger-smime/content/msgHdrViewSMIMEOverlay.js"/>
+  <script type="application/javascript" src="chrome://messenger-smime/content/msgReadSMIMEOverlay.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/mailCommands.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/junkCommands.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/mailWindowOverlay.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/mailTabs.js"/>
+  <script type="application/javascript" src="chrome://messenger-newsblog/content/newsblogOverlay.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/mail-offline.js"/>
+  <script type="application/javascript" src="chrome://global/content/printUtils.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/msgViewPickerOverlay.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/plugins.js"/>
+  <script type="application/javascript" src="chrome://global/content/viewZoomOverlay.js"/>
+  <script type="application/javascript" src="chrome://communicator/content/utilityOverlay.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/mailCore.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/quickFilterBar.js"/>
+#ifdef XP_MACOSX
+  <script type="application/javascript" src="chrome://global/content/macWindowMenu.js"/>
+#endif
+  <script type="application/javascript" src="chrome://messenger/content/newmailaccount/uriListener.js"/>
 
   <commandset id="mailCommands">
-    <commandset id="mailFileMenuItems"/>
-    <commandset id="mailViewMenuItems"/>
-    <commandset id="mailEditMenuItems"/>
+#include mainCommandSet.inc
     <commandset id="mailSearchMenuItems"/>
-    <commandset id="mailGoMenuItems"/>
-    <commandset id="mailMessageMenuItems"/>
-    <commandset id="mailToolbarItems"/>
-    <commandset id="mailGetMsgMenuItems"/>
-    <commandset id="mailTagMenuItems"/>
-    <commandset id="mailMarkMenuItems"/>
-    <commandset id="mailToolsMenuItems"/>
-    <commandset id="mailEditContextMenuItems"/>
-    <commandset id="tasksCommands"/>
+    <commandset id="attachmentCommands">
+      <command id="cmd_openAllAttachments"
+               oncommand="goDoCommand('cmd_openAllAttachments');"
+               disabled="true"/>
+      <command id="cmd_saveAllAttachments"
+               oncommand="goDoCommand('cmd_saveAllAttachments');"
+               disabled="true"/>
+      <command id="cmd_detachAllAttachments"
+               oncommand="goDoCommand('cmd_detachAllAttachments');"
+               disabled="true"/>
+      <command id="cmd_deleteAllAttachments"
+               oncommand="goDoCommand('cmd_deleteAllAttachments');"
+               disabled="true"/>
+    </commandset>
+    <commandset id="tasksCommands">
+      <command id="cmd_newMessage" oncommand="goOpenNewMessage();"/>
+      <command id="cmd_newCard" oncommand="openNewCardDialog()"/>
+    </commandset>
     <commandset id="commandKeys"/>
-#ifdef XP_MACOSX
-    <commandset id="macWindowMenuItems"/>
-#endif
     <command id="cmd_close" oncommand="window.close();"/>
   </commandset>
 
@@ -88,27 +144,29 @@
   </broadcasterset>
 
   <keyset id="mailKeys">
-    <keyset id="tasksKeys"/>
     <key keycode="VK_ESCAPE" oncommand="window.close();"/>
+#include mainKeySet.inc
+    <keyset id="tasksKeys">
+#ifdef XP_MACOSX
+      <key id="key_newMessage" key="&newMessageCmd.key;" command="cmd_newMessage"
+           modifiers="accel,shift"/>
+      <key id="key_newMessage2" key="&newMessageCmd2.key;" command="cmd_newMessage"
+           modifiers="accel"/>
+#else
+      <key id="key_newMessage"  key="&newMessageCmd.key;" command="cmd_newMessage"
+           modifiers="accel"/>
+      <key id="key_newMessage2" key="&newMessageCmd2.key;" command="cmd_newMessage"
+           modifiers="accel"/>
+#endif
+    </keyset>
   </keyset>
 
   <!-- Popup menus provided by mailWindowOverlay.xul -->
-  <popupset id="mainPopupSet"/>
-  <menupopup id="mailContext"/>
-  <menupopup id="toolbar-context-menu"/>
-  <menupopup id="remoteContentOptions"/>
-  <menupopup id="phishingOptions"/>
-
-  <!-- Popup menus provided by msgHdrViewOverlay.xul -->
-  <menupopup id="messageIdContext"/>
-  <menupopup id="attachmentListContext"/>
-  <menupopup id="attachmentItemContext"/>
-  <menupopup id="header-toolbar-context-menu"/>
-  <menupopup id="attachment-toolbar-context-menu"/>
-  <menupopup id="copyUrlPopup"/>
-
-  <!-- Panel provided by editContactOverlay.xul -->
-  <panel id="editContactPanel"/>
+  <popupset id="mainPopupSet">
+#include mainPopupSet.inc
+#include msgHdrPopup.inc
+  </popupset>
+#include editContactPanel.inc
 
 #ifdef XP_MACOSX
   <vbox id="titlebar">
@@ -126,11 +184,12 @@
   </vbox>
 #endif
 
-  <!-- navigation-toolbox is provided by mailWindowOverlay.xul -->
-  <toolbox id="navigation-toolbox" class="toolbox-top" />
+  <!-- navigation-toolbox with the main menubar -->
+#include mainNavigationToolbox.inc
+  </toolbox>
 
-  <!-- mail-toolbox is provided by mailWindowOverlay.xul -->
-  <toolbox id="mail-toolbox" />
+  <!-- mail-toolbox with the main toolbarbuttons -->
+#include mainMailToolbox.inc
 
   <tooltip id="aHTMLTooltip" page="true"/>
 
@@ -142,7 +201,9 @@
           ondrop="nsDragAndDrop.drop(event, messagepaneObserver);"
           ondragexit="nsDragAndDrop.dragExit(event, messagepaneObserver);">
 
-      <hbox id="msgHeaderView"/>
+      <hbox id="msgHeaderView" collapsed="true" class="main-header-area">
+#include msgHdrView.inc
+      </hbox>
       <!-- The msgNotificationBar appears on top of the message and displays
            information like: junk, mdn, remote content and phishing warnings -->
       <notificationbox id="msgNotificationBar" notificationside="top"/>
@@ -154,7 +215,9 @@
                onresize="return messagePaneOnResize(event);" autofind="false"
                src="about:blank" onclick="return contentAreaClick(event);" />
       <splitter id="attachment-splitter" collapse="after" resizebefore="closest" resizeafter="closest" collapsed="true"/>
-      <vbox id="attachmentView"/>
+      <vbox id="attachmentView" collapsed="true">
+#include msgAttachmentView.inc
+      </vbox>
       <findbar id="FindToolbar" browserid="messagepane"/>
     </vbox>
   </hbox>
@@ -164,5 +227,7 @@
             hidden="true"/>
   </panel>
 
-  <statusbar class="chromeclass-status" id="status-bar"/>
+  <statusbar class="chromeclass-status" id="status-bar">
+#include mainStatusbar.inc
+  </statusbar>
 </window>

@@ -7,21 +7,18 @@
 
 "use strict";
 
-var { classes: Cc, interfaces: Ci, utils: Cu } = Components;
-
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/Troubleshoot.jsm");
-Cu.import("resource://gre/modules/ResetProfile.jsm");
-Cu.import("resource://gre/modules/AppConstants.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Troubleshoot.jsm");
+ChromeUtils.import("resource://gre/modules/ResetProfile.jsm");
+ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 // added for TB
-Cu.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 // end of TB addition
 
-XPCOMUtils.defineLazyModuleGetter(this, "PluralForm",
-                                  "resource://gre/modules/PluralForm.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "PlacesDBUtils",
-                                  "resource://gre/modules/PlacesDBUtils.jsm");
+ChromeUtils.defineModuleGetter(this, "PluralForm",
+                               "resource://gre/modules/PluralForm.jsm");
+ChromeUtils.defineModuleGetter(this, "PlacesDBUtils",
+                               "resource://gre/modules/PlacesDBUtils.jsm");
 
 // added for TB
 /* Node classes. All of these are mutually exclusive. */
@@ -103,27 +100,25 @@ var snapshotFormatters = {
       $("contentprocesses-row").hidden = true;
     }
 
-    function getReasonStringName(resultValue, defaultValue) {
-      if (resultValue != defaultValue) {
-        return resultValue ? "enabledByUser" : "disabledByUser";
+    if (Services.policies) {
+      let policiesText = "";
+      switch (data.policiesStatus) {
+        case Services.policies.INACTIVE:
+          policiesText = strings.GetStringFromName("policies.inactive");
+          break;
+
+        case Services.policies.ACTIVE:
+          policiesText = strings.GetStringFromName("policies.active");
+          break;
+
+        default:
+          policiesText = strings.GetStringFromName("policies.error");
+          break;
       }
-      return resultValue ? "enabledByDefault" : "disabledByDefault";
-    }
-    let styloReason;
-    let styloChromeReason;
-    if (!data.styloBuild) {
-      styloReason = "disabledByBuild";
-      styloChromeReason = "disabledByBuild";
+      $("policies-status").textContent = policiesText;
     } else {
-      styloReason = getReasonStringName(data.styloResult, data.styloDefault);
-      styloChromeReason = getReasonStringName(data.styloChromeResult,
-                                              data.styloChromeDefault);
+      $("policies-status-row").hidden = true;
     }
-    styloReason = strings.GetStringFromName(styloReason);
-    styloChromeReason = strings.GetStringFromName(styloChromeReason);
-    $("stylo-box").textContent =
-      `content = ${data.styloResult} (${styloReason}), ` +
-      `chrome = ${data.styloChromeResult} (${styloChromeReason})`;
 
     let keyGoogleFound = data.keyGoogleFound ? "found" : "missing";
     $("key-google-box").textContent = strings.GetStringFromName(keyGoogleFound);
@@ -159,7 +154,7 @@ var snapshotFormatters = {
       profElem.appendChild(fsTextNode);
     }
     catch (x) {
-      Components.utils.reportError(x);
+      Cu.reportError(x);
     }
     // end of TB addition
   },
@@ -233,6 +228,18 @@ var snapshotFormatters = {
         $.new("td", extension.id),
       ]);
     }));
+  },
+
+  securitySoftware: function securitySoftware(data) {
+    if (!AppConstants.isPlatformAndVersionAtLeast("win", "6.2")) {
+      $("security-software-title").hidden = true;
+      $("security-software-table").hidden = true;
+      return;
+    }
+
+    $("security-software-antivirus").textContent = data.registeredAntiVirus;
+    $("security-software-antispyware").textContent = data.registeredAntiSpyware;
+    $("security-software-firewall").textContent = data.registeredFirewall;
   },
 
 /* Not used by TB
@@ -511,7 +518,9 @@ var snapshotFormatters = {
     addRowFromKey("features", "webgl2Extensions");
     addRowFromKey("features", "supportsHardwareH264", "hardwareH264");
     addRowFromKey("features", "direct2DEnabled", "#Direct2D");
+    addRowFromKey("features", "usesTiling");
     addRowFromKey("features", "offMainThreadPaintEnabled");
+    addRowFromKey("features", "offMainThreadPaintWorkerCount");
 
     if ("directWriteEnabled" in data) {
       let message = data.directWriteEnabled;
@@ -755,7 +764,6 @@ var snapshotFormatters = {
     // Basic information
     insertBasicInfo("audioBackend", data.currentAudioBackend);
     insertBasicInfo("maxAudioChannels", data.currentMaxAudioChannels);
-    insertBasicInfo("channelLayout", data.currentPreferredChannelLayout);
     insertBasicInfo("sampleRate", data.currentPreferredSampleRate);
 
     // Output devices information
@@ -957,13 +965,10 @@ function copyRawDataToClipboard(button) {
       transferable.setTransferData("text/unicode", str, str.data.length * 2);
       Services.clipboard.setData(transferable, null, Ci.nsIClipboard.kGlobalClipboard);
       if (AppConstants.platform == "android") {
-        // Present a toast notification.
-        let message = {
-          type: "Toast:Show",
-          message: stringBundle().GetStringFromName("rawDataCopied"),
-          duration: "short"
-        };
-        Services.androidBridge.handleGeckoMessage(message);
+        // Present a snackbar notification.
+        ChromeUtils.import("resource://gre/modules/Snackbars.jsm");
+        Snackbars.show(stringBundle().GetStringFromName("rawDataCopied"),
+                       Snackbars.LENGTH_SHORT);
       }
     });
   } catch (err) {
@@ -1008,13 +1013,10 @@ function copyContentsToClipboard() {
   Services.clipboard.setData(transferable, null, Services.clipboard.kGlobalClipboard);
 
   if (AppConstants.platform == "android") {
-    // Present a toast notification.
-    let message = {
-      type: "Toast:Show",
-      message: stringBundle().GetStringFromName("textCopied"),
-      duration: "short"
-    };
-    Services.androidBridge.handleGeckoMessage(message);
+    // Present a snackbar notification.
+    ChromeUtils.import("resource://gre/modules/Snackbars.jsm");
+    Snackbars.show(stringBundle().GetStringFromName("textCopied"),
+                   Snackbars.LENGTH_SHORT);
   }
 }
 
@@ -1225,9 +1227,13 @@ function populateActionBox() {
     $("reset-box").style.display = "block";
     $("action-box").style.display = "block";
   }
-  if (!Services.appinfo.inSafeMode) {
+  if (!Services.appinfo.inSafeMode && AppConstants.platform !== "android") {
     $("safe-mode-box").style.display = "block";
     $("action-box").style.display = "block";
+
+    if (Services.policies && !Services.policies.isAllowed("safeMode")) {
+      $("restart-in-safe-mode-button").setAttribute("disabled", "true");
+    }
   }
 }
 

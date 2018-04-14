@@ -56,7 +56,7 @@
         <xul:vbox class="tooltipBuddies" anonid="buddies"/>
       </xul:vbox>
     </content>
-    <implementation implements="nsIObserver, nsIDOMEventListener">
+    <implementation implements="nsIObserver">
      <property name="bundle">
        <getter>
          <![CDATA[
@@ -487,14 +487,14 @@
            let date = new Date(node._originalMsg.time * 1000);
            let text;
            if ((new Date()).toDateString() == date.toDateString()) {
-             const dateTimeFormatter = Services.intl.createDateTimeFormat(undefined, {
-               timeStyle: "long"
+             const dateTimeFormatter = new Services.intl.DateTimeFormat(undefined, {
+               timeStyle: "medium"
              });
              text = dateTimeFormatter.format(date);
            }
            else {
-             const dateTimeFormatter = Services.intl.createDateTimeFormat(undefined, {
-               dateStyle: "short", timeStyle: "long"
+             const dateTimeFormatter = new Services.intl.DateTimeFormat(undefined, {
+               dateStyle: "short", timeStyle: "medium"
              });
              text = dateTimeFormatter.format(date);
            }

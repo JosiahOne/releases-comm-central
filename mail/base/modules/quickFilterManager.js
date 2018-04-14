@@ -4,29 +4,25 @@
 
 this.EXPORTED_SYMBOLS = ["QuickFilterState", "QuickFilterManager",
                           "MessageTextFilter", "QuickFilterSearchListener"];
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-var Cr = Components.results;
-var Cu = Components.utils;
 
-Cu.import("resource://gre/modules/PluralForm.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/AppConstants.jsm");
+ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
-Cu.import("resource:///modules/iteratorUtils.jsm");
-Cu.import("resource:///modules/errUtils.js");
-Cu.import("resource:///modules/mailServices.js");
-Cu.import("resource:///modules/searchSpec.js");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource:///modules/errUtils.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/searchSpec.js");
 
-var nsMsgSearchAttrib = Components.interfaces.nsMsgSearchAttrib;
-var nsMsgMessageFlags = Components.interfaces.nsMsgMessageFlags;
-var nsMsgSearchOp = Components.interfaces.nsMsgSearchOp;
+var nsMsgSearchAttrib = Ci.nsMsgSearchAttrib;
+var nsMsgMessageFlags = Ci.nsMsgMessageFlags;
+var nsMsgSearchOp = Ci.nsMsgSearchOp;
 
 // XXX we need to know whether the gloda indexer is enabled for upsell reasons,
 // but this should really just be exposed on the main Gloda public interface.
-Cu.import("resource:///modules/gloda/indexer.js");
+ChromeUtils.import("resource:///modules/gloda/indexer.js");
 // we need to be able to create gloda message searcher instances for upsells:
-Cu.import("resource:///modules/gloda/msg_search.js");
+ChromeUtils.import("resource:///modules/gloda/msg_search.js");
 
 
 /**
@@ -321,7 +317,7 @@ var QuickFilterManager = {
    *     of the attribute we cram your state into the state dictionary as, so
    *     the key thing is that it doesn't conflict with other id's.
    * @param {String} aFilterDef.domId The id of the DOM node that you have
-   *     overlayed into the quick filter bar.
+   *     overlaid into the quick filter bar.
    * @param {function(aTermCreator, aTerms, aState)} aFilterDef.appendTerms
    *     The function to invoke to contribute your terms to the list of
    *     search terms in aTerms.  Your function will not be invoked if you do
@@ -593,10 +589,10 @@ QuickFilterManager.defineFilter({
     term = null;
     while (enumerator.hasMoreElements()) {
       let addrbook = enumerator.getNext();
-      if (addrbook instanceof Components.interfaces.nsIAbDirectory &&
+      if (addrbook instanceof Ci.nsIAbDirectory &&
           !addrbook.isRemote) {
         term = aTermCreator.createTerm();
-        term.attrib = Components.interfaces.nsMsgSearchAttrib.Sender;
+        term.attrib = Ci.nsMsgSearchAttrib.Sender;
         value = term.value;
         value.attrib = term.attrib;
         value.str = addrbook.URI;
@@ -666,13 +662,13 @@ var TagFacetingFilter = {
     // just the true/false case
     if (this.isSimple(aFilterValue)) {
       term = aTermCreator.createTerm();
-      term.attrib = Components.interfaces.nsMsgSearchAttrib.Keywords;
+      term.attrib = Ci.nsMsgSearchAttrib.Keywords;
       value = term.value;
       value.str = "";
       term.value = value;
       term.op = aFilterValue ?
-                  Components.interfaces.nsMsgSearchOp.IsntEmpty :
-                  Components.interfaces.nsMsgSearchOp.IsEmpty;
+                  Ci.nsMsgSearchOp.IsntEmpty :
+                  Ci.nsMsgSearchOp.IsEmpty;
       term.booleanAnd = true;
       aTerms.push(term);
 
@@ -692,7 +688,7 @@ var TagFacetingFilter = {
         let shouldFilter = aFilterValue.tags[key];
         if (shouldFilter !== null) {
           term = aTermCreator.createTerm();
-          term.attrib = Components.interfaces.nsMsgSearchAttrib.Keywords;
+          term.attrib = Ci.nsMsgSearchAttrib.Keywords;
           value = term.value;
           value.attrib = term.attrib;
           value.str = key;
@@ -728,11 +724,11 @@ var TagFacetingFilter = {
         // (we need to add has a tag)
         if (!lastIncludeTerm) {
           term = aTermCreator.createTerm();
-          term.attrib = Components.interfaces.nsMsgSearchAttrib.Keywords;
+          term.attrib = Ci.nsMsgSearchAttrib.Keywords;
           value = term.value;
           value.str = "";
           term.value = value;
-          term.op = Components.interfaces.nsMsgSearchOp.IsntEmpty;
+          term.op = Ci.nsMsgSearchOp.IsntEmpty;
           term.booleanAnd = true;
           aTerms.push(term);
         }
@@ -920,10 +916,10 @@ QuickFilterManager.defineFilter({
   appendTerms: function(aTermCreator, aTerms, aFilterValue) {
     let term, value;
     term = aTermCreator.createTerm();
-    term.attrib = Components.interfaces.nsMsgSearchAttrib.MsgStatus;
+    term.attrib = Ci.nsMsgSearchAttrib.MsgStatus;
     value = term.value;
     value.attrib = term.attrib;
-    value.status = Components.interfaces.nsMsgMessageFlags.Attachment;
+    value.status = Ci.nsMsgMessageFlags.Attachment;
     term.value = value;
     term.op = aFilterValue ? nsMsgSearchOp.Is : nsMsgSearchOp.Isnt;
     term.booleanAnd = true;
@@ -1278,7 +1274,7 @@ ResultsLabelFolderDisplayListener.prototype = {
   //// FolderDisplayListener
 
   // We want to make sure that anything that would change the count of displayed
-  //  messages causes us to update our dislayed value.
+  //  messages causes us to update our displayed value.
 
   onMessageCountsChanged: function(aFolderDisplay) {
     this._update(aFolderDisplay);

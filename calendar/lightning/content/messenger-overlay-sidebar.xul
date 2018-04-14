@@ -83,7 +83,7 @@
                oncommand="document.getElementById('tabmail').openTab('tasks', { title: document.getElementById('task-tab-button').getAttribute('title') })"/>
       <command id="calendar_go_to_today_command"
                observes="calendar_mode_calendar"
-               oncommand="document.getElementById('tabmail').openTab('calendar', { title: document.getElementById('calendar-tab-button').getAttribute('title') }); goToDate(cal.now())"/>
+               oncommand="document.getElementById('tabmail').openTab('calendar', { title: document.getElementById('calendar-tab-button').getAttribute('title') }); goToDate(cal.dtz.now())"/>
     </commandset>
 
     <commandset id="mailCommands">
@@ -211,7 +211,6 @@
               state="collapsed"
               class="calendar-sidebar-splitter"
               oncommand="TodayPane.onCommandTodaySplitter();">
-      <grippy/>
     </splitter>
     <modevbox id="today-pane-panel" />
   </hbox>
@@ -303,8 +302,7 @@
       <label id="calendar-invitations-label"
              class="text-link"
              onclick="openInvitationsDialog()"
-             onkeypress="if (event.keyCode == event.VK_RETURN) {
-                             openInvitationsDialog(); }"/>
+             onkeypress="if (event.key == 'Enter') { openInvitationsDialog(); }"/>
     </statusbarpanel>
   </statusbar>
 </overlay>

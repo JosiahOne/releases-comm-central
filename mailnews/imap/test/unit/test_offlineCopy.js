@@ -11,8 +11,8 @@
  * by allowUndo == true in CopyMessages).
  */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 load("../../../resources/logHelper.js");
 
@@ -30,23 +30,19 @@ var gMsg4Id = "foo.12345@example";
 var gFolder1;
 
 // Adds some messages directly to a mailbox (eg new mail)
-function addMessagesToServer(messages, mailbox, localFolder)
+function addMessagesToServer(messages, mailbox)
 {
   // For every message we have, we need to convert it to a file:/// URI
   messages.forEach(function (message)
   {
     let URI = Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL);
-    message.spec = URI.spec;
-  });
-
-  // Create the imapMessages and store them on the mailbox
-  messages.forEach(function (message)
-  {
-    mailbox.addMessage(new imapMessage(message.spec, mailbox.uidnext++, []));
+    // Create the imapMessage and store it on the mailbox.
+    mailbox.addMessage(new imapMessage(URI.spec, mailbox.uidnext++, []));
   });
 }
+
 var tests = [
-  function *setup() {
+  async function setup() {
     // Turn off autosync_offline_stores because
     // fetching messages is invoked after copying the messages.
     // (i.e. The fetching process will be invoked after OnStopCopy)
@@ -58,7 +54,7 @@ var tests = [
 
     let promiseFolderAdded = PromiseTestUtils.promiseFolderAdded("folder 1");
     IMAPPump.incomingServer.rootFolder.createSubfolder("folder 1", null);
-    yield promiseFolderAdded;
+    await promiseFolderAdded;
 
     gFolder1 = IMAPPump.incomingServer.rootFolder.getChildNamed("folder 1");
     Assert.ok(gFolder1 instanceof Ci.nsIMsgFolder);
@@ -75,32 +71,32 @@ var tests = [
     addMessagesToServer([{file: gMsgFile1, messageId: gMsgId1},
                          {file: gMsgFile2, messageId: gMsgId2},
                         ],
-                        IMAPPump.daemon.getMailbox("INBOX"), IMAPPump.inbox);
+                        IMAPPump.daemon.getMailbox("INBOX"));
   },
-  function *updateFolder() {
+  async function updateFolder() {
     let promiseUrlListener = new PromiseTestUtils.PromiseUrlListener();
     IMAPPump.inbox.updateFolderWithListener(null, promiseUrlListener);
-    yield promiseUrlListener.promise;
+    await promiseUrlListener.promise;
   },
-  function *downloadAllForOffline() {
+  async function downloadAllForOffline() {
      let promiseUrlListener = new PromiseTestUtils.PromiseUrlListener();
      IMAPPump.inbox.downloadAllForOffline(promiseUrlListener, null);
-     yield promiseUrlListener.promise;
+     await promiseUrlListener.promise;
   },
-  function *copyMessagesToInbox() {
+  async function copyMessagesToInbox() {
     let promiseCopyListener = new PromiseTestUtils.PromiseCopyListener();
     MailServices.copy.CopyFileMessage(gMsgFile3, IMAPPump.inbox, null, false, 0,
                                       "", promiseCopyListener, null);
-    yield promiseCopyListener.promise;
+    await promiseCopyListener.promise;
 
     promiseCopyListener = new PromiseTestUtils.PromiseCopyListener();
     MailServices.copy.CopyFileMessage(gMsgFile4, IMAPPump.inbox, null, false, 0,
                                       "", promiseCopyListener, null);
-    yield promiseCopyListener.promise;
+    await promiseCopyListener.promise;
 
     let promiseUrlListener = new PromiseTestUtils.PromiseUrlListener();
     IMAPPump.inbox.updateFolderWithListener(null, promiseUrlListener);
-    yield promiseUrlListener.promise;
+    await promiseUrlListener.promise;
 
     let db = IMAPPump.inbox.msgDatabase;
 
@@ -172,7 +168,7 @@ var tests = [
     }
     Assert.equal(count, 3);
   },
-  function *test_headers() {
+  async function test_headers() {
     let msgIds = [gMsgId1, gMsg3Id, gMsg4Id];
     for (let msgId of msgIds)
     {
@@ -183,7 +179,7 @@ var tests = [
       let msgServ = messenger.messageServiceFromURI(msgURI);
       let promiseStreamListener = new PromiseTestUtils.PromiseStreamListener();
       msgServ.streamHeaders(msgURI, promiseStreamListener, null, true);
-      let data = yield promiseStreamListener.promise;
+      let data = await promiseStreamListener.promise;
       dump('\nheaders for messageId ' + msgId + '\n' + data + '\n\n');
       Assert.ok(data.includes(msgId));
     }

@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/InlineSpellChecker.jsm");
+ChromeUtils.import("resource://gre/modules/InlineSpellChecker.jsm");
 
 var gMisspelledWord;
 var gSpellChecker = null;
@@ -23,7 +23,7 @@ function Startup()
   }
 
   // Get the spellChecker shell
-  gSpellChecker = Components.classes['@mozilla.org/editor/editorspellchecker;1'].createInstance(Components.interfaces.nsIEditorSpellCheck);
+  gSpellChecker = Cc['@mozilla.org/editor/editorspellchecker;1'].createInstance(Ci.nsIEditorSpellCheck);
   if (!gSpellChecker)
   {
     dump("SpellChecker not found!!!\n");
@@ -43,7 +43,7 @@ function Startup()
     else
       filterContractId = "@mozilla.org/editor/txtsrvfilter;1";
 
-    gSpellChecker.setFilter(Components.classes[filterContractId].createInstance(Components.interfaces.nsITextServicesFilter));
+    gSpellChecker.setFilter(Cc[filterContractId].createInstance(Ci.nsITextServicesFilter));
     gSpellChecker.InitSpellChecker(editor, enableSelectionChecking, spellCheckStarted);
 
   }
@@ -77,12 +77,12 @@ function spellCheckStarted() {
   }
 
   InitLanguageMenu(curLang);
-  
+
   // Get the first misspelled word and setup all UI
   NextWord();
 
-  // When startup param is true, setup different UI when spell checking 
-  //   just before sending mail message  
+  // When startup param is true, setup different UI when spell checking
+  //   just before sending mail message
   if (window.arguments[0])
   {
     // If no misspelled words found, simply close dialog and send message
@@ -236,14 +236,14 @@ function SetWidgetsForMisspelledWord()
 function CheckWord()
 {
   var word = gDialog.ReplaceWordInput.value;
-  if (word) 
+  if (word)
   {
     if (gSpellChecker.CheckCurrentWord(word))
     {
       FillSuggestedList(word);
       SetReplaceEnable();
-    } 
-    else 
+    }
+    else
     {
       ClearListbox(gDialog.SuggestedList);
       var item = gDialog.SuggestedList.appendItem(GetString("CorrectSpelling"), "");
@@ -404,12 +404,12 @@ function Recheck()
     recheckLanguage = gSpellChecker.GetCurrentDictionary();
     gSpellChecker.UninitSpellChecker();
     // Clear the ignore all list.
-    Components.classes["@mozilla.org/spellchecker/personaldictionary;1"]
-              .getService(Components.interfaces.mozIPersonalDictionary)
-              .endSession();
+    Cc["@mozilla.org/spellchecker/personaldictionary;1"]
+      .getService(Ci.mozIPersonalDictionary)
+      .endSession();
     gSpellChecker.InitSpellChecker(GetCurrentEditor(), false, finishRecheck);
   } catch(ex) {
-    Components.utils.reportError(ex);
+    Cu.reportError(ex);
   }
 }
 
@@ -449,7 +449,7 @@ function FillSuggestedList(misspelledWord)
       // Initialize with first suggested list by selecting it
       gDialog.SuggestedList.selectedIndex = 0;
     }
-  } 
+  }
   else
   {
     item = list.appendItem("", "");

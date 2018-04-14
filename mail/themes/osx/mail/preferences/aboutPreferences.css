@@ -4,14 +4,8 @@
 
 @import url("chrome://messenger/skin/shared/in-content/aboutPreferences.css");
 
-html *,
-page *,
-window * {
-  font-size: 1.36rem;
-}
-
-caption label:not(.dialogTitle) {
-  font-size: 1.55rem;
+:root > * {
+  font-size: 1.36em;
 }
 
 prefpane .groupbox-title {
@@ -24,16 +18,23 @@ caption {
   padding-bottom: 2px !important;
 }
 
+.numberbox-input-box {
+  -moz-appearance: none;
+  border-width: 0;
+}
+
 spinbuttons {
   -moz-appearance: none;
 }
 
 .spinbuttons-up {
   margin-top: 0 !important;
+  margin-bottom: 0;
   border-radius: 4px 4px 0 0;
 }
 
 .spinbuttons-down  {
+  margin-top: 0;
   margin-bottom: 0 !important;
   border-radius: 0 0 4px 4px;
 }

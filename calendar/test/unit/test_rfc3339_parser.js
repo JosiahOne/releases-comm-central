@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calProviderUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calProviderUtils.jsm");
 
 function run_test() {
     do_calendar_startup(really_run_test);
@@ -29,7 +29,7 @@ function really_run_test() {
             isDate: aExpectedDateTime[7]
         };
         for (let prop in expectedDateProps) {
-            do_print("Checking prop: " + prop);
+            info("Checking prop: " + prop);
             // Object comparison fails with ical.js, and we only want to check
             // that we have the right timezone.
             if (prop == "timezone") {
@@ -67,7 +67,7 @@ function really_run_test() {
     // An arbitrary timezone (that has daylight savings time).
     let getTz = (aTz) => cal.getTimezoneService().getTimezone(aTz);
     let timezone = getTz("America/New_York");
-    let utc = cal.UTC();
+    let utc = cal.dtz.UTC;
     // Timezones used in tests.
     let belize = getTz("America/Belize");
     let dawson = getTz("America/Dawson");

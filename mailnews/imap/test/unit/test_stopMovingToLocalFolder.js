@@ -5,8 +5,8 @@
 /* Test that the message failed to move to a local folder remains on IMAP
  * server. */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -30,7 +30,7 @@ var asyncCopyListener = {
     stop_server();
   },
   OnStopCopy: function(aStatus) {
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     async_driver();
   }
 };
@@ -64,13 +64,13 @@ function* move_messages() {
 }
 
 function* check_messages() {
-  do_check_eq(IMAPPump.inbox.getTotalMessages(false), 1);
-  do_check_eq(localAccountUtils.inboxFolder.getTotalMessages(false), 0);
+  Assert.equal(IMAPPump.inbox.getTotalMessages(false), 1);
+  Assert.equal(localAccountUtils.inboxFolder.getTotalMessages(false), 0);
   yield true;
 }
 
 function run_test() {
-  do_register_cleanup(function() {
+  registerCleanupFunction(function() {
     // IMAPPump.server.performTest() brings this test to a halt,
     // so we need teardownIMAPPump() without IMAPPump.server.performTest().
     IMAPPump.inbox = null;

@@ -6,12 +6,12 @@ var MODULE_NAME = "calendar-utils";
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["window-helpers", "folder-display-helpers", "pref-window-helpers"];
 
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+// Disabled, see bug 1449487. ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 var os = {};
-Cu.import("resource://mozmill/stdlib/os.js", os);
+ChromeUtils.import("chrome://mozmill/content/stdlib/os.js", os);
 var frame = {};
-Cu.import("resource://mozmill/modules/frame.js", frame);
+ChromeUtils.import("chrome://mozmill/content/modules/frame.js", frame);
 
 var SHORT_SLEEP = 100;
 var MID_SLEEP = 500;
@@ -325,7 +325,7 @@ function invokeEventDialog(controller, clickBox, body) {
 
     eventController.waitFor(() => {
         return iframe.contentWindow.onLoad &&
-               iframe.contentWindow.onLoad.hasLoaded == true;
+               iframe.contentWindow.onLoad.hasLoaded;
     }, "event-dialog did not load in time", 10000);
 
     // We can't use a full mozmill controller on an iframe, but we need
@@ -534,7 +534,7 @@ function handleNewCalendarWizard(wizard, name, data = undefined) {
             data.network.offline = true;
         }
         wizard.check(wizardId("cache"), data.network.offline);
-        wizard.waitFor(() => dlgButton("next").disabled == false);
+        wizard.waitFor(() => !dlgButton("next").disabled);
         dlgButton("next").doCommand();
     } else {
         // local calendar is default
@@ -559,7 +559,7 @@ function handleNewCalendarWizard(wizard, name, data = undefined) {
         data.eMail = "none";
     }
     menulistSelect(wizardId("email-identity-menulist"), data.eMail, wizard);
-    wizard.waitFor(() => dlgButton("next").disabled == false);
+    wizard.waitFor(() => !dlgButton("next").disabled);
     dlgButton("next").doCommand();
 
     // finish
@@ -716,7 +716,7 @@ function setData(dialog, iframe, data) {
 
     // startdate
     if (data.startdate != undefined && data.startdate.constructor.name == "Date") {
-        let startdate = dateFormatter.formatDateShort(cal.jsDateToDateTime(data.startdate, cal.floating()));
+        let startdate = dateFormatter.formatDateShort(cal.dtz.jsDateToDateTime(data.startdate, cal.dtz.floating));
 
         if (!isEvent) {
             dialog.check(iframeId("todo-has-entrydate"), true);
@@ -727,14 +727,14 @@ function setData(dialog, iframe, data) {
 
     // starttime
     if (data.starttime != undefined && data.starttime.constructor.name == "Date") {
-        let starttime = dateFormatter.formatTime(cal.jsDateToDateTime(data.starttime, cal.floating()));
+        let starttime = dateFormatter.formatTime(cal.dtz.jsDateToDateTime(data.starttime, cal.dtz.floating));
         startTimeInput.getNode().value = starttime;
         sleep();
     }
 
     // enddate
     if (data.enddate != undefined && data.enddate.constructor.name == "Date") {
-        let enddate = dateFormatter.formatDateShort(cal.jsDateToDateTime(data.enddate, cal.floating()));
+        let enddate = dateFormatter.formatDateShort(cal.dtz.jsDateToDateTime(data.enddate, cal.dtz.floating));
         if (!isEvent) {
             dialog.check(iframeId("todo-has-duedate"), true);
         }
@@ -744,7 +744,7 @@ function setData(dialog, iframe, data) {
 
     // endtime
     if (data.endtime != undefined && data.endtime.constructor.name == "Date") {
-        let endtime = dateFormatter.formatTime(cal.jsDateToDateTime(data.endtime, cal.floating()));
+        let endtime = dateFormatter.formatTime(cal.dtz.jsDateToDateTime(data.endtime, cal.dtz.floating));
         endTimeInput.getNode().value = endtime;
     }
 
@@ -792,7 +792,7 @@ function setData(dialog, iframe, data) {
 
     // completed on
     if (data.completed != undefined && data.completed.constructor.name == "Date" && !isEvent) {
-        let completeddate = dateFormatter.formatDateShort(cal.jsDateToDateTime(data.completed, cal.floating()));
+        let completeddate = dateFormatter.formatDateShort(cal.dtz.jsDateToDateTime(data.completed, cal.dtz.floating));
 
         if (currentStatus == "COMPLETED") {
             completedDateInput.getNode().value = completeddate;

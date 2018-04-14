@@ -6,10 +6,6 @@
  * Tests the get an account (account provisioning) workflow.
  */
 
-var Cu = Components.utils;
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-
 var MODULE_NAME = 'test-newmailaccount';
 
 var RELATIVE_ROOT = '../shared-modules';
@@ -21,11 +17,11 @@ var MODULE_REQUIRES = ['folder-display-helpers',
                        'dom-helpers'];
 
 var elib = {};
-Cu.import('resource://mozmill/modules/elementslib.js', elib);
-Cu.import('resource://gre/modules/Services.jsm');
-Cu.import('resource:///modules/iteratorUtils.jsm');
-Cu.import("resource:///modules/mailServices.js");
-Cu.import('resource://mozmill/stdlib/httpd.js');
+ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+ChromeUtils.import('resource://gre/modules/Services.jsm');
+ChromeUtils.import('resource:///modules/iteratorUtils.jsm');
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("chrome://mozmill/content/stdlib/httpd.js");
 
 // RELATIVE_ROOT messes with the collector, so we have to bring the path back
 // so we get the right path for the resources.
@@ -438,7 +434,7 @@ function subtest_html_characters_and_ampersands(w) {
 
   wait_for_search_results(w);
 
-  let displayedName = w.e("FirstAndLastName").innerHTML;
+  let displayedName = w.e("FirstAndLastName").textContent;
 
   assert_not_equals(CLEVER_STRING, displayedName);
   // & should have been replaced with &amp;, and the
@@ -1166,7 +1162,7 @@ function subtest_search_button_enabled_state_on_init(aController) {
  */
 function test_provider_language_wildcard() {
   let originalReqLocales = Services.locale.getRequestedLocales();
-  Services.locale.setRequestedLocales(["foo-bar"]);
+  Services.locale.setRequestedLocales(["foo-ba"]);
 
   let original = Services.prefs.getCharPref(kProviderListPref);
   Services.prefs.setCharPref(kProviderListPref, url + "providerListWildcard");

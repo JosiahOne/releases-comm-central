@@ -12,9 +12,9 @@
 #include "msgCore.h"
 #include "nsMsgMaildirStore.h"
 #include "nsIMsgFolder.h"
+#include "nsIMsgFolderNotificationService.h"
 #include "nsISimpleEnumerator.h"
 #include "nsMsgFolderFlags.h"
-#include "nsILocalMailIncomingServer.h"
 #include "nsCOMArray.h"
 #include "nsIFile.h"
 #include "nsNetUtil.h"
@@ -27,7 +27,6 @@
 #include "nsArrayUtils.h"
 #include "nsMailHeaders.h"
 #include "nsParseMailbox.h"
-#include "nsIMailboxService.h"
 #include "nsMsgLocalCID.h"
 #include "nsIMsgLocalMailFolder.h"
 #include "nsITimer.h"
@@ -799,8 +798,10 @@ nsMsgMaildirStore::MoveNewlyDownloadedMessage(nsIMsgDBHdr *aHdr,
   if (NS_SUCCEEDED(rv) && !newHdr)
     rv = NS_ERROR_UNEXPECTED;
 
-  if (NS_FAILED(rv))
+  if (NS_FAILED(rv)) {
     aDestFolder->ThrowAlertMsg("filterFolderHdrAddFailed", nullptr);
+    return rv;
+  }
 
   nsCOMPtr<nsIFile> existingPath;
   toPath->Clone(getter_AddRefs(existingPath));
@@ -1253,7 +1254,7 @@ void MaildirStoreParser::TimerCallback(nsITimer *aTimer, void *aClosure)
         url->SetUpdatingFolder(true);
         nsAutoCString uriSpec("mailbox://");
         // ### TODO - what if SetSpec fails?
-        (void) url->SetSpec(uriSpec);
+        (void)url->SetSpecInternal(uriSpec);
         parser->m_listener->OnStopRunningUrl(url, NS_OK);
       }
     }

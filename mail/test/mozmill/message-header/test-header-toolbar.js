@@ -13,8 +13,8 @@ var MODULE_REQUIRES = ['folder-display-helpers', 'window-helpers',
                        'customization-helpers'];
 
 var elib = {};
-Cu.import('resource://mozmill/modules/elementslib.js', elib);
-Cu.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var folder;
 var gCDHelper ;
@@ -316,7 +316,7 @@ function test_customize_header_toolbar_remove_buttons()
   assert_equals(hdrToolbar.getAttribute("currentset"), hdrBarDefaultSet);
   close_window(msgc);
 
-  // Check button persistance
+  // Check button persistence
 
   // Make sure we have a different window open, so that we don't start shutting
   // down just because the last window was closed

@@ -14,7 +14,7 @@
 #include "msgCore.h"
 #include "nsMimeStringResources.h"
 #include "mimemoz2.h"
-#include "nsIMimeConverter.h" // for MimeConverterOutputCallback
+#include "modmimee.h" // for MimeConverterOutputCallback
 #include "mozilla/Attributes.h"
 
 #define MIME_SUPERCLASS mimeMultipartClass
@@ -180,7 +180,7 @@ MimeMultipartSigned_parse_line (const char *line, int32_t length, MimeObject *ob
 
     case MimeMultipartHeaders:
       /* If we're moving in to the Headers state, then that means
-       that this line is the preceeding boundary string (and we
+       that this line is the preceding boundary string (and we
        should ignore it.)
        */
       hash_line_p = false;
@@ -197,7 +197,7 @@ MimeMultipartSigned_parse_line (const char *line, int32_t length, MimeObject *ob
 
     case MimeMultipartPartFirstLine:
       if (sig->state == MimeMultipartSignedBodyFirstHeader)
-      {      
+      {
         sig->state = MimeMultipartSignedBodyFirstLine;
         no_headers_p = true;
       }
@@ -294,7 +294,7 @@ MimeMultipartSigned_parse_line (const char *line, int32_t length, MimeObject *ob
        that it does not end in a trailing newline.
 
        To implement this, we send a newline *before* each line instead
-       of after, except for the first line, which is not preceeded by a
+       of after, except for the first line, which is not preceded by a
        newline.
 
        For purposes of cryptographic hashing, we always hash line
@@ -311,7 +311,7 @@ MimeMultipartSigned_parse_line (const char *line, int32_t length, MimeObject *ob
 
       if (!first_line_p)
       {
-        /* Push out a preceeding newline... */
+        /* Push out a preceding newline... */
         char nl[] = CRLF;
         status = (((MimeMultipartSignedClass *) obj->clazz)
             ->crypto_data_hash (nl, 2, sig->crypto_closure));
@@ -518,7 +518,7 @@ MimeMultipartSigned_parse_child_line (MimeObject *obj,
        that it does not end in a trailing newline.
 
        To implement this, we send a newline *before* each line instead
-       of after, except for the first line, which is not preceeded by a
+       of after, except for the first line, which is not preceded by a
        newline.
      */
 
@@ -532,7 +532,7 @@ MimeMultipartSigned_parse_child_line (MimeObject *obj,
 
     if (!first_line_p)
       {
-      /* Push out a preceeding newline... */
+      /* Push out a preceding newline... */
       char nl[] = MSG_LINEBREAK;
       status = MimePartBufferWrite (sig->part_buffer, nl, MSG_LINEBREAK_LEN);
       if (status < 0) return status;
@@ -656,7 +656,7 @@ MimeMultipartSigned_emit_child (MimeObject *obj)
   if (obj->options && !(obj->options->override_charset)) {
     MimeObject *firstChild = ((MimeContainer*) obj)->children[0];
     char *disposition = MimeHeaders_get (firstChild->headers,
-                                         HEADER_CONTENT_DISPOSITION, 
+                                         HEADER_CONTENT_DISPOSITION,
                                          true,
                                          false);
     // check if need to show as inline
@@ -683,7 +683,7 @@ MimeMultipartSigned_emit_child (MimeObject *obj)
       }
     }
   }
-  
+
   // The js emitter wants to know about the newly created child.  Because
   //  MimeMultipartSigned dummies out its create_child operation, the logic
   //  in MimeMultipart_parse_line that would normally provide this notification
@@ -699,7 +699,7 @@ MimeMultipartSigned_emit_child (MimeObject *obj)
     mimeEmitterAddHeaderField(obj->options, HEADER_CONTENT_TYPE,
                               ct ? ct : "text/plain");
     PR_Free(ct);
-    
+
     char *part_path = mime_part_address(kid);
     if (part_path) {
       mimeEmitterAddHeaderField(obj->options,

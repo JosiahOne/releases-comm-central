@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 function run_test() {
     do_calendar_startup(run_next_test);
@@ -43,7 +43,7 @@ add_task(function* formatDate_test() {
     for (let test of data) {
         i++;
         Preferences.set("calendar.date.format", test.input.dateformat);
-        let zone = (test.input.timezone == "floating") ? cal.floating() : tzs.getTimezone(test.input.timezone);
+        let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
         let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
@@ -122,7 +122,7 @@ add_task(function* formatDateShort_test() {
     for (let test of data) {
         i++;
 
-        let zone = (test.input.timezone == "floating") ? cal.floating() : tzs.getTimezone(test.input.timezone);
+        let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
         let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
@@ -202,7 +202,7 @@ add_task(function* formatDateLong_test() {
     for (let test of data) {
         i++;
 
-        let zone = (test.input.timezone == "floating") ? cal.floating() : tzs.getTimezone(test.input.timezone);
+        let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
         let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
@@ -282,7 +282,7 @@ add_task(function* formatDateWithoutYear_test() {
     for (let test of data) {
         i++;
 
-        let zone = (test.input.timezone == "floating") ? cal.floating() : tzs.getTimezone(test.input.timezone);
+        let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
         let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
@@ -337,7 +337,7 @@ add_task(function* formatTime_test() {
     for (let test of data) {
         i++;
 
-        let zone = (test.input.timezone == "floating") ? cal.floating() : tzs.getTimezone(test.input.timezone);
+        let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
         let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]

@@ -4,21 +4,19 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+<?xml-stylesheet href="chrome://messenger/content/bindings.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/searchBox.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/addressbook/addressbook.css" type="text/css"?>
-
-#ifdef XP_MACOSX
-<?xul-overlay href="chrome://messenger/content/macMenuOverlay.xul"?>
-#endif
-<?xul-overlay href="chrome://messenger/content/baseMenuOverlay.xul"?>
 
 <!DOCTYPE window [
 <!ENTITY % abMainWindowDTD SYSTEM "chrome://messenger/locale/addressbook/abMainWindow.dtd" >
 %abMainWindowDTD;
 <!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd" >
 %brandDTD;
-<!ENTITY % customizeToolbarDTD SYSTEM "chrome://global/locale/customizeToolbar.dtd">
+<!ENTITY % customizeToolbarDTD SYSTEM "chrome://messenger/locale/customizeToolbar.dtd">
 %customizeToolbarDTD;
+<!ENTITY % baseMenuOverlayDTD SYSTEM "chrome://messenger/locale/baseMenuOverlay.dtd">
+%baseMenuOverlayDTD;
 ]>
 
 <window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
@@ -56,8 +54,11 @@
 <script type="application/javascript" src="chrome://global/content/nsDragAndDrop.js"/>
 <script type="application/javascript" src="chrome://messenger/content/addressbook/abDragDrop.js"/>
 <script type="application/javascript" src="chrome://global/content/globalOverlay.js"/>
+#ifdef XP_MACOSX
+<script type="application/javascript" src="chrome://global/content/macWindowMenu.js"/>
+#endif
 <script type="application/javascript" src="chrome://messenger/content/addressbook/abResultsPane.js"/>
-<script type="application/javascript" src="chrome://messenger/content/addressbook/abCardViewOverlay.js"/>
+<script type="application/javascript" src="chrome://messenger/content/addressbook/abCardView.js"/>
 <script type="application/javascript" src="chrome://messenger/content/toolbarIconColor.js"/>
 
 <commandset id="addressBook">
@@ -195,10 +196,12 @@
 #ifdef XP_MACOSX
   <!-- Mac Window keys -->
   <key id="key_minimizeWindow" command="minimizeWindow" key="&minimizeWindow.key;" modifiers="accel"/>
+  <key id="key_addressbook" key="&addressBookCmd.key;" oncommand="toAddressBook();" modifiers="accel, shift"/>
+  <key id="key_openHelp" oncommand="openSupportURL();" key="&openHelpMac2.commandkey;" modifiers="&openHelpMac2.modifiers;"/>
+#else
+  <key id="key_openHelp" oncommand="openSupportURL();" keycode="&openHelp.commandkey;"/>
 #endif
 </keyset>
-
-<keyset id="baseMenuKeyset"/>
 
 <menupopup id="dirTreeContext" onpopupshowing="updateDirTreeContext();">
   <menuitem id="dirTreeContext-properties"
@@ -297,7 +300,7 @@
            context="toolbar-context-menu" mode="icons">
 
    <toolbaritem id="menubar-items" align="center">
-     <menubar id="mail-menubar" style="border:0px;padding:0px;margin:0px;-moz-appearance:none">
+     <menubar id="mail-menubar">
         <menu id="menu_File" label="&fileMenu.label;" accesskey="&fileMenu.accesskey;">
 #ifdef XP_MACOSX
             <menupopup id="menu_FilePopup" onpopupshowing="onOSXFileMenuInit();">
@@ -575,6 +578,11 @@
             <menuitem id="tasksMenuMail" accesskey="&messengerCmd.accesskey;"
                       label="&messengerCmd.label;" key="key_mail"
                       oncommand="toMessengerWindow();"/>
+            <menuitem id="tasksMenuAddressBook"
+                      label="&addressBookCmd.label;"
+                      accesskey="&addressBookCmd.accesskey;"
+                      key="key_addressbook"
+                      oncommand="toAddressBook();"/>
             <menuseparator/>
 #endif
             <menuitem label="&importCmd.label;" accesskey="&importCmd.accesskey;" oncommand="toImport()"/>
@@ -600,12 +608,11 @@
         </menu>
 
 #ifdef XP_MACOSX
-<!-- Mac window menu -->
-#includesubst @TOOLKIT_DIR@/content/macWindowMenu.inc
+#include ../../../base/content/macWindowMenu.inc
 #endif
 
       <!-- Help -->
-      <menu id="helpMenu"/>
+#include ../../../base/content/helpMenu.inc
     </menubar>
    </toolbaritem>
   </toolbar>
@@ -638,7 +645,7 @@
       </toolbaritem>
   </toolbarpalette>
   <!-- toolbar -->
-  <toolbar id="ab-bar2" class="toolbar-primary chromeclass-toolbar"
+  <toolbar id="ab-bar2" class="chromeclass-toolbar"
            toolbarname="&showAbToolbarCmd.label;"
            accesskey="&showAbToolbarCmd.accesskey;"
            fullscreentoolbar="true" mode="full"

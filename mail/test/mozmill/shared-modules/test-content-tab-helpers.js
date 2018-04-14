@@ -11,11 +11,11 @@ var MODULE_REQUIRES = ["folder-display-helpers",
                          "mock-object-helpers"];
 
 var elib = {};
-Cu.import('resource://mozmill/modules/elementslib.js', elib);
+ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
 var utils = {};
-Cu.import('resource://mozmill/modules/utils.js', utils);
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import('resource://gre/modules/XPCOMUtils.jsm');
+ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import('resource://gre/modules/XPCOMUtils.jsm');
 
 var NORMAL_TIMEOUT = 6000;
 var FAST_TIMEOUT = 1000;
@@ -187,8 +187,8 @@ function open_content_tab_with_url(aURL, aClickHandler, aBackground, aController
  * be opened in the foreground. The element is expected to be associated with
  * the given controller.
  *
- * @param aElem The element to click.
- * @param aExpectedURL The URL that is expected to be opened (string).
+ * @param aElem         The element to click or a function that causes the tab to open.
+ * @param aExpectedURL  The URL that is expected to be opened (string).
  * @param [aController] The controller the element is associated with. Defaults
  *                      to |mc|.
  * @returns The newly-opened tab.
@@ -198,7 +198,11 @@ function open_content_tab_with_click(aElem, aExpectedURL, aController) {
     aController = mc;
 
   let preCount = aController.tabmail.tabContainer.childNodes.length;
-  aController.click(new elib.Elem(aElem));
+  if (typeof(aElem) != "function")
+    aController.click(new elib.Elem(aElem));
+  else
+    aElem();
+
   utils.waitFor(() => (
                   aController.tabmail.tabContainer.childNodes.length == preCount + 1),
                 "Timeout waiting for the content tab to open",
@@ -432,7 +436,7 @@ function get_test_plugin() {
   return null;
 }
 
-/* Returns true if we're currently set up to run plugins in seperate
+/* Returns true if we're currently set up to run plugins in separate
  * processes, false otherwise.
  */
 function plugins_run_in_separate_processes(aController) {

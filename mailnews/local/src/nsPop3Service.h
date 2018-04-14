@@ -9,9 +9,7 @@
 #include "nscore.h"
 
 #include "nsIPop3Service.h"
-#include "nsIPop3URL.h"
 #include "nsIUrlListener.h"
-#include "nsIStreamListener.h"
 #include "nsIProtocolHandler.h"
 #include "nsIMsgProtocolInfo.h"
 #include "nsTObserverArray.h"
@@ -39,7 +37,7 @@ protected:
                    nsIMsgFolder *inbox,
                    nsIPop3IncomingServer *popServer,
                    nsIURI ** aURL);
-  // convience function to make constructing of the pop3 url easier...
+  // convenience function to make constructing of the pop3 url easier...
   nsresult BuildPop3Url(const char * urlSpec, nsIMsgFolder *inbox,
                     nsIPop3IncomingServer *, nsIUrlListener * aUrlListener,
                     nsIURI ** aUrl, nsIMsgWindow *aMsgWindow);

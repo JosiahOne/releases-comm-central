@@ -2,9 +2,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
 #include "nsCOMPtr.h"
 #include <stdio.h>
-#include "nsMimeRebuffer.h"
 #include "nsMimeHtmlEmitter.h"
 #include "plstr.h"
 #include "nsMailHeaders.h"
@@ -23,11 +23,9 @@
 // hack: include this to fix opening news attachments.
 #include "nsINntpUrl.h"
 #include "nsComponentManagerUtils.h"
-#include "nsIMimeConverter.h"
 #include "nsMsgMimeCID.h"
 #include "nsMsgUtils.h"
 #include "nsAutoPtr.h"
-#include "nsINetUtil.h"
 #include "nsMemory.h"
 #include "mozilla/Services.h"
 
@@ -168,18 +166,36 @@ nsresult nsMimeHtmlDisplayEmitter::BroadcastHeaders(nsIMsgHeaderSink * aHeaderSi
 
   nsCString extraExpandedHeaders;
   nsTArray<nsCString> extraExpandedHeadersArray;
+  nsCString extraAddonHeaders;
+  nsTArray<nsCString> extraAddonHeadersArray;
   nsAutoCString convertedDateString;
+  bool pushAllHeaders = false;
+  bool checkExtraHeaders = false;
+  bool checkAddonHeaders = false;
 
   nsresult rv;
   nsCOMPtr<nsIPrefBranch> pPrefBranch(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
   if (pPrefBranch)
   {
     pPrefBranch->GetCharPref("mailnews.headers.extraExpandedHeaders", extraExpandedHeaders);
-    // todo - should make this upper case
     if (!extraExpandedHeaders.IsEmpty())
     {
       ToLowerCase(extraExpandedHeaders);
       ParseString(extraExpandedHeaders, ' ', extraExpandedHeadersArray);
+      checkExtraHeaders = true;
+    }
+
+    pPrefBranch->GetCharPref("mailnews.headers.extraAddonHeaders", extraAddonHeaders);
+    if (!extraAddonHeaders.IsEmpty())
+    {
+      // Push all headers if extraAddonHeaders is "*".
+      if (extraAddonHeaders.EqualsLiteral("*")) {
+        pushAllHeaders = true;
+      } else {
+        ToLowerCase(extraAddonHeaders);
+        ParseString(extraAddonHeaders, ' ', extraAddonHeadersArray);
+        checkAddonHeaders = true;
+      }
     }
   }
 
@@ -195,38 +211,46 @@ nsresult nsMimeHtmlDisplayEmitter::BroadcastHeaders(nsIMsgHeaderSink * aHeaderSi
     {
       bool skip = true;
       const char * headerName = headerInfo->name;
-      // Accept the following:
-      if (!PL_strcasecmp("to",           headerName) ||
-          !PL_strcasecmp("from",         headerName) ||
-          !PL_strcasecmp("cc",           headerName) ||
-          !PL_strcasecmp("newsgroups",   headerName) ||
-          !PL_strcasecmp("bcc",          headerName) ||
-          !PL_strcasecmp("followup-to",  headerName) ||
-          !PL_strcasecmp("reply-to",     headerName) ||
-          !PL_strcasecmp("subject",      headerName) ||
-          !PL_strcasecmp("organization", headerName) ||
-          !PL_strcasecmp("user-agent",   headerName) ||
-          !PL_strcasecmp("content-base", headerName) ||
-          !PL_strcasecmp("sender",       headerName) ||
-          !PL_strcasecmp("date",         headerName) ||
-          !PL_strcasecmp("x-mailer",     headerName) ||
-          !PL_strcasecmp("content-type", headerName) ||
-          !PL_strcasecmp("message-id",   headerName) ||
-          !PL_strcasecmp("x-newsreader", headerName) ||
-          !PL_strcasecmp("x-mimeole",    headerName) ||
-          !PL_strcasecmp("references",   headerName) ||
-          !PL_strcasecmp("in-reply-to",  headerName) ||
-          !PL_strcasecmp("list-post",    headerName) ||
-          !PL_strcasecmp("delivered-to", headerName)) {
+      if (pushAllHeaders) {
         skip = false;
-      } else if (extraExpandedHeadersArray.Length() > 0) {
-        // Make headerStr lower case because IndexOf is case-sensitive.
+
+      // Accept the following:
+      } else if (!PL_strcasecmp("to",           headerName) ||
+                 !PL_strcasecmp("from",         headerName) ||
+                 !PL_strcasecmp("cc",           headerName) ||
+                 !PL_strcasecmp("newsgroups",   headerName) ||
+                 !PL_strcasecmp("bcc",          headerName) ||
+                 !PL_strcasecmp("followup-to",  headerName) ||
+                 !PL_strcasecmp("reply-to",     headerName) ||
+                 !PL_strcasecmp("subject",      headerName) ||
+                 !PL_strcasecmp("organization", headerName) ||
+                 !PL_strcasecmp("user-agent",   headerName) ||
+                 !PL_strcasecmp("content-base", headerName) ||
+                 !PL_strcasecmp("sender",       headerName) ||
+                 !PL_strcasecmp("date",         headerName) ||
+                 !PL_strcasecmp("x-mailer",     headerName) ||
+                 !PL_strcasecmp("content-type", headerName) ||
+                 !PL_strcasecmp("message-id",   headerName) ||
+                 !PL_strcasecmp("x-newsreader", headerName) ||
+                 !PL_strcasecmp("x-mimeole",    headerName) ||
+                 !PL_strcasecmp("references",   headerName) ||
+                 !PL_strcasecmp("in-reply-to",  headerName) ||
+                 !PL_strcasecmp("list-post",    headerName) ||
+                 !PL_strcasecmp("delivered-to", headerName)) {
+        skip = false;
+
+      } else if (checkExtraHeaders || checkAddonHeaders) {
+        // Make headerStr lowercase because extraExpandedHeaders/extraAddonHeadersArray
+        // was made lowercase above.
         nsDependentCString headerStr(headerInfo->name);
         ToLowerCase(headerStr);
         // Accept if it's an "extra" header.
-        if (extraExpandedHeadersArray.Contains(headerStr))
+        if (checkExtraHeaders && extraExpandedHeadersArray.Contains(headerStr))
+          skip = false;
+        if (checkAddonHeaders && extraAddonHeadersArray.Contains(headerStr))
           skip = false;
       }
+
       if (skip)
         continue;
     }

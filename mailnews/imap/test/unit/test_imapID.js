@@ -5,31 +5,31 @@
 
 load("../../../resources/logHelper.js");
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 var kIDResponse = "(\"name\" \"GImap\" \"vendor\" \"Google, Inc.\" \"support-url\" \"http://mail.google.com/support\")";
 
-add_task(function* setup() {
+add_task(async function setup() {
   setupIMAPPump("GMail");
   IMAPPump.daemon.idResponse = kIDResponse;
 
   // update folder to kick start tests.
   let promiseUrlListener = new PromiseTestUtils.PromiseUrlListener();
   IMAPPump.inbox.updateFolderWithListener(null, promiseUrlListener);
-  yield promiseUrlListener.promise;
+  await promiseUrlListener.promise;
 });
 
-add_task(function* updateInbox() {
+add_task(async function updateInbox() {
   let rootFolder = IMAPPump.incomingServer.rootFolder;
   let promiseUrlListener = new PromiseTestUtils.PromiseUrlListener();
   IMAPPump.inbox.updateFolderWithListener(null, promiseUrlListener);
-  yield promiseUrlListener.promise;
+  await promiseUrlListener.promise;
 });
 
 add_task(function checkIDHandling() {
-  do_check_eq(IMAPPump.daemon.clientID, "(\"name\" \"xpcshell\" \"version\" \"1\")");
-  do_check_eq(IMAPPump.incomingServer.serverIDPref, kIDResponse);
+  Assert.equal(IMAPPump.daemon.clientID, "(\"name\" \"xpcshell\" \"version\" \"1\")");
+  Assert.equal(IMAPPump.incomingServer.serverIDPref, kIDResponse);
 });
 
 add_task(teardownIMAPPump);

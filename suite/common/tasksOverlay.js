@@ -3,8 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 function toNavigator()
 {
@@ -15,22 +14,22 @@ function toNavigator()
 function ExpirePassword()
 {
   // Queries the HTTP Auth Manager and clears all sessions
-  Components.classes['@mozilla.org/network/http-auth-manager;1']
-            .getService(Components.interfaces.nsIHttpAuthManager)
-            .clearAll();
+  Cc['@mozilla.org/network/http-auth-manager;1']
+    .getService(Ci.nsIHttpAuthManager)
+    .clearAll();
 
   // Expires the master password
-  Components.classes["@mozilla.org/security/pk11tokendb;1"]
-            .createInstance(Components.interfaces.nsIPK11TokenDB)
-            .getInternalKeyToken()
-            .checkPassword("");
+  Cc["@mozilla.org/security/pk11tokendb;1"]
+    .createInstance(Ci.nsIPK11TokenDB)
+    .getInternalKeyToken()
+    .checkPassword("");
 }
 
 function toDownloadManager()
 {
-  Components.classes["@mozilla.org/suite/suiteglue;1"]
-            .getService(Components.interfaces.nsISuiteGlue)
-            .showDownloadManager();
+  Cc["@mozilla.org/suite/suiteglue;1"]
+    .getService(Ci.nsISuiteGlue)
+    .showDownloadManager();
 }
 
 function toDataManager(aView)
@@ -167,9 +166,9 @@ function OpenBrowserWindow()
     preventDefault: true
   };
   const clh_prefix = "@mozilla.org/commandlinehandler/general-startup;1";
-  Components.classes[clh_prefix + "?type=browser"]
-            .getService(Components.interfaces.nsICommandLineHandler)
-            .handle(cmdLine);
+  Cc[clh_prefix + "?type=browser"]
+    .getService(Ci.nsICommandLineHandler)
+    .handle(cmdLine);
   return null;
 }
 
@@ -205,31 +204,39 @@ function CycleWindow( aType )
   return firstWindow;
 }
 
-XPCOMUtils.defineLazyServiceGetter(Services, "windowManagerDS",
-                                   "@mozilla.org/rdf/datasource;1?name=window-mediator",
-                                   "nsIWindowDataSource");
-
-function ShowWindowFromResource( node )
+function windowMenuDidHide()
 {
-  var desiredWindow = null;
-  var url = node.getAttribute("id");
-  desiredWindow = Services.windowManagerDS.getWindowForResource(url);
-  if (desiredWindow)
-    toOpenWindow(desiredWindow);
+  let sep = document.getElementById("sep-window-list");
+  // Clear old items
+  while (sep.nextElementSibling) {
+    sep.nextElementSibling.remove();
+  }
 }
 
 function checkFocusedWindow()
 {
-  var sep = document.getElementById("sep-window-list");
-  // Using double parens to avoid warning
-  while ((sep = sep.nextSibling)) {
-    var url = sep.getAttribute("id");
-    var win = Services.windowManagerDS.getWindowForResource(url);
-    if (win == window) {
-      sep.setAttribute("checked", "true");
-      break;
+  let windows = Services.wm.getEnumerator("");
+  let frag = document.createDocumentFragment();
+  while (windows.hasMoreElements()) {
+    let win = windows.getNext();
+    if (win.document.documentElement.getAttribute("inwindowmenu") == "false") {
+      continue;
     }
+    let item = document.createElement("menuitem");
+    item.setAttribute("label", win.document.title);
+    item.setAttribute("type", "radio");
+    if (win == window) {
+      item.setAttribute("checked", "true");
+    }
+    item.addEventListener("command", () => {
+      if (win.windowState == window.STATE_MINIMIZED) {
+        win.restore();
+      }
+      win.document.commandDispatcher.focusedWindow.focus();
+    });
+    frag.appendChild(item);
   }
+  document.getElementById("windowPopup").appendChild(frag);
 }
 
 function toProfileManager()
@@ -238,8 +245,8 @@ function toProfileManager()
   if (promgrWin) {
     promgrWin.focus();
   } else {
-    var params = Components.classes["@mozilla.org/embedcomp/dialogparam;1"]
-                 .createInstance(Components.interfaces.nsIDialogParamBlock);
+    var params = Cc["@mozilla.org/embedcomp/dialogparam;1"]
+                 .createInstance(Ci.nsIDialogParamBlock);
 
     params.SetNumberStrings(1);
     params.SetString(0, "menu");

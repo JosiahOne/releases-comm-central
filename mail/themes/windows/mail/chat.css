@@ -6,9 +6,11 @@
 
 %include ../../../components/im/themes/chat.css
 
-#noConvScreen {
-  border-inline-start: 2px solid;
-  -moz-border-left-colors: ThreeDFace ThreeDDarkShadow;
+#chatTabPanel {
+  --imbox-selected-text-color: -moz-FieldText;
+  --imbox-selected-background-color: -moz-Field;
+  --imbox-selected-border-color: #a9b7c9;
+  --imgroup-selected-background-color: ThreeDLightShadow;
 }
 
 /* Adaptation from #folderTree */
@@ -25,12 +27,12 @@
 }
 
 #conversationsDeck {
-  background: -moz-Dialog;
+  background: var(--imbox-selected-background-color);
 }
 
 .conv-messages {
-  border-top: 0px;
-  border-bottom: 0px;
+  border-top: 0;
+  border-bottom: 0;
 }
 
 .conv-textbox {
@@ -74,20 +76,6 @@
   background-color: -moz-Dialog;
 }
 
-:-moz-any(imconv, imcontact, imgroup) {
-  border: 1px solid transparent;
-}
-
-:-moz-any(imconv, imcontact, imgroup)[selected] {
-  background-color: -moz-cellhighlight;
-}
-
-#contactlistbox:focus > :-moz-any(imconv, imcontact, imgroup)[selected] {
-  background-color: Highlight;
-  color: HighlightText;
-  border: 1px dotted #F3D982;
-}
-
 #displayNameAndstatusMessageStack #statusMessage {
   margin: 32px 0 0;
 }
@@ -110,7 +98,7 @@
 
 #listSplitter,
 #contextSplitter {
-  border: none;
+  border-width: 0;
   background-color: transparent;
   min-width: 0;
   /* splitter grip area */
@@ -122,7 +110,7 @@
 }
 
 #listSplitter {
-  border-inline-start: 1px solid #a9b7c9;
+  border-inline-start: 1px solid transparent;
   /* make only the splitter border visible */
   margin-inline-end: -5px;
 }
@@ -143,7 +131,7 @@
 
 .splitter,
 #logsSplitter {
-  border: none;
+  border-width: 0;
   border-bottom: 1px solid ThreeDShadow;
   min-height: 0;
   /* splitter grip area */
@@ -157,93 +145,36 @@
   z-index: 10;
 }
 
-#noConvScreen {
-  border-inline-start: none;
-}
-
 @media (-moz-windows-default-theme) {
   .conv-status-container {
-    border-bottom-color: #A9B7C9;
+    border-bottom-color: #a9b7c9;
   }
 
   #statusTypeIcon > .toolbarbutton-menu-dropmarker {
     padding: 1px 3px;
   }
 
-  #chat-status-selector:hover > .statusMessageToolbarItem,
-  .statusMessageToolbarItem:focus {
-    border-color: hsla(210, 54%, 20%, .25) hsla(210, 54%, 20%, .27)
-                  hsla(210, 54%, 20%, .3);
-  }
-
   #chat-status-selector > .statusMessageToolbarItem[editing] {
     -moz-appearance: none;
     padding-inline-start: 2px;
     padding-inline-end: 2px;
+  }
+
+  #chat-status-selector:not(:-moz-lwtheme):hover > .statusMessageToolbarItem,
+  .statusMessageToolbarItem:not(:-moz-lwtheme):focus {
+    border-color: hsla(210, 54%, 20%, .25) hsla(210, 54%, 20%, .27)
+                  hsla(210, 54%, 20%, .3);
+  }
+
+  #chat-status-selector:not(:-moz-lwtheme) > .statusMessageToolbarItem[editing] {
     border-color: hsla(206, 100%, 60%, .65) hsla(206, 100%, 55%, .65)
                   hsla(206, 100%, 50%, .65);
     background-color: -moz-field;
   }
 
-  #listSplitter {
-    border-inline-start: 1px solid #A9B7C9;
-  }
-
-  #contextSplitter {
-    border-inline-end: 1px solid #A9B7C9;
-  }
-
   .splitter,
   #logsSplitter {
-    border-bottom: 1px solid #A9B7C9;
-  }
-
-  :-moz-any(imconv, imcontact, imgroup) {
-    min-height: 1.7em;
-    color: -moz-FieldText !important;
-    margin-inline-start: 1px;
-    margin-inline-end: 1px;
-    border: 2px solid transparent;
-    background-color: transparent;
-    background-origin: border-box;
-  }
-
-  :-moz-any(imconv, imcontact, imgroup)[selected] {
-    background-color: transparent;
-    -moz-border-top-colors: rgb(217, 217, 217) rgba(255, 255, 255, .4);
-    -moz-border-right-colors: rgb(217, 217, 217) rgba(255, 255, 255, .4);
-    -moz-border-left-colors: rgb(217, 217, 217) rgba(255, 255, 255, .4);
-    -moz-border-bottom-colors: rgb(217, 217, 217) rgba(255, 255, 255, .6);
-  }
-
-  :-moz-any(imconv, imcontact, imgroup):hover {
-    -moz-border-top-colors: rgb(184, 214, 251) rgba(255, 255, 255, .4);
-    -moz-border-right-colors: rgb(184, 214, 251) rgba(255, 255, 255, .4);
-    -moz-border-left-colors: rgb(184, 214, 251) rgba(255, 255, 255, .4);
-    -moz-border-bottom-colors: rgb(184, 214, 251) rgba(255, 255, 255, .6);
-  }
-
-  :-moz-any(imconv, imcontact, imgroup)[selected]:hover {
-    -moz-border-top-colors: rgb(125, 162, 206) rgba(255, 255, 255, .4);
-    -moz-border-right-colors: rgb(125, 162, 206) rgba(255, 255, 255, .4);
-    -moz-border-left-colors: rgb(125, 162, 206) rgba(255, 255, 255, .4);
-    -moz-border-bottom-colors: rgb(125, 162, 206) rgba(255, 255, 255, .6);
-  }
-
-  #contactlistbox:focus > :-moz-any(imconv, imcontact, imgroup)[selected] {
-    background-color: transparent;
-    border: 2px solid transparent;
-    -moz-border-top-colors: rgb(132, 172, 221) rgba(255, 255, 255, .4);
-    -moz-border-right-colors: rgb(132, 172, 221) rgba(255, 255, 255, .4);
-    -moz-border-left-colors: rgb(132, 172, 221) rgba(255, 255, 255, .4);
-    -moz-border-bottom-colors: rgb(132, 172, 221) rgba(255, 255, 255, .6);
-  }
-
-  #contactlistbox:focus > :-moz-any(imconv, imcontact, imgroup)[selected][current] {
-    -moz-border-top-colors: rgb(125, 162, 206) rgba(255, 255, 255, .4);
-    -moz-border-right-colors: rgb(125, 162, 206) rgba(255, 255, 255, .4);
-    -moz-border-left-colors: rgb(125, 162, 206) rgba(255, 255, 255, .4);
-    -moz-border-bottom-colors: rgb(125, 162, 206) rgba(255, 255, 255, .6);
+    border-bottom: 1px solid #a9b7c9;
   }
 
   .listitem-iconic[selected] .listcell-label,
@@ -309,30 +240,6 @@ richlistitem[state="disconnected"] .accountStateIcon {
   .conv-logs-header-label {
     background-color: rgb(233, 239, 245);
   }
-
-  :-moz-any(imconv, imcontact, imgroup) {
-    border-radius: 3px;
-  }
-
-  :-moz-any(imconv, imcontact, imgroup)[selected] {
-    background-image: linear-gradient(rgba(190, 190, 190, .1),
-                                      rgba(190, 190, 190, .4));
-  }
-
-  :-moz-any(imconv, imcontact, imgroup):hover {
-    background-image: linear-gradient(rgba(131, 183, 249, .05),
-                                      rgba(131, 183, 249, .16));
-  }
-
-  :-moz-any(imconv, imcontact, imgroup)[selected]:hover {
-    background-image: linear-gradient(rgba(131, 183, 249, .28),
-                                      rgba(131, 183, 249, .50));
-  }
-
-  #contactlistbox:focus > :-moz-any(imconv, imcontact, imgroup)[selected] {
-    background-image: linear-gradient(rgba(131, 183, 249, .16),
-                                      rgba(131, 183, 249, .375));
-  }
 }
 
 @media (-moz-os-version: windows-win8) and (-moz-windows-default-theme) {
@@ -351,30 +258,5 @@ richlistitem[state="disconnected"] .accountStateIcon {
        (-moz-os-version: windows-win10) and (-moz-windows-default-theme) {
   .statusMessageToolbarItem {
     border-radius: 0;
-  }
-
-  :-moz-any(imconv, imcontact, imgroup) {
-    border-width: 1px;
-  }
-
-  :-moz-any(imconv, imcontact, imgroup)[selected] {
-    background-image: linear-gradient(rgba(190, 190, 190, .4),
-                                      rgba(190, 190, 190, .4));
-  }
-
-  :-moz-any(imconv, imcontact, imgroup):hover {
-    background-image: linear-gradient(rgba(131, 183, 249, .16),
-                                      rgba(131, 183, 249, .16));
-  }
-
-  :-moz-any(imconv, imcontact, imgroup)[selected]:hover {
-    background-image: linear-gradient(rgba(131, 183, 249, .50),
-                                      rgba(131, 183, 249, .50));
-  }
-
-  #contactlistbox:focus > :-moz-any(imconv, imcontact, imgroup)[selected] {
-    background-image: linear-gradient(rgba(131, 183, 249, .375),
-                                      rgba(131, 183, 249, .375));
-    border-width: 1px;
   }
 }

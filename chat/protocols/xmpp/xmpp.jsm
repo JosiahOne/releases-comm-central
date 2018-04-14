@@ -9,22 +9,20 @@ this.EXPORTED_SYMBOLS = [
   "XMPPAccountPrototype"
 ];
 
-var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+ChromeUtils.import("resource:///modules/imServices.jsm");
+ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
+ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/jsProtoHelper.jsm");
+ChromeUtils.import("resource:///modules/NormalizedMap.jsm");
+ChromeUtils.import("resource:///modules/socket.jsm");
+ChromeUtils.import("resource:///modules/xmpp-xml.jsm");
+ChromeUtils.import("resource:///modules/xmpp-session.jsm");
 
-Cu.import("resource:///modules/imServices.jsm");
-Cu.import("resource:///modules/imStatusUtils.jsm");
-Cu.import("resource:///modules/imXPCOMUtils.jsm");
-Cu.import("resource:///modules/jsProtoHelper.jsm");
-Cu.import("resource:///modules/NormalizedMap.jsm");
-Cu.import("resource:///modules/socket.jsm");
-Cu.import("resource:///modules/xmpp-xml.jsm");
-Cu.import("resource:///modules/xmpp-session.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "DownloadUtils",
+ChromeUtils.defineModuleGetter(this, "DownloadUtils",
   "resource://gre/modules/DownloadUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "FileUtils",
+ChromeUtils.defineModuleGetter(this, "FileUtils",
   "resource://gre/modules/FileUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
+ChromeUtils.defineModuleGetter(this, "NetUtil",
   "resource://gre/modules/NetUtil.jsm");
 XPCOMUtils.defineLazyServiceGetter(this, "imgTools",
                                    "@mozilla.org/image/tools;1",
@@ -424,7 +422,7 @@ var XMPPMUCConversationPrototype = {
     }
   },
 
-  /* Called by the account when a messsage is received for this muc */
+  /* Called by the account when a message is received for this muc */
   incomingMessage: function(aMsg, aStanza, aDate) {
     let from = this._account._parseJID(aStanza.attributes["from"]).resource;
     let id = aStanza.attributes["id"];
@@ -759,7 +757,7 @@ var XMPPConversationPrototype = {
     GenericConversationPrototype.prepareForDisplaying.apply(this, arguments);
   },
 
-  /* Called by the account when a messsage is received from the buddy */
+  /* Called by the account when a message is received from the buddy */
   incomingMessage: function(aMsg, aStanza, aDate) {
     let from = aStanza.attributes["from"];
     this._targetResource = this._account._parseJID(from).resource;
@@ -2297,7 +2295,7 @@ var XMPPAccountPrototype = {
   // aDomain is required, but aNode and aResource are optional.
   _setJID: function(aDomain, aNode = null, aResource = null) {
     if (!aDomain)
-      throw "aDomain must have a vaule";
+      throw "aDomain must have a value";
 
     let result = {
       node: aNode,
@@ -2665,7 +2663,7 @@ var XMPPAccountPrototype = {
     // This lets us preserve the fields that we don't change or don't know.
     // Some servers may reject a new vCard if we don't do this first.
     if (!this.hasOwnProperty("_userVCard")) {
-      // The download of the vCard is asyncronous and will call _sendVCard back
+      // The download of the vCard is asynchronous and will call _sendVCard back
       // when the user's vCard has been received.
       this._downloadUserVCard();
       return;

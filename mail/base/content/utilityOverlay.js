@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/PlacesUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/PlacesUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gShowBiDi = false;
 
@@ -55,12 +55,12 @@ function goCopyImage() {
   }
   // A mailbox/imap URL then... copy only data then since the HTML data is
   // not that useful for pasting when the image won't be resolved.
-  let param = Components.classes["@mozilla.org/embedcomp/command-params;1"]
-                        .createInstance(Components.interfaces.nsICommandParams);
+  let param = Cc["@mozilla.org/embedcomp/command-params;1"]
+                .createInstance(Ci.nsICommandParams);
   param.setLongValue("imageCopy",
-                     Components.interfaces.nsIContentViewerEdit.COPY_IMAGE_DATA);
+                     Ci.nsIContentViewerEdit.COPY_IMAGE_DATA);
   document.commandDispatcher.getControllerForCommand("cmd_copyImage")
-          .QueryInterface(Components.interfaces.nsICommandController)
+          .QueryInterface(Ci.nsICommandController)
           .doCommandWithParams("cmd_copyImage", param);
 }
 
@@ -193,7 +193,7 @@ function openUILink(url, event)
       uri: makeURI(url),
       visits:  [{
         visitDate: Date.now() * 1000,
-        transitionType: Components.interfaces.nsINavHistoryService.TRANSITION_LINK
+        transitionType: Ci.nsINavHistoryService.TRANSITION_LINK
       }]
     });
     messenger.launchExternalURL(url);
@@ -322,4 +322,48 @@ function openPrivacyPolicy(where) {
   const kTelemetryInfoUrl = "toolkit.telemetry.infoURL";
   let url = Services.prefs.getCharPref(kTelemetryInfoUrl);
   openContentTab(url, where, "^http://www.mozilla.org/");
+}
+
+/* Used by the Add-on manager's search box */
+function openLinkIn(aURL, aWhere, aOpenParams) {
+  if (!aURL)
+    return;
+  // Open a new tab.
+  switchToTabHavingURI(aURL, true);
+}
+
+/**
+ * Moved from toolkit/content/globalOverlay.js.
+ * For details see bug 1422720 and bug 1422721.
+ */
+function goSetMenuValue(aCommand, aLabelAttribute) {
+  var commandNode = top.document.getElementById(aCommand);
+  if (commandNode) {
+    var label = commandNode.getAttribute(aLabelAttribute);
+    if (label)
+      commandNode.setAttribute("label", label);
+  }
+}
+
+function goSetAccessKey(aCommand, aValueAttribute) {
+  var commandNode = top.document.getElementById(aCommand);
+  if (commandNode) {
+    var value = commandNode.getAttribute(aValueAttribute);
+    if (value)
+      commandNode.setAttribute("accesskey", value);
+  }
+}
+
+// this function is used to inform all the controllers attached to a node that an event has occurred
+// (e.g. the tree controllers need to be informed of blur events so that they can change some of the
+// menu items back to their default values)
+function goOnEvent(aNode, aEvent) {
+  var numControllers = aNode.controllers.getControllerCount();
+  var controller;
+
+  for (var controllerIndex = 0; controllerIndex < numControllers; controllerIndex++) {
+    controller = aNode.controllers.getControllerAt(controllerIndex);
+    if (controller)
+      controller.onEvent(aEvent);
+  }
 }

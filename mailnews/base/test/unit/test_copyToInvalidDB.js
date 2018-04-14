@@ -10,7 +10,7 @@ load("../../../resources/messageGenerator.js");
 load("../../../resources/messageModifier.js");
 load("../../../resources/messageInjection.js");
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var gMsg1;
 var gMessages = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
@@ -63,11 +63,11 @@ function* actually_run_test() {
   try {
     gTestFolder2.getDatabaseWithReparse(asyncUrlListener, null);
   } catch (ex) {
-    do_check_true(ex.result == Cr.NS_ERROR_NOT_INITIALIZED);
+    Assert.ok(ex.result == Cr.NS_ERROR_NOT_INITIALIZED);
   }
   yield false;
   let msgRestored = gTestFolder2.msgDatabase.getMsgHdrForMessageID(gMsgId1);
   let msg = mailTestUtils.loadMessageToString(gTestFolder2, msgRestored);
-  do_check_eq(msg, gMsg1.toMboxString());
+  Assert.equal(msg, gMsg1.toMboxString());
   do_test_finished();
 }

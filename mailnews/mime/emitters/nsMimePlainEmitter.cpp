@@ -4,7 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include <stdio.h>
-#include "nsMimeRebuffer.h"
 #include "nsMimePlainEmitter.h"
 #include "plstr.h"
 #include "nsMailHeaders.h"
@@ -33,7 +32,7 @@ nsMimePlainEmitter::StartHeader(bool rootMailHeader, bool headerOnly, const char
                            const char *outCharset)
 {
   mDocHeader = rootMailHeader;
-  return NS_OK; 
+  return NS_OK;
 }
 
 nsresult
@@ -52,7 +51,7 @@ nsresult
 nsMimePlainEmitter::EndHeader(const nsACString &name)
 {
   UtilityWriteCRLF("");
-  return NS_OK; 
+  return NS_OK;
 }
 
 NS_IMETHODIMP

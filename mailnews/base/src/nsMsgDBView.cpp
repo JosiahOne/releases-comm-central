@@ -20,7 +20,6 @@
 #include "nsImapCore.h"
 #include "nsMsgFolderFlags.h"
 #include "nsIMsgLocalMailFolder.h"
-#include "nsIDOMElement.h"
 #include "nsMsgMimeCID.h"
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
@@ -42,7 +41,6 @@
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
 #include "nsMemory.h"
-#include "nsAlgorithm.h"
 #include "nsIAbManager.h"
 #include "nsIAbDirectory.h"
 #include "nsIAbCard.h"
@@ -50,7 +48,6 @@
 #include "mozilla/Attributes.h"
 #include "mozilla/mailnews/MimeHeaderParser.h"
 #include "nsTArray.h"
-#include <algorithm>
 
 using namespace mozilla::mailnews;
 nsrefcnt nsMsgDBView::gInstanceCount  = 0;
@@ -347,7 +344,7 @@ GetCachedName(const nsCString& unparsedString,
 {
   nsresult err;
 
-  // Get verion #.
+  // Get version #.
   int32_t cachedVersion = unparsedString.ToInteger(&err);
   if (cachedVersion != displayVersion)
     return;
@@ -424,10 +421,21 @@ nsMsgDBView::FetchAuthor(nsIMsgDBHdr * aHdr,
   {
     // We can't use the display name in the card; use the name contained in
     // the header or email address.
-    if (!name.IsEmpty())
-      aSenderString = name;
-    else
+    if (name.IsEmpty()) {
       CopyUTF8toUTF16(emailAddress, aSenderString);
+    } else {
+      int32_t atPos;
+      if ((atPos = name.FindChar('@')) == kNotFound ||
+          name.FindChar('.', atPos) == kNotFound) {
+        aSenderString = name;
+      } else {
+        // Found @ followed by a dot, so this looks like a spoofing case.
+        aSenderString = name;
+        aSenderString.AppendLiteral(" <");
+        AppendUTF8toUTF16(emailAddress, aSenderString);
+        aSenderString.Append('>');
+      }
+    }
   }
 
   UpdateCachedName(aHdr, "sender_name", aSenderString);
@@ -534,10 +542,21 @@ nsMsgDBView::FetchRecipients(nsIMsgDBHdr * aHdr,
     {
       // We can't use the display name in the card; use the name contained in
       // the header or email address.
-      if (!curName.IsEmpty())
-        recipient = curName;
-      else
+      if (curName.IsEmpty()) {
         CopyUTF8toUTF16(curAddress, recipient);
+      } else {
+        int32_t atPos;
+        if ((atPos = curName.FindChar('@')) == kNotFound ||
+            curName.FindChar('.', atPos) == kNotFound) {
+          recipient = curName;
+        } else {
+          // Found @ followed by a dot, so this looks like a spoofing case.
+          recipient = curName;
+          recipient.AppendLiteral(" <");
+          AppendUTF8toUTF16(curAddress, recipient);
+          recipient.Append('>');
+        }
+      }
     }
 
     // Add ', ' between each recipient.
@@ -1022,25 +1041,6 @@ nsMsgDBView::GetMessageEnumerator(nsISimpleEnumerator **enumerator)
   return m_db->EnumerateMessages(enumerator);
 }
 
-nsresult
-nsMsgDBView::CycleThreadedColumn(nsIDOMElement * aElement)
-{
-  nsAutoString currentView;
-
-  // Toggle threaded/unthreaded mode.
-  aElement->GetAttribute(NS_LITERAL_STRING("currentView"), currentView);
-  if (currentView.EqualsLiteral("threaded"))
-    aElement->SetAttribute(NS_LITERAL_STRING("currentView"),
-                           NS_LITERAL_STRING("unthreaded"));
-  else
-    aElement->SetAttribute(NS_LITERAL_STRING("currentView"),
-                           NS_LITERAL_STRING("threaded"));
-
-  // I think we need to create a new view and switch it in this circumstance
-  // since we are toggline between threaded and non threaded mode.
-  return NS_OK;
-}
-
 NS_IMETHODIMP
 nsMsgDBView::IsEditable(int32_t row,
                         nsITreeColumn* col,
@@ -1048,7 +1048,7 @@ nsMsgDBView::IsEditable(int32_t row,
 {
   NS_ENSURE_ARG_POINTER(col);
   NS_ENSURE_ARG_POINTER(_retval);
-  // Attempt to retreive a custom column handler. If it exists call it and
+  // Attempt to retrieve a custom column handler. If it exists call it and
   // return.
   const char16_t* colID;
   col->GetIdConst(&colID);
@@ -1873,14 +1873,6 @@ nsMsgDBView::GetImageSrc(int32_t aRow,
 }
 
 NS_IMETHODIMP
-nsMsgDBView::GetProgressMode(int32_t aRow,
-                             nsITreeColumn* aCol,
-                             int32_t* _retval)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 nsMsgDBView::GetCellValue(int32_t aRow,
                           nsITreeColumn* aCol,
                           nsAString& aValue)
@@ -2172,7 +2164,7 @@ nsMsgDBView::GetCellText(int32_t aRow,
 
   aValue.Truncate();
 
-  // Attempt to retreive a custom column handler. If it exists call it and
+  // Attempt to retrieve a custom column handler. If it exists call it and
   // return.
   nsIMsgCustomColumnHandler* colHandler = GetColumnHandler(colID);
 
@@ -2341,7 +2333,7 @@ nsMsgDBView::CycleCell(int32_t row,
   const char16_t* colID;
   col->GetIdConst(&colID);
 
-  // Attempt to retreive a custom column handler. If it exists call it and
+  // Attempt to retrieve a custom column handler. If it exists call it and
   // return.
   nsIMsgCustomColumnHandler* colHandler = GetColumnHandler(colID);
 
@@ -3459,12 +3451,12 @@ nsMsgDBView::ApplyCommandToIndices(nsMsgViewCommandTypeValue command,
                                      imapUids.Length(),
                                      nullptr);
 
-          return imapFolder->StoreCustomKeywords(msgWindow,
-                                                 NS_LITERAL_CSTRING("NonJunk"),
-                                                 NS_LITERAL_CSTRING("Junk"),
-                                                 imapUids.Elements(),
-                                                 imapUids.Length(),
-                                                 nullptr);
+        return imapFolder->StoreCustomKeywords(msgWindow,
+                                               NS_LITERAL_CSTRING("NonJunk"),
+                                               NS_LITERAL_CSTRING("Junk"),
+                                               imapUids.Elements(),
+                                               imapUids.Length(),
+                                               nullptr);
       }
       default:
         break;
@@ -4393,7 +4385,7 @@ nsresult nsMsgDBView::GetFieldTypeAndLenForSort(nsMsgViewSortTypeValue sortType,
       if (isString)
       {
         *pFieldType = kCollationKey;
-        // 80 - do we need a seperate k?
+        // 80 - do we need a separate k?
         *pMaxLen = kMaxRecipientKey;
       }
       else
@@ -6538,7 +6530,7 @@ nsMsgDBView::FindLevelInThread(nsIMsgDBHdr *msgHdr,
     if (msgKey == parentKey ||
         NS_FAILED(m_db->GetMsgHdrForKey(parentKey, getter_AddRefs(curMsgHdr))))
     {
-      NS_ERROR("msgKey == parentKey, or GetMsgHdrForKey failed, this used to be an infinte loop condition");
+      NS_ERROR("msgKey == parentKey, or GetMsgHdrForKey failed, this used to be an infinite loop condition");
       curMsgHdr = nullptr;
     }
     else
@@ -7414,7 +7406,7 @@ nsMsgDBView::NavigateFromPos(nsMsgNavigationTypeValue motion,
       break;
     case nsMsgNavigationType::firstUnreadMessage:
       startIndex = nsMsgViewIndex_None;
-      // Note fall thru - is this motion ever used?
+      // Note fall through - is this motion ever used?
       MOZ_FALLTHROUGH;
     case nsMsgNavigationType::nextUnreadMessage:
       for (curIndex = (startIndex == nsMsgViewIndex_None) ? 0 : startIndex;
@@ -8570,7 +8562,7 @@ nsMsgDBView::GetImapDeleteModel(nsIMsgFolder *folder)
 NS_IMETHODIMP
 nsMsgDBView::CanDrop(int32_t index,
                      int32_t orient,
-                     nsIDOMDataTransfer *dataTransfer,
+                     nsISupports *dataTransfer,
                      bool *_retval)
 {
   NS_ENSURE_ARG_POINTER(_retval);
@@ -8587,7 +8579,7 @@ nsMsgDBView::CanDrop(int32_t index,
 NS_IMETHODIMP
 nsMsgDBView::Drop(int32_t row,
                   int32_t orient,
-                  nsIDOMDataTransfer *dataTransfer)
+                  nsISupports *dataTransfer)
 {
   return NS_OK;
 }
@@ -8718,14 +8710,14 @@ nsMsgDBView::CopyDBView(nsMsgDBView *aNewMsgDBView,
 NS_IMETHODIMP
 nsMsgDBView::GetSearchSession(nsIMsgSearchSession* *aSession)
 {
-  NS_ASSERTION(false, "should be overriden by child class");
+  NS_ASSERTION(false, "should be overridden by child class");
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 NS_IMETHODIMP
 nsMsgDBView::SetSearchSession(nsIMsgSearchSession *aSession)
 {
-  NS_ASSERTION(false, "should be overriden by child class");
+  NS_ASSERTION(false, "should be overridden by child class");
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 

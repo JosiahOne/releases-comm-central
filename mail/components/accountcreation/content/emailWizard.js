@@ -3,10 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource:///modules/hostnameUtils.jsm");
-Components.utils.import("resource:///modules/OAuth2Providers.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
+ChromeUtils.import("resource:///modules/OAuth2Providers.jsm");
 
 /**
  * This is the dialog opened by menu File | New account | Mail... .
@@ -33,10 +33,10 @@ Components.utils.import("resource:///modules/OAuth2Providers.jsm");
 
 
 // from http://xyfer.blogspot.com/2005/01/javascript-regexp-email-validator.html
-var emailRE = /^[-_a-z0-9\'+*$^&%=~!?{}]+(?:\.[-_a-z0-9\'+*$^&%=~!?{}]+)*@(?:[-a-z0-9.]+\.[a-z]{2,6}|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?$/i;
+var emailRE = /^[-_a-z0-9\'+*$^&%=~!?{}]+(?:\.[-_a-z0-9\'+*$^&%=~!?{}]+)*@(?:[-a-z0-9.]+\.[a-z]{2,20}|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?$/i;
 
 if (typeof gEmailWizardLogger == "undefined") {
-  Cu.import("resource:///modules/gloda/log4moz.js");
+  ChromeUtils.import("resource:///modules/gloda/log4moz.js");
   var gEmailWizardLogger = Log4Moz.getConfiguredLogger("mail.wizard");
 }
 
@@ -153,7 +153,7 @@ EmailConfigWizard.prototype =
       userFullname = userInfo.fullname;
     } catch(e) {
       // nsIUserInfo may not be implemented on all platforms, and name might
-      // not be avaialble even if it is.
+      // not be available even if it is.
     }
 
     this._domain = "";
@@ -1031,7 +1031,7 @@ EmailConfigWizard.prototype =
     if (!e("in-authMethod-oauth2").hidden) {
       config.oauthSettings = {};
       [config.oauthSettings.issuer, config.oauthSettings.scope] = iDetails;
-      // oauthsettings are not stored nor changable in the user interface, so just
+      // oauthsettings are not stored nor changeable in the user interface, so just
       // store them in the base configuration.
       this._currentConfig.oauthSettings = config.oauthSettings;
     }
@@ -1060,7 +1060,7 @@ EmailConfigWizard.prototype =
     if (!e("out-authMethod-oauth2").hidden) {
       config.oauthSettings = {};
       [config.oauthSettings.issuer, config.oauthSettings.scope] = oDetails;
-      // oauthsettings are not stored nor changable in the user interface, so just
+      // oauthsettings are not stored nor changeable in the user interface, so just
       // store them in the base configuration.
       this._currentConfig.oauthSettings = config.oauthSettings;
     }
@@ -1583,7 +1583,7 @@ EmailConfigWizard.prototype =
       }
     }
 
-    // TODO use a UI mode (switchToMode()) for verfication, too.
+    // TODO use a UI mode (switchToMode()) for verification, too.
     // But we need to go back to the previous mode, because we might be in
     // "result" or "manual-edit-complete" mode.
     _disable("create_button");

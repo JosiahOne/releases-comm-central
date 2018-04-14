@@ -14,11 +14,8 @@
 #include "plstr.h"
 #include "mimemoz2.h"
 #include "nsMimeTypes.h"
-#include "nsIComponentManager.h"
-#include "nsIURL.h"
 #include "nsString.h"
 #include "nsUnicharUtils.h"
-#include "nsIServiceManager.h"
 #include "nsMemory.h"
 #include "nsIPipe.h"
 #include "nsMimeStringResources.h"
@@ -26,16 +23,11 @@
 #include "nsIPrefBranch.h"
 #include "nsNetUtil.h"
 #include "nsIMsgQuote.h"
-#include "nsIScriptSecurityManager.h"
 #include "nsNetUtil.h"
 #include "mozITXTToHTMLConv.h"
 #include "nsIMsgMailNewsUrl.h"
 #include "nsIMsgWindow.h"
 #include "nsICategoryManager.h"
-#include "nsIInterfaceRequestor.h"
-#include "nsIInterfaceRequestorUtils.h"
-#include "nsIAsyncInputStream.h"
-#include "nsIAsyncOutputStream.h"
 #include "nsMsgUtils.h"
 #include "mozilla/ArrayUtils.h"
 
@@ -844,14 +836,14 @@ nsStreamConverter::GetOrigMsgHdr(nsIMsgDBHdr * *aMsgHdr)
   if (!aMsgHdr) return NS_ERROR_NULL_POINTER;
   NS_IF_ADDREF(*aMsgHdr = mOrigMsgHdr);
   return NS_OK;
-} 
+}
 
 /////////////////////////////////////////////////////////////////////////////
 // Methods for nsIStreamListener...
 /////////////////////////////////////////////////////////////////////////////
 //
 // Notify the client that data is available in the input stream.  This
-// method is called whenver data is written into the input stream by the
+// method is called whenever data is written into the input stream by the
 // networking library...
 //
 nsresult
@@ -1098,7 +1090,7 @@ nsresult nsStreamConverter::Close()
 
 // nsIStreamConverter implementation
 
-// No syncronous conversion at this time.
+// No synchronous conversion at this time.
 NS_IMETHODIMP nsStreamConverter::Convert(nsIInputStream  *aFromStream,
                                          const char *aFromType,
                                          const char *aToType,

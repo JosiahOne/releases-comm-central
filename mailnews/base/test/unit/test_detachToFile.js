@@ -11,8 +11,8 @@ load("../../../resources/asyncTestUtils.js");
 
 // javascript mime emitter functions
 var mimeMsg = {};
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource:///modules/gloda/mimemsg.js", mimeMsg);
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/gloda/mimemsg.js", mimeMsg);
 
 var tests = [
   startCopy,
@@ -65,7 +65,7 @@ function* testDetach()
   //  now exist in the profile directory.
   let checkFile = do_get_profile().clone();
   checkFile.append("check.pdf");
-  do_check_true(checkFile.exists());
+  Assert.ok(checkFile.exists());
 
   // The message should now have a detached attachment. Read the message,
   //  and search for "AttachmentDetached" which is added on detachment.
@@ -74,7 +74,7 @@ function* testDetach()
   let msgHdr = mailTestUtils.firstMsgHdr(localAccountUtils.inboxFolder);
 
   let messageContent = getContentFromMessage(msgHdr);
-  do_check_true(messageContent.includes("AttachmentDetached"));
+  Assert.ok(messageContent.includes("AttachmentDetached"));
 }
 
 function SaveAttachmentCallback() {

@@ -20,7 +20,6 @@ SOURCES += [
     'nsMessengerContentHandler.cpp',
     'nsMsgAccount.cpp',
     'nsMsgAccountManager.cpp',
-    'nsMsgAccountManagerDS.cpp',
     'nsMsgBiffManager.cpp',
     'nsMsgContentPolicy.cpp',
     'nsMsgCopyService.cpp',
@@ -28,7 +27,6 @@ SOURCES += [
     'nsMsgFolderCache.cpp',
     'nsMsgFolderCacheElement.cpp',
     'nsMsgFolderCompactor.cpp',
-    'nsMsgFolderDataSource.cpp',
     'nsMsgFolderNotificationService.cpp',
     'nsMsgGroupThread.cpp',
     'nsMsgGroupView.cpp',
@@ -60,7 +58,7 @@ if CONFIG['NS_PRINTING']:
 if CONFIG['OS_ARCH'] == 'WINNT':
     SOURCES += ['nsMessengerWinIntegration.cpp']
 
-if CONFIG['MOZ_WIDGET_TOOLKIT'] in ('gtk2', 'gtk3', 'qt'):
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gtk3':
     SOURCES += ['nsMessengerUnixIntegration.cpp']
 elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     SOURCES += ['nsMessengerOSXIntegration.mm']

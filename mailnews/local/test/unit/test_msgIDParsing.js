@@ -3,8 +3,8 @@
  */
 
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://testing-common/mailnews/localAccountUtils.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
 
 var gMessenger = Cc["@mozilla.org/messenger;1"].
                    createInstance(Ci.nsIMessenger);
@@ -19,7 +19,7 @@ function testMsgID()
   let localFolder = localAccountUtils.inboxFolder.QueryInterface(Ci.nsIMsgLocalMailFolder);
   localAccountUtils.inboxFolder.addMessage("From \r\n"+ headers + "\r\nhello\r\n");
   let msgHdr = localAccountUtils.inboxFolder.firstNewMessage;
-  do_check_eq(msgHdr.messageId, "abcmessageid");
+  Assert.equal(msgHdr.messageId, "abcmessageid");
 }
 
 function run_test()

@@ -10,7 +10,7 @@
 
 // make xpcshell-tests TEST_PATH=mailnews/addrbook/test/unit/test_collection.js
 
-var nsIAbPMF = Components.interfaces.nsIAbPreferMailFormat;
+var nsIAbPMF = Ci.nsIAbPreferMailFormat;
 
 // Source fields (emailHeader/mailFormat) and expected results for use for
 // testing the addition of new addresses to the database.
@@ -228,22 +228,22 @@ var collectChecker = {
     try {
       var card = this.AB.cardForEmailAddress(aDetails.primaryEmail);
 
-      do_check_true(card != null);
+      Assert.ok(card != null);
 
       if ("secondEmail" in aDetails)
-        do_check_eq(card.getProperty("SecondEmail", "BAD"), aDetails.secondEmail);
+        Assert.equal(card.getProperty("SecondEmail", "BAD"), aDetails.secondEmail);
 
       if (overrideMailFormat)
-        do_check_eq(card.getProperty("PreferMailFormat", "BAD"), nsIAbPMF.unknown);
+        Assert.equal(card.getProperty("PreferMailFormat", "BAD"), nsIAbPMF.unknown);
       else if ("mailFormatOut" in aDetails)
-        do_check_eq(card.getProperty("PreferMailFormat", "BAD"), aDetails.mailFormatOut);
+        Assert.equal(card.getProperty("PreferMailFormat", "BAD"), aDetails.mailFormatOut);
       else
-        do_check_eq(card.getProperty("PreferMailFormat", "BAD"), aDetails.mailFormat);
+        Assert.equal(card.getProperty("PreferMailFormat", "BAD"), aDetails.mailFormat);
 
-      do_check_eq(card.displayName, aDetails.displayName);
-      do_check_eq(card.firstName, aDetails.firstName);
-      do_check_eq(card.lastName, aDetails.lastName);
-      do_check_eq(card.getProperty("_AimScreenName", ""), aDetails.screenName);
+      Assert.equal(card.displayName, aDetails.displayName);
+      Assert.equal(card.firstName, aDetails.firstName);
+      Assert.equal(card.lastName, aDetails.lastName);
+      Assert.equal(card.getProperty("_AimScreenName", ""), aDetails.screenName);
     }
     catch (e) {
       throw "FAILED in checkCardResult emailHeader: " + aDetails.emailHeader + " : " + e;
@@ -266,8 +266,8 @@ function run_test()
 
   // Get the actual collecter
   collectChecker.addressCollect =
-    Components.classes["@mozilla.org/addressbook/services/addressCollector;1"]
-              .getService(Components.interfaces.nsIAbAddressCollector);
+    Cc["@mozilla.org/addressbook/services/addressCollector;1"]
+      .getService(Ci.nsIAbAddressCollector);
 
   // Test - Addition of header without email address.
 
@@ -275,7 +275,7 @@ function run_test()
                                                nsIAbPMF.unknown);
 
   // Address book should have no cards present.
-  do_check_false(collectChecker.AB.childCards.hasMoreElements());
+  Assert.ok(!collectChecker.AB.childCards.hasMoreElements());
 
   // Test - Email doesn't exist, but don't add it.
 
@@ -287,7 +287,7 @@ function run_test()
 
   var card = collectChecker.AB.cardForEmailAddress(addEmailChecks[0].emailHeader);
 
-  do_check_true(card == null);
+  Assert.ok(card == null);
 
   // Test - Try and collect various emails and formats.
 
@@ -299,8 +299,8 @@ function run_test()
 
   // First delete all existing cards
   var childCards = collectChecker.AB.childCards;
-  var cardsToDelete = Components.classes["@mozilla.org/array;1"]
-                                .createInstance(Components.interfaces.nsIMutableArray);
+  var cardsToDelete = Cc["@mozilla.org/array;1"]
+                        .createInstance(Ci.nsIMutableArray);
   while (childCards.hasMoreElements()) {
     cardsToDelete.appendElement(childCards.getNext());
   }
@@ -312,9 +312,9 @@ function run_test()
   cardsToDelete = null;
 
   // Address book should have no cards present.
-  do_check_false(collectChecker.AB.childCards.hasMoreElements());
+  Assert.ok(!collectChecker.AB.childCards.hasMoreElements());
 
-  do_check_eq(collectChecker.AB.cardForEmailAddress(addEmailChecks[0].emailHeader), null);
+  Assert.equal(collectChecker.AB.cardForEmailAddress(addEmailChecks[0].emailHeader), null);
 
   // Now do all emails at the same time.
   collectChecker.checkAll(addEmailChecks);
@@ -323,8 +323,8 @@ function run_test()
 
   // Add a basic card with just primary and second email to allow testing
   // of the case where we don't modify when second email is matching.
-  card = Components.classes["@mozilla.org/addressbook/cardproperty;1"]
-                   .createInstance(Components.interfaces.nsIAbCard);
+  card = Cc["@mozilla.org/addressbook/cardproperty;1"]
+           .createInstance(Ci.nsIAbCard);
 
   card.primaryEmail = "userprim\u00D0@foo.invalid";
   card.setProperty("SecondEmail", "usersec\u00D0@foo.invalid");
@@ -370,7 +370,7 @@ function run_test()
       foundCards.push(card);
   }
 
-  do_check_eq(foundCards.length, 2);
+  Assert.equal(foundCards.length, 2);
 
   if (foundCards[0].displayName != kSingleDisplayName &&
       foundCards[1].displayName != kSingleDisplayName)

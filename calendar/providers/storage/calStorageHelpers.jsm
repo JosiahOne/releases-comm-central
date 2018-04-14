@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /* exported CAL_ITEM_FLAG, getInUtcOrKeepFloating, dateToText, textToDate,
  *          calStorageTimezone, getTimezone, newDateTime
@@ -49,7 +49,7 @@ function getInUtcOrKeepFloating(date) {
     if (timezone.isFloating || timezone.isUTC) {
         return date;
     } else {
-        return date.getInTimezone(cal.UTC());
+        return date.getInTimezone(cal.dtz.UTC);
     }
 }
 
@@ -141,7 +141,7 @@ calStorageTimezone.prototype = {
  */
 function getTimezone(aTimezone) {
     let timezone = null;
-    if (aTimezone.indexOf("BEGIN:VTIMEZONE") == 0) {
+    if (aTimezone.startsWith("BEGIN:VTIMEZONE")) {
         timezone = gForeignTimezonesCache[aTimezone]; // using full definition as key
         if (!timezone) {
             try {
@@ -189,7 +189,7 @@ function newDateTime(aNativeTime, aTimezone) {
             cal.ASSERT(false, "Timezone not available: " + aTimezone);
         }
     } else {
-        date.timezone = cal.floating();
+        date.timezone = cal.dtz.floating;
     }
     return date;
 }

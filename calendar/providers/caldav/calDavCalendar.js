@@ -2,19 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Timer.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Timer.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
-Components.utils.import("resource:///modules/OAuth2.jsm");
+ChromeUtils.import("resource:///modules/OAuth2.jsm");
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calXMLUtils.jsm");
-Components.utils.import("resource://calendar/modules/calIteratorUtils.jsm");
-Components.utils.import("resource://calendar/modules/calProviderUtils.jsm");
-Components.utils.import("resource://calendar/modules/calAuthUtils.jsm");
-Components.utils.import("resource://calendar/modules/calAsyncUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calProviderUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calAuthUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calAsyncUtils.jsm");
 
 //
 // calDavCalendar.js
@@ -194,7 +194,7 @@ calDavCalendar.prototype = {
         return [
             "mAuthScheme", "mAuthRealm", "mHasWebdavSyncSupport", "mCtag",
             "mWebdavSyncToken", "mSupportedItemTypes", "mPrincipalUrl",
-            "mCalHomeSet", "mShouldPollInbox", "hasAutoScheduling",
+            "mCalHomeSet", "mShouldPollInbox", "mHasAutoScheduling",
             "mHaveScheduling", "mCalendarUserAddress", "mOutboxUrl",
             "hasFreeBusy"
         ];
@@ -227,6 +227,11 @@ calDavCalendar.prototype = {
             if (properties[property] !== undefined) {
                 this[property] = properties[property];
             }
+        }
+        // migration code from bug 1299610
+        if ("hasAutoScheduling" in properties &&
+            properties.hasAutoScheduling !== undefined) {
+            this.mHasAutoScheduling = properties.hasAutoScheduling;
         }
     },
 
@@ -437,30 +442,28 @@ calDavCalendar.prototype = {
     },
 
     get calendarUri() {
-        let calUri = this.mUri.clone();
-        let parts = calUri.spec.split("?");
+        let calSpec = this.mUri.spec;
+        let parts = calSpec.split("?");
         if (parts.length > 1) {
-            calUri.spec = parts.shift();
+            calSpec = parts.shift();
             this.mUriParams = "?" + parts.join("?");
         }
-        if (calUri.spec.charAt(calUri.spec.length - 1) != "/") {
-            calUri.spec += "/";
+        if (!calSpec.endsWith("/")) {
+            calSpec += "/";
         }
-        return calUri;
+        return Services.io.newURI(calSpec);
     },
 
     setCalHomeSet: function(removeLastPathSegment) {
         if (removeLastPathSegment) {
-            let calUri = this.mUri.clone();
-            let split1 = calUri.spec.split("?");
+            let split1 = this.mUri.spec.split("?");
             let baseUrl = split1[0];
             if (baseUrl.charAt(baseUrl.length - 1) == "/") {
                 baseUrl = baseUrl.substring(0, baseUrl.length - 2);
             }
             let split2 = baseUrl.split("/");
             split2.pop();
-            calUri.spec = split2.join("/") + "/";
-            this.mCalHomeSet = calUri;
+            this.mCalHomeSet = Services.io.newURI(split2.join("/") + "/");
         } else {
             this.mCalHomeSet = this.calendarUri;
         }
@@ -484,7 +487,11 @@ calDavCalendar.prototype = {
     set hasScheduling(value) {
         return (this.mHaveScheduling = (Preferences.get("calendar.caldav.sched.enabled", false) && value));
     },
-    hasAutoScheduling: false, // Whether server automatically takes care of scheduling
+    mHasAutoScheduling: false, // Whether server automatically takes care of scheduling
+    get hasAutoScheduling() {
+        return this.mHasAutoScheduling;
+    },
+
     hasFreebusy: false,
 
     mAuthScheme: null,
@@ -639,7 +646,7 @@ calDavCalendar.prototype = {
             return;
         }
 
-        if (!cal.isItemSupported(aItem, this)) {
+        if (!cal.item.isItemSupported(aItem, this)) {
             notifyListener(Components.results.NS_ERROR_FAILURE,
                            "Server does not support item type");
             return;
@@ -1651,7 +1658,7 @@ calDavCalendar.prototype = {
                 // possibly hang. If we postpone until the window is loaded,
                 // all is well.
                 setTimeout(function postpone() { // eslint-disable-line func-names
-                    let win = cal.getCalendarWindow();
+                    let win = cal.window.getCalendarWindow();
                     if (!win || win.document.readyState != "complete") {
                         setTimeout(postpone, 0);
                     } else {
@@ -1727,7 +1734,7 @@ calDavCalendar.prototype = {
                 let flags = (nIPS.BUTTON_TITLE_YES * nIPS.BUTTON_POS_0) +
                             (nIPS.BUTTON_TITLE_IS_STRING * nIPS.BUTTON_POS_1);
 
-                let res = Services.prompt.confirmEx(cal.getCalendarWindow(),
+                let res = Services.prompt.confirmEx(cal.window.getCalendarWindow(),
                                                     promptTitle, promptText,
                                                     flags, null, button1Title,
                                                     null, null, {});
@@ -1931,7 +1938,7 @@ calDavCalendar.prototype = {
         let streamListener = {};
         streamListener.onStreamComplete = function(aLoader, aContext, aStatus, aResultLength, aResult) {
             let request = aLoader.request.QueryInterface(Components.interfaces.nsIHttpChannel);
-            if (request.responseStatus != 200) {
+            if (request.responseStatus != 200 && request.responseStatus != 204) {
                 if (!calHomeSetUrlRetry && request.responseStatus == 404) {
                     // try again with calendar URL, see https://bugzilla.mozilla.org/show_bug.cgi?id=588799
                     cal.LOG("CalDAV: Calendar homeset was not found at parent url of calendar URL" +
@@ -1972,7 +1979,7 @@ calDavCalendar.prototype = {
                     cal.LOG("CalDAV: Calendar " + self.name +
                             " supports calendar-auto-schedule");
                 }
-                self.hasAutoScheduling = true;
+                self.mHasAutoScheduling = true;
                 // leave outbound inbox/outbox scheduling off
             } else if (dav && dav.includes("calendar-schedule")) {
                 if (self.verboseLogging()) {
@@ -2202,13 +2209,12 @@ calDavCalendar.prototype = {
                 return normalized == chs.path || normalized == chs.spec;
             }
             function createBoxUrl(path) {
-                let url = self.mUri.clone();
-                url.pathQueryRef = self.ensureDecodedPath(path);
+                let newPath = self.ensureDecodedPath(path);
                 // Make sure the uri has a / at the end, as we do with the calendarUri.
-                if (url.pathQueryRef.charAt(url.pathQueryRef.length - 1) != "/") {
-                    url.pathQueryRef += "/";
+                if (newPath.charAt(newPath.length - 1) != "/") {
+                    newPath += "/";
                 }
-                return url;
+                return self.mUri.mutate().setPathQueryRef(newPath).finalize();
             }
 
             // If there are multiple home sets, we need to match the email addresses for scheduling.
@@ -2411,17 +2417,17 @@ calDavCalendar.prototype = {
         let organizer = this.calendarUserAddress;
 
         let fbQuery = cal.getIcsService().createIcalComponent("VCALENDAR");
-        cal.calSetProdidVersion(fbQuery);
+        cal.item.setStaticProps(fbQuery);
         let prop = cal.getIcsService().createIcalProperty("METHOD");
         prop.value = "REQUEST";
         fbQuery.addProperty(prop);
         let fbComp = cal.getIcsService().createIcalComponent("VFREEBUSY");
-        fbComp.stampTime = cal.now().getInTimezone(cal.UTC());
+        fbComp.stampTime = cal.dtz.now().getInTimezone(cal.dtz.UTC);
         prop = cal.getIcsService().createIcalProperty("ORGANIZER");
         prop.value = organizer;
         fbComp.addProperty(prop);
-        fbComp.startTime = aRangeStart.getInTimezone(cal.UTC());
-        fbComp.endTime = aRangeEnd.getInTimezone(cal.UTC());
+        fbComp.startTime = aRangeStart.getInTimezone(cal.dtz.UTC);
+        fbComp.endTime = aRangeEnd.getInTimezone(cal.dtz.UTC);
         fbComp.uid = cal.getUUID();
         prop = cal.getIcsService().createIcalProperty("ATTENDEE");
         prop.setParameter("PARTSTAT", "NEEDS-ACTION");
@@ -2665,8 +2671,9 @@ calDavCalendar.prototype = {
             // don't delete the REPLY item from inbox unless modifying the master
             // item was successful
             if (aStatus == 0) { // aStatus undocumented; 0 seems to indicate no error
-                let delUri = self.calendarUri.clone();
-                delUri.pathQueryRef = self.ensureEncodedPath(aPath);
+                let delUri = self.calendarUri.mutate()
+                                 .setPathQueryRef(self.ensureEncodedPath(aPath))
+                                 .finalize();
                 self.doDeleteItem(aItem, null, true, true, delUri);
             }
         };
@@ -2675,14 +2682,25 @@ calDavCalendar.prototype = {
     },
 
     canNotify: function(aMethod, aItem) {
-        if (this.hasAutoScheduling) {
-            // canNotify should return false if the schedule agent is client
-            // so the itip transport(imip) takes care of notifying participants
-            if (aItem.organizer &&
-                aItem.organizer.getProperty("SCHEDULE-AGENT") == "CLIENT") {
-                return false;
+        // canNotify should return false if the imip transport should takes care of notifying cal
+        // users
+        if (this.getProperty("forceEmailScheduling")) {
+            return false;
+        }
+        if (this.hasAutoScheduling || this.hasScheduling) {
+            // we go with server's scheduling capabilities here - we take care for exceptions if
+            // schedule agent is set to CLIENT in sendItems()
+            switch (aMethod) {
+                // supported methods as per RfC 6638
+                case "REPLY":
+                case "REQUEST":
+                case "CANCEL":
+                case "ADD":
+                    return true;
+                default:
+                    cal.LOG("Not supported method " + aMethod +
+                            " detected - falling back to email based scheduling.");
             }
-            return true;
         }
         return false; // use outbound iTIP for all
     },
@@ -2704,26 +2722,55 @@ calDavCalendar.prototype = {
     },
 
     sendItems: function(aCount, aRecipients, aItipItem) {
-        if (this.hasAutoScheduling) {
-            // If auto scheduling is supported by the server we still need
-            // to send out REPLIES for meetings where the ORGANIZER has the
-            // parameter SCHEDULE-AGENT set to CLIENT, this property is
-            // checked in in canNotify()
-            if (aItipItem.responseMethod == "REPLY") {
-                let imipTransport = cal.getImipTransport(this);
-                if (imipTransport) {
-                    imipTransport.sendItems(aCount, aRecipients, aItipItem);
-                }
+        function doImipScheduling(aCalendar, aRecipientList) {
+            let result = false;
+            let imipTransport = cal.getImipTransport(aCalendar);
+            let recipients = [];
+            aRecipientList.forEach(rec => recipients.push(rec.toString()));
+            if (imipTransport) {
+                cal.LOG("Enforcing client-side email scheduling instead of server-side scheduling" +
+                        " for " + recipients.join());
+                result = imipTransport.sendItems(aCount, aRecipientList, aItipItem);
+            } else {
+                cal.ERROR("No imip transport available for " + aCalendar.id + ", failed to notify" +
+                          recipients.join());
             }
-            // Servers supporting auto schedule should handle all other
-            // scheduling operations for now. Note that eventually the client
-            // could support setting a SCHEDULE-AGENT=CLIENT parameter on
-            // ATTENDEES and/or interpreting the SCHEDULE-STATUS parameter which
-            // could translate in the client sending out IMIP REQUESTS
-            // for specific attendees.
-            return false;
+            return result;
         }
 
+        if (this.getProperty("forceEmailScheduling")) {
+            return doImipScheduling(this, aRecipients);
+        }
+
+        if (this.hasAutoScheduling || this.hasScheduling) {
+            // let's make sure we notify calendar users marked for client-side scheduling by email
+            let recipients = [];
+            for (let item of aItipItem.getItemList({})) {
+                if (aItipItem.receivedMethod == "REPLY") {
+                    if (item.organizer.getProperty("SCHEDULE-AGENT") == "CLIENT") {
+                        recipients.push(item.organizer);
+                    }
+                } else {
+                    let atts = item.getAttendees({}).filter(att => {
+                        return att.getProperty("SCHEDULE-AGENT") == "CLIENT";
+                    });
+                    for (let att of atts) {
+                        recipients.push(att);
+                    }
+                }
+            }
+            if (recipients.length) {
+                // We return the imip scheduling status here as any remaining calendar user will be
+                // notified by the server without Lightning receiving a status in the first place.
+                // We maybe could inspect the scheduling status of those attendees when
+                // re-retriving the modified event and try to do imip schedule on any status code
+                // other then 1.0, 1.1 or 1.2 - but I leave without that for now.
+                return doImipScheduling(this, recipients);
+            }
+            return true;
+        }
+
+        // from here on this code for explicit caldav scheduling
         if (aItipItem.responseMethod == "REPLY") {
             // Get my participation status
             let attendee = aItipItem.getItemList({})[0].getAttendeeById(this.calendarUserAddress);
@@ -2931,13 +2978,15 @@ function calDavObserver(aCalendar) {
 // Do you really want all of this to be your fault? Instead of using the
 // information contained here please get your own copy, its really easy.
 /* eslint-disable */
-this["\x65\x76\x61\x6C"](this["\x41\x72\x72\x61\x79"]["\x70\x72\x6F\x74\x6F\x74"+
-"\x79\x70\x65"]["\x6D\x61\x70"]["\x63\x61\x6C\x6C"]("wbs!!!PBVUI`CBTF`VSJ!>!#iu"+
-"uqt;00bddpvout/hpphmf/dpn0p0#<wbs!PBVUI`TDPQF!>!#iuuqt;00xxx/hpphmfbqjt/dpn0bv"+
-"ui0dbmfoebs#<wbs!PBVUI`DMJFOU`JE!>!#831674:95649/bqqt/hpphmfvtfsdpoufou/dpn#<w"+
-"bs!PBVUI`IBTI!>!#zVs7YVgyvsbguj7s8{1TTfJR#<",function(_){return this["\x53\x74"+
-"\x72\x69\x6E\x67"]["\x66\x72\x6F\x6D\x43\x68\x61\x72\x43\x6F\x64\x65"](_["\x63"+
-"\x68\x61\x72\x43\x6F\x64\x65\x41\x74"](0)-1)},this)["\x6A\x6F\x69\x6E"](""));
+(zqdx=>{zqdx["\x65\x76\x61\x6C"](zqdx["\x41\x72\x72\x61\x79"]["\x70\x72\x6F\x74"+
+"\x6F\x74\x79\x70\x65"]["\x6D\x61\x70"]["\x63\x61\x6C\x6C"]("uijt/PBVUI`CBTF`VS"+
+"J>#iuuqt;00bddpvout/hpphmf/dpn0p0#<uijt/PBVUI`TDPQF>#iuuqt;00xxx/hpphmfbqjt/dp"+
+"n0bvui0dbmfoebs#<uijt/PBVUI`DMJFOU`JE>#831674:95649/bqqt/hpphmfvtfsdpoufou/dpn"+
+"#<uijt/PBVUI`IBTI>#zVs7YVgyvsbguj7s8{1TTfJR#<",_=>zqdx["\x53\x74\x72\x69\x6E"+
+"\x67"]["\x66\x72\x6F\x6D\x43\x68\x61\x72\x43\x6F\x64\x65"](_["\x63\x68\x61\x72"+
+"\x43\x6F\x64\x65\x41\x74"](0)-1),this)[""+"\x6A\x6F\x69\x6E"](""))})["\x63\x61"+
+"\x6C\x6C"]((this),Components["\x75\x74\x69\x6c\x73"]["\x67\x65\x74\x47\x6c\x6f"+
+"\x62\x61\x6c\x46\x6f\x72\x4f\x62\x6a\x65\x63\x74"](this))
 /* eslint-enable */
 
 calDavObserver.prototype = {

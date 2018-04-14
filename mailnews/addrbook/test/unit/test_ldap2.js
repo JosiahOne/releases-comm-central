@@ -11,7 +11,7 @@ var kLDAPTestSpec = "ldap://invalidhost//dc=intranet??sub?(objectclass=*)";
 function run_test() {
   // If nsIAbLDAPDirectory doesn't exist in our build options, someone has
   // specified --disable-ldap
-  if (!("nsIAbLDAPDirectory" in Components.interfaces))
+  if (!("nsIAbLDAPDirectory" in Ci))
     return;
 
   // Test - Create an LDAP directory
@@ -23,16 +23,16 @@ function run_test() {
 
   // Test - Check we have the directory.
   let abDir = MailServices.ab.getDirectory(kLDAPUriPrefix + abUri)
-                             .QueryInterface(Components.interfaces.nsIAbLDAPDirectory);
+                             .QueryInterface(Ci.nsIAbLDAPDirectory);
 
   // Test - Check various fields
-  do_check_eq(abDir.dirName, "\u041C\u0435\u043B\u0435\u043D\u043A\u0438");
-  do_check_eq(abDir.lDAPURL.spec, kLDAPTestSpec);
-  do_check_true(abDir.readOnly);
+  Assert.equal(abDir.dirName, "\u041C\u0435\u043B\u0435\u043D\u043A\u0438");
+  Assert.equal(abDir.lDAPURL.spec, kLDAPTestSpec);
+  Assert.ok(abDir.readOnly);
 
   // XXX I'd really like a better check than this, to check that searching
   // works correctly. However we haven't got the support for that at the moment
   // and this at least ensures that we get a consistent ascii based preference
   // for the directory.
-  do_check_eq(abDir.dirPrefId, "ldap_2.servers._nonascii");
+  Assert.equal(abDir.dirPrefId, "ldap_2.servers._nonascii");
 };

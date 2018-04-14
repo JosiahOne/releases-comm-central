@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calIteratorUtils.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function calIcsParser() {
     this.wrappedJSObject = this;
@@ -75,7 +75,7 @@ calIcsParser.prototype = {
                 let parent = state.uid2parent[item.id];
 
                 if (!parent) { // a parentless one, fake a master and override it's occurrence
-                    parent = cal.isEvent(item) ? cal.createEvent() : cal.createTodo();
+                    parent = cal.item.isEvent(item) ? cal.createEvent() : cal.createTodo();
                     parent.id = item.id;
                     parent.setProperty("DTSTART", item.recurrenceId);
                     parent.setProperty("X-MOZ-FAKED-MASTER", "1"); // this tag might be useful in the future
@@ -142,7 +142,23 @@ calIcsParser.prototype = {
                 }
             });
         } else {
-            this.processIcalComponent(cal.getIcsService().parseICS(aICSString, aTzProvider));
+            try {
+                let icalComp = cal.getIcsService().parseICS(aICSString, aTzProvider);
+                // There is no such indicator like X-LIC in icaljs, so there would need to
+                // detect and log such errors already within the parser. However, until
+                // X-LIC or libical will be removed we make use of X-LIC-ERRORS here but
+                // don't add something similar to icaljs
+                if (icalComp.toString().match(/X-LIC-ERROR/)) {
+                    cal.WARN(
+                        "Parsing failed for parts of the item (while this is considered " +
+                        "to be a minor issue, we continue processing the item):\n" +
+                        icalComp.toString()
+                    );
+                }
+                this.processIcalComponent(icalComp);
+            } catch (exc) {
+                cal.ERROR(exc.message + " when parsing\n" + aICSString);
+            }
         }
     },
 
@@ -237,7 +253,11 @@ parserState.prototype = {
      * @param date      The datetime object to check with
      */
     checkTimezone: function(item, date) {
-        if (date && cal.isPhantomTimezone(date.timezone)) {
+        function isPhantomTimezone(timezone) {
+            return !timezone.icalComponent && !timezone.isUTC && !timezone.isFloating;
+        }
+
+        if (date && isPhantomTimezone(date.timezone)) {
             let tzid = date.timezone.tzid;
             let hid = item.hashId + "#" + tzid;
             if (!(hid in this.tzErrors)) {

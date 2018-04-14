@@ -11,7 +11,6 @@
 #include "nsAbDirectoryQuery.h"
 #include "nsIAbBooleanExpression.h"
 #include "nsIAbManager.h"
-#include "nsIAbMDBDirectory.h"
 #include "nsAbQueryStringToExpression.h"
 #include "nsAbUtils.h"
 #include "nsEnumeratorUtils.h"
@@ -26,7 +25,7 @@
 #include "nsArrayEnumerator.h"
 #include "nsMsgUtils.h"
 
-static mozilla::LazyLogModule gAbOutlookDirectoryLog("nsAbOutlookDirectoryLog");
+static mozilla::LazyLogModule gAbOutlookDirectoryLog("AbOutlookDirectory");
 
 #define PRINTF(args) MOZ_LOG(gAbOutlookDirectoryLog, mozilla::LogLevel::Debug, args)
 

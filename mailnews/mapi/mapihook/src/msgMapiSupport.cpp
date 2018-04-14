@@ -9,9 +9,6 @@
 #include "mozilla/Services.h"
 #include "nsIObserverService.h"
 #include "nsIAppStartupNotifier.h"
-#include "nsIServiceManager.h"
-#include "nsIComponentManager.h"
-#include "nsICategoryManager.h"
 #include "Registry.h"
 #include "msgMapiSupport.h"
 
@@ -37,7 +34,7 @@ nsMapiSupport::Observe(nsISupports *aSubject, const char *aTopic, const char16_t
     nsCOMPtr<nsIObserverService> observerService =
       mozilla::services::GetObserverService();
     NS_ENSURE_TRUE(observerService, NS_ERROR_UNEXPECTED);
- 
+
     rv = observerService->AddObserver(this,"profile-after-change", false);
     if (NS_FAILED(rv)) return rv;
 
@@ -107,7 +104,7 @@ nsMapiSupport::ShutdownMAPISupport()
 NS_IMETHODIMP
 nsMapiSupport::RegisterServer()
 {
-  // TODO: Figure out what kind of error propogation to pass back
+  // TODO: Figure out what kind of error propagation to pass back
   ::RegisterServer(CLSID_CMapiImp, "Mozilla MAPI", "MozillaMapi", "MozillaMapi.1");
   return NS_OK;
 }
@@ -115,7 +112,7 @@ nsMapiSupport::RegisterServer()
 NS_IMETHODIMP
 nsMapiSupport::UnRegisterServer()
 {
-  // TODO: Figure out what kind of error propogation to pass back
+  // TODO: Figure out what kind of error propagation to pass back
   ::UnregisterServer(CLSID_CMapiImp, "MozillaMapi", "MozillaMapi.1");
   return NS_OK;
 }

@@ -99,11 +99,11 @@ interface nsMsgSearchAttrib {
 
     // 52 is for showing customize - in ui headers start from 53 onwards up until 99.
 
-     /** OtherHeader MUST ALWAYS BE LAST attribute since 
+     /** OtherHeader MUST ALWAYS BE LAST attribute since
        * we can have an arbitrary # of these. The number can be changed,
        * however, because we never persist AttribValues as integers.
       */
-    const nsMsgSearchAttribValue OtherHeader = 52; 
+    const nsMsgSearchAttribValue OtherHeader = 52;
     // must be last attribute
     const nsMsgSearchAttribValue kNumMsgSearchAttributes = 100;
 };
@@ -152,19 +152,6 @@ interface nsMsgSearchWidget {
     const nsMsgSearchWidgetValue Menu = 2;
   const nsMsgSearchWidgetValue Int = 3;          /* added to account for age in days which requires an integer field */
     const nsMsgSearchWidgetValue None = 4;
-};
-
-typedef long nsMsgSearchTypeValue;
-
-
-/* Used to specify type of search to be performed */
-[scriptable,uuid(964b7f32-304e-11d3-ae13-00a0c900d445)]
-interface nsMsgSearchType {
-  const nsMsgSearchTypeValue None = 0;
-  const nsMsgSearchTypeValue RootDSE = 1;
-  const nsMsgSearchTypeValue Normal = 2;
-  const nsMsgSearchTypeValue LdapVLV = 3;
-  const nsMsgSearchTypeValue NameCompletion = 4;
 };
 
 typedef long nsMsgSearchBooleanOperator;

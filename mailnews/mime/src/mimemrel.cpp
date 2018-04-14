@@ -104,7 +104,6 @@
 #include "plstr.h"
 #include "mimemoz2.h"
 #include "nsString.h"
-#include "nsIURL.h"
 #include "msgCore.h"
 #include "nsMimeStringResources.h"
 #include "nsMimeTypes.h"
@@ -491,7 +490,7 @@ MimeMultipartRelated_output_child_p(MimeObject *obj, MimeObject* child)
           /*
             AppleDouble part need special care: we need to output only the data fork part of it.
             The problem at this point is that we haven't yet decoded the children of the AppleDouble
-            part therfore we will have to hope the datafork is the second one!
+            part therefore we will have to hope the datafork is the second one!
           */
           if (mime_typep(child, (MimeObjectClass *) &mimeMultipartAppleDoubleClass))
             partnum.AppendLiteral(".2");
@@ -571,7 +570,7 @@ MimeMultipartRelated_output_child_p(MimeObject *obj, MimeObject* child)
             /*  rhp - End of putting more stuff into the hash table */
 
               /* it's possible that temp pointer is the same than the part pointer,
-                 therefore be carefull to not freeing twice the same pointer */
+                 therefore be careful to not freeing twice the same pointer */
               if (temp && temp != part)
                 PR_Free(temp);
               PR_Free(part);
@@ -746,7 +745,7 @@ real_write(MimeMultipartRelated* relobj, const char* buf, int32_t size)
 
     // the buf here has already been decoded, but we want to use general output
     // functions here that permit decoded or encoded input, using the closure
-    // to tell the difference. We'll temporarily disable the closure's decoder, 
+    // to tell the difference. We'll temporarily disable the closure's decoder,
     // then restore it when we are done. Not sure if we shouldn't just turn it off
     // permanently though.
 

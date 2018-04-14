@@ -1,15 +1,14 @@
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource:///modules/Sanitizer.jsm", this);
-XPCOMUtils.defineLazyModuleGetter(this, "FormHistory",
-                                  "resource://gre/modules/FormHistory.jsm");
+ChromeUtils.import("resource:///modules/Sanitizer.jsm", this);
+ChromeUtils.defineModuleGetter(this, "FormHistory",
+                               "resource://gre/modules/FormHistory.jsm");
 
 var sanTests = {
   cache: {
     desc: "Cache",
     async setup() {
       var entry = null;
-      this.cs = Services.cache.createSession("SanitizerTest", Components.interfaces.nsICache.STORE_ANYWHERE, true);
-      entry = await promiseOpenCacheEntry("http://santizer.test", Components.interfaces.nsICache.ACCESS_READ_WRITE, this.cs);
+      this.cs = Services.cache.createSession("SanitizerTest", Ci.nsICache.STORE_ANYWHERE, true);
+      entry = await promiseOpenCacheEntry("http://santizer.test", Ci.nsICache.ACCESS_READ_WRITE, this.cs);
       entry.setMetaDataElement("Foo", "Bar");
       entry.markValid();
       entry.close();
@@ -17,13 +16,13 @@ var sanTests = {
 
     async check(aShouldBeCleared) {
       let entry = null;
-      entry = await promiseOpenCacheEntry("http://santizer.test", Components.interfaces.nsICache.ACCESS_READ, this.cs);
+      entry = await promiseOpenCacheEntry("http://santizer.test", Ci.nsICache.ACCESS_READ, this.cs);
 
       if (entry) {
         entry.close();
       }
 
-      do_check_eq(!entry, aShouldBeCleared);
+      Assert.equal(!entry, aShouldBeCleared);
     }
   },
 
@@ -32,8 +31,8 @@ var sanTests = {
     async setup() {
       //XXX test offline DOMStorage
       var entry = null;
-      this.cs = Services.cache.createSession("SanitizerTest", Components.interfaces.nsICache.STORE_OFFLINE, true);
-      entry = await promiseOpenCacheEntry("http://santizer.test", Components.interfaces.nsICache.ACCESS_READ_WRITE, this.cs);
+      this.cs = Services.cache.createSession("SanitizerTest", Ci.nsICache.STORE_OFFLINE, true);
+      entry = await promiseOpenCacheEntry("http://santizer.test", Ci.nsICache.ACCESS_READ_WRITE, this.cs);
       entry.setMetaDataElement("Foo", "Bar");
       entry.markValid();
       entry.close();
@@ -41,12 +40,12 @@ var sanTests = {
 
     async check(aShouldBeCleared) {
       var entry = null;
-      entry = await promiseOpenCacheEntry("http://santizer.test", Components.interfaces.nsICache.ACCESS_READ, this.cs);
+      entry = await promiseOpenCacheEntry("http://santizer.test", Ci.nsICache.ACCESS_READ, this.cs);
       if (entry) {
         entry.close();
       }
 
-      do_check_eq(!entry, aShouldBeCleared);
+      Assert.equal(!entry, aShouldBeCleared);
     }
   },
 
@@ -54,27 +53,27 @@ var sanTests = {
     desc: "Cookie",
     setup: function() {
       Services.prefs.setIntPref("network.cookie.cookieBehavior", 0);
-      var ios = Components.classes["@mozilla.org/network/io-service;1"]
-                          .getService(Components.interfaces.nsIIOService);
+      var ios = Cc["@mozilla.org/network/io-service;1"]
+                  .getService(Ci.nsIIOService);
       this.uri = ios.newURI("http://sanitizer.test/");
-      this.cs = Components.classes["@mozilla.org/cookieService;1"]
-                          .getService(Components.interfaces.nsICookieService);
+      this.cs = Cc["@mozilla.org/cookieService;1"]
+                  .getService(Ci.nsICookieService);
       this.cs.setCookieString(this.uri, null, "Sanitizer!", null);
     },
 
     check: function(aShouldBeCleared) {
       if (aShouldBeCleared)
-        do_check_neq(this.cs.getCookieString(this.uri, null), "Sanitizer!");
+        Assert.notEqual(this.cs.getCookieString(this.uri, null), "Sanitizer!");
       else
-        do_check_eq(this.cs.getCookieString(this.uri, null), "Sanitizer!");
+        Assert.equal(this.cs.getCookieString(this.uri, null), "Sanitizer!");
     }
   },
 
   history: {
     desc: "History",
     async setup() {
-      var ios = Components.classes["@mozilla.org/network/io-service;1"]
-                          .getService(Components.interfaces.nsIIOService);
+      var ios = Cc["@mozilla.org/network/io-service;1"]
+                  .getService(Ci.nsIIOService);
       var uri = ios.newURI("http://sanitizer.test/");
       await promiseAddVisits({
         uri: uri,
@@ -84,8 +83,8 @@ var sanTests = {
 
     check: function(aShouldBeCleared) {
       var rv = false;
-      var history = Components.classes["@mozilla.org/browser/nav-history-service;1"]
-                              .getService(Components.interfaces.nsINavHistoryService);
+      var history = Cc["@mozilla.org/browser/nav-history-service;1"]
+                      .getService(Ci.nsINavHistoryService);
       var options = history.getNewQueryOptions();
       var query = history.getNewQuery();
       query.searchTerms = "Sanitizer!";
@@ -101,7 +100,7 @@ var sanTests = {
       // Close container after reading from it
       results.containerOpen = false;
 
-      do_check_eq(rv, !aShouldBeCleared);
+      Assert.equal(rv, !aShouldBeCleared);
     }
   },
 
@@ -109,14 +108,14 @@ var sanTests = {
     desc: "Location bar history",
     setup: function() {
       // Create urlbarhistory file first otherwise tests will fail.
-      var file = Components.classes["@mozilla.org/file/directory_service;1"]
-                           .getService(Components.interfaces.nsIProperties)
-                           .get("ProfD", Components.interfaces.nsIFile);
+      var file = Cc["@mozilla.org/file/directory_service;1"]
+                   .getService(Ci.nsIProperties)
+                   .get("ProfD", Ci.nsIFile);
       file.append("urlbarhistory.sqlite");
       if (!file.exists()) {
-        var connection = Components.classes["@mozilla.org/storage/service;1"]
-                                   .getService(Components.interfaces.mozIStorageService)
-                                   .openDatabase(file);
+        var connection = Cc["@mozilla.org/storage/service;1"]
+                           .getService(Ci.mozIStorageService)
+                           .openDatabase(file);
         connection.createTable("urlbarhistory", "url TEXT");
         connection.executeSimpleSQL(
           "INSERT INTO urlbarhistory (url) VALUES ('Sanitizer')");
@@ -133,16 +132,16 @@ var sanTests = {
         locData = Services.prefs.getStringPref("general.open_location.last_url");
       } catch(ex) {}
 
-      do_check_eq(locData == "Sanitizer!", !aShouldBeCleared);
+      Assert.equal(locData == "Sanitizer!", !aShouldBeCleared);
 
-      var file = Components.classes["@mozilla.org/file/directory_service;1"]
-                           .getService(Components.interfaces.nsIProperties)
-                           .get("ProfD", Components.interfaces.nsIFile);
+      var file = Cc["@mozilla.org/file/directory_service;1"]
+                   .getService(Ci.nsIProperties)
+                   .get("ProfD", Ci.nsIFile);
       file.append("urlbarhistory.sqlite");
 
-      var connection = Components.classes["@mozilla.org/storage/service;1"]
-                                 .getService(Components.interfaces.mozIStorageService)
-                                 .openDatabase(file);
+      var connection = Cc["@mozilla.org/storage/service;1"]
+                         .getService(Ci.mozIStorageService)
+                         .openDatabase(file);
       var urlbar = connection.tableExists("urlbarhistory");
       if (urlbar) {
         var handle = connection.createStatement(
@@ -154,7 +153,7 @@ var sanTests = {
       }
       connection.close();
 
-      do_check_eq(urlbar, !aShouldBeCleared);
+      Assert.equal(urlbar, !aShouldBeCleared);
     }
   },
 
@@ -199,29 +198,29 @@ var sanTests = {
 
       // Checking for Sanitizer form history entry creation.
       let exists = await formNameExists("Sanitizer");
-      do_check_eq(exists, !aShouldBeCleared);
+      Assert.equal(exists, !aShouldBeCleared);
     }
   },
 
   downloads: {
     desc: "Download",
     setup: function() {
-      var ios = Components.classes["@mozilla.org/network/io-service;1"]
-                          .getService(Components.interfaces.nsIIOService);
+      var ios = Cc["@mozilla.org/network/io-service;1"]
+                  .getService(Ci.nsIIOService);
       var uri = ios.newURI("http://sanitizer.test/");
-      var file = Components.classes["@mozilla.org/file/directory_service;1"]
-                           .getService(Components.interfaces.nsIProperties)
-                           .get("TmpD", Components.interfaces.nsIFile);
+      var file = Cc["@mozilla.org/file/directory_service;1"]
+                   .getService(Ci.nsIProperties)
+                   .get("TmpD", Ci.nsIFile);
       file.append("sanitizer.file");
-      file.createUnique(Components.interfaces.nsIFile.NORMAL_FILE_TYPE, parseInt("0666", 8));
+      file.createUnique(Ci.nsIFile.NORMAL_FILE_TYPE, parseInt("0666", 8));
       var dest = ios.newFileURI(file);
 
-      this.dm = Components.classes["@mozilla.org/download-manager;1"]
-                          .getService(Components.interfaces.nsIDownloadManager);
+      this.dm = Cc["@mozilla.org/download-manager;1"]
+                  .getService(Ci.nsIDownloadManager);
 
-      const nsIWBP = Components.interfaces.nsIWebBrowserPersist;
-      var persist = Components.classes["@mozilla.org/embedding/browser/nsWebBrowserPersist;1"]
-                              .createInstance(nsIWBP);
+      const nsIWBP = Ci.nsIWebBrowserPersist;
+      var persist = Cc["@mozilla.org/embedding/browser/nsWebBrowserPersist;1"]
+                      .createInstance(nsIWBP);
       persist.persistFlags = nsIWBP.PERSIST_FLAGS_REPLACE_EXISTING_FILES |
                              nsIWBP.PERSIST_FLAGS_BYPASS_CACHE |
                              nsIWBP.PERSIST_FLAGS_AUTODETECT_APPLY_CONVERSION;
@@ -242,19 +241,19 @@ var sanTests = {
       } catch(ex) {}
 
       if (aShouldBeCleared)
-        do_check_eq(!dl, aShouldBeCleared)
+        Assert.equal(!dl, aShouldBeCleared)
       else
-        do_check_eq(dl.displayName, "Sanitizer!");
+        Assert.equal(dl.displayName, "Sanitizer!");
     }
   },
 
   passwords: {
     desc: "Login manager",
     setup: function() {
-      this.pm = Components.classes["@mozilla.org/login-manager;1"]
-                          .getService(Components.interfaces.nsILoginManager);
+      this.pm = Cc["@mozilla.org/login-manager;1"]
+                  .getService(Ci.nsILoginManager);
       var info = Components.Constructor("@mozilla.org/login-manager/loginInfo;1",
-                                        Components.interfaces.nsILoginInfo, "init");
+                                        Ci.nsILoginInfo, "init");
       var login = new info("http://sanitizer.test", null, "Rick Astley Fan Club",
                            "dolske", "iliketurtles1", "", "");
       this.pm.addLogin(login);
@@ -270,15 +269,15 @@ var sanTests = {
         }
       }
 
-      do_check_eq(rv, !aShouldBeCleared);
+      Assert.equal(rv, !aShouldBeCleared);
     }
   },
 
   sessions: {
     desc: "HTTP auth session",
     setup: function() {
-      this.authMgr = Components.classes["@mozilla.org/network/http-auth-manager;1"]
-                               .getService(Components.interfaces.nsIHttpAuthManager);
+      this.authMgr = Cc["@mozilla.org/network/http-auth-manager;1"]
+                       .getService(Ci.nsIHttpAuthManager);
 
       this.authMgr.setAuthIdentity("http", "sanitizer.test", 80, "basic", "Sanitizer",
                                    "", "Foo", "fooo", "foo12");
@@ -294,13 +293,13 @@ var sanTests = {
                                      "", domain, user, password);
       } catch(ex) {}
 
-      do_check_eq(domain.value == "Foo", !aShouldBeCleared);
+      Assert.equal(domain.value == "Foo", !aShouldBeCleared);
     }
   }
 }
 
 async function fullSanitize() {
-  do_print("Now doing a full sanitize run");
+  info("Now doing a full sanitize run");
   var prefs = Services.prefs.getBranch("privacy.item.");
 
   Services.prefs.setBoolPref("privacy.sanitize.promptOnSanitize", false);
@@ -316,7 +315,7 @@ async function fullSanitize() {
   for (var testName in sanTests) {
     var test = sanTests[testName];
     await test.check(true);
-    do_print(test.desc + " data cleared by full sanitize");
+    info(test.desc + " data cleared by full sanitize");
     try {
       prefs.clearUserPref(testName);
     } catch (ex) {}
@@ -340,9 +339,9 @@ add_task(async function test_browser_sanitizer()
     await test.setup();
     await test.check(false);
 
-    do_check_true(Sanitizer.items[testName].canClear);
+    Assert.ok(Sanitizer.items[testName].canClear);
     Sanitizer.items[testName].clear();
-    do_print(test.desc + " data cleared");
+    info(test.desc + " data cleared");
 
     await test.check(true);
   }

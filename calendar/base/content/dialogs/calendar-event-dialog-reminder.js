@@ -6,10 +6,10 @@
  *          onRemoveReminder, onAccept, onCancel
  */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calIteratorUtils.jsm");
-Components.utils.import("resource://gre/modules/PluralForm.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
+ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 var allowedActionsMap = {};
 
@@ -95,7 +95,7 @@ function loadReminders() {
     // Set up a default absolute date. This will be overridden if the selected
     // alarm is absolute.
     let absDate = document.getElementById("reminder-absolute-date");
-    absDate.value = cal.dateTimeToJsDate(cal.getDefaultStartDate());
+    absDate.value = cal.dtz.dateTimeToJsDate(cal.dtz.getDefaultStartDate());
 
     if (listbox.childNodes.length) {
         // We have reminders, select the first by default. For some reason,
@@ -249,7 +249,7 @@ function onReminderSelected() {
             relationType.value = "absolute";
 
             // Date
-            absDate.value = cal.dateTimeToJsDate(reminder.alarmDate || cal.getDefaultStartDate());
+            absDate.value = cal.dtz.dateTimeToJsDate(reminder.alarmDate || cal.dtz.getDefaultStartDate());
         } else {
             relationType.value = "relative";
 
@@ -335,7 +335,7 @@ function updateReminder(event) {
         reminder.related = Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE;
 
         if (absDate.value) {
-            reminder.alarmDate = cal.jsDateToDateTime(absDate.value,
+            reminder.alarmDate = cal.dtz.jsDateToDateTime(absDate.value,
                                                       window.arguments[0].timezone);
         } else {
             reminder.alarmDate = null;
@@ -353,7 +353,7 @@ function updateReminder(event) {
  * @return              The full string name.
  */
 function getItemBundleStringName(aPrefix) {
-    if (cal.isEvent(window.arguments[0].item)) {
+    if (cal.item.isEvent(window.arguments[0].item)) {
         return aPrefix + "Event";
     } else {
         return aPrefix + "Task";
@@ -365,7 +365,7 @@ function getItemBundleStringName(aPrefix) {
  * new reminder item.
  */
 function onNewReminder() {
-    let itemType = (cal.isEvent(window.arguments[0].item) ? "event" : "todo");
+    let itemType = (cal.item.isEvent(window.arguments[0].item) ? "event" : "todo");
     let listbox = document.getElementById("reminder-listbox");
 
     let reminder = cal.createAlarm();

@@ -4,9 +4,9 @@
 
 /** Helper functions for parsing and serializing XML */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
-Components.utils.importGlobalProperties(["XMLHttpRequest"]);
+Cu.importGlobalProperties(["XMLSerializer", "XMLHttpRequest"]);
 
 this.EXPORTED_SYMBOLS = ["cal"];
 cal.xml = {} || cal.xml;
@@ -26,7 +26,19 @@ cal.xml = {} || cal.xml;
  * @return          The result, see above for details.
  */
 cal.xml.evalXPath = function(aNode, aExpr, aResolver, aType) {
-    const XPR = Components.interfaces.nsIDOMXPathResult;
+    const XPR = {
+        // XPathResultType
+        ANY_TYPE: 0,
+        NUMBER_TYPE: 1,
+        STRING_TYPE: 2,
+        BOOLEAN_TYPE: 3,
+        UNORDERED_NODE_ITERATOR_TYPE: 4,
+        ORDERED_NODE_ITERATOR_TYPE: 5,
+        UNORDERED_NODE_SNAPSHOT_TYPE: 6,
+        ORDERED_NODE_SNAPSHOT_TYPE: 7,
+        ANY_UNORDERED_NODE_TYPE: 8,
+        FIRST_ORDERED_NODE_TYPE: 9
+    };
     let doc = (aNode.ownerDocument ? aNode.ownerDocument : aNode);
     let resolver = aResolver || doc.createNSResolver(doc.documentElement);
     let resultType = aType || XPR.ANY_TYPE;
@@ -47,9 +59,10 @@ cal.xml.evalXPath = function(aNode, aExpr, aResolver, aType) {
         case XPR.ORDERED_NODE_ITERATOR_TYPE:
             returnResult = [];
             while ((next = result.iterateNext())) {
-                if (next instanceof Components.interfaces.nsIDOMText) {
+                if (next.nodeType == next.TEXT_NODE ||
+                    next.nodeType == next.CDATA_SECTION_NODE) {
                     returnResult.push(next.wholeText);
-                } else if (next instanceof Components.interfaces.nsIDOMAttr) {
+                } else if (ChromeUtils.getClassName(next) === "Attr") {
                     returnResult.push(next.value);
                 } else {
                     returnResult.push(next);
@@ -61,9 +74,10 @@ cal.xml.evalXPath = function(aNode, aExpr, aResolver, aType) {
             returnResult = [];
             for (let i = 0; i < result.snapshotLength; i++) {
                 next = result.snapshotItem(i);
-                if (next instanceof Components.interfaces.nsIDOMText) {
+                if (next.nodeType == next.TEXT_NODE ||
+                    next.nodeType == next.CDATA_SECTION_NODE) {
                     returnResult.push(next.wholeText);
-                } else if (next instanceof Components.interfaces.nsIDOMAttr) {
+                } else if (ChromeUtils.getClassName(next) === "Attr") {
                     returnResult.push(next.value);
                 } else {
                     returnResult.push(next);
@@ -148,8 +162,7 @@ cal.xml.parseFile = function(uri) {
  * @return          The DOM document as a string.
  */
 cal.xml.serializeDOM = function(doc) {
-    let serializer = Components.classes["@mozilla.org/xmlextras/xmlserializer;1"]
-                               .createInstance(Components.interfaces.nsIDOMSerializer);
+    let serializer = new XMLSerializer();
     return serializer.serializeToString(doc);
 };
 

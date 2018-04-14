@@ -1,6 +1,6 @@
 
-Components.utils.import("resource:///modules/iteratorUtils.jsm");
-Components.utils.import("resource://testing-common/mailnews/MockFactory.js");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource://testing-common/mailnews/MockFactory.js");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -126,7 +126,7 @@ function compact_with_exception(expectedException) {
     compactor.compact(gTargetFolder, false, listener, null);
     do_throw("nsIMsgFolderCompactor.compact did not fail.");
   } catch(ex) {
-    do_check_eq(expectedException, ex.result);
+    Assert.equal(expectedException, ex.result);
   }
 }
 

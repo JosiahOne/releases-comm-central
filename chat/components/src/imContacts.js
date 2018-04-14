@@ -2,9 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
-Cu.import("resource:///modules/imXPCOMUtils.jsm");
-Cu.import("resource:///modules/imServices.jsm");
+ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/imServices.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "_", () =>
   l10nHelper("chrome://chat/locale/contacts.properties")
@@ -93,30 +92,35 @@ function getDBConnection()
 }
 
 // Wrap all the usage of DBConn inside a transaction that will be
-// commited automatically at the end of the event loop spin so that
+// committed automatically at the end of the event loop spin so that
 // we flush buddy list data to disk only once per event loop spin.
 var gDBConnWithPendingTransaction = null;
-this.__defineGetter__("DBConn", function() {
-  if (gDBConnWithPendingTransaction)
-    return gDBConnWithPendingTransaction;
+Object.defineProperty(this, "DBConn", {
+  configurable: true,
+  enumerable: true,
 
-  if (!gDBConnection) {
-    gDBConnection = getDBConnection();
-    Services.obs.addObserver(function dbClose(aSubject, aTopic, aData) {
-      Services.obs.removeObserver(dbClose, aTopic);
-      if (gDBConnection) {
-        gDBConnection.asyncClose();
-        gDBConnection = null;
-      }
-    }, "profile-before-change");
+  get() {
+    if (gDBConnWithPendingTransaction)
+      return gDBConnWithPendingTransaction;
+
+    if (!gDBConnection) {
+      gDBConnection = getDBConnection();
+      Services.obs.addObserver(function dbClose(aSubject, aTopic, aData) {
+        Services.obs.removeObserver(dbClose, aTopic);
+        if (gDBConnection) {
+          gDBConnection.asyncClose();
+          gDBConnection = null;
+        }
+      }, "profile-before-change");
+    }
+    gDBConnWithPendingTransaction = gDBConnection;
+    gDBConnection.beginTransaction();
+    executeSoon(function() {
+      gDBConnWithPendingTransaction.commitTransaction();
+      gDBConnWithPendingTransaction = null;
+    });
+    return gDBConnection;
   }
-  gDBConnWithPendingTransaction = gDBConnection;
-  gDBConnection.beginTransaction();
-  executeSoon(function() {
-    gDBConnWithPendingTransaction.commitTransaction();
-    gDBConnWithPendingTransaction = null;
-  });
-  return gDBConnection;
 });
 
 function TagsService() { }
@@ -600,7 +604,7 @@ Contact.prototype = {
     // Avoid merging the contact with itself or merging into an
     // already removed contact.
     if (aContact.id == this.id || !(this.id in ContactsById))
-      throw Components.results.NS_ERROR_INVALID_ARG;
+      throw Cr.NS_ERROR_INVALID_ARG;
 
     this._ensureNotDummy();
     let contact = ContactsById[aContact.id]; // remove XPConnect wrapper
@@ -639,7 +643,7 @@ Contact.prototype = {
   },
   adoptBuddy: function(aBuddy) {
     if (aBuddy.contact.id == this.id)
-      throw Components.results.NS_ERROR_INVALID_ARG;
+      throw Cr.NS_ERROR_INVALID_ARG;
 
     let buddy = BuddiesById[aBuddy.id]; // remove XPConnect wrapper
     buddy.contact = this;
@@ -709,9 +713,9 @@ Contact.prototype = {
     // Should return a new contact with the same list of tags.
     let buddy = BuddiesById[aBuddy.id];
     if (buddy.contact.id != this.id)
-      throw Components.results.NS_ERROR_INVALID_ARG;
+      throw Cr.NS_ERROR_INVALID_ARG;
     if (buddy.contact._buddies.length == 1)
-      throw Components.results.NS_ERROR_UNEXPECTED;
+      throw Cr.NS_ERROR_UNEXPECTED;
 
     // Save the list of tags, it may be destoyed if the buddy was the last one.
     let tags = buddy.contact.getTags();
@@ -951,7 +955,7 @@ Buddy.prototype = {
   get contact() { return this._contact; },
   set contact(aContact) /* not in imIBuddy */ {
     if (aContact.id == this._contact.id)
-      throw Components.results.NS_ERROR_INVALID_ARG;
+      throw Cr.NS_ERROR_INVALID_ARG;
 
     this._notifyObservers("moved-out-of-contact");
     this._contact._removeBuddy(this);
@@ -1511,7 +1515,7 @@ ContactsService.prototype = {
       statement.finalize();
     }
 
-    // removing the account from the accounts table is not enought,
+    // removing the account from the accounts table is not enough,
     // we need to remove all the associated account_buddy entries too
     statement = DBConn.createStatement("DELETE FROM account_buddy " +
                                        "WHERE account_id = :accountId");

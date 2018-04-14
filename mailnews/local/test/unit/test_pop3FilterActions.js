@@ -8,10 +8,10 @@
 
 
 load("../../../resources/POP3pump.js");
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 var gFiles = ["../../../data/bugmail10", "../../../data/bugmail11"];
 
@@ -54,12 +54,12 @@ var gTestArray =
     gFilterList.insertFilterAt(0, gFilter);
   },
   // just get a message into the local folder
-  function *getLocalMessages1() {
+  async function getLocalMessages1() {
     gPOP3Pump.files = gFiles;
-    yield gPOP3Pump.run();
+    await gPOP3Pump.run();
   },
-  function *verifyFolders2() {
-    do_check_eq(folderCount(localAccountUtils.inboxFolder), 2);
+  async function verifyFolders2() {
+    Assert.equal(folderCount(localAccountUtils.inboxFolder), 2);
 
     // invalidate the inbox summary file, to be sure that we wrote the keywords
     // into the mailbox.
@@ -71,13 +71,13 @@ var gTestArray =
       localAccountUtils.inboxFolder
                        .getDatabaseWithReparse(promiseUrlListener, null);
     } catch (ex) {
-      yield promiseUrlListener.promise;
-      do_check_true(ex.result == Cr.NS_ERROR_NOT_INITIALIZED);
+      await promiseUrlListener.promise;
+      Assert.ok(ex.result == Cr.NS_ERROR_NOT_INITIALIZED);
       return;
     }
 
     // This statement is never reached.
-    do_check_true(false);
+    Assert.ok(false);
   },
   function verifyMessages() {
     let hdrs = [];
@@ -89,19 +89,19 @@ var gTestArray =
       keys.push(hdr.messageKey);
       hdrs.push(hdr);
     }
-    do_check_false(localAccountUtils.inboxFolder
-                                    .fetchMsgPreviewText(keys, keys.length,
-                                                         false, null));
+    Assert.ok(!localAccountUtils.inboxFolder
+                                .fetchMsgPreviewText(keys, keys.length,
+                                                     false, null));
     let preview1 = hdrs[0].getStringProperty('preview');
     let preview2 = hdrs[1].getStringProperty('preview');
-    do_check_eq(preview1, previews[hdrs[0].subject]);
-    do_check_eq(preview2, previews[hdrs[1].subject]);
-    do_check_eq(hdrs[0].getStringProperty('keywords'), "TheTag");
-    do_check_eq(hdrs[1].getStringProperty('keywords'), "TheTag");
-    do_check_eq(hdrs[0].flags, Ci.nsMsgMessageFlags.Read |
-                               Ci.nsMsgMessageFlags.Marked);
-    do_check_eq(hdrs[1].flags, Ci.nsMsgMessageFlags.Read |
-                               Ci.nsMsgMessageFlags.Marked);
+    Assert.equal(preview1, previews[hdrs[0].subject]);
+    Assert.equal(preview2, previews[hdrs[1].subject]);
+    Assert.equal(hdrs[0].getStringProperty('keywords'), "TheTag");
+    Assert.equal(hdrs[1].getStringProperty('keywords'), "TheTag");
+    Assert.equal(hdrs[0].flags, Ci.nsMsgMessageFlags.Read |
+                                Ci.nsMsgMessageFlags.Marked);
+    Assert.equal(hdrs[1].flags, Ci.nsMsgMessageFlags.Read |
+                                Ci.nsMsgMessageFlags.Marked);
   }
 ];
 
@@ -148,6 +148,6 @@ function run_test()
 
 function exitTest()
 {
-  do_print("Exiting mail tests\n");
+  info("Exiting mail tests\n");
   gPOP3Pump = null;
 }

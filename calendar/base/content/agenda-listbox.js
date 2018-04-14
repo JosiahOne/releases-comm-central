@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function Synthetic(aOpen, aDuration, aMultiday) {
     this.open = aOpen;
@@ -115,7 +115,7 @@ agendaListbox.removePeriodListItem = function(aPeriod) {
 agendaListbox.onCheckboxChange = function(event) {
     let periodCheckbox = event.target;
     let lopen = (periodCheckbox.getAttribute("checked") == "true");
-    let listItem = cal.getParentNodeOrThis(periodCheckbox, "agenda-checkbox-richlist-item");
+    let listItem = cal.view.getParentNodeOrThis(periodCheckbox, "agenda-checkbox-richlist-item");
     let period = listItem.getItem();
     period.open = lopen;
     // as the agenda-checkboxes are only transient we have to set the "checked"
@@ -179,21 +179,21 @@ agendaListbox.onKeyPress = function(aEvent) {
     if (listItem.localName == "richlistbox") {
         listItem = listItem.selectedItem;
     }
-    switch (aEvent.keyCode) {
-        case aEvent.DOM_VK_RETURN:
+    switch (aEvent.key) {
+        case "Enter":
             document.getElementById("agenda_edit_event_command").doCommand();
             break;
-        case aEvent.DOM_VK_DELETE:
+        case "Delete":
             document.getElementById("agenda_delete_event_command").doCommand();
             aEvent.stopPropagation();
             aEvent.preventDefault();
             break;
-        case aEvent.DOM_VK_LEFT:
+        case "ArrowLeft":
             if (!this.isEventListItem(listItem)) {
                 listItem.getCheckbox().checked = false;
             }
             break;
-        case aEvent.DOM_VK_RIGHT:
+        case "ArrowRight":
             if (!this.isEventListItem(listItem)) {
                 listItem.getCheckbox().checked = true;
             }
@@ -221,7 +221,7 @@ agendaListbox.findPeriodsForItem = function(aItem) {
     let retPeriods = [];
     for (let i = 0; i < this.periods.length; i++) {
         if (this.periods[i].open) {
-            if (cal.checkIfInRange(aItem, this.periods[i].start, this.periods[i].end)) {
+            if (cal.item.checkIfInRange(aItem, this.periods[i].start, this.periods[i].end)) {
                 retPeriods.push(this.periods[i]);
             }
         }
@@ -294,7 +294,7 @@ agendaListbox.addItemBefore = function(aNewItem, aAgendaItem, aPeriod, visible) 
  * @return              The newly created XUL element.
  */
 agendaListbox.addItem = function(aItem) {
-    if (!cal.isEvent(aItem)) {
+    if (!cal.item.isEvent(aItem)) {
         return null;
     }
     let periods = this.findPeriodsForItem(aItem);
@@ -515,7 +515,7 @@ agendaListbox.deleteItemsFromCalendar = function(aCalendar) {
  */
 agendaListbox.isSameEvent = function(aItem, aCompItem) {
     return aItem.id == aCompItem.id &&
-           aItem[cal.calGetStartDateProp(aItem)].compare(aCompItem[cal.calGetStartDateProp(aCompItem)]) == 0;
+           aItem[cal.dtz.startDateProp(aItem)].compare(aCompItem[cal.dtz.startDateProp(aCompItem)]) == 0;
 };
 
 /**
@@ -685,7 +685,7 @@ agendaListbox.refreshCalendarQuery = function(aStart, aEnd, aCalendar) {
 agendaListbox.setupCalendar = function() {
     this.init();
     if (this.calendar == null) {
-        this.calendar = cal.getCompositeCalendar(window);
+        this.calendar = cal.view.getCompositeCalendar(window);
     }
     if (this.calendar) {
         // XXX This always gets called, does that happen on purpose?
@@ -707,7 +707,7 @@ agendaListbox.setupCalendar = function() {
  *                        today.
  */
 agendaListbox.refreshPeriodDates = function(newDate) {
-    this.kDefaultTimezone = cal.calendarDefaultTimezone();
+    this.kDefaultTimezone = cal.dtz.defaultTimezone;
     // Today: now until midnight of tonight
     let oldshowstoday = this.showstoday;
     this.showstoday = this.showsToday(newDate);
@@ -723,7 +723,7 @@ agendaListbox.refreshPeriodDates = function(newDate) {
         let curPeriod = this.periods[i];
         newDate.hour = newDate.minute = newDate.second = 0;
         if (i == 0 && this.showstoday) {
-            curPeriod.start = cal.now();
+            curPeriod.start = cal.dtz.now();
         } else {
             curPeriod.start = newDate.clone();
         }
@@ -755,7 +755,7 @@ agendaListbox.showsToday = function(aStartDate) {
     if (!lstart) {
         lstart = this.today.start;
     }
-    let lshowsToday = cal.sameDay(cal.now(), lstart);
+    let lshowsToday = cal.dtz.sameDay(cal.dtz.now(), lstart);
     if (lshowsToday) {
         this.periods = [this.today, this.tomorrow, this.soon];
     } else {
@@ -889,7 +889,7 @@ agendaListbox.calendarObserver.onLoad = function() {
 };
 
 agendaListbox.calendarObserver.onAddItem = function(item) {
-    if (!cal.isEvent(item)) {
+    if (!cal.item.isEvent(item)) {
         return;
     }
     // get all sub items if it is a recurring item
@@ -913,7 +913,7 @@ agendaListbox.calendarObserver.onDeleteItem = function(item, rebuildFlag) {
 };
 
 agendaListbox.calendarObserver.onLocalDeleteItem = function(item, moveSelection) {
-    if (!cal.isEvent(item)) {
+    if (!cal.item.isEvent(item)) {
         return false;
     }
     let selectedItemHashId = -1;
@@ -930,7 +930,7 @@ agendaListbox.calendarObserver.onLocalDeleteItem = function(item, moveSelection)
 
 agendaListbox.calendarObserver.onModifyItem = function(newItem, oldItem) {
     let selectedItemHashId = this.onLocalDeleteItem(oldItem, false);
-    if (!cal.isEvent(newItem)) {
+    if (!cal.item.isEvent(newItem)) {
         return;
     }
     this.onAddItem(newItem);
@@ -996,7 +996,7 @@ agendaListbox.updateSoonSection = function() {
     let soonHeader = document.getElementById("nextweek-header");
     if (soonHeader) {
         soonHeader.setItem(this.soon, true);
-        agendaListbox.refreshPeriodDates(cal.now());
+        agendaListbox.refreshPeriodDates(cal.dtz.now());
     }
 };
 
@@ -1015,7 +1015,7 @@ function setCurrentEvent() {
     let msScheduleTime = -1;
     let complistItem = agendaListbox.tomorrow.listItem.previousSibling;
     let removelist = [];
-    let anow = cal.now();
+    let anow = cal.dtz.now();
     let msuntillend = 0;
     let msuntillstart = 0;
     let leaveloop;

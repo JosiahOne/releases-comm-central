@@ -2,10 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calItipUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 /* exported getInvitationsManager */
 
@@ -191,7 +190,7 @@ InvitationsManager.prototype = {
         };
 
         for (let calendar of cals) {
-            if (!cal.isCalendarWritable(calendar) || calendar.getProperty("disabled")) {
+            if (!cal.acl.isCalendarWritable(calendar) || calendar.getProperty("disabled")) {
                 opListener.onOperationComplete();
                 continue;
             }
@@ -339,7 +338,7 @@ InvitationsManager.prototype = {
      */
     addItem: function(item) {
         let recInfo = item.recurrenceInfo;
-        if (recInfo && !cal.isOpenInvitation(item)) {
+        if (recInfo && !cal.itip.isOpenInvitation(item)) {
             // scan exceptions:
             let ids = recInfo.getExceptionIds({});
             for (let id of ids) {
@@ -379,7 +378,7 @@ InvitationsManager.prototype = {
      * @return      Potential start date.
      */
     getStartDate: function() {
-        let date = cal.now();
+        let date = cal.dtz.now();
         date.second = 0;
         date.minute = 0;
         date.hour = 0;
@@ -415,7 +414,7 @@ InvitationsManager.prototype = {
             !item.calendar.isInvitation(item)) {
             return false; // exclude if organizer has invited himself
         }
-        let start = item[cal.calGetStartDateProp(item)] || item[cal.calGetEndDateProp(item)];
-        return cal.isOpenInvitation(item) && start.compare(this.mStartDate) >= 0;
+        let start = item[cal.dtz.startDateProp(item)] || item[cal.dtz.endDateProp(item)];
+        return cal.itip.isOpenInvitation(item) && start.compare(this.mStartDate) >= 0;
     }
 };

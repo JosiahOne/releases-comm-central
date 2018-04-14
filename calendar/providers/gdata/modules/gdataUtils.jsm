@@ -2,17 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gdata-provider/modules/gdataLogging.jsm");
-Components.utils.import("resource://gdata-provider/modules/gdataRequest.jsm");
-Components.utils.import("resource://gdata-provider/modules/timezoneMap.jsm");
+ChromeUtils.import("resource://gdata-provider/modules/gdataLogging.jsm");
+ChromeUtils.import("resource://gdata-provider/modules/gdataRequest.jsm");
+ChromeUtils.import("resource://gdata-provider/modules/timezoneMap.jsm");
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.import("resource://gre/modules/PromiseUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/PromiseUtils.jsm");
 
-Components.utils.import("resource://calendar/modules/calAsyncUtils.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calProviderUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calAsyncUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calProviderUtils.jsm");
+
+ChromeUtils.import("resource://gdata-provider/modules/calUtilsShim.jsm");
 
 var cIE = Components.interfaces.calIErrors;
 
@@ -39,7 +41,7 @@ function getGoogleId(aItem, aOfflineStorage) {
                getItemMetadata(aOfflineStorage, aItem.parentItem);
     let baseId = meta ? meta.path : aItem.id.replace("@google.com", "");
     if (aItem.recurrenceId) {
-        let recSuffix = "_" + aItem.recurrenceId.getInTimezone(cal.UTC()).icalString;
+        let recSuffix = "_" + aItem.recurrenceId.getInTimezone(cal.dtz.UTC).icalString;
         if (!baseId.endsWith(recSuffix)) {
             baseId += recSuffix;
         }
@@ -80,7 +82,7 @@ function migrateItemMetadata(aOfflineStorage, aOldItem, aNewItem, aMetadata) {
 
     // If an exception was turned into an EXDATE, we need to clear its metadata
     if (aOldItem.recurrenceInfo && aNewItem.recurrenceInfo) {
-        let newExIds = new Set(aNewItem.recurrenceInfo.getExceptionIds({}).map(function(x) { return x.icalString; }));
+        let newExIds = new Set(aNewItem.recurrenceInfo.getExceptionIds({}).map(exception => exception.icalString));
         for (let exId of aOldItem.recurrenceInfo.getExceptionIds({})) {
             if (!newExIds.has(exId.icalString)) {
                 let ex = aOldItem.recurrenceInfo.getExceptionFor(exId);
@@ -121,7 +123,7 @@ function getItemMetadata(aOfflineStorage, aItem) {
         data = { etag: parts[0], path: parts[1] };
     } else if (parts && parts.length == 1) {
         // Temporary migration for alpha versions of this provider.
-        data = { etag: parts[0], path: aItem.getProperty("X-GOOGLE-ID") }
+        data = { etag: parts[0], path: aItem.getProperty("X-GOOGLE-ID") };
     }
     return data;
 }
@@ -140,7 +142,7 @@ function dateToJSON(aDate) {
         if (tzid in windowsTimezoneMap) {
             // A Windows timezone, likely an outlook invitation.
             jsonData.timeZone = windowsTimezoneMap[tzid];
-        } else if (tzid.match(/^[^\/ ]+(\/[^\/ ]+){1,2}$/)) {
+        } else if (tzid.match(/^[^\/ ]+(\/[^\/ ]+){1,2}$/)) { // eslint-disable-line no-useless-escape
             // An Olson timezone id
             jsonData.timeZone = aDate.timezone.tzid;
         } else {
@@ -159,7 +161,7 @@ function dateToJSON(aDate) {
 
         if (jsonData.timeZone) {
             // Strip the timezone offset if a timeZone was specified.
-            jsonData.dateTime = jsonData.dateTime.replace(/[+-]\d{2}:\d{2}$/, '');
+            jsonData.dateTime = jsonData.dateTime.replace(/[+-]\d{2}:\d{2}$/, "");
 
             // Strip the Z for zones other than UTC, this usually happens for
             // unknown timezones.
@@ -260,11 +262,11 @@ fromRFC3339FixedZone.regex = new RegExp(
  * Like cal.toRFC3339, but include milliseconds. Google timestamps require
  * this.
  *
- * @param dt        The calIDateTime to convert.
+ * @param date      The calIDateTime to convert.
  * @return          The RFC3339 string stamp.
  */
-function toRFC3339Fraction(dt) {
-    let str = cal.toRFC3339(dt);
+function toRFC3339Fraction(date) {
+    let str = cal.toRFC3339(date);
     return str ? str.replace(/(Z?)$/, ".000$1") : null;
 }
 
@@ -297,7 +299,9 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
         }
     }
     function setIf(data, prop, value) {
-        if (value) data[prop] = value;
+        if (value) {
+            data[prop] = value;
+        }
     }
 
     let itemData = {};
@@ -333,7 +337,7 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
 
     // Google does not support categories natively, but allows us to store data
     // as an "extendedProperty", so we do here
-    let categories = cal.categoriesArrayToString(aItem.getCategories({}));
+    let categories = cal.category.arrayToString(aItem.getCategories({}));
     addExtendedProperty("X-MOZ-CATEGORIES", categories);
 
     // Only parse attendees if they are enabled, due to bug 407961
@@ -376,7 +380,9 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
             }
         }
 
-        if (attendeeData.length) itemData.attendees = attendeeData;
+        if (attendeeData.length) {
+            itemData.attendees = attendeeData;
+        }
     }
 
     // reminder
@@ -403,15 +409,13 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
 
         if (alarm.related == alarm.ALARM_RELATED_ABSOLUTE) {
             alarmOffset = aItem.startDate.subtractDate(alarm.alarmDate);
+        } else if (alarm.related == alarm.ALARM_RELATED_END) {
+            // Google always uses an alarm offset related to the start time
+            // for relative alarms.
+            alarmOffset = alarm.alarmOffset.clone();
+            alarmOffset.addDuration(aItem.endDate.subtractDate(aItem.startDate));
         } else {
-            if (alarm.related == alarm.ALARM_RELATED_END) {
-                // Google always uses an alarm offset related to the start time
-                // for relative alarms.
-                alarmOffset = alarm.alarmOffset.clone();
-                alarmOffset.addDuration(aItem.endDate.subtractDate(aItem.startDate));
-            } else {
-                alarmOffset = alarm.offset;
-            }
+            alarmOffset = alarm.offset;
         }
         alarmData.minutes = -alarmOffset.inSeconds / 60;
 
@@ -478,7 +482,7 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
                 // EXDATES require special casing, since they might contain
                 // a TZID. To avoid the need for conversion of TZID strings,
                 // convert to UTC before serialization.
-                prop.valueAsDatetime = ritem.date.getInTimezone(cal.UTC());
+                prop.valueAsDatetime = ritem.date.getInTimezone(cal.dtz.UTC);
             }
             itemData.recurrence.push(prop.icalString.trim());
         }
@@ -499,7 +503,9 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
  */
 function TaskToJSON(aItem, aOfflineStorage, aIsImport) {
     function setIf(data, prop, value) {
-        if (value) data[prop] = value;
+        if (value) {
+            data[prop] = value;
+        }
     }
 
     let itemData = {};
@@ -511,7 +517,7 @@ function TaskToJSON(aItem, aOfflineStorage, aIsImport) {
     itemData.status = (aItem.isCompleted ? "completed" : "needsAction");
 
     if (aItem.dueDate) {
-        let dueDate = aItem.dueDate.getInTimezone(cal.UTC());
+        let dueDate = aItem.dueDate.getInTimezone(cal.dtz.UTC);
         dueDate.isDate = false;
         itemData.due = cal.toRFC3339(dueDate);
     }
@@ -526,7 +532,9 @@ function TaskToJSON(aItem, aOfflineStorage, aIsImport) {
     }
 
     let attachments = aItem.getAttachments({});
-    if (attachments.length) itemData.links = [];
+    if (attachments.length) {
+        itemData.links = [];
+    }
     for (let attach of aItem.getAttachments({})) {
         let attachData = {};
         attachData.link = attach.uri.spec;
@@ -546,9 +554,9 @@ function TaskToJSON(aItem, aOfflineStorage, aIsImport) {
  * @return              A JS Object representing the item.
  */
 function ItemToJSON(aItem, aOfflineStorage, aIsImport) {
-    if (cal.isEvent(aItem)) {
+    if (cal.item.isEvent(aItem)) {
         return EventToJSON(aItem, aOfflineStorage, aIsImport);
-    } else if (cal.isToDo(aItem)) {
+    } else if (cal.item.isToDo(aItem)) {
         return TaskToJSON(aItem, aOfflineStorage, aIsImport);
     } else {
         cal.ERROR("[calGoogleCalendar] Invalid item type: " + aItem.icalString);
@@ -567,10 +575,10 @@ function setupRecurrence(aItem, aRecurrence, aTimezone) {
         return;
     }
 
-    if (!aItem.recurrenceInfo) {
-        aItem.recurrenceInfo = cal.createRecurrenceInfo(aItem);
-    } else {
+    if (aItem.recurrenceInfo) {
         aItem.recurrenceInfo.clearRecurrenceItems();
+    } else {
+        aItem.recurrenceInfo = cal.createRecurrenceInfo(aItem);
     }
 
     let rootComp;
@@ -585,11 +593,11 @@ function setupRecurrence(aItem, aRecurrence, aTimezone) {
     for (let prop = rootComp.getFirstProperty("ANY");
          prop;
          prop = rootComp.getNextProperty("ANY")) {
-       switch (prop.propertyName) {
+        switch (prop.propertyName) {
             case "RDATE":
-            case "EXDATE":
+            case "EXDATE": {
                 let recItem = Components.classes["@mozilla.org/calendar/recurrence-date;1"]
-                              .createInstance(Components.interfaces.calIRecurrenceDate);
+                                        .createInstance(Components.interfaces.calIRecurrenceDate);
                 try {
                     recItem.icalProperty = prop;
                     aItem.recurrenceInfo.appendRecurrenceItem(recItem);
@@ -600,7 +608,8 @@ function setupRecurrence(aItem, aRecurrence, aTimezone) {
                               prop.icalString + "):" + e);
                 }
                 break;
-            case "RRULE":
+            }
+            case "RRULE": {
                 let recRule = cal.createRecurrenceRule();
                 try {
                     recRule.icalProperty = prop;
@@ -611,6 +620,7 @@ function setupRecurrence(aItem, aRecurrence, aTimezone) {
                               prop.icalString + "):" + e);
                 }
                 break;
+            }
         }
     }
 
@@ -677,7 +687,7 @@ function JSONToEvent(aEntry, aCalendar, aDefaultReminders, aReferenceItem, aMeta
 
     let tzs = cal.getTimezoneService();
     let calendarZoneName = aCalendar.getProperty("settings.timeZone");
-    let calendarZone = calendarZoneName ? tzs.getTimezone(calendarZoneName) : cal.calendarDefaultTimezone();
+    let calendarZone = calendarZoneName ? tzs.getTimezone(calendarZoneName) : cal.dtz.defaultTimezone;
 
     try {
         item.id = aEntry.iCalUID || ((aEntry.recurringEventId || aEntry.id) + "@google.com");
@@ -697,7 +707,7 @@ function JSONToEvent(aEntry, aCalendar, aDefaultReminders, aReferenceItem, aMeta
         item.privacy = (aEntry.visibility ? aEntry.visibility.toUpperCase() : null);
 
         item.setProperty("URL", aEntry.htmlLink && aCalendar.uri.schemeIs("https") ? aEntry.htmlLink.replace(/^http:/, "https:") : aEntry.htmlLink);
-        item.setProperty("CREATED", (aEntry.created ? cal.fromRFC3339(aEntry.created, calendarZone).getInTimezone(cal.UTC()) : null));
+        item.setProperty("CREATED", (aEntry.created ? cal.fromRFC3339(aEntry.created, calendarZone).getInTimezone(cal.dtz.UTC) : null));
         item.setProperty("DESCRIPTION", aEntry.description);
         item.setProperty("LOCATION", aEntry.location);
         item.setProperty("TRANSP", (aEntry.transparency ? aEntry.transparency.toUpperCase() : null));
@@ -820,12 +830,12 @@ function JSONToEvent(aEntry, aCalendar, aDefaultReminders, aReferenceItem, aMeta
         // Google does not support categories natively, but allows us to store
         // data as an "extendedProperty", and here it's going to be retrieved
         // again
-        let categories = cal.categoriesStringToArray(sharedProps["X-MOZ-CATEGORIES"]);
+        let categories = cal.category.stringToArray(sharedProps["X-MOZ-CATEGORIES"]);
         item.setCategories(categories.length, categories);
 
         // updated (This must be set last!)
         if (aEntry.updated) {
-            let updated = cal.fromRFC3339(aEntry.updated, calendarZone).getInTimezone(cal.UTC());
+            let updated = cal.fromRFC3339(aEntry.updated, calendarZone).getInTimezone(cal.dtz.UTC);
             item.setProperty("DTSTAMP", updated);
             item.setProperty("LAST-MODIFIED", updated);
         }
@@ -857,7 +867,7 @@ function JSONToTask(aEntry, aCalendar, aDefaultReminders, aReferenceItem, aMetad
 
     let tzs = cal.getTimezoneService();
     let calendarZoneName = aCalendar.getProperty("settings.timeZone");
-    let calendarZone = calendarZoneName ? tzs.getTimezone(calendarZoneName) : cal.calendarDefaultTimezone();
+    let calendarZone = calendarZoneName ? tzs.getTimezone(calendarZoneName) : cal.dtz.defaultTimezone;
 
     try {
         item.id = aEntry.id;
@@ -871,9 +881,9 @@ function JSONToTask(aEntry, aCalendar, aDefaultReminders, aReferenceItem, aMetad
 
         // Google Tasks don't have a due time, but still use 0:00 UTC. They
         // should really be using floating time.
-        item.dueDate = cal.fromRFC3339(aEntry.due, cal.floating())
+        item.dueDate = cal.fromRFC3339(aEntry.due, cal.dtz.floating);
         if (item.dueDate) {
-            item.dueDate.timezone = cal.floating();
+            item.dueDate.timezone = cal.dtz.floating;
             item.dueDate.isDate = true;
         }
         item.completedDate = cal.fromRFC3339(aEntry.completed, calendarZone);
@@ -903,8 +913,8 @@ function JSONToTask(aEntry, aCalendar, aDefaultReminders, aReferenceItem, aMetad
         }
 
         // updated (This must be set last!)
-        item.setProperty("DTSTAMP", cal.fromRFC3339(aEntry.updated, calendarZone).getInTimezone(cal.UTC()));
-        item.setProperty("LAST-MODIFIED", cal.fromRFC3339(aEntry.updated, calendarZone).getInTimezone(cal.UTC()));
+        item.setProperty("DTSTAMP", cal.fromRFC3339(aEntry.updated, calendarZone).getInTimezone(cal.dtz.UTC));
+        item.setProperty("LAST-MODIFIED", cal.fromRFC3339(aEntry.updated, calendarZone).getInTimezone(cal.dtz.UTC));
     } catch (e) {
         cal.ERROR("[calGoogleCalendar] Error parsing JSON tasks stream: " + stringException(e));
         throw e;
@@ -926,9 +936,9 @@ function JSONToItem(aEntry, aCalendar, aDefaultReminders, aReferenceItem, aMetad
     aDefaultReminders = aDefaultReminders || [];
     aMetadata = aMetadata || {};
     if (aEntry.kind == "tasks#task") {
-        return JSONToTask.apply(null, arguments);
+        return JSONToTask(...arguments);
     } else if (aEntry.kind == "calendar#event") {
-        return JSONToEvent.apply(null, arguments);
+        return JSONToEvent(...arguments);
     } else {
         cal.ERROR("[calGoogleCalendar] Invalid item type: " + (aEntry ? aEntry.kind : "<no entry>"));
         return null;
@@ -992,7 +1002,7 @@ ItemSaver.prototype = {
 
             for (let cur = 0; cur < total; cur++) {
                 let entry = aData.items[cur];
-                //let metaData = Object.create(null);
+                // let metaData = Object.create(null);
                 let metaData = {};
                 let item = JSONToTask(entry, this.calendar, null, null, metaData);
                 this.metaData[item.hashId] = metaData;
@@ -1027,7 +1037,7 @@ ItemSaver.prototype = {
         }
 
         let exceptionItems = [];
-        let defaultReminders = (aData.defaultReminders || []).map(function(x) { return JSONToAlarm(x, true); });
+        let defaultReminders = (aData.defaultReminders || []).map(reminder => JSONToAlarm(reminder, true));
 
         // In the first pass, we go through the data and sort into master items and
         // exception items, as the master item might be after the exception in the
@@ -1156,9 +1166,9 @@ ItemSaver.prototype = {
      * after the last request.
      */
     complete: function() {
-        return this.processRemainingExceptions().then(function() {
+        return this.processRemainingExceptions().then(() => {
             this.activity.complete();
-        }.bind(this));
+        });
     },
 
     /**
@@ -1177,23 +1187,23 @@ ItemSaver.prototype = {
                 // user is invited to an instance of a recurring event.
                 // Unless this is a cancelled exception, create a mock
                 // parent item with one positive RDATE.
-                let item = exc.clone();
-                item.recurrenceId = null;
-                item.calendar = this.calendar.superCalendar;
-                item.startDate = exc.recurrenceId.clone();
-                item.setProperty("X-MOZ-FAKED-MASTER", "1");
-                if (!item.id) {
+                let parent = exc.clone();
+                parent.recurrenceId = null;
+                parent.calendar = this.calendar.superCalendar;
+                parent.startDate = exc.recurrenceId.clone();
+                parent.setProperty("X-MOZ-FAKED-MASTER", "1");
+                if (!parent.id) {
                     // Exceptions often don't have the iCalUID field set,
                     // we need to fake it from the google id.
                     let meta = this.metaData[exc.hashId];
-                    item.id = meta.path + "@google.com";
+                    parent.id = meta.path + "@google.com";
                 }
-                item.recurrenceInfo = cal.createRecurrenceInfo(item);
+                parent.recurrenceInfo = cal.createRecurrenceInfo(parent);
                 let rdate = Components.classes["@mozilla.org/calendar/recurrence-date;1"]
                     .createInstance(Components.interfaces.calIRecurrenceDate);
                 rdate.date = exc.recurrenceId;
-                item.recurrenceInfo.appendRecurrenceItem(rdate);
-                await this.commitItem(item);
+                parent.recurrenceInfo.appendRecurrenceItem(rdate);
+                await this.commitItem(parent);
             }
         }
     }
@@ -1207,7 +1217,7 @@ ItemSaver.prototype = {
 function ActivityShell(aCalendar) {
     this.calendar = aCalendar;
 
-    if ('@mozilla.org/activity-process;1' in Components.classes) {
+    if ("@mozilla.org/activity-process;1" in Components.classes) {
         this.init();
     }
 }
@@ -1219,10 +1229,10 @@ ActivityShell.prototype = {
     type: null,
 
     init: function() {
-        this.actMgr = Components.classes['@mozilla.org/activity-manager;1']
+        this.actMgr = Components.classes["@mozilla.org/activity-manager;1"]
                                 .getService(Components.interfaces.nsIActivityManager);
-        this.act =  Components.classes['@mozilla.org/activity-process;1']
-                              .createInstance(Components.interfaces.nsIActivityProcess);
+        this.act = Components.classes["@mozilla.org/activity-process;1"]
+                             .createInstance(Components.interfaces.nsIActivityProcess);
         this.act.init(getProviderString("syncStatus", this.calendar.name), this);
         this.act.iconClass = "syncMail";
         this.act.contextType = "gdata-calendar";
@@ -1339,7 +1349,7 @@ function monkeyPatch(obj, x, func) {
             Components.utils.reportError(e);
             throw e;
         }
-    }
+    };
 }
 
 /**

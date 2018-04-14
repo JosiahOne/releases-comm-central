@@ -5,15 +5,13 @@
 
 this.EXPORTED_SYMBOLS = ["Feed", "FeedItem", "FeedParser", "FeedUtils"];
 
-var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
-
-Cu.import("resource:///modules/gloda/log4moz.js");
-Cu.import("resource:///modules/mailServices.js");
-Cu.import("resource:///modules/MailUtils.js");
-Cu.import("resource:///modules/jsmime.jsm");
-Cu.import("resource://gre/modules/FileUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/MailUtils.js");
+ChromeUtils.import("resource:///modules/jsmime.jsm");
+ChromeUtils.import("resource://gre/modules/FileUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 Cu.importGlobalProperties(["XMLHttpRequest"]);
 
@@ -659,7 +657,7 @@ var FeedUtils = {
         aFolder.getFlag(Ci.nsMsgFolderFlags.Virtual) ||
         !aFolder.filePath.exists())
       // There are never any feedUrls in the account/non-feed/trash/virtual
-      // folders or in a ghost folder (nonexistant on disk yet found in
+      // folders or in a ghost folder (nonexistent on disk yet found in
       // aFolder.subFolders).
       return null;
 
@@ -1419,7 +1417,7 @@ var FeedUtils = {
     request.responseType = "document";
     request.send();
     let dom = request.responseXML;
-    if (dom instanceof Ci.nsIDOMXMLDocument &&
+    if ((ChromeUtils.getClassName(dom) === "XMLDocument") &&
         dom.documentElement.namespaceURI != this.MOZ_PARSERERROR_NS)
       return file;
 
@@ -1499,20 +1497,19 @@ var FeedUtils = {
  * browser or app that provides a less nice dataTransfer object in the event.
  * Extract the url and if it passes the scheme test, try to subscribe.
  *
- * @param  nsIDOMDataTransfer aDataTransfer  - the dnd event's dataTransfer.
- * @return nsIURI uri                        - a uri if valid, null if none.
+ * @param  nsISupports aDataTransfer  - the dnd event's dataTransfer.
+ * @return nsIURI uri                 - a uri if valid, null if none.
  */
   getFeedUriFromDataTransfer: function(aDataTransfer) {
     let dt = aDataTransfer;
     let types = ["text/x-moz-url-data", "text/x-moz-url"];
     let validUri = false;
-    let uri = Cc["@mozilla.org/network/standard-url;1"].
-              createInstance(Ci.nsIURI);
+    let uri;
 
     if (dt.getData(types[0]))
     {
       // The url is the data.
-      uri.spec = dt.mozGetDataAt(types[0], 0);
+      uri = Services.io.newURI(dt.mozGetDataAt(types[0], 0));
       validUri = this.isValidScheme(uri);
       this.log.trace("getFeedUriFromDataTransfer: dropEffect:type:value - " +
                      dt.dropEffect + " : " + types[0] + " : " + uri.spec);
@@ -1520,7 +1517,7 @@ var FeedUtils = {
     else if (dt.getData(types[1]))
     {
       // The url is the first part of the data, the second part is random.
-      uri.spec = dt.mozGetDataAt(types[1], 0).split("\n")[0];
+      uri = Services.io.newURI(dt.mozGetDataAt(types[1], 0).split("\n")[0]);
       validUri = this.isValidScheme(uri);
       this.log.trace("getFeedUriFromDataTransfer: dropEffect:type:value - " +
                      dt.dropEffect + " : " + types[0] + " : " + uri.spec);
@@ -1533,7 +1530,7 @@ var FeedUtils = {
         this.log.trace("getFeedUriFromDataTransfer: dropEffect:index:type:value - " +
                        dt.dropEffect + " : " + i + " : " + dt.types[i] + " : "+spec);
         try {
-          uri.spec = spec;
+          uri = Services.io.newURI(spec);
           validUri = this.isValidScheme(uri);
         }
         catch(ex) {}
@@ -1858,17 +1855,29 @@ var FeedUtils = {
           if (feed.itemsStored)
             options.updates.lastDownloadTime = now;
 
+          // If a previously disabled due to error feed is successful, set
+          // enabled state on, as that was the desired user setting.
+          if (options.updates.enabled == null)
+          {
+            options.updates.enabled = true;
+            FeedUtils.setStatus(feed.folder, feed.url, "enabled", true);
+          }
+
           feed.options = options;
           FeedUtils.setStatus(feed.folder, feed.url, "lastUpdateTime", now);
         }
         else if (aDisable)
         {
-          // Do not keep retrying feeds with error states.
+          // Do not keep retrying feeds with error states. Set persisted state
+          // to |null| to indicate error disable (and not user disable), but
+          // only if the feed is user enabled.
           let options = feed.options;
-          options.updates.enabled = false;
+          if (options.updates.enabled)
+            options.updates.enabled = null;
+
           feed.options = options;
           FeedUtils.setStatus(feed.folder, feed.url, "enabled", false);
-          FeedUtils.log.warn("downloaded: udpates disabled due to error, " +
+          FeedUtils.log.warn("downloaded: updates disabled due to error, " +
                              "check the url - " + feed.url);
         }
 
@@ -1948,7 +1957,7 @@ var FeedUtils = {
         FeedUtils.log.debug("downloaded: all pending downloads finished");
 
         // Should we do this on a timer so the text sticks around for a little
-        // while?  It doesnt look like we do it on a timer for newsgroups so
+        // while?  It doesn't look like we do it on a timer for newsgroups so
         // we'll follow that model.  Don't clear the status text if we just
         // dumped an error to the status bar!
         if (aErrorCode == FeedUtils.kNewsBlogSuccess && this.mStatusFeedback)

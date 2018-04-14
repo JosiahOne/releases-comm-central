@@ -4,14 +4,12 @@
 
 this.EXPORTED_SYMBOLS = ["XMPPSession", "XMPPDefaultResource"];
 
-var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
-
-Cu.import("resource:///modules/DNS.jsm");
-Cu.import("resource:///modules/imServices.jsm");
-Cu.import("resource:///modules/imXPCOMUtils.jsm");
-Cu.import("resource:///modules/socket.jsm");
-Cu.import("resource:///modules/xmpp-xml.jsm");
-Cu.import("resource:///modules/xmpp-authmechs.jsm");
+ChromeUtils.import("resource:///modules/DNS.jsm");
+ChromeUtils.import("resource:///modules/imServices.jsm");
+ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/socket.jsm");
+ChromeUtils.import("resource:///modules/xmpp-xml.jsm");
+ChromeUtils.import("resource:///modules/xmpp-authmechs.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "_", () =>
   l10nHelper("chrome://chat/locale/xmpp.properties")
@@ -21,7 +19,13 @@ XPCOMUtils.defineLazyGetter(this, "_", () =>
 XPCOMUtils.defineLazyGetter(this, "_defaultResource", () =>
   l10nHelper("chrome://branding/locale/brand.properties")("brandShortName")
 );
-this.__defineGetter__("XMPPDefaultResource", () => _defaultResource);
+Object.defineProperty(this, "XMPPDefaultResource", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    return _defaultResource;
+  }
+});
 
 function XMPPSession(aHost, aPort, aSecurity, aJID, aPassword, aAccount) {
   this._host = aHost;

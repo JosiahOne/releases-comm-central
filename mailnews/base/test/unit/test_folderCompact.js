@@ -15,8 +15,8 @@
   * - Compacting imap offline stores.
   */
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 Services.prefs.setCharPref("mail.serverDefaultStoreContractID",
                            "@mozilla.org/msgstore/berkeleystore;1");
@@ -30,7 +30,7 @@ var gLocalFolder2;
 var gLocalFolder3;
 var gLocalTrashFolder;
 var gCurTestNum;
-// After a compact (or other operation), this is what we expect the 
+// After a compact (or other operation), this is what we expect the
 // folder size to be.
 var gExpectedFolderSize;
 var gMsgHdrs = new Array();
@@ -42,7 +42,7 @@ var gExpectedFolder3Size;
 var gMsgKeys = [];
 
 // nsIMsgCopyServiceListener implementation
-var copyListenerWrap = 
+var copyListenerWrap =
 {
   SetMessageKey: function(aKey)
   {
@@ -52,7 +52,7 @@ var copyListenerWrap =
   OnStopCopy: function(aStatus)
   {
     // Check: message successfully copied.
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
   }
 };
 
@@ -60,18 +60,18 @@ var urlListenerWrap =
 {
   OnStopRunningUrl: function (aUrl, aExitCode) {
     // Check: message successfully copied.
-    do_check_eq(aExitCode, 0);
+    Assert.equal(aExitCode, 0);
 
     if (gMsgKeys.length > 0) {
       // Bug 854798: Check if the new message keys are the same as before compaction.
       let folderMsgs = gMsgKeys.folder.messages;
       // First message was deleted so skip it in the old array.
       for (let i = 1; i < gMsgKeys.length; i++) {
-        do_check_true(folderMsgs.hasMoreElements());
+        Assert.ok(folderMsgs.hasMoreElements());
         let header = folderMsgs.getNext().QueryInterface(Ci.nsIMsgDBHdr);
-        do_check_eq(header.messageKey, gMsgKeys[i]);
+        Assert.equal(header.messageKey, gMsgKeys[i]);
       }
-      do_check_false(folderMsgs.hasMoreElements());
+      Assert.ok(!folderMsgs.hasMoreElements());
       gMsgKeys.length = 0;
     }
   }
@@ -101,7 +101,7 @@ function deleteMessages(srcFolder, items)
   items.forEach(function (item) {
     array.appendElement(item);
   });
-  
+
   let listener = new PromiseTestUtils.PromiseCopyListener(copyListenerWrap);
   srcFolder.deleteMessages(array, null, false, true, listener, true);
   return listener.promise;
@@ -117,7 +117,7 @@ function calculateFolderSize(folder)
     while (enumerator.hasMoreElements())
     {
       var header = enumerator.getNext();
-      if (header instanceof Components.interfaces.nsIMsgDBHdr)
+      if (header instanceof Ci.nsIMsgDBHdr)
         totalSize += header.messageSize;
     }
   }
@@ -133,9 +133,9 @@ function verifyMsgOffsets(folder)
     while (enumerator.hasMoreElements())
     {
       let header = enumerator.getNext();
-      if (header instanceof Components.interfaces.nsIMsgDBHdr) {
+      if (header instanceof Ci.nsIMsgDBHdr) {
         let storeToken = header.getStringProperty("storeToken");
-        do_check_eq(storeToken, header.messageOffset);
+        Assert.equal(storeToken, header.messageOffset);
       }
     }
   }
@@ -149,34 +149,34 @@ function verifyMsgOffsets(folder)
 var gTestArray =
 [
   // Copying messages from files
-  function* testCopyFileMessage1() {
-    yield copyFileMessage(gMsgFile1, localAccountUtils.inboxFolder, false);
+  async function testCopyFileMessage1() {
+    await copyFileMessage(gMsgFile1, localAccountUtils.inboxFolder, false);
   },
-  function* testCopyFileMessage2() {
-    yield copyFileMessage(gMsgFile2, localAccountUtils.inboxFolder, false);
+  async function testCopyFileMessage2() {
+    await copyFileMessage(gMsgFile2, localAccountUtils.inboxFolder, false);
   },
-  function* testCopyFileMessage3() {
-    yield copyFileMessage(gMsgFile3, localAccountUtils.inboxFolder, true);
+  async function testCopyFileMessage3() {
+    await copyFileMessage(gMsgFile3, localAccountUtils.inboxFolder, true);
     showMessages(localAccountUtils.inboxFolder, "after initial 3 messages copy to inbox");
   },
 
   // Moving/copying messages
-  function* testCopyMessages1() {
-    yield copyMessages([gMsgHdrs[0].hdr], false, localAccountUtils.inboxFolder, gLocalFolder2);
+  async function testCopyMessages1() {
+    await copyMessages([gMsgHdrs[0].hdr], false, localAccountUtils.inboxFolder, gLocalFolder2);
   },
-  function* testCopyMessages2() {
-    yield copyMessages([gMsgHdrs[1].hdr, gMsgHdrs[2].hdr], false, localAccountUtils.inboxFolder, gLocalFolder2);
+  async function testCopyMessages2() {
+    await copyMessages([gMsgHdrs[1].hdr, gMsgHdrs[2].hdr], false, localAccountUtils.inboxFolder, gLocalFolder2);
     showMessages(gLocalFolder2, "after copying 3 messages");
   },
-  function* testMoveMessages1() {
-    yield copyMessages([gMsgHdrs[0].hdr, gMsgHdrs[1].hdr], true, localAccountUtils.inboxFolder, gLocalFolder3);
+  async function testMoveMessages1() {
+    await copyMessages([gMsgHdrs[0].hdr, gMsgHdrs[1].hdr], true, localAccountUtils.inboxFolder, gLocalFolder3);
 
     showMessages(localAccountUtils.inboxFolder, "after moving 2 messages");
     showMessages(gLocalFolder3, "after moving 2 messages");
   },
 
   // Deleting messages
-  function* testDeleteMessages1() { // delete to trash
+  async function testDeleteMessages1() { // delete to trash
     // Let's take a moment to re-initialize stuff that got moved
     var folder3DB = gLocalFolder3.msgDatabase;
     gMsgHdrs[0].hdr = folder3DB.getMsgHdrForMessageID(gMsgHdrs[0].ID);
@@ -190,22 +190,22 @@ var gTestArray =
     }
 
     // Now delete the message
-    yield deleteMessages(gLocalFolder3, [gMsgHdrs[0].hdr], false, false);
+    await deleteMessages(gLocalFolder3, [gMsgHdrs[0].hdr], false, false);
 
     showMessages(gLocalFolder3, "after deleting 1 message to trash");
   },
-  function* compactFolder()
+  async function compactFolder()
   {
     gExpectedFolderSize = calculateFolderSize(gLocalFolder3);
-    do_check_neq(gLocalFolder3.expungedBytes, 0);
+    Assert.notEqual(gLocalFolder3.expungedBytes, 0);
     let listener = new PromiseTestUtils.PromiseUrlListener(urlListenerWrap);
     gLocalFolder3.compact(listener, null);
-    yield listener.promise;
+    await listener.promise;
 
     showMessages(gLocalFolder3, "after compact");
   },
-  function* testDeleteMessages2() {
-    do_check_eq(gExpectedFolderSize, gLocalFolder3.filePath.fileSize);
+  async function testDeleteMessages2() {
+    Assert.equal(gExpectedFolderSize, gLocalFolder3.filePath.fileSize);
     verifyMsgOffsets(gLocalFolder3);
     var folder2DB = gLocalFolder2.msgDatabase;
     gMsgHdrs[0].hdr = folder2DB.getMsgHdrForMessageID(gMsgHdrs[0].ID);
@@ -219,11 +219,11 @@ var gTestArray =
     }
 
     // Now delete the message
-    yield deleteMessages(gLocalFolder2, [gMsgHdrs[0].hdr], false, false);
+    await deleteMessages(gLocalFolder2, [gMsgHdrs[0].hdr], false, false);
 
     showMessages(gLocalFolder2, "after deleting 1 message");
   },
-  function* compactAllFolders()
+  async function compactAllFolders()
   {
     gExpectedInboxSize = calculateFolderSize(localAccountUtils.inboxFolder);
     gExpectedFolder2Size = calculateFolderSize(gLocalFolder2);
@@ -260,12 +260,12 @@ var gTestArray =
     let checkResult = {
       OnStopRunningUrl: function (aUrl, aExitCode) {
       // Check: message successfully compacted.
-      do_check_eq(aExitCode, 0);
+      Assert.equal(aExitCode, 0);
       }
     };
     let listener = new PromiseTestUtils.PromiseUrlListener(checkResult);
     localAccountUtils.inboxFolder.compactAll(listener, null, true);
-    yield listener.promise;
+    await listener.promise;
 
     showMessages(localAccountUtils.inboxFolder, "after compactAll");
     showMessages(gLocalFolder2, "after compactAll");
@@ -274,22 +274,22 @@ var gTestArray =
     let postInboxMsg3Key = localAccountUtils.inboxFolder.msgDatabase
                                             .getMsgHdrForMessageID(gMsg3ID)
                                             .messageKey;
-    do_check_eq(preInboxMsg3Key, postInboxMsg3Key);
+    Assert.equal(preInboxMsg3Key, postInboxMsg3Key);
 
     // For folder2, which was rebuilt, keys change but all messages should exist.
     let message2 = gLocalFolder2.msgDatabase.getMsgHdrForMessageID(gMsg2ID);
-    do_check_true(message2);
-    do_check_true(gLocalFolder2.msgDatabase.getMsgHdrForMessageID(gMsg3ID));
+    Assert.ok(message2);
+    Assert.ok(gLocalFolder2.msgDatabase.getMsgHdrForMessageID(gMsg3ID));
 
     // In folder2, gMsg2ID is the first message. After compact with database
     // rebuild, that key has now changed.
-    do_check_neq(message2.messageKey, f2m2Key);
+    Assert.notEqual(message2.messageKey, f2m2Key);
   },
   function lastTestCheck()
   {
-    do_check_eq(gExpectedInboxSize, localAccountUtils.inboxFolder.filePath.fileSize);
-    do_check_eq(gExpectedFolder2Size, gLocalFolder2.filePath.fileSize);
-    do_check_eq(gExpectedFolder3Size, gLocalFolder3.filePath.fileSize);
+    Assert.equal(gExpectedInboxSize, localAccountUtils.inboxFolder.filePath.fileSize);
+    Assert.equal(gExpectedFolder2Size, gLocalFolder2.filePath.fileSize);
+    Assert.equal(gExpectedFolder3Size, gLocalFolder3.filePath.fileSize);
     verifyMsgOffsets(gLocalFolder2);
     verifyMsgOffsets(gLocalFolder3);
     verifyMsgOffsets(localAccountUtils.inboxFolder);

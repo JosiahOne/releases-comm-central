@@ -106,13 +106,13 @@ function verify_index(smsg, gmsg) {
   let attachmentName = gmsg.attachmentNames[0];
   LOG.debug("using character set: " + charset + " actual: " + actual);
   LOG.debug("subject: " + subject + " (len: " + subject.length + ")");
-  do_check_eq(actual, subject);
+  Assert.equal(actual, subject);
   LOG.debug("body: " + indexedBodyText +
       " (len: " + indexedBodyText.length + ")");
-  do_check_eq(actual, indexedBodyText);
+  Assert.equal(actual, indexedBodyText);
   LOG.debug("attachment name:" + attachmentName +
       " (len: " + attachmentName.length + ")");
-  do_check_eq(actual, attachmentName);
+  Assert.equal(actual, attachmentName);
 }
 
 /**
@@ -145,8 +145,8 @@ function* test_fulltextsearch(aPhrase)
   }
 }
 
-Components.utils.import("resource:///modules/gloda/msg_search.js");
-Components.utils.import("resource:///modules/gloda/datastore.js");
+ChromeUtils.import("resource:///modules/gloda/msg_search.js");
+ChromeUtils.import("resource:///modules/gloda/datastore.js");
 
 /**
  * Pass a query string to the GlodaMsgSearcher, run the corresponding SQL query,
@@ -193,7 +193,7 @@ function msgSearchExpectCount(aCount, aFulltextStr) {
     },
 
     handleCompletion: function(aReason) {
-      if (aReason != Components.interfaces.mozIStorageStatementCallback.REASON_FINISHED)
+      if (aReason != Ci.mozIStorageStatementCallback.REASON_FINISHED)
         do_throw(new Error("Query canceled or aborted!"));
 
       if (i != aCount) {

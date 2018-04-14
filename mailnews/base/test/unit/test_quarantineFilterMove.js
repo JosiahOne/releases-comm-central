@@ -9,8 +9,8 @@
  * adapted from test_copyThenMoveManual.js
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 load("../../../resources/POP3pump.js");
 
 var gFiles = ["../../../data/bugmail1", "../../../data/bugmail10"];
@@ -35,28 +35,28 @@ var gTestArray =
     gFilterList.insertFilterAt(0, gFilter);
   },
   // just get a message into the local folder
-  function *getLocalMessages1() {
+  async function getLocalMessages1() {
     gPOP3Pump.files = gFiles;
     let promise1 = PromiseTestUtils.promiseFolderNotification(gMoveFolder, "msgsClassified");
     let promise2 = gPOP3Pump.run();
-    yield Promise.all([promise1, promise2]);
+    await Promise.all([promise1, promise2]);
   },
   function verifyFolders1() {
-    do_check_eq(folderCount(gMoveFolder), 2);
+    Assert.equal(folderCount(gMoveFolder), 2);
     // the local inbox folder should now be empty, since the second
     // operation was a move
-    do_check_eq(folderCount(localAccountUtils.inboxFolder), 0);
+    Assert.equal(folderCount(localAccountUtils.inboxFolder), 0);
 
     let enumerator = gMoveFolder.msgDatabase.EnumerateMessages();
     let firstMsgHdr = enumerator.getNext().QueryInterface(Ci.nsIMsgDBHdr);
     let secondMsgHdr = enumerator.getNext().QueryInterface(Ci.nsIMsgDBHdr);
     // Check that the messages have content
     messageContent = getContentFromMessage(firstMsgHdr);
-    do_check_true(messageContent.includes("Some User <bugmail@example.org> changed"));
+    Assert.ok(messageContent.includes("Some User <bugmail@example.org> changed"));
     messageContent = getContentFromMessage(secondMsgHdr);
-    do_check_true(messageContent.includes("https://bugzilla.mozilla.org/show_bug.cgi?id=436880"));
+    Assert.ok(messageContent.includes("https://bugzilla.mozilla.org/show_bug.cgi?id=436880"));
   },
-  function* copyMovedMessages() {
+  async function copyMovedMessages() {
     let messages = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
     let enumerator = gMoveFolder.msgDatabase.EnumerateMessages();
     let firstMsgHdr = enumerator.getNext().QueryInterface(Ci.nsIMsgDBHdr);
@@ -68,19 +68,19 @@ var gTestArray =
                                    promiseCopyListener, null, false);
     let promiseMoveMsg =
       PromiseTestUtils.promiseFolderEvent(gMoveFolder, "DeleteOrMoveMsgCompleted");
-    yield Promise.all([promiseCopyListener.promise, promiseMoveMsg]);
+    await Promise.all([promiseCopyListener.promise, promiseMoveMsg]);
   },
   function verifyFolders2() {
-    do_check_eq(folderCount(gMoveFolder2), 2);
+    Assert.equal(folderCount(gMoveFolder2), 2);
 
     let enumerator = gMoveFolder2.msgDatabase.EnumerateMessages();
     let firstMsgHdr = enumerator.getNext().QueryInterface(Ci.nsIMsgDBHdr);
     let secondMsgHdr = enumerator.getNext().QueryInterface(Ci.nsIMsgDBHdr);
     // Check that the messages have content
     messageContent = getContentFromMessage(firstMsgHdr);
-    do_check_true(messageContent.includes("Some User <bugmail@example.org> changed"));
+    Assert.ok(messageContent.includes("Some User <bugmail@example.org> changed"));
     messageContent = getContentFromMessage(secondMsgHdr);
-    do_check_true(messageContent.includes("https://bugzilla.mozilla.org/show_bug.cgi?id=436880"));
+    Assert.ok(messageContent.includes("https://bugzilla.mozilla.org/show_bug.cgi?id=436880"));
   },
   function endTest() {
     dump("Exiting mail tests\n");

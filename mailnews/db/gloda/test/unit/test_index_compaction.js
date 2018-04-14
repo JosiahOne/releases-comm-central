@@ -138,7 +138,7 @@ function* test_sweep_performs_compaction() {
 
   // Make sure the folder is marked compacted...
   let glodaFolder = Gloda.getFolderForFolder(msgFolder);
-  do_check_true(glodaFolder.compacted);
+  Assert.ok(glodaFolder.compacted);
 
   // Re-enable indexing and fire up an indexing pass
   configure_gloda_indexing({event: true});
@@ -195,7 +195,7 @@ function* test_moves_and_deletions_on_compacted_folder_edge_case() {
   GlodaIndexer.purgeJobsUsingFilter(() => true);
 
   // - Indexing pass
-  // Reenable indexing so we can do a sweep.
+  // Re-enable indexing so we can do a sweep.
   configure_gloda_indexing({event: true});
 
   // This will trigger compaction (per the previous unit test) which should mark

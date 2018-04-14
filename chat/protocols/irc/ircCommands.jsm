@@ -6,12 +6,9 @@
 // implementing the commands field before we register them.
 this.EXPORTED_SYMBOLS = ["commands"];
 
-var {interfaces: Ci, utils: Cu} = Components;
-
-Cu.import("resource:///modules/imXPCOMUtils.jsm");
-Cu.import("resource:///modules/ircUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "Task",
-  "resource://gre/modules/Task.jsm");
+ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/ircUtils.jsm");
+ChromeUtils.defineModuleGetter(this, "Task", "resource://gre/modules/Task.jsm");
 
 // Shortcut to get the JavaScript conversation object.
 function getConv(aConv) { return aConv.wrappedJSObject; }
@@ -148,7 +145,7 @@ function simpleCommand(aConv, aCommand, aParams) {
 }
 
 // Sends a CTCP message to aTarget using the CTCP command aCommand and aMsg as
-// a CTCP paramter.
+// a CTCP parameter.
 function ctcpCommand(aConv, aTarget, aCommand, aParams) {
   return getAccount(aConv).sendCTCPMessage(aTarget, false, aCommand, aParams);
 }

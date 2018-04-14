@@ -343,7 +343,7 @@ function* test_empty_set_logic() {
 
   // make sure that the query doesn't explode when it has to handle a case
   //  that's not supposed to match
-  do_check_false(query.test(singularWidgets[0]));
+  Assert.ok(!query.test(singularWidgets[0]));
 }
 
 /* === Search === */
@@ -355,7 +355,7 @@ function* test_empty_set_logic() {
  *  then apply to message timestamps to make them appear more recent.  We
  *  then order by this 'date score' hybrid, which we dub "dascore".  Such a
  *  flattening heuristic is over-simple, but believed to be sufficient to
- *  generally get us the messsages we want.  Post-processing based can then
+ *  generally get us the messages we want.  Post-processing based can then
  *  be more multi-dimensional and what not, but that is beyond the scope of
  *  this unit test.
  */
@@ -433,7 +433,7 @@ var WIDGET_FULLTEXT_QUERY_EXPLICIT_SQL =
  */
 function verify_widget_order_and_stashing(aZeroBasedIndex, aWidget,
                                           aCollection) {
-  do_check_eq(aZeroBasedIndex, aWidget.inum);
+  Assert.equal(aZeroBasedIndex, aWidget.inum);
   if (!aCollection.stashedColumns[aWidget.id] ||
       !aCollection.stashedColumns[aWidget.id].length)
     do_throw("no stashed information for widget: " + aWidget);

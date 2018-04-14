@@ -8,10 +8,12 @@
 <?xml-stylesheet href="chrome://messenger/skin/folderPane.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
 
-<?xul-overlay href="chrome://messenger/content/searchTermOverlay.xul"?>
-<?xul-overlay href="chrome://communicator/content/utilityOverlay.xul"?>
-
-<!DOCTYPE window SYSTEM "chrome://messenger/locale/SearchDialog.dtd" >
+<!DOCTYPE dialog [
+  <!ENTITY % SearchDialogDTD SYSTEM "chrome://messenger/locale/SearchDialog.dtd">
+  %SearchDialogDTD;
+  <!ENTITY % searchTermDTD SYSTEM "chrome://messenger/locale/searchTermOverlay.dtd">
+  %searchTermDTD;
+]>
 
 <window id="searchMailWindow"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
@@ -37,6 +39,8 @@
   <script type="application/javascript" src="chrome://messenger/content/commandglue.js"/>
   <script type="application/javascript" src="chrome://messenger/content/SearchDialog.js"/>
   <script type="application/javascript" src="chrome://messenger-newsblog/content/newsblogOverlay.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/searchTerm.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/dateFormat.js"/>
 
   <commands id="commands">
     <commandset id="mailSearchItems"
@@ -54,16 +58,17 @@
   </commands>
 
   <keyset id="mailKeys">
-    <key id="key_delete" oncommand="goDoCommand('cmd_delete');"/>
     <key key="&closeCmd.key;" modifiers="accel" oncommand="window.close();"/>
     <key keycode="VK_ESCAPE" oncommand="window.close();"/>
 #ifdef XP_MACOSX
-      <key id="key_delete2" oncommand="goDoCommand('cmd_delete');"/>
+      <key id="key_delete" keycode="VK_BACK"     command="cmd_delete"/>
+      <key id="key_delete2" keycode="VK_DELETE"  command="cmd_delete"/>
       <key id="cmd_shiftDelete" keycode="VK_BACK"
            oncommand="goDoCommand('cmd_shiftDelete');" modifiers="shift"/>
       <key id="cmd_shiftDelete2" keycode="VK_DELETE"
            oncommand="goDoCommand('cmd_shiftDelete');" modifiers="shift"/>
 #else
+      <key id="key_delete" keycode="VK_DELETE" command="cmd_delete"/>
       <key id="cmd_shiftDelete" keycode="VK_DELETE"
            oncommand="goDoCommand('cmd_shiftDelete');" modifiers="shift"/>
 #endif
@@ -106,7 +111,8 @@
       </vbox>
 
       <hbox flex="1">
-        <vbox id="searchTermListBox" flex="1"/>
+        <vbox id="searchTermListBox" flex="1">
+#include ../../../mailnews/base/search/content/searchTerm.inc
       </hbox>
     </vbox>
 

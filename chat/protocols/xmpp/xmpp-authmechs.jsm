@@ -12,10 +12,8 @@
 
 this.EXPORTED_SYMBOLS = ["XMPPAuthMechanisms"];
 
-var {classes: Cc, interfaces: Ci, utils: Cu} = Components;
-
-Cu.import("resource://services-crypto/utils.js");
-Cu.import("resource:///modules/xmpp-xml.jsm");
+ChromeUtils.import("resource://services-crypto/utils.js");
+ChromeUtils.import("resource:///modules/xmpp-xml.jsm");
 
 // Handle PLAIN authorization mechanism.
 function* PlainAuth(aUsername, aPassword, aDomain) {
@@ -237,7 +235,7 @@ const RFC3454 = {
 // aLength in bytes.
 function createNonce(aLength) {
   // RFC 5802 (5.1): Printable ASCII except ",".
-  // We guarantee a vaild nonce value using base64 encoding.
+  // We guarantee a valid nonce value using base64 encoding.
   return btoa(CryptoUtils.generateRandomBytes(aLength));
 }
 

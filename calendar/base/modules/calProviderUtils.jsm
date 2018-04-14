@@ -2,13 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calAuthUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
-Components.utils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calAuthUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 /*
  * Provider helper code
@@ -157,7 +157,7 @@ cal.BadCertHandler.prototype = {
         // we'll just take the first available calendar window. We also need to
         // do this on a timer so that the modal window doesn't block the
         // network request.
-        let calWindow = cal.getCalendarWindow();
+        let calWindow = cal.window.getCalendarWindow();
 
         let timerCallback = {
             thisProvider: this.thisProvider,
@@ -221,7 +221,7 @@ cal.FreeBusyInterval.prototype = {
  */
 cal.getImipTransport = function(aCalendar) {
     // assure an identity is configured for the calendar
-    return (aCalendar.getProperty("imip.identity")
+    return (aCalendar && aCalendar.getProperty("imip.identity")
             ? Components.classes["@mozilla.org/calendar/itip-transport;1?type=email"]
                         .getService(Components.interfaces.calIItipTransport)
             : null);
@@ -277,7 +277,7 @@ cal.getEmailIdentityOfCalendar = function(aCalendar, outAccount) {
             return null;
         }
         let identity = null;
-        cal.calIterateEmailIdentities((identity_, account) => {
+        cal.email.iterateIdentities((identity_, account) => {
             if (identity_.key == key) {
                 identity = identity_;
                 if (outAccount) {
@@ -338,7 +338,7 @@ cal.fromRFC3339 = function(aStr, aTimezone) {
     if (matches[9] == "Z" || matches[9] == "z") {
         // If the dates timezone is "Z" or "z", then this is UTC, no matter
         // what timezone was passed
-        dateTime.timezone = cal.UTC();
+        dateTime.timezone = cal.dtz.UTC;
     } else if (matches[9] == null) {
         // We have no timezone info, only a date. We have no way to
         // know what timezone we are in, so lets assume we are in the
@@ -370,7 +370,7 @@ cal.fromRFC3339 = function(aStr, aTimezone) {
                 }
             }
             // We are still here: no timezone was found
-            dateTime.timezone = cal.UTC();
+            dateTime.timezone = cal.dtz.UTC;
             if (!dateTime.isDate) {
                 dateTime.hour += (matches[11] == "-" ? -1 : 1) * matches[12];
                 dateTime.minute += (matches[11] == "-" ? -1 : 1) * matches[13];
@@ -424,7 +424,7 @@ cal.toRFC3339 = function(aDateTime) {
 };
 
 cal.promptOverwrite = function(aMode, aItem) {
-    let window = cal.getCalendarWindow();
+    let window = cal.window.getCalendarWindow();
     let args = {
         item: aItem,
         mode: aMode,
@@ -440,36 +440,23 @@ cal.promptOverwrite = function(aMode, aItem) {
 };
 
 /**
- * Observer bag implementation taking care to replay open batch notifications.
+ * Gets the calendar directory, defaults to <profile-dir>/calendar-data
  */
-cal.ObserverBag = function(iid) {
-    this.init(iid);
-};
-cal.ObserverBag.prototype = {
-    __proto__: cal.calListenerBag.prototype,
-
-    mBatchCount: 0,
-    notify: function(func, args) {
-        switch (func) {
-            case "onStartBatch":
-                ++this.mBatchCount;
-                break;
-            case "onEndBatch":
-                --this.mBatchCount;
-                break;
-        }
-        return this.__proto__.__proto__.notify.apply(this, arguments);
-    },
-
-    add: function(iface) {
-        if (this.__proto__.__proto__.add.apply(this, arguments) && (this.mBatchCount > 0)) {
-            // Replay batch notifications, because the onEndBatch notifications are yet to come.
-            // We may think about doing the reverse on remove, though I currently see no need:
-            for (let i = this.mBatchCount; i--;) {
-                iface.onStartBatch();
+cal.getCalendarDirectory = function() {
+    if (cal.getCalendarDirectory.mDir === undefined) {
+        let dir = Services.dirsvc.get("ProfD", Components.interfaces.nsIFile);
+        dir.append("calendar-data");
+        if (!dir.exists()) {
+            try {
+                dir.create(Components.interfaces.nsIFile.DIRECTORY_TYPE, 0o700);
+            } catch (exc) {
+                cal.ASSERT(false, exc);
+                throw exc;
             }
         }
+        cal.getCalendarDirectory.mDir = dir;
     }
+    return cal.getCalendarDirectory.mDir.clone();
 };
 
 /**
@@ -504,7 +491,7 @@ cal.ProviderBase.prototype = {
 
     initProviderBase: function() {
         this.wrappedJSObject = this;
-        this.mObservers = new cal.ObserverBag(Components.interfaces.calIObserver);
+        this.mObservers = new cal.data.ObserverSet(Components.interfaces.calIObserver);
         this.mProperties = {};
         this.mProperties.currentStatus = Components.results.NS_OK;
     },
@@ -534,22 +521,6 @@ cal.ProviderBase.prototype = {
                 }
             }
         }
-
-        let takeOverIfNotPresent = (oldPref, newPref, dontDeleteOldPref) => {
-            let val = calMgr.getCalendarPref_(this, oldPref);
-            if (val !== null) {
-                if (!dontDeleteOldPref) {
-                    calMgr.deleteCalendarPref_(this, oldPref);
-                }
-                if (calMgr.getCalendarPref_(this, newPref) === null) {
-                    calMgr.setCalendarPref_(this, newPref, val);
-                }
-            }
-        };
-
-        // takeover lightning calendar visibility from 0.5:
-        takeOverIfNotPresent("lightning-main-in-composite", "calendar-main-in-composite");
-        takeOverIfNotPresent("lightning-main-default", "calendar-main-default");
 
         return aValue;
     },
@@ -787,7 +758,7 @@ cal.ProviderBase.prototype = {
 
     // void removeObserver( in calIObserver observer );
     removeObserver: function(aObserver) {
-        this.mObservers.remove(aObserver);
+        this.mObservers.delete(aObserver);
     },
 
     // calISchedulingSupport: Implementation corresponding to our iTIP/iMIP support

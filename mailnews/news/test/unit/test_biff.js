@@ -3,7 +3,7 @@
 
 load("../../../resources/filterTestUtils.js");
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 function run_test() {
   // Set up the server and add in filters
@@ -43,6 +43,6 @@ function run_test() {
   // have 1 read message, either we're not running the filters on biff, or the
   // filters aren't working. This is disambiguated by the test_filter.js test.
   let folder = localserver.rootFolder.getChildNamed("test.filter");
-  do_check_eq(folder.getTotalMessages(false), folder.getNumUnread(false) + 1);
+  Assert.equal(folder.getTotalMessages(false), folder.getNumUnread(false) + 1);
   server.stop();
 }

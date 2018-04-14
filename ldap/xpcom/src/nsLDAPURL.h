@@ -1,5 +1,5 @@
 /* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*-
- * 
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -19,7 +19,7 @@
  * nsLDAPURL
  *
  * nsLDAPURL uses an nsStandardURL stored in mBaseURL as its main url formatter.
- * 
+ *
  * This is done to ensure that the pre-path sections of the URI are correctly
  * formatted and to re-use the functions for nsIURI as appropriate.
  *
@@ -39,20 +39,30 @@ public:
 
   nsLDAPURL();
 
+protected:
+  virtual nsresult SetSpecInternal(const nsACString &aSpec);
+  virtual nsresult SetScheme(const nsACString &aScheme);
+  virtual nsresult SetUserPass(const nsACString &aUserPass);
+  virtual nsresult SetUsername(const nsACString &aUsername);
+  virtual nsresult SetPassword(const nsACString &aPassword);
+  virtual nsresult SetHostPort(const nsACString &aHostPort);
+  virtual nsresult SetHost(const nsACString &aHost);
+  virtual nsresult SetPort(int32_t aPort);
+  virtual nsresult SetPathQueryRef(const nsACString &aPath);
+  virtual nsresult SetRef(const nsACString &aRef);
+  virtual nsresult SetFilePath(const nsACString &aFilePath);
+  virtual nsresult SetQuery(const nsACString &aQuery);
+  virtual nsresult SetQueryWithEncoding(const nsACString &aQuery, const mozilla::Encoding* aEncoding);
+
 public:
   class Mutator
       : public nsIURIMutator
       , public BaseURIMutator<nsLDAPURL>
   {
     NS_DECL_ISUPPORTS
-    NS_FORWARD_SAFE_NSIURISETTERS(mURI)
+    NS_FORWARD_SAFE_NSIURISETTERS_RET(mURI)
 
     NS_IMETHOD Deserialize(const mozilla::ipc::URIParams& aParams) override
-    {
-      return NS_ERROR_NOT_IMPLEMENTED;
-    }
-
-    NS_IMETHOD Read(nsIObjectInputStream* aStream) override
     {
       return NS_ERROR_NOT_IMPLEMENTED;
     }
@@ -63,8 +73,10 @@ public:
       return NS_OK;
     }
 
-    NS_IMETHOD SetSpec(const nsACString & aSpec) override
+    NS_IMETHOD SetSpec(const nsACString & aSpec, nsIURIMutator** aMutator) override
     {
+      if (aMutator)
+        NS_ADDREF(*aMutator = this);
       return InitFromSpec(aSpec);
     }
 
@@ -74,6 +86,7 @@ public:
 
     friend class nsLDAPURL;
   };
+  friend BaseURIMutator<nsLDAPURL>;
 
 protected:
   enum RefHandlingEnum {

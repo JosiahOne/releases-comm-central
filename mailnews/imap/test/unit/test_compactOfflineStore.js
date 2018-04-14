@@ -12,7 +12,7 @@ load("../../../resources/asyncTestUtils.js");
 load("../../../resources/messageGenerator.js");
 load("../../../resources/alertTestUtils.js");
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 // Globals
 var gRootFolder;
@@ -37,15 +37,9 @@ function addMessagesToServer(messages, mailbox)
   // For every message we have, we need to convert it to a file:/// URI
   messages.forEach(function (message)
   {
-    let URI =
-      Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL);
-    message.spec = URI.spec;
-  });
-
-  // Create the imapMessages and store them on the mailbox
-  messages.forEach(function (message)
-  {
-    mailbox.addMessage(new imapMessage(message.spec, mailbox.uidnext++, []));
+    let URI = Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL);
+    // Create the imapMessage and store it on the mailbox.
+    mailbox.addMessage(new imapMessage(URI.spec, mailbox.uidnext++, []));
   });
 }
 
@@ -73,14 +67,14 @@ function checkOfflineStore(prevOfflineStoreSize) {
       let header = enumerator.getNext();
       // this will verify that the message in the offline store
       // starts with "From " - otherwise, it returns an error.
-      if (header instanceof Components.interfaces.nsIMsgDBHdr &&
+      if (header instanceof Ci.nsIMsgDBHdr &&
          (header.flags & Ci.nsMsgMessageFlags.Offline))
         IMAPPump.inbox.getOfflineFileStream(header.messageKey, offset, size).close();
     }
   }
   // check that the offline store shrunk by at least 100 bytes.
   // (exact calculation might be fragile).
-  do_check_true(prevOfflineStoreSize > IMAPPump.inbox.filePath.fileSize + 100);
+  Assert.ok(prevOfflineStoreSize > IMAPPump.inbox.filePath.fileSize + 100);
 }
 
 var tests = [
@@ -113,7 +107,7 @@ var tests = [
     // check that nstmp file has been cleaned up.
     let tmpFile = gRootFolder.filePath;
     tmpFile.append("nstmp");
-    do_check_false(tmpFile.exists());
+    Assert.ok(!tmpFile.exists());
     dump("deleting one message\n");
     IMAPPump.incomingServer.deleteModel = Ci.nsMsgImapDeleteModels.MoveToTrash;
     let msgHdr = IMAPPump.inbox.msgDatabase.getMsgHdrForMessageID(gMsgId1);
@@ -146,12 +140,12 @@ var tests = [
   function* checkCompactionResult() {
     let tmpFile = gRootFolder.filePath;
     tmpFile.append("nstmp");
-    do_check_false(tmpFile.exists());
+    Assert.ok(!tmpFile.exists());
     checkOfflineStore(gImapInboxOfflineStoreSize);
     asyncUrlListener.OnStopRunningUrl(null, 0);
     yield false;
     let msgHdr = IMAPPump.inbox.msgDatabase.getMsgHdrForMessageID(gMsgId2);
-    do_check_eq(msgHdr.flags & Ci.nsMsgMessageFlags.Offline, 0);
+    Assert.equal(msgHdr.flags & Ci.nsMsgMessageFlags.Offline, 0);
   },
   teardown
 ];
@@ -177,10 +171,10 @@ function setup() {
   // Add a couple of messages to the INBOX
   // this is synchronous, afaik
   addMessagesToServer([{file: gMsgFile1, messageId: gMsgId1},
-                        {file: gMsgFile4, messageId: gMsgId4},
-                        {file: gMsgFile2, messageId: gMsgId2},
-                        {file: gMsgFile5, messageId: gMsgId5}],
-                        IMAPPump.daemon.getMailbox("INBOX"), IMAPPump.inbox);
+                       {file: gMsgFile4, messageId: gMsgId4},
+                       {file: gMsgFile2, messageId: gMsgId2},
+                       {file: gMsgFile5, messageId: gMsgId5}],
+                      IMAPPump.daemon.getMailbox("INBOX"));
 }
 
 // nsIMsgCopyServiceListener implementation - runs next test when copy
@@ -195,7 +189,7 @@ var CopyListener = {
   SetMessageId: function(aMessageId) {},
   OnStopCopy: function(aStatus) {
     // Check: message successfully copied.
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     async_driver();
   }
 };

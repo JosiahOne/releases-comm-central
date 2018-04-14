@@ -4,7 +4,7 @@
 
 /* exported gCalendarGeneralPane */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Global Object to hold methods for the general pref pane
@@ -18,8 +18,8 @@ var gCalendarGeneralPane = {
         let formatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
                                   .getService(Components.interfaces.calIDateTimeFormatter);
 
-        let dateFormattedLong = formatter.formatDateLong(cal.now());
-        let dateFormattedShort = formatter.formatDateShort(cal.now());
+        let dateFormattedLong = formatter.formatDateLong(cal.dtz.now());
+        let dateFormattedShort = formatter.formatDateShort(cal.dtz.now());
 
         // menu items include examples of current date formats.
         document.getElementById("dateformat-long-menuitem")
@@ -56,7 +56,7 @@ var gCalendarGeneralPane = {
 
         let prefValue = document.getElementById("calendar-timezone-local").value;
         if (!prefValue) {
-            prefValue = cal.calendarDefaultTimezone().tzid;
+            prefValue = cal.dtz.defaultTimezone.tzid;
         }
         tzMenuList.value = prefValue;
 

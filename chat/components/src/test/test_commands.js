@@ -2,9 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var {interfaces: Ci, utils: Cu} = Components;
-
-Cu.import("resource:///modules/imServices.jsm");
+ChromeUtils.import("resource:///modules/imServices.jsm");
 // We don't load the command service via Services as we want to access
 // _findCommands in order to avoid having to intercept command execution.
 var imCommands = {};
@@ -75,7 +73,7 @@ function run_test() {
   // particular, the name of the command and whether the first (i.e. preferred)
   // entry in the returned array of commands is a prpl command. (If the latter
   // boolean is not given, false is assumed, if the name is not given, that
-  // corresponds to no commmands being returned.)
+  // corresponds to no commands being returned.)
   let testData = [
     {
       desc: "No conversation argument.",
@@ -127,24 +125,24 @@ function run_test() {
   ];
 
   for (let test of testData) {
-    do_print("The following tests are with: " + test.desc);
+    info("The following tests are with: " + test.desc);
 
     // Check which commands are available in which context.
     let cmdlist = cmdserv.listCommandsForConversation(test.conv, {})
                          .map(aCmd => aCmd.name).sort().join(", ");
-    do_check_eq(cmdlist, test.cmdlist);
+    Assert.equal(cmdlist, test.cmdlist);
 
     for (let testCmd of testCmds) {
-      do_print("Testing command found for '" + testCmd + "'");
+      info("Testing command found for '" + testCmd + "'");
       let expectedResult = test.results.shift();
       let cmdArray = cmdserv._findCommands(test.conv, testCmd);
       // Check whether commands are only returned when appropriate.
-      do_check_eq(cmdArray.length > 0, expectedResult.length > 0);
+      Assert.equal(cmdArray.length > 0, expectedResult.length > 0);
       if (cmdArray.length) {
         // Check if the right command was returned.
-        do_check_eq(cmdArray[0].name, expectedResult[0]);
-        do_check_eq(cmdArray[0].priority == Ci.imICommand.CMD_PRIORITY_PRPL,
-                    !!expectedResult[1]);
+        Assert.equal(cmdArray[0].name, expectedResult[0]);
+        Assert.equal(cmdArray[0].priority == Ci.imICommand.CMD_PRIORITY_PRPL,
+                     !!expectedResult[1]);
       }
     }
   }
@@ -175,8 +173,8 @@ function run_test() {
 
   // Test command execution.
   for (let executionTest of testMessages) {
-    do_print("Testing command execution for '" + executionTest.message + "'");
-    do_check_eq(cmdserv.executeCommand(executionTest.message, fakeConversation), executionTest.result);
+    info("Testing command execution for '" + executionTest.message + "'");
+    Assert.equal(cmdserv.executeCommand(executionTest.message, fakeConversation), executionTest.result);
   }
 
   cmdserv.unInitCommands();

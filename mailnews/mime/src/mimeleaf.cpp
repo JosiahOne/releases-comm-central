@@ -10,6 +10,7 @@
 #include "plstr.h"
 #include "prlog.h"
 #include "nsMimeStringResources.h"
+#include "modmimee.h" // for MimeConverterOutputCallback
 
 #define MIME_SUPERCLASS mimeObjectClass
 MimeDefClass(MimeLeaf, MimeLeafClass, mimeLeafClass, &MIME_SUPERCLASS);
@@ -104,7 +105,7 @@ MimeLeaf_parse_begin (MimeObject *obj)
   else if (!PL_strcasecmp(obj->encoding, ENCODING_BASE64))
   fn = &MimeB64DecoderInit;
   else if (!PL_strcasecmp(obj->encoding, ENCODING_QUOTED_PRINTABLE))
-  leaf->decoder_data = 
+  leaf->decoder_data =
           MimeQPDecoderInit(((MimeConverterOutputCallback)
                         ((MimeLeafClass *)obj->clazz)->parse_decoded_buffer),
                         obj, obj);
@@ -153,7 +154,7 @@ MimeLeaf_parse_buffer (const char *buffer, int32_t size, MimeObject *obj)
     leaf->sizeSoFar = 0;
 
   if (leaf->decoder_data &&
-      obj->options && 
+      obj->options &&
       obj->options->format_out != nsMimeOutput::nsMimeMessageDecrypt
       && obj->options->format_out != nsMimeOutput::nsMimeMessageAttach) {
     int outSize = 0;

@@ -10,7 +10,6 @@
 #include "nsMsgProtocol.h"
 #include "nsCOMPtr.h"
 #include "nsIFile.h"
-#include "nsIChannel.h"
 #include "nsIOutputStream.h"
 #include "nsIMailboxUrl.h"
 // State Flags (Note, I use the word state in terms of storing
@@ -59,7 +58,7 @@ public:
   virtual nsresult LoadUrl(nsIURI * aURL, nsISupports * aConsumer) override;
 
   ////////////////////////////////////////////////////////////////////////////////////////
-  // we suppport the nsIStreamListener interface
+  // we support the nsIStreamListener interface
   ////////////////////////////////////////////////////////////////////////////////////////
 
   NS_IMETHOD OnStartRequest(nsIRequest *request, nsISupports *ctxt) override;
@@ -67,7 +66,7 @@ public:
 
 private:
   nsCOMPtr<nsIMailboxUrl>  m_runningUrl; // the nsIMailboxURL that is currently running
-  nsMailboxAction m_mailboxAction; // current mailbox action associated with this connnection...
+  nsMailboxAction m_mailboxAction; // current mailbox action associated with this connection...
   uint64_t m_msgOffset;
   // Event sink handles
   nsCOMPtr<nsIStreamListener> m_mailboxParser;

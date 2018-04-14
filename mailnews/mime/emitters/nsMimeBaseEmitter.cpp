@@ -10,27 +10,22 @@
 #include "nscore.h"
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
-#include "nsIServiceManager.h"
 #include "prmem.h"
 #include "nsEmitterUtils.h"
 #include "nsMimeStringResources.h"
 #include "msgCore.h"
-#include "nsIComponentManager.h"
 #include "nsEmitterUtils.h"
 #include "nsIMimeStreamConverter.h"
-#include "nsIMimeConverter.h"
 #include "nsMsgMimeCID.h"
 #include "mozilla/Logging.h"
 #include "prprf.h"
 #include "nsIMimeHeaders.h"
-#include "nsIMsgWindow.h"
 #include "nsIMsgMailNewsUrl.h"
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
 #include "nsMsgUtils.h"
 #include "nsTextFormatter.h"
 #include "mozilla/Services.h"
-#include <algorithm>
 
 static mozilla::LazyLogModule gMimeEmitterLogModule("MIME");
 
@@ -476,7 +471,7 @@ nsMimeBaseEmitter::WriteHelper(const nsACString &buf, uint32_t *countWritten)
     uint64_t avail;
     rv = mInputStream->Available(&avail);
     if (NS_SUCCEEDED(rv) && avail) {
-      mOutListener->OnDataAvailable(mChannel, mURL, mInputStream, 0, 
+      mOutListener->OnDataAvailable(mChannel, mURL, mInputStream, 0,
                                     std::min(avail, uint64_t(PR_UINT32_MAX)));
 
       // try writing again...

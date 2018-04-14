@@ -1,6 +1,6 @@
-var elementslib = {}; Components.utils.import('resource://mozmill/modules/elementslib.js', elementslib);
-var mozmill = {}; Components.utils.import('resource://mozmill/modules/mozmill.js', mozmill);
-var controller = {};  Components.utils.import('resource://mozmill/modules/controller.js', controller);
+var elementslib = {}; ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elementslib);
+var mozmill = {}; ChromeUtils.import("chrome://mozmill/content/modules/mozmill.js", mozmill);
+var controller = {};  ChromeUtils.import("chrome://mozmill/content/modules/controller.js", controller);
 
 var test_PrefsContentTab = function() {
   // Bring up preferences controller.

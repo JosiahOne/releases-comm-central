@@ -14,7 +14,6 @@
 #include "nsINNTPProtocol.h"
 #include "nsMsgNewsCID.h"
 #include "nsNNTPProtocol.h"
-#include "nsIDirectoryService.h"
 #include "nsMailDirServiceDefs.h"
 #include "nsMsgUtils.h"
 #include "nsIPrompt.h"
@@ -31,6 +30,8 @@
 #include "nsISimpleEnumerator.h"
 #include "nsMsgUtils.h"
 #include "mozilla/Services.h"
+#include "mozilla/dom/Element.h"
+#include "mozilla/ErrorResult.h"
 #include "nsITreeBoxObject.h"
 
 #define INVALID_VERSION         0
@@ -1733,18 +1734,18 @@ nsNntpIncomingServer::GetCellProperties(int32_t row, nsITreeColumn* col, nsAStri
   col->GetIdConst(&colID);
   if (colID[0] == 's') {
     // if <name> is in our temporary list of subscribed groups
-    // add the "subscribed" property so the check mark shows up
-    // in the "subscribedCol"
+    // add the "subscribed-true" property so the check mark shows up
+    // in the "subscribedColumn2"
     if (mSearchResultSortDescending)
       row = mSubscribeSearchResult.Length() - 1 - row;
     if (mTempSubscribed.Contains(mSubscribeSearchResult.ElementAt(row))) {
-      properties.AssignLiteral("subscribed");
+      properties.AssignLiteral("subscribed-true");
     }
   }
   else if (colID[0] == 'n') {
-    // add the "nntp" property to the "nameCol"
+    // add the "serverType-nntp" property to the "nameColumn2"
     // so we get the news folder icon in the search view
-    properties.AssignLiteral("nntp");
+    properties.AssignLiteral("serverType-nntp");
   }
   return NS_OK;
 }
@@ -1790,7 +1791,7 @@ nsNntpIncomingServer::IsSorted(bool *_retval)
 NS_IMETHODIMP
 nsNntpIncomingServer::CanDrop(int32_t index,
                               int32_t orientation,
-                              nsIDOMDataTransfer *dataTransfer,
+                              nsISupports *dataTransfer,
                               bool *_retval)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
@@ -1799,7 +1800,7 @@ nsNntpIncomingServer::CanDrop(int32_t index,
 NS_IMETHODIMP
 nsNntpIncomingServer::Drop(int32_t row,
                            int32_t orientation,
-                           nsIDOMDataTransfer *dataTransfer)
+                           nsISupports *dataTransfer)
 {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -1836,15 +1837,24 @@ nsNntpIncomingServer::GetImageSrc(int32_t row, nsITreeColumn* col, nsAString& _r
 }
 
 NS_IMETHODIMP
-nsNntpIncomingServer::GetProgressMode(int32_t row, nsITreeColumn* col, int32_t* _retval)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 nsNntpIncomingServer::GetCellValue(int32_t row, nsITreeColumn* col, nsAString& _retval)
 {
-  return NS_OK;
+  if (!IsValidRow(row))
+    return NS_ERROR_UNEXPECTED;
+
+  NS_ENSURE_ARG_POINTER(col);
+
+  const char16_t* colID;
+  col->GetIdConst(&colID);
+
+  nsresult rv = NS_OK;
+  if (colID[0] == 'n') {
+    nsAutoCString str;
+    if (mSearchResultSortDescending)
+      row = mSubscribeSearchResult.Length() - 1 - row;
+    _retval.Assign(NS_ConvertASCIItoUTF16(mSubscribeSearchResult.ElementAt(row)));
+  }
+  return rv;
 }
 
 NS_IMETHODIMP
@@ -1893,7 +1903,8 @@ nsNntpIncomingServer::SetTree(nsITreeBoxObject *tree)
     return NS_OK;
 
   nsAutoString dir;
-  element->GetAttribute(NS_LITERAL_STRING("sortDirection"), dir);
+  nsCOMPtr<Element> element2 = do_QueryInterface(element);
+  element2->GetAttribute(NS_LITERAL_STRING("sortDirection"), dir);
   mSearchResultSortDescending = dir.EqualsLiteral("descending");
   return NS_OK;
 }
@@ -1916,8 +1927,13 @@ nsNntpIncomingServer::CycleHeader(nsITreeColumn* col)
     nsCOMPtr<nsIDOMElement> element;
     col->GetElement(getter_AddRefs(element));
     mSearchResultSortDescending = !mSearchResultSortDescending;
-    element->SetAttribute(dir, mSearchResultSortDescending ?
-      NS_LITERAL_STRING("descending") : NS_LITERAL_STRING("ascending"));
+    nsCOMPtr<Element> element2 = do_QueryInterface(element);
+    mozilla::IgnoredErrorResult rv2;
+    element2->SetAttribute(dir,
+                           mSearchResultSortDescending ?
+                             NS_LITERAL_STRING("descending") :
+                             NS_LITERAL_STRING("ascending"),
+                           rv2);
     mTree->Invalidate();
   }
   return NS_OK;

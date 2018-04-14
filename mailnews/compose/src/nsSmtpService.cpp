@@ -47,14 +47,14 @@ typedef struct _findServerByHostnameEntry {
 } findServerByHostnameEntry;
 
 static NS_DEFINE_CID(kCSmtpUrlCID, NS_SMTPURL_CID);
-static NS_DEFINE_CID(kCMailtoUrlCID, NS_MAILTOURL_CID);
 
-// foward declarations...
+// forward declarations...
 nsresult
 NS_MsgBuildSmtpUrl(nsIFile * aFilePath,
                    nsISmtpServer *aServer,
                    const char* aRecipients,
                    nsIMsgIdentity * aSenderIdentity,
+                   const char * aSender,
                    nsIUrlListener * aUrlListener,
                    nsIMsgStatusFeedback *aStatusFeedback,
                    nsIInterfaceRequestor* aNotificationCallbacks,
@@ -80,6 +80,7 @@ NS_IMPL_ISUPPORTS(nsSmtpService, nsISmtpService, nsIProtocolHandler)
 NS_IMETHODIMP nsSmtpService::SendMailMessage(nsIFile * aFilePath,
                                         const char * aRecipients,
                                         nsIMsgIdentity * aSenderIdentity,
+                                        const char * aSender,
                                         const nsAString & aPassword,
                                         nsIUrlListener * aUrlListener,
                                         nsIMsgStatusFeedback *aStatusFeedback,
@@ -100,7 +101,7 @@ NS_IMETHODIMP nsSmtpService::SendMailMessage(nsIFile * aFilePath,
       smtpServer->SetPassword(aPassword);
 
     // this ref counts urlToRun
-    rv = NS_MsgBuildSmtpUrl(aFilePath, smtpServer, aRecipients, aSenderIdentity,
+    rv = NS_MsgBuildSmtpUrl(aFilePath, smtpServer, aRecipients, aSenderIdentity, aSender,
                             aUrlListener, aStatusFeedback,
                             aNotificationCallbacks, &urlToRun, aRequestDSN);
     if (NS_SUCCEEDED(rv) && urlToRun)	
@@ -116,20 +117,21 @@ NS_IMETHODIMP nsSmtpService::SendMailMessage(nsIFile * aFilePath,
 }
 
 
-// The following are two convience functions I'm using to help expedite building and running a mail to url...
+// The following are two convenience functions I'm using to help expedite building and running a mail to url...
 
 // short cut function for creating a mailto url...
 nsresult NS_MsgBuildSmtpUrl(nsIFile * aFilePath,
                             nsISmtpServer *aSmtpServer,
                             const char * aRecipients,
                             nsIMsgIdentity * aSenderIdentity,
+                            const char * aSender,
                             nsIUrlListener * aUrlListener,
                             nsIMsgStatusFeedback *aStatusFeedback,
                             nsIInterfaceRequestor* aNotificationCallbacks,
                             nsIURI ** aUrl,
                             bool aRequestDSN)
 {
-  // mscott: this function is a convience hack until netlib actually dispatches
+  // mscott: this function is a convenience hack until netlib actually dispatches
   // smtp urls. in addition until we have a session to get a password, host and
   // other stuff from, we need to use default values....
   // ..for testing purposes....
@@ -170,12 +172,13 @@ nsresult NS_MsgBuildSmtpUrl(nsIFile * aFilePath,
     urlSpec.AppendInt(smtpPort);
   }
 
-  nsCOMPtr<nsIMsgMailNewsUrl> url(do_QueryInterface(smtpUrl, &rv));
+  nsCOMPtr<nsIMsgMailNewsUrl> mailnewsurl(do_QueryInterface(smtpUrl, &rv));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  rv = url->SetSpec(urlSpec);
+  rv = mailnewsurl->SetSpecInternal(urlSpec);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  smtpUrl->SetSender(aSender);
   smtpUrl->SetRecipients(aRecipients);
   smtpUrl->SetRequestDSN(aRequestDSN);
   smtpUrl->SetPostMessageFile(aFilePath);
@@ -201,9 +204,9 @@ nsresult NS_MsgBuildSmtpUrl(nsIFile * aFilePath,
   smtpUrl->SetAuthPrompt(smtpAuthPrompt);
 
   if (aUrlListener)
-    url->RegisterListener(aUrlListener);
+    mailnewsurl->RegisterListener(aUrlListener);
   if (aStatusFeedback)
-    url->SetStatusFeedback(aStatusFeedback);
+    mailnewsurl->SetStatusFeedback(aStatusFeedback);
 
   return CallQueryInterface(smtpUrl, aUrl);
 }
@@ -240,7 +243,7 @@ NS_IMETHODIMP nsSmtpService::VerifyLogon(nsISmtpServer *aServer,
   nsCOMPtr <nsIURI> urlToRun;
 
   nsresult rv = NS_MsgBuildSmtpUrl(nullptr, aServer,
-                          nullptr, nullptr, aUrlListener, nullptr,
+                          nullptr, nullptr, nullptr, aUrlListener, nullptr,
                           nullptr , getter_AddRefs(urlToRun), false);
   if (NS_SUCCEEDED(rv) && urlToRun)
   {
@@ -295,8 +298,6 @@ NS_IMETHODIMP nsSmtpService::NewURI(const nsACString &aSpec,
 {
   // get a new smtp url
   nsresult rv;
-  nsCOMPtr<nsIURI> mailtoUrl = do_CreateInstance(kCMailtoUrlCID, &rv);
-  NS_ENSURE_SUCCESS(rv, rv);
 
   nsAutoCString utf8Spec;
   if (aOriginCharset)
@@ -309,11 +310,18 @@ NS_IMETHODIMP nsSmtpService::NewURI(const nsACString &aSpec,
 
   // utf8Spec is filled up only when aOriginCharset is specified and
   // the conversion is successful. Otherwise, fall back to aSpec.
-  if (aOriginCharset && NS_SUCCEEDED(rv))
-    rv = mailtoUrl->SetSpec(utf8Spec);
-  else
-    rv = mailtoUrl->SetSpec(aSpec);
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIURI> mailtoUrl;
+  if (aOriginCharset && NS_SUCCEEDED(rv)) {
+    rv = NS_MutateURI(new nsMailtoUrl::Mutator())
+           .SetSpec(utf8Spec)
+           .Finalize(mailtoUrl);
+    NS_ENSURE_SUCCESS(rv, rv);
+  } else {
+    rv = NS_MutateURI(new nsMailtoUrl::Mutator())
+           .SetSpec(aSpec)
+           .Finalize(mailtoUrl);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
 
   mailtoUrl.forget(_retval);
   return NS_OK;

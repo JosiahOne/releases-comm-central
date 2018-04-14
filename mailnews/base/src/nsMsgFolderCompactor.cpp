@@ -33,7 +33,6 @@
 #include "nsIMsgFolderNotificationService.h"
 #include "nsIMsgPluggableStore.h"
 #include "nsMsgFolderCompactor.h"
-#include <algorithm>
 #include "nsIOutputStream.h"
 #include "nsIInputStream.h"
 #include "nsPrintfCString.h"
@@ -1284,7 +1283,7 @@ nsFolderCompactState::EndCopy(nsISupports *url, nsresult aStatus)
     m_totalMsgSize += msgSize;
   }
 
-//  m_db->Commit(nsMsgDBCommitType::kLargeCommit);  // no sense commiting until the end
+//  m_db->Commit(nsMsgDBCommitType::kLargeCommit);  // no sense committing until the end
   // advance to next message
   m_curIndex ++;
   m_startOfMsg = true;

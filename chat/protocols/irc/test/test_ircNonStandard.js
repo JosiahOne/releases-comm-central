@@ -1,10 +1,10 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 var irc = {};
 Services.scriptloader.loadSubScript("resource:///components/irc.js", irc);
-Components.utils.import("resource:///modules/ircNonStandard.jsm");
+ChromeUtils.import("resource:///modules/ircNonStandard.jsm");
 
 // The function that is under test here.
 var NOTICE = ircNonStandard.commands["NOTICE"];
@@ -88,7 +88,7 @@ function testZncAuth() {
     let result = NOTICE.call(account, message);
 
     // Yes, it was handled.
-    do_check_true(result);
+    Assert.ok(result);
 
     // No sent data and parameters should be unchanged.
     equal(account.buffer.length, 0);

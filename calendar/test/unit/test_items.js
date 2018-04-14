@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function run_test() {
     do_calendar_startup(really_run_test);
@@ -208,7 +208,7 @@ function test_immutable() {
 
     event.setCategories(3, ["a", "b", "c"]);
 
-    equal(event.alarmLastAck.timezone.tzid, cal.UTC().tzid);
+    equal(event.alarmLastAck.timezone.tzid, cal.dtz.UTC.tzid);
 
     event.makeImmutable();
 

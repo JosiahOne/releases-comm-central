@@ -5,12 +5,12 @@
 
 /* This is where functions related to the standalone message window are kept */
 
-Components.utils.import("resource:///modules/jsTreeSelection.js");
-Components.utils.import("resource:///modules/MailUtils.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/AppConstants.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource:///modules/MsgHdrSyntheticView.js");
+ChromeUtils.import("resource:///modules/jsTreeSelection.js");
+ChromeUtils.import("resource:///modules/MailUtils.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/MsgHdrSyntheticView.js");
 
 // from MailNewsTypes.h
 var nsMsgKey_None = 0xFFFFFFFF;
@@ -442,7 +442,7 @@ function actuallyLoadMessage() {
         originViewWrapper = hdrObject.viewWrapperToClone;
     }
     // message header as a separate param?
-    else if (window.arguments[0] instanceof Components.interfaces.nsIMsgDBHdr) {
+    else if (window.arguments[0] instanceof Ci.nsIMsgDBHdr) {
       msgHdr = window.arguments[0];
       originViewWrapper = window.arguments.length > 1 ?
         window.arguments[1] : null;
@@ -482,7 +482,7 @@ function actuallyLoadMessage() {
       gFolderDisplay.view.openSearchView();
       // - load the message
       let messageURI = window.arguments[0];
-      if (messageURI instanceof Components.interfaces.nsIURI)
+      if (messageURI instanceof Ci.nsIURI)
         messageURI = messageURI.spec;
       gMessageDisplay.displayExternalMessage(messageURI);
     }
@@ -803,7 +803,7 @@ function ReloadMessage()
 {
   // If the current message was loaded from a file or attachment, so the dbView
   // can't handle reloading it. Let's do it ourselves, instead.
-  if (window.arguments[0] instanceof Components.interfaces.nsIURI)
+  if (window.arguments[0] instanceof Ci.nsIURI)
     gMessageDisplay.displayExternalMessage(window.arguments[0].spec);
   else
     gFolderDisplay.view.dbView.reloadMessage();
@@ -896,6 +896,7 @@ var MessageWindowController =
       case "cmd_editAsNew":
       case "cmd_editDraftMsg":
       case "cmd_newMsgFromTemplate":
+      case "cmd_editTemplateMsg":
       case "cmd_getNextNMessages":
       case "cmd_find":
       case "cmd_findAgain":
@@ -981,6 +982,7 @@ var MessageWindowController =
       case "cmd_editAsNew":
       case "cmd_editDraftMsg":
       case "cmd_newMsgFromTemplate":
+      case "cmd_editTemplateMsg":
       case "cmd_print":
       case "cmd_printpreview":
       case "button_print":
@@ -1003,7 +1005,6 @@ var MessageWindowController =
       case "cmd_tag8":
       case "cmd_tag9":
       case "button_mark":
-      case "cmd_markAllRead":
       case "cmd_markThreadAsRead":
       case "cmd_markReadByDate":
       case "cmd_viewAllHeader":
@@ -1011,6 +1012,8 @@ var MessageWindowController =
       case "cmd_stop":
       case "cmd_toggleRead":
         return true;
+      case "cmd_markAllRead":
+        return false;
       case "cmd_markAsRead":
         return CanMarkMsgAsRead(true);
       case "cmd_markAsUnread":
@@ -1155,6 +1158,9 @@ var MessageWindowController =
       case "cmd_newMsgFromTemplate":
         MsgNewMessageFromTemplate(null);
         break;
+      case "cmd_editTemplateMsg":
+        MsgEditTemplateMessage(null);
+        break;
       case "cmd_moveToFolderAgain":
         var folder = MailUtils.getFolderForURI(
                        Services.prefs.getCharPref("mail.last_msg_movecopy_target_uri"));
@@ -1252,7 +1258,7 @@ var MessageWindowController =
         gFolderDisplay.doCommand(nsMsgViewCommandType.markThreadRead);
         return;
       case "cmd_markAllRead":
-        MsgMarkAllRead();
+        MsgMarkAllRead();  // Won't run since always disabled.
         return;
       case "cmd_markReadByDate":
         MsgMarkReadByDate();

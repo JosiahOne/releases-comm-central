@@ -28,9 +28,7 @@
 #include "nsMsgUtils.h"
 #include "nsIMsgHdr.h"
 #include "nsIProgressEventSink.h"
-#include "nsAlgorithm.h"
 #include "nsServiceManagerUtils.h"
-#include <algorithm>
 
 using namespace mozilla;
 
@@ -202,9 +200,9 @@ NS_IMETHODIMP nsImapUrl::SetImapServerSink(nsIImapServerSink  * aImapServerSink)
 // End nsIImapUrl specific support
 ////////////////////////////////////////////////////////////////////////////////////
 
-NS_IMETHODIMP nsImapUrl::SetSpec(const nsACString &aSpec)
+nsresult nsImapUrl::SetSpecInternal(const nsACString &aSpec)
 {
-  nsresult rv = nsMsgMailNewsUrl::SetSpec(aSpec);
+  nsresult rv = nsMsgMailNewsUrl::SetSpecInternal(aSpec);
   if (NS_SUCCEEDED(rv))
   {
     m_validUrl = true;  // assume the best.
@@ -213,7 +211,7 @@ NS_IMETHODIMP nsImapUrl::SetSpec(const nsACString &aSpec)
   return rv;
 }
 
-NS_IMETHODIMP nsImapUrl::SetQuery(const nsACString &aQuery)
+nsresult nsImapUrl::SetQuery(const nsACString &aQuery)
 {
   nsresult rv = nsMsgMailNewsUrl::SetQuery(aQuery);
   if (NS_SUCCEEDED(rv))
@@ -332,7 +330,7 @@ NS_IMETHODIMP nsImapUrl::GetImapPartToFetch(char **result)
 {
   //  here's the old code....
 
-  // unforunately an imap part can have the form: /;section= OR
+  // unfortunately an imap part can have the form: /;section= OR
   // it can have the form ?section=. We need to look for both.
   if (m_listOfMessageIds)
   {

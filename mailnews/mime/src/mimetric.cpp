@@ -40,7 +40,7 @@ MimeRichtextConvert (const char *line, int32_t length,
            bool enriched_p)
 {
   /* RFC 1341 (the original MIME spec) defined text/richtext.
-   RFC 1563 superceded text/richtext with text/enriched.
+   RFC 1563 superseded text/richtext with text/enriched.
    The changes from text/richtext to text/enriched are:
     - CRLF semantics are different
     - << maps to <
@@ -76,7 +76,7 @@ MimeRichtextConvert (const char *line, int32_t length,
   if ( (uint32_t)length >= ( (uint32_t) 0xfffffffe)/BGROWTH )
       return -1;
   desired_size = (length * BGROWTH) + 1;
-#undef BGROWTH  
+#undef BGROWTH
   if (desired_size >= (uint32_t) *obuffer_sizeP)
   status = mime_GrowBuffer (desired_size, sizeof(char), 1024,
                obufferP, obuffer_sizeP);
@@ -125,7 +125,7 @@ MimeRichtextConvert (const char *line, int32_t length,
 
     this_end++;
 
-    /* Push out the text preceeding the tag. */
+    /* Push out the text preceding the tag. */
     if (last_end && last_end != this_start)
     {
       memcpy (out, last_end, this_start - last_end);
@@ -138,16 +138,16 @@ MimeRichtextConvert (const char *line, int32_t length,
     break;
     else if (*this_start == '&')
     {
-      PL_strncpyz (out, "&amp;", outlen); 
+      PL_strncpyz (out, "&amp;", outlen);
       addedlen = strlen(out);
-      outlen -= addedlen; 
+      outlen -= addedlen;
       out += addedlen;
     }
     else if (*this_start == '>')
     {
-      PL_strncpyz (out, "&gt;", outlen); 
-      addedlen = strlen(out); 
-      outlen -= addedlen; 
+      PL_strncpyz (out, "&gt;", outlen);
+      addedlen = strlen(out);
+      outlen -= addedlen;
       out += addedlen;
     }
     else if (enriched_p &&
@@ -155,9 +155,9 @@ MimeRichtextConvert (const char *line, int32_t length,
          this_start[0] == '<' &&
          this_start[1] == '<')
     {
-      PL_strncpyz (out, "&lt;", outlen); 
-      addedlen = strlen(out); 
-      outlen -= addedlen; 
+      PL_strncpyz (out, "&lt;", outlen);
+      addedlen = strlen(out);
+      outlen -= addedlen;
       out += addedlen;
     }
     else if (this_start != this_end)

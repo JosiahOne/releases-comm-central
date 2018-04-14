@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource:///modules/imServices.jsm");
+ChromeUtils.import("resource:///modules/imServices.jsm");
 
 this.EXPORTED_SYMBOLS = [
   "cleanupImMarkup", // used to clean up incoming IMs.
@@ -11,7 +11,7 @@ this.EXPORTED_SYMBOLS = [
   "createDerivedRuleset", // used to create a ruleset that inherits from the
                           // default one
                           // useful if you want to allow or forbid
-                          // an additionnal thing in a specific
+                          // an additional thing in a specific
                           // conversation but take into account all
                           // the other global settings.
   "addGlobalAllowedTag",
@@ -249,13 +249,14 @@ function cleanupNode(aNode, aRules, aTextModifiers)
 {
   for (let i = 0; i < aNode.childNodes.length; ++i) {
     let node = aNode.childNodes[i];
-    if (node instanceof Components.interfaces.nsIDOMHTMLElement) {
+    if (node.nodeType == node.ELEMENT_NODE &&
+        node.namespaceURI == "http://www.w3.org/1999/xhtml") {
       // check if node allowed
       let nodeName = node.localName;
       if (!(nodeName in aRules.tags)) {
         if (nodeName in kForbiddenTags) {
-          Components.utils.reportError("removing a " + nodeName +
-                                       " tag from a message before display");
+          Cu.reportError("removing a " + nodeName +
+                         " tag from a message before display");
         }
         else {
           // this node is not allowed, replace it with its children
@@ -275,7 +276,7 @@ function cleanupNode(aNode, aRules, aTextModifiers)
       // cleanup attributes
       let attrs = node.attributes;
       let acceptFunction = function(aAttrRules, aAttr) {
-        // an attribute is always accepted if its rule is true, or conditionnaly
+        // an attribute is always accepted if its rule is true, or conditionally
         // accepted if its rule is a function that evaluates to true
         // if its rule does not exist, it is refused
           let localName = aAttr.localName;
@@ -303,6 +304,18 @@ function cleanupNode(aNode, aRules, aTextModifiers)
           --j;
         }
       }
+      // Sort the style attributes for easier checking/comparing later.
+      if (node.hasAttribute("style")) {
+        let trailingSemi = false;
+        let attrs = node.getAttribute("style").trim();
+        if (attrs.endsWith(";")) {
+          attrs = attrs.slice(0, -1);
+          trailingSemi = true;
+        }
+        attrs = attrs.split(";").map(a => a.trim());
+        attrs.sort();
+        node.setAttribute("style", attrs.join("; ") + (trailingSemi?";":""));
+      }
     }
     else {
       // We are on a text node, we need to apply the functions
@@ -327,7 +340,8 @@ function cleanupNode(aNode, aRules, aTextModifiers)
           // If we are processing nodes created by one of the previous
           // text modifier function, some of the nodes are likely not
           // text node, skip them.
-          if (!(textNode instanceof Components.interfaces.nsIDOMText))
+          if (textNode.nodeType != textNode.TEXT_NODE &&
+              textNode.nodeType != textNode.CDATA_SECTION_NODE)
             continue;
 
           let result = modifier(textNode);
@@ -346,8 +360,8 @@ function cleanupImMarkup(aText, aRuleset, aTextModifiers = [])
   if (!gGlobalRuleset)
     initGlobalRuleset();
 
-  let parser = Components.classes["@mozilla.org/xmlextras/domparser;1"]
-                         .createInstance(Components.interfaces.nsIDOMParser);
+  let parser = Cc["@mozilla.org/xmlextras/domparser;1"]
+                 .createInstance(Ci.nsIDOMParser);
   // Wrap the text to be parsed in a <span> to avoid losing leading whitespace.
   let doc = parser.parseFromString("<span>" + aText + "</span>", "text/html");
   let span = doc.querySelector("span");

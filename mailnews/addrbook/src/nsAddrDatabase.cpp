@@ -31,7 +31,6 @@
 #include "nsIPrefBranch.h"
 #include "nsIAbManager.h"
 #include "mozilla/Services.h"
-#include <algorithm>
 
 #define ID_PAB_TABLE            1
 #define ID_DELETEDCARDS_TABLE           2
@@ -472,10 +471,8 @@ NS_IMETHODIMP nsAddrDatabase::OpenMDB(nsIFile *dbName, bool create)
   if (NS_SUCCEEDED(ret))
   {
     nsIMdbThumb *thumb = nullptr;
-    nsAutoCString filePath;
 
-    ret = dbName->GetNativePath(filePath);
-    NS_ENSURE_SUCCESS(ret, ret);
+    PathString filePath = dbName->NativePath();
 
     nsIMdbHeap* dbHeap = nullptr;
 

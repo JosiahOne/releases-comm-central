@@ -2,11 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/AddonManager.jsm");
-Components.utils.import("resource:///modules/StringBundle.js");
-Components.utils.import("resource://gre/modules/BrowserUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
+ChromeUtils.import("resource:///modules/StringBundle.js");
+ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
+ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
 
 function tabProgressListener(aTab, aStartsBlank) {
   this.mTab = aTab;
@@ -66,7 +67,7 @@ tabProgressListener.prototype =
       // by a pushState or a replaceState. See bug 550565.
       if (aWebProgress.isLoadingDocument &&
           !(this.mBrowser.docShell.loadType &
-            Components.interfaces.nsIDocShell.LOAD_CMD_PUSHSTATE))
+            Ci.nsIDocShell.LOAD_CMD_PUSHSTATE))
         this.mBrowser.mIconURL = null;
 
       var location = aLocationURI ? aLocationURI.spec : "";
@@ -94,8 +95,8 @@ tabProgressListener.prototype =
 
     var oldBlank = this.mBlank;
 
-    const nsIWebProgressListener = Components.interfaces.nsIWebProgressListener;
-    const nsIChannel = Components.interfaces.nsIChannel;
+    const nsIWebProgressListener = Ci.nsIWebProgressListener;
+    const nsIChannel = Ci.nsIChannel;
     let tabmail = document.getElementById("tabmail");
 
     if (aStateFlags & nsIWebProgressListener.STATE_START) {
@@ -153,9 +154,9 @@ tabProgressListener.prototype =
       this.mProgressListener.onRefreshAttempted(aWebProgress, aURI, aDelay,
         aSameURI);
   },
-  QueryInterface: XPCOMUtils.generateQI([Components.interfaces.nsIWebProgressListener,
-                                         Components.interfaces.nsIWebProgressListener2,
-                                         Components.interfaces.nsISupportsWeakReference])
+  QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener,
+                                         Ci.nsIWebProgressListener2,
+                                         Ci.nsISupportsWeakReference])
 };
 
 var DOMLinkHandler = {
@@ -197,18 +198,16 @@ var DOMLinkHandler = {
         // something we shouldn't. Firefox does this, so we're doing the same.
           try {
             Services.scriptSecurityManager.checkLoadURIWithPrincipal(targetDoc.nodePrincipal, uri,
-                                           Components.interfaces.nsIScriptSecurityManager.DISALLOW_SCRIPT);
+                                           Ci.nsIScriptSecurityManager.DISALLOW_SCRIPT);
           }
           catch (ex) {
             return;
           }
       }
 
-      const nsIContentPolicy = Components.interfaces.nsIContentPolicy;
-
       try {
-        var contentPolicy = Components.classes["@mozilla.org/layout/content-policy;1"]
-          .getService(nsIContentPolicy);
+        var contentPolicy = Cc["@mozilla.org/layout/content-policy;1"]
+                              .getService(Ci.nsIContentPolicy);
       }
       catch (e) {
         // Refuse to load if we can't do a security check.
@@ -219,10 +218,15 @@ var DOMLinkHandler = {
       // ensure that the image loaded always obeys the content policy. There
       // may have been a chance that it was cached and we're trying to load it
       // direct from the cache and not the normal route.
-      if (contentPolicy.shouldLoad(nsIContentPolicy.TYPE_IMAGE,
-                                   uri, targetDoc.documentURIObject,
-                                   link, link.type, null) !=
-                                   nsIContentPolicy.ACCEPT)
+      let tmpChannel = NetUtil.newChannel({
+        uri: uri,
+        loadingNode: targetDoc,
+        securityFlags: Ci.nsILoadInfo.SEC_ONLY_FOR_EXPLICIT_CONTENTSEC_CHECK,
+        contentPolicyType: Ci.nsIContentPolicy.TYPE_IMAGE
+      });
+      let tmpLoadInfo = tmpChannel.loadInfo;
+      if (contentPolicy.shouldLoad(uri, tmpLoadInfo, link.type) !=
+                                   Ci.nsIContentPolicy.ACCEPT)
         return;
 
       let tab = document.getElementById("tabmail")
@@ -450,15 +454,15 @@ var specialTabs = {
   get _protocolSvc() {
     delete this._protocolSvc;
     return this._protocolSvc =
-      Components.classes["@mozilla.org/uriloader/external-protocol-service;1"]
-                .getService(Components.interfaces.nsIExternalProtocolService);
+      Cc["@mozilla.org/uriloader/external-protocol-service;1"]
+        .getService(Ci.nsIExternalProtocolService);
   },
 
   get mFaviconService() {
     delete this.mFaviconService;
     return this.mFaviconService =
-      Components.classes["@mozilla.org/browser/favicon-service;1"]
-                .getService(Components.interfaces.nsIFaviconService);
+      Cc["@mozilla.org/browser/favicon-service;1"]
+        .getService(Ci.nsIFaviconService);
   },
 
   /**
@@ -528,7 +532,8 @@ var specialTabs = {
     let onDownload = (aEvent => {
       let request = aEvent.target;
       let dom = request.response;
-      if (request.status != 200 || !(dom instanceof Ci.nsIDOMHTMLDocument)) {
+      if (request.status != 200 ||
+          ChromeUtils.getClassName(dom) !== "HTMLDocument") {
         onDownloadError(aEvent);
         return;
       }
@@ -570,9 +575,7 @@ var specialTabs = {
     // window.
     // Wire up session and global history before any possible
     // progress notifications for back/forward button updating
-    browser.webNavigation.sessionHistory =
-      Components.classes["@mozilla.org/browser/shistory;1"]
-                .createInstance(Components.interfaces.nsISHistory);
+    browser.docShell.initSessionHistory();
     Services.obs.addObserver(browser, "browser:purge-session-history");
 
     // remove the disablehistory attribute so the browser cleans up, as
@@ -583,7 +586,7 @@ var specialTabs = {
     try {
       browser.docShell.useGlobalHistory = true;
     } catch(ex) {
-      Components.utils.reportError("Places database may be locked: " + ex);
+      Cu.reportError("Places database may be locked: " + ex);
     }
 
     Services.obs.addObserver(specialTabs, "mail-startup-done");
@@ -719,15 +722,15 @@ var specialTabs = {
       }
 
       // Create a filter and hook it up to our browser
-      let filter = Components.classes["@mozilla.org/appshell/component/browser-status-filter;1"]
-                             .createInstance(Components.interfaces.nsIWebProgress);
+      let filter = Cc["@mozilla.org/appshell/component/browser-status-filter;1"]
+                     .createInstance(Ci.nsIWebProgress);
       aTab.filter = filter;
-      aTab.browser.webProgress.addProgressListener(filter, Components.interfaces.nsIWebProgress.NOTIFY_ALL);
+      aTab.browser.webProgress.addProgressListener(filter, Ci.nsIWebProgress.NOTIFY_ALL);
 
       // Wire up a progress listener to the filter for this browser
       aTab.progressListener = new tabProgressListener(aTab, false);
 
-      filter.addProgressListener(aTab.progressListener, Components.interfaces.nsIWebProgress.NOTIFY_ALL);
+      filter.addProgressListener(aTab.progressListener, Ci.nsIWebProgress.NOTIFY_ALL);
 
       if ("onListener" in aArgs)
         aArgs.onListener(aTab.browser, aTab.progressListener);
@@ -817,13 +820,13 @@ var specialTabs = {
    * Shows the what's new page in a content tab.
    */
   showWhatsNewPage: function onShowWhatsNewPage() {
-    let um = Components.classes["@mozilla.org/updates/update-manager;1"]
-               .getService(Components.interfaces.nsIUpdateManager);
+    let um = Cc["@mozilla.org/updates/update-manager;1"]
+               .getService(Ci.nsIUpdateManager);
 
     try {
       // If the updates.xml file is deleted then getUpdateAt will throw.
       var update = um.getUpdateAt(0)
-                     .QueryInterface(Components.interfaces.nsIPropertyBag);
+                     .QueryInterface(Ci.nsIPropertyBag);
     } catch (x) {
       Cu.reportError("Unable to find update: " + x);
       return;
@@ -1328,7 +1331,6 @@ var specialTabs = {
 
   xpInstallObserver: {
     observe: function (aSubject, aTopic, aData) {
-      const Ci = Components.interfaces;
       let brandBundle = document.getElementById("bundle_brand");
       let messengerBundle = document.getElementById("bundle_messenger");
 

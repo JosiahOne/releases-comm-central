@@ -75,20 +75,21 @@ SummaryFrameManager.prototype = {
     try {
       // Make sure we're responding to the summary frame being loaded, and not
       // some subnode.
-      if (event.originalTarget != this.iframe.contentDocument)
+      if (event.originalTarget != this.iframe.contentDocument ||
+          this.pendingOrLoadedUrl == "about:blank")
         return;
 
       this.callback = this.pendingCallback;
       this.pendingCallback = null;
       if (this.pendingOrLoadedUrl != this.iframe.contentDocument.location.href)
-        Components.utils.reportError(
+        Cu.reportError(
           "Please do not load stuff in the multimessage browser directly, "+
           "use the SummaryFrameManager instead.");
       else if (this.callback)
         this.callback(true);
     }
     catch (e) {
-      Components.utils.reportError(e);
+      Cu.reportError(e);
     }
   }
 };

@@ -7,14 +7,6 @@ include $(moztopsrcdir)/toolkit/mozapps/installer/package-name.mk
 CONFIG_DIR = instgen
 SFX_MODULE = $(commtopsrcdir)/other-licenses/7zstub/thunderbird/7zSD.sfx
 
-DEFINES += -DMOZ_APP_VERSION=$(MOZ_APP_VERSION)
-PRE_RELEASE_SUFFIX := ""
-DEFINES += -DPRE_RELEASE_SUFFIX="$(PRE_RELEASE_SUFFIX)"
-
-ifdef MOZ_UPDATER
-DEFINES += -DMOZ_UPDATER=1
-endif
-
 INSTALLER_FILES = \
 	app.tag \
 	nsis/installer.nsi \
@@ -28,7 +20,6 @@ INSTALLER_FILES += \
 	$(NULL)
 endif
 
-
 BRANDING_FILES = \
 	branding.nsi \
 	wizHeader.bmp \
@@ -36,17 +27,14 @@ BRANDING_FILES = \
 	wizWatermark.bmp \
 	$(NULL)
 
-DEFINES += \
-	-DMOZ_APP_NAME=$(MOZ_APP_NAME) \
-	-DMOZ_APP_DISPLAYNAME='${MOZ_APP_DISPLAYNAME}' \
-	-DMOZILLA_VERSION=${MOZILLA_VERSION} \
-	$(NULL)
+LOCALE_TOPDIR=$(commtopsrcdir)
+LOCALE_RELATIVEDIR=mail/installer/windows
 
 include $(moztopsrcdir)/config/config.mk
 
-ifdef LOCALE_MERGEDIR
+ifdef IS_LANGUAGE_REPACK
 PPL_LOCALE_ARGS = \
-  --l10n-dir=$(LOCALE_MERGEDIR)/mail/installer \
+  --l10n-dir=$(REAL_LOCALE_MERGEDIR)/mail/installer \
   --l10n-dir=$(call EXPAND_LOCALE_SRCDIR,mail/locales)/installer \
   --l10n-dir=$(commtopsrcdir)/mail/locales/en-US/installer \
   $(NULL)
@@ -62,9 +50,10 @@ installer::
 # For building the uninstaller during the application build so it can be
 # included for mar file generation.
 uninstaller::
-	$(RM) -r $(CONFIG_DIR) && mkdir $(CONFIG_DIR)
+	$(RM) -r $(CONFIG_DIR)
+	$(MKDIR) $(CONFIG_DIR)
 	$(INSTALL) $(addprefix $(srcdir)/,$(INSTALLER_FILES)) $(CONFIG_DIR)
-	$(INSTALL) $(addprefix $(DIST)/branding/,$(BRANDING_FILES)) $(CONFIG_DIR)
+	$(INSTALL) $(addprefix $(topsrcdir)/$(MOZ_BRANDING_DIRECTORY)/,$(BRANDING_FILES)) $(CONFIG_DIR)
 	$(call py_action,preprocessor,-Fsubstitution $(DEFINES) $(ACDEFINES) \
 	  $(srcdir)/nsis/defines.nsi.in -o $(CONFIG_DIR)/defines.nsi)
 	$(PYTHON) $(moztopsrcdir)/toolkit/mozapps/installer/windows/nsis/preprocess-locale.py \
@@ -83,14 +72,17 @@ maintenanceservice_installer::
 endif
 
 $(CONFIG_DIR)/setup.exe::
-	$(RM) -r $(CONFIG_DIR) && mkdir $(CONFIG_DIR)
+	$(RM) -r $(CONFIG_DIR)
+	$(MKDIR) $(CONFIG_DIR)
 	$(INSTALL) $(addprefix $(srcdir)/,$(INSTALLER_FILES)) $(CONFIG_DIR)
-	$(INSTALL) $(addprefix $(DIST)/branding/,$(BRANDING_FILES)) $(CONFIG_DIR)
+	$(INSTALL) $(addprefix $(topsrcdir)/$(MOZ_BRANDING_DIRECTORY)/,$(BRANDING_FILES)) $(CONFIG_DIR)
 	$(call py_action,preprocessor,-Fsubstitution $(DEFINES) $(ACDEFINES) \
 	  $(srcdir)/nsis/defines.nsi.in -o $(CONFIG_DIR)/defines.nsi)
 	$(PYTHON) $(moztopsrcdir)/toolkit/mozapps/installer/windows/nsis/preprocess-locale.py \
 	  --preprocess-locale $(moztopsrcdir) \
 	  $(PPL_LOCALE_ARGS) $(AB_CD) $(CONFIG_DIR)
+
+GARBARGE_DIRS += instgen
 
 include $(moztopsrcdir)/config/rules.mk
 include $(moztopsrcdir)/toolkit/mozapps/installer/windows/nsis/makensis.mk

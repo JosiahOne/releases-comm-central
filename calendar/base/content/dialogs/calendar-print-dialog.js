@@ -4,8 +4,8 @@
 
 /* exported loadCalendarPrintDialog, printAndClose, onDatePick */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 /**
  * Gets the calendar view from the opening window
@@ -25,8 +25,8 @@ function loadCalendarPrintDialog() {
     // set the datepickers to the currently selected dates
     let theView = getCalendarView();
     if (theView) {
-        document.getElementById("start-date-picker").value = cal.dateTimeToJsDate(theView.startDay);
-        document.getElementById("end-date-picker").value = cal.dateTimeToJsDate(theView.endDay);
+        document.getElementById("start-date-picker").value = cal.dtz.dateTimeToJsDate(theView.startDay);
+        document.getElementById("end-date-picker").value = cal.dtz.dateTimeToJsDate(theView.endDay);
     } else {
         document.getElementById("printCurrentViewRadio").setAttribute("disabled", true);
     }
@@ -97,10 +97,10 @@ function getPrintSettings(receiverFunc) {
         case "selected": {
             let selectedItems = theView.getSelectedItems({});
             settings.eventList = selectedItems.filter((item) => {
-                if (cal.isEvent(item) && !settings.printEvents) {
+                if (cal.item.isEvent(item) && !settings.printEvents) {
                     return false;
                 }
-                if (cal.isToDo(item) && !settings.printTasks) {
+                if (cal.item.isToDo(item) && !settings.printTasks) {
                     return false;
                 }
                 return true;
@@ -123,10 +123,10 @@ function getPrintSettings(receiverFunc) {
             // We return the time from the timepickers using the selected
             // timezone, as not doing so in timezones with a positive offset
             // from UTC may cause the printout to include the wrong days.
-            let currentTimezone = cal.calendarDefaultTimezone();
-            settings.start = cal.jsDateToDateTime(document.getElementById("start-date-picker").value);
+            let currentTimezone = cal.dtz.defaultTimezone;
+            settings.start = cal.dtz.jsDateToDateTime(document.getElementById("start-date-picker").value);
             settings.start = settings.start.getInTimezone(currentTimezone);
-            settings.end = cal.jsDateToDateTime(document.getElementById("end-date-picker").value);
+            settings.end = cal.dtz.jsDateToDateTime(document.getElementById("end-date-picker").value);
             settings.end = settings.end.getInTimezone(currentTimezone);
             settings.end = settings.end.clone();
             settings.end.day += 1;
@@ -161,7 +161,7 @@ function getPrintSettings(receiverFunc) {
         };
         let filter = getFilter(settings);
         if (filter) {
-            cal.getCompositeCalendar(window.opener).getItems(filter, 0, settings.start, settings.end, listener);
+            cal.view.getCompositeCalendar(window.opener).getItems(filter, 0, settings.start, settings.end, listener);
         } else {
             // No filter means no items, just complete with the empty list set above
             receiverFunc(settings);
@@ -304,7 +304,7 @@ function printAndClose() {
  * Called when once a date has been selected in the datepicker.
  */
 function onDatePick() {
-    cal.calRadioGroupSelectItem("view-field", "custom-range");
+    cal.view.radioGroupSelectItem("view-field", "custom-range");
     setTimeout(refreshHtml, 0);
 }
 

@@ -19,7 +19,7 @@
  * }
  */
 
-Components.utils.import("resource:///modules/errUtils.js");
+ChromeUtils.import("resource:///modules/errUtils.js");
 
 /**
  * Url listener that can wrap another listener and trigger a callback, but
@@ -134,7 +134,7 @@ function async_run(aArgs) {
  */
 function async_driver(val) {
   asyncGeneratorSendValue = val;
-  do_execute_soon(_async_driver);
+  executeSoon(_async_driver);
   return false;
 }
 

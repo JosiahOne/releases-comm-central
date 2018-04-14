@@ -3,12 +3,13 @@
  * Authentication tests for SMTP.
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 load("../../../resources/passwordStorage.js");
 
 var server;
 
+var kIdentityMail = "identity@foo.invalid";
 var kSender = "from@foo.invalid";
 var kTo = "to@foo.invalid";
 var kUsername = "testsmtp";
@@ -43,7 +44,7 @@ add_task(function *() {
     // Start the fake SMTP server
     server.start();
     var smtpServer = getBasicSmtpServer(server.port);
-    var identity = getSmtpIdentity(kSender, smtpServer);
+    var identity = getSmtpIdentity(kIdentityMail, smtpServer);
 
     // This time with auth
     test = "Auth sendMailMessage";
@@ -52,7 +53,7 @@ add_task(function *() {
     smtpServer.socketType = Ci.nsMsgSocketType.plain;
     smtpServer.username = kUsername;
 
-    MailServices.smtp.sendMailMessage(testFile, kTo, identity,
+    MailServices.smtp.sendMailMessage(testFile, kTo, identity, kSender,
                                       null, null, null, null,
                                       false, {}, {});
 
@@ -61,7 +62,7 @@ add_task(function *() {
     var transaction = server.playTransaction();
     do_check_transaction(transaction, ["EHLO test",
                                        "AUTH PLAIN " + AuthPLAIN.encodeLine(kUsername, kPassword),
-                                       "MAIL FROM:<" + kSender + "> BODY=8BITMIME SIZE=155",
+                                       "MAIL FROM:<" + kSender + "> BODY=8BITMIME SIZE=159",
                                        "RCPT TO:<" + kTo + ">",
                                        "DATA"]);
 
@@ -69,7 +70,7 @@ add_task(function *() {
     do_throw(e);
   } finally {
     server.stop();
-  
+
     var thread = gThreadManager.currentThread;
     while (thread.hasPendingEvents())
       thread.processNextEvent(true);

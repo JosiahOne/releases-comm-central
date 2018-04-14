@@ -4,10 +4,10 @@
 
 /* exported taskDetailsView, sendMailToOrganizer, taskViewCopyLink */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/AppConstants.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 var taskDetailsView = {
 
@@ -53,7 +53,7 @@ var taskDetailsView = {
             }
 
             let priority = 0;
-            if (item.calendar.getProperty("capabilities.priority.supported") != false) {
+            if (item.calendar.getProperty("capabilities.priority.supported")) {
                 priority = parseInt(item.priority, 10);
             }
             displayElement("calendar-task-details-priority-label", priority > 0);
@@ -85,7 +85,7 @@ var taskDetailsView = {
                     case "COMPLETED": {
                         if (item.completedDate) {
                             let completedDate = item.completedDate.getInTimezone(
-                                                    cal.calendarDefaultTimezone());
+                                                    cal.dtz.defaultTimezone);
                             statusDetails.value = cal.calGetString(
                                 "calendar",
                                 "taskDetailsStatusCompletedOn",
@@ -119,7 +119,7 @@ var taskDetailsView = {
             let recurrenceInfo = parentItem.recurrenceInfo;
             let recurStart = parentItem.recurrenceStartDate;
             if (displayElement("calendar-task-details-repeat-row", recurrenceInfo && recurStart)) {
-                let kDefaultTimezone = cal.calendarDefaultTimezone();
+                let kDefaultTimezone = cal.dtz.defaultTimezone;
                 let startDate = recurStart.getInTimezone(kDefaultTimezone);
                 let endDate = item.dueDate ? item.dueDate.getInTimezone(kDefaultTimezone) : null;
                 let detailsString = recurrenceRule2String(recurrenceInfo, startDate, endDate, startDate.isDate);
@@ -221,10 +221,10 @@ function sendMailToOrganizer() {
     let item = document.getElementById("calendar-task-tree").currentTask;
     if (item != null) {
         let organizer = item.organizer;
-        let email = cal.getAttendeeEmail(organizer, true);
+        let email = cal.email.getAttendeeEmail(organizer, true);
         let emailSubject = cal.calGetString("calendar-event-dialog", "emailSubjectReply", [item.title]);
         let identity = item.calendar.getProperty("imip.identity");
-        cal.sendMailTo(email, emailSubject, null, identity);
+        cal.email.sendTo(email, emailSubject, null, identity);
     }
 }
 

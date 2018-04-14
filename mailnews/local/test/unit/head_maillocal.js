@@ -1,16 +1,13 @@
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://testing-common/mailnews/mailTestUtils.js");
-Components.utils.import("resource://testing-common/mailnews/localAccountUtils.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://testing-common/mailnews/mailTestUtils.js");
+ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
 
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-var Cr = Components.results;
 var CC = Components.Constructor;
 
 // WebApps.jsm called by ProxyAutoConfig (PAC) requires a valid nsIXULAppInfo.
-Components.utils.import("resource://testing-common/AppInfo.jsm");
+ChromeUtils.import("resource://testing-common/AppInfo.jsm");
 updateAppInfo();
 
 // Ensure the profile directory is set up
@@ -19,11 +16,11 @@ do_get_profile();
 var gDEPTH = "../../../../";
 
 // Import the pop3 server scripts
-Components.utils.import("resource://testing-common/mailnews/maild.js");
-Components.utils.import("resource://testing-common/mailnews/auth.js");
-Components.utils.import("resource://testing-common/mailnews/pop3d.js");
+ChromeUtils.import("resource://testing-common/mailnews/maild.js");
+ChromeUtils.import("resource://testing-common/mailnews/auth.js");
+ChromeUtils.import("resource://testing-common/mailnews/pop3d.js");
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 // Setup the daemon and server
 // If the debugOption is set, then it will be applied to the server.
@@ -118,7 +115,7 @@ function do_check_transaction(real, expected) {
   if (real.them[real.them.length-1] == "QUIT")
     real.them.pop();
 
-  do_check_eq(real.them.join(","), expected.join(","));
+  Assert.equal(real.them.join(","), expected.join(","));
   dump("Passed test " + test + "\n");
 }
 
@@ -167,6 +164,6 @@ function setup_mailbox(type, mailboxPath) {
   return incomingServer.rootFolder;
 }
 
-do_register_cleanup(function() {
+registerCleanupFunction(function() {
   load(gDEPTH + "mailnews/resources/mailShutdown.js");
 });

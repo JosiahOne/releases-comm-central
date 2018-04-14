@@ -12,13 +12,13 @@ load("../../../resources/asyncTestUtils.js");
 load("../../../resources/alertTestUtils.js");
 
 // IMAP pump
-Components.utils.import("resource://testing-common/mailnews/IMAPpump.js");
+ChromeUtils.import("resource://testing-common/mailnews/IMAPpump.js");
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 
 setupIMAPPump("GMail");
-// create our own hander so that we can call imapd functions directly
+// create our own handler so that we can call imapd functions directly
 var handler;
 
 // Definition of tests
@@ -44,7 +44,7 @@ function* setupMailboxes()
 
   handler = IMAPPump.server._handlerCreator(IMAPPump.daemon);
   let response = handler.onError('1', 'LOGIN user password');
-  do_check_true(response.includes('OK'));
+  Assert.ok(response.includes('OK'));
   // wait for imap pump to do its thing or else we get memory leaks
   IMAPPump.inbox.updateFolderWithListener(null, asyncUrlListener);
   yield false;
@@ -55,15 +55,15 @@ function* testXlist()
 {
   let response = handler.onError('2', 'XLIST "" "*"');
 
-  do_check_true(response.includes('* LIST (\\HasNoChildren \\Inbox) "/" "INBOX"'));
-  do_check_true(response.includes('* LIST (\\Noselect \\HasChildren) "/" "[Gmail]"'));
-  do_check_true(response.includes('* LIST (\\HasNoChildren \\AllMail) "/" "[Gmail]/All Mail"'));
-  do_check_true(response.includes('* LIST (\\HasNoChildren \\Drafts) "/" "[Gmail]/Drafts"'));
-  do_check_true(response.includes('* LIST (\\HasNoChildren \\Sent) "/" "[Gmail]/Sent"'));
-  do_check_true(response.includes('* LIST (\\HasNoChildren \\Spam) "/" "[Gmail]/Spam"'));
-  do_check_true(response.includes('* LIST (\\HasNoChildren \\Starred) "/" "[Gmail]/Starred"'));
-  do_check_true(response.includes('* LIST (\\HasNoChildren \\Trash) "/" "[Gmail]/Trash"'));
-  do_check_true(response.includes('* LIST (\\HasNoChildren) "/" "test"'));
+  Assert.ok(response.includes('* LIST (\\HasNoChildren \\Inbox) "/" "INBOX"'));
+  Assert.ok(response.includes('* LIST (\\Noselect \\HasChildren) "/" "[Gmail]"'));
+  Assert.ok(response.includes('* LIST (\\HasNoChildren \\AllMail) "/" "[Gmail]/All Mail"'));
+  Assert.ok(response.includes('* LIST (\\HasNoChildren \\Drafts) "/" "[Gmail]/Drafts"'));
+  Assert.ok(response.includes('* LIST (\\HasNoChildren \\Sent) "/" "[Gmail]/Sent"'));
+  Assert.ok(response.includes('* LIST (\\HasNoChildren \\Spam) "/" "[Gmail]/Spam"'));
+  Assert.ok(response.includes('* LIST (\\HasNoChildren \\Starred) "/" "[Gmail]/Starred"'));
+  Assert.ok(response.includes('* LIST (\\HasNoChildren \\Trash) "/" "[Gmail]/Trash"'));
+  Assert.ok(response.includes('* LIST (\\HasNoChildren) "/" "test"'));
 
   yield true;
 }

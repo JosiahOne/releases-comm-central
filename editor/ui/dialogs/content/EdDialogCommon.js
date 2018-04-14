@@ -30,7 +30,7 @@ var gLocation;
 // The element being edited - so AdvancedEdit can have access to it
 var globalElement;
 
-/* Validate contents of an input field 
+/* Validate contents of an input field
  *
  *  inputWidget    The 'textbox' XUL element for text input of the attribute's value
  *  listWidget     The 'menulist' XUL element for choosing "pixel" or "percent"
@@ -43,8 +43,8 @@ var globalElement;
  *  attName        Name of the attribute to set.  May be null or ignored if "element" is null
  *  mustHaveValue  If true, error dialog is displayed if "value" is empty string
  *
- *  This calls "ValidateNumberRange()", which puts up an error dialog to inform the user. 
- *    If error, we also: 
+ *  This calls "ValidateNumberRange()", which puts up an error dialog to inform the user.
+ *    If error, we also:
  *      Shift focus and select contents of the inputWidget,
  *      Switch to appropriate panel of tabbed dialog if user implements "SwitchToValidate()",
  *      and/or will expand the dialog to full size if "More / Fewer" feature is implemented
@@ -81,7 +81,7 @@ function ValidateNumber(inputWidget, listWidget, minVal, maxVal, element, attNam
       SwitchToValidatePanel();
 
       // or expand dialog for users of "More / Fewer" button
-      if ("dialog" in window && dialog && 
+      if ("dialog" in window && dialog &&
            "MoreSection" in gDialog && gDialog.MoreSection)
       {
         if ( !SeeMore )
@@ -105,7 +105,7 @@ function ValidateNumber(inputWidget, listWidget, minVal, maxVal, element, attNam
   return numString;
 }
 
-/* Validate contents of an input field 
+/* Validate contents of an input field
  *
  *  value          number to validate
  *  minVal         minimum allowed for input widget's value
@@ -385,14 +385,14 @@ function SwitchToValidatePanel()
   // Only EdTableProps.js currently implements this
 }
 
-const nsIFilePicker = Components.interfaces.nsIFilePicker;
+const nsIFilePicker = Ci.nsIFilePicker;
 
 /**
  * @return {Promise} URL spec of the file chosen, or null
  */
 function GetLocalFileURL(filterType)
 {
-  var fp = Components.classes["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
+  var fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
   var fileType = "html";
 
   if (filterType == "img")
@@ -422,7 +422,7 @@ function GetLocalFileURL(filterType)
 
   // set the file picker's current directory to last-opened location saved in prefs
   SetFilePickerDirectory(fp, fileType);
-  
+
   return new Promise(resolve => {
     fp.open(rv => {
       if (rv != nsIFilePicker.returnOK || !fp.file) {
@@ -574,7 +574,7 @@ function SetRelativeCheckbox(checkbox)
 
   var editor = GetCurrentEditor();
   // Mail never allows relative URLs, so hide the checkbox
-  if (editor && (editor.flags & Components.interfaces.nsIPlaintextEditor.eEditorMailMask))
+  if (editor && (editor.flags & Ci.nsIPlaintextEditor.eEditorMailMask))
   {
     checkbox.collapsed = true;
     return;
@@ -619,7 +619,7 @@ function SetRelativeCheckbox(checkbox)
       }
       else
       {
-        // Any other url is assumed 
+        // Any other url is assumed
         //  to be ok to try to make absolute
         enable = true;
       }
@@ -644,7 +644,7 @@ function MakeInputValueRelativeOrAbsolute(checkbox)
     Services.prompt.alert(window, "", GetString("SaveToUseRelativeUrl"));
     window.focus();
   }
-  else 
+  else
   {
     // Note that "checked" is opposite of its last state,
     //  which determines what we want to do here
@@ -911,7 +911,7 @@ function FillLinkMenulist(linkMenulist, headingsArray)
           anchorMap[anchor] = true;
         }
       }
-      
+
       // grab IDs
       if (element.id)
       {
@@ -956,7 +956,7 @@ function FillLinkMenulist(linkMenulist, headingsArray)
     else
     {
       // Don't bother with named anchors in Mail.
-      if (editor && (editor.flags & Components.interfaces.nsIPlaintextEditor.eEditorMailMask))
+      if (editor && (editor.flags & Ci.nsIPlaintextEditor.eEditorMailMask))
       {
         menupopup.remove();
         linkMenulist.removeAttribute("enablehistory");

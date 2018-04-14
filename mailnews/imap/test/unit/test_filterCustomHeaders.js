@@ -7,7 +7,7 @@
  * Original author: David Bienvenu <bienvenu@mozilla.com>
  */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
 
@@ -63,7 +63,7 @@ function* setupTest() {
 
 function* checkFilterResults() {
   let msgHdr = mailTestUtils.firstMsgHdr(IMAPPump.inbox);
-  do_check_true(msgHdr.isRead);
+  Assert.ok(msgHdr.isRead);
   yield true;
 }
 

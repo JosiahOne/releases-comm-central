@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calAlarmUtils.jsm");
-Components.utils.import("resource://calendar/modules/calIteratorUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
 
 calWcapCalendar.prototype.encodeAttendee = function(att) {
     if (LOG_LEVEL > 2) {
@@ -55,9 +55,9 @@ calWcapCalendar.prototype.getRecurrenceParams = function(item, out_rrules, out_r
             } else if (rDateInstance) {
                 // cs does not accept DATEs here:
                 if (isNeg) {
-                    out_exdates.value.push(getIcalUTC(cal.ensureDateTime(rDateInstance.date)));
+                    out_exdates.value.push(getIcalUTC(cal.dtz.ensureDateTime(rDateInstance.date)));
                 } else {
-                    out_rdates.value.push(getIcalUTC(cal.ensureDateTime(rDateInstance.date)));
+                    out_rdates.value.push(getIcalUTC(cal.dtz.ensureDateTime(rDateInstance.date)));
                 }
             } else {
                 this.notifyError(NS_ERROR_UNEXPECTED,
@@ -238,7 +238,7 @@ function equalDatetimes(one, two) {
 function identicalDatetimes(one, two) {
     return (!one && !two) ||
             (equalDatetimes(one, two) &&
-             cal.compareObjects(one.timezone, two.timezone));
+             cal.data.compareObjects(one.timezone, two.timezone));
 }
 
 // @return null if nothing has changed else value to be written
@@ -319,7 +319,7 @@ calWcapCalendar.prototype.storeItem = function(bAddItem, item, oldItem, request)
         return ret || "";
     };
 
-    let bIsEvent = cal.isEvent(item);
+    let bIsEvent = cal.item.isEvent(item);
     let bIsParent = isParent(item);
 
     let method = METHOD_PUBLISH;
@@ -554,7 +554,7 @@ calWcapCalendar.prototype.storeItem = function(bAddItem, item, oldItem, request)
         if (bIsParent) {
             params += "&mod=4"; // THIS AND ALL INSTANCES
         } else {
-            params += "&mod=1&rid=" + getIcalUTC(cal.ensureDateTime(item.recurrenceId)); // THIS INSTANCE
+            params += "&mod=1&rid=" + getIcalUTC(cal.dtz.ensureDateTime(item.recurrenceId)); // THIS INSTANCE
         }
 
         params += "&method=" + method;
@@ -714,7 +714,7 @@ calWcapCalendar.prototype.modifyItem = function(newItem, oldItem, listener) {
                                                  request.unlockPending();
                                              }
                                          },
-                                         stringToXml, cal.isEvent(newItem) ? "deleteevents_by_id" : "deletetodos_by_id",
+                                         stringToXml, cal.item.isEvent(newItem) ? "deleteevents_by_id" : "deletetodos_by_id",
                                          params, calIWcapCalendar.AC_COMP_WRITE);
                 return request;
             }
@@ -752,7 +752,7 @@ calWcapCalendar.prototype.deleteItem = function(item, listener) {
             params += "&mod=4&rid=0";
         } else { // delete THIS INSTANCE:
             // cs does not accept DATE here:
-            params += "&mod=1&rid=" + getIcalUTC(cal.ensureDateTime(item.recurrenceId));
+            params += "&mod=1&rid=" + getIcalUTC(cal.dtz.ensureDateTime(item.recurrenceId));
         }
 
         let orgCalId = getCalId(item.organizer);
@@ -774,7 +774,7 @@ calWcapCalendar.prototype.deleteItem = function(item, listener) {
                                          log("deleteItem(): " + getWcapRequestStatusString(xml), this);
                                      }
                                  },
-                                 stringToXml, cal.isEvent(item) ? "deleteevents_by_id" : "deletetodos_by_id",
+                                 stringToXml, cal.item.isEvent(item) ? "deleteevents_by_id" : "deletetodos_by_id",
                                  params, calIWcapCalendar.AC_COMP_WRITE);
     } catch (exc) {
         request.execRespFunc(exc);
@@ -899,7 +899,7 @@ calWcapCalendar.prototype.parseItems = function(
                 unexpandedItems.push(item);
                 uid2parent[item.id] = item;
             } else if ((maxResults == 0 || items.length < maxResults) &&
-                       cal.checkIfInRange(item, rangeStart, rangeEnd)) {
+                       cal.item.checkIfInRange(item, rangeStart, rangeEnd)) {
                 if (LOG_LEVEL > 2) {
                     log("item: " + item.title + "\n" + item.icalString, this);
                 }
@@ -916,7 +916,7 @@ calWcapCalendar.prototype.parseItems = function(
         let parent = uid2parent[item.id];
 
         if (!parent) { // a parentless one, fake a master and override it's occurrence
-            parent = cal.isEvent(item) ? cal.createEvent() : cal.createTodo();
+            parent = cal.item.isEvent(item) ? cal.createEvent() : cal.createTodo();
             parent.id = item.id;
             parent.calendar = this.superCalendar;
             parent.setProperty("DTSTART", item.recurrenceId);
@@ -1123,8 +1123,8 @@ function getItemFilterParams(itemFilter) {
 }
 
 calWcapCalendar.prototype.getItems = function(itemFilter, maxResults, rangeStart, rangeEnd, listener) {
-    rangeStart = cal.ensureDateTime(rangeStart);
-    rangeEnd = cal.ensureDateTime(rangeEnd);
+    rangeStart = cal.dtz.ensureDateTime(rangeStart);
+    rangeEnd = cal.dtz.ensureDateTime(rangeEnd);
     let zRangeStart = getIcalUTC(rangeStart);
     let zRangeEnd = getIcalUTC(rangeEnd);
 

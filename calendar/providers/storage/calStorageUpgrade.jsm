@@ -68,9 +68,10 @@
 
 /* exported upgradeDB */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calStorageHelpers.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calProviderUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calStorageHelpers.jsm");
 
 // The current database version. Be sure to increment this when you create a new
 // updater.
@@ -649,8 +650,8 @@ upgrade.v2 = upgrade.v1 = function(db, version) { // eslint-disable-line id-leng
         /* While this table is in v1, actually keeping it in the sql object will
          * cause problems when migrating from storage.sdb to local.sqlite. There,
          * all tables from storage.sdb will be moved to local.sqlite and so starting
-         * sunbird again afterwards causes a borked upgrade since its missing tables
-         * it expects.
+         * the application again afterwards causes a borked upgrade since its missing
+         * tables it expects.
          *
          *  cal_calendars: {
          *   id:  "INTEGER PRIMARY KEY",
@@ -1127,7 +1128,7 @@ upgrade.v16 = function(db, version) {
                             // soon, I will just fix this on the "client side"
                             // and do the conversion here.
                             alarmDate.timezone = cal.getTimezoneService().defaultTimezone;
-                            alarmDate = alarmDate.getInTimezone(cal.UTC());
+                            alarmDate = alarmDate.getInTimezone(cal.dtz.UTC);
                         } else {
                             alarmDate.timezone = cal.getTimezoneService().getTimezone(aTzId);
                         }

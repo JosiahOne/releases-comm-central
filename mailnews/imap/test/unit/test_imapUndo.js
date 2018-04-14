@@ -10,7 +10,7 @@
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var gRootFolder;
 var gLastKey;
@@ -18,7 +18,7 @@ var gMessages = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
 var gCopyService = MailServices.copy;
 var gMsgWindow;
 
-Components.utils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 var gMsgFile1 = do_get_file("../../../data/bugmail10");
 var gMsgFile2 = do_get_file("../../../data/bugmail11");
@@ -36,19 +36,14 @@ var gMsgId5 = "bugmail6.m47LtAEf007542@mrapp51.mozilla.org";
 
 
 // Adds some messages directly to a mailbox (eg new mail)
-function addMessagesToServer(messages, mailbox, localFolder)
+function addMessagesToServer(messages, mailbox)
 {
   // For every message we have, we need to convert it to a file:/// URI
   messages.forEach(function (message)
   {
-    message.spec =
-      Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL).spec;
-  });
-
-  // Create the imapMessages and store them on the mailbox
-  messages.forEach(function (message)
-  {
-    mailbox.addMessage(new imapMessage(message.spec, mailbox.uidnext++, []));
+    let URI = Services.io.newFileURI(message.file).QueryInterface(Ci.nsIFileURL);
+    // Create the imapMessage and store it on the mailbox.
+    mailbox.addMessage(new imapMessage(URI.spec, mailbox.uidnext++, []));
   });
 }
 
@@ -81,7 +76,7 @@ var tests = [
     yield false;
 
     // Ensure that the message has been surely deleted.
-    do_check_eq(IMAPPump.inbox.msgDatabase.dBFolderInfo.numMessages, 3);
+    Assert.equal(IMAPPump.inbox.msgDatabase.dBFolderInfo.numMessages, 3);
   },
   function* undoDelete() {
     gMsgWindow.transactionManager.undoTransaction();
@@ -99,8 +94,8 @@ var tests = [
   },
   function verifyFolders() {
     let msgRestored = IMAPPump.inbox.msgDatabase.getMsgHdrForMessageID(gMsgId1);
-    do_check_true(msgRestored !== null);
-    do_check_eq(IMAPPump.inbox.msgDatabase.dBFolderInfo.numMessages, 4);
+    Assert.ok(msgRestored !== null);
+    Assert.equal(IMAPPump.inbox.msgDatabase.dBFolderInfo.numMessages, 4);
   },
   teardown
 ];
@@ -116,7 +111,7 @@ function setup() {
   Services.prefs.setBoolPref("mail.server.server1.offline_download", false);
 
   gMsgWindow = Cc["@mozilla.org/messenger/msgwindow;1"]
-                  .createInstance(Components.interfaces.nsIMsgWindow);
+                  .createInstance(Ci.nsIMsgWindow);
 
   gRootFolder = IMAPPump.incomingServer.rootFolder;
   // these hacks are required because we've created the inbox before
@@ -133,11 +128,11 @@ function setup() {
                        {file: gMsgFile4, messageId: gMsgId4},
                        {file: gMsgFile5, messageId: gMsgId5},
                        {file: gMsgFile2, messageId: gMsgId2}],
-                      IMAPPump.mailbox, IMAPPump.inbox);
+                      IMAPPump.mailbox);
 }
 
 asyncUrlListener.callback = function(aUrl, aExitCode) {
-  do_check_eq(aExitCode, 0);
+  Assert.equal(aExitCode, 0);
 };
 
 function teardown() {

@@ -16,21 +16,17 @@
 @import url("chrome://messenger/skin/messageIcons.css");
 @import url("chrome://messenger/skin/shared/mailWindow1.css");
 
-/* give the toolbox a min-height of 42px for Australis theme */
-.mail-toolbox:not([mode="full"]) > toolbar:only-of-type,
-.mail-toolbox[mode="full"][labelalign="end"] > toolbar:only-of-type {
-  margin-top: 7px;
-  margin-bottom: 7px;
-}
-
 menu > #folderLocationPopup > menu > .menu-iconic-left,
 menu > #folderLocationPopup > menuitem > .menu-iconic-left {
   padding-inline-start: 2px;
 }
 
 #folderTree {
-  border-bottom: 1px solid ThreeDShadow;
   background-color: -moz-OddTreeRow;
+}
+
+#folderTree:not(:-moz-lwtheme) {
+  border-bottom: 1px solid ThreeDShadow;
 }
 
 #threadTree {
@@ -160,7 +156,7 @@ treechildren::-moz-tree-cell-text(imapdeleted) {
 
 /* ..... message pane adjustments ..... */
 
-#messagepanebox {
+#messagepanebox:not(:-moz-lwtheme) {
   border-bottom: 1px solid ThreeDShadow;
 }
 

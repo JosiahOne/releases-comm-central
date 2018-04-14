@@ -58,7 +58,7 @@ BOOL setKeyAndValue(nsAutoCString keyName, const char* subKey,
     }
 
     // Create and open key and subkey.
-    long lResult = RegCreateKeyEx(HKEY_CLASSES_ROOT, theKey.get(), 
+    long lResult = RegCreateKeyEx(HKEY_CLASSES_ROOT, theKey.get(),
                                   0, NULL, REG_OPTION_NON_VOLATILE,
                                   KEY_ALL_ACCESS, NULL, &hKey, NULL);
     if (lResult != ERROR_SUCCESS)
@@ -67,7 +67,7 @@ BOOL setKeyAndValue(nsAutoCString keyName, const char* subKey,
     // Set the Value.
     if (theValue != NULL)
     {
-       lResult = RegSetValueEx(hKey, NULL, 0, REG_SZ, (BYTE *)theValue, 
+       lResult = RegSetValueEx(hKey, NULL, 0, REG_SZ, (BYTE *)theValue,
                       strlen(theValue)+1);
        if (lResult != ERROR_SUCCESS)
            retValue = FALSE;
@@ -91,14 +91,14 @@ LONG recursiveDeleteKey(HKEY hKeyParent,           // Parent of key to delete
         return lRes ;
     }
 
-    // Enumerate all of the decendents of this child.
+    // Enumerate all of the descendants of this child.
     FILETIME time ;
     char szBuffer[MAX_SIZE] ;
     DWORD dwSize = MAX_SIZE ;
     while (RegEnumKeyEx(hKeyChild, 0, szBuffer, &dwSize, NULL,
                         NULL, NULL, &time) == S_OK)
     {
-        // Delete the decendents of this child.
+        // Delete the descendants of this child.
         lRes = recursiveDeleteKey(hKeyChild, szBuffer) ;
         if (lRes != ERROR_SUCCESS)
         {
@@ -234,7 +234,7 @@ HRESULT RegisterServer(const CLSID& clsid,         // Class ID
 
     // Add the version-independent ProgID subkey under HKEY_CLASSES_ROOT.
     if (!setKeyAndValue(independentProgId, NULL, szFriendlyName))
-        return S_FALSE; 
+        return S_FALSE;
     if (!setKeyAndValue(independentProgId, "CLSID", szCLSID))
         return S_FALSE;
     if (!setKeyAndValue(independentProgId, "CurVer", szProgID))
@@ -242,7 +242,7 @@ HRESULT RegisterServer(const CLSID& clsid,         // Class ID
 
     // Add the versioned ProgID subkey under HKEY_CLASSES_ROOT.
     if (!setKeyAndValue(progId, NULL, szFriendlyName))
-        return S_FALSE; 
+        return S_FALSE;
     if (!setKeyAndValue(progId, "CLSID", szCLSID))
         return S_FALSE;
 

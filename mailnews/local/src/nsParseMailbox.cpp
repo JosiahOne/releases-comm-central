@@ -19,10 +19,11 @@
 #include "nsNetUtil.h"
 #include "nsMsgFolderFlags.h"
 #include "nsIMsgFolder.h"
-#include "nsIURL.h"
+#include "nsIMsgFolderNotificationService.h"
 #include "nsIMsgMailNewsUrl.h"
-#include "nsIMsgFilterList.h"
 #include "nsIMsgFilter.h"
+#include "nsIMsgFilterPlugin.h"
+#include "nsIMsgFilterHitNotify.h"
 #include "nsIIOService.h"
 #include "nsNetCID.h"
 #include "nsRDFCID.h"
@@ -34,24 +35,16 @@
 #include "prprf.h"
 #include "prmem.h"
 #include "nsISeekableStream.h"
-#include "nsIMimeHeaders.h"
-#include "nsIMsgMdnGenerator.h"
 #include "nsMsgSearchCore.h"
 #include "nsMailHeaders.h"
 #include "nsIMsgMailSession.h"
-#include "nsIMsgComposeParams.h"
 #include "nsMsgCompCID.h"
-#include "nsIInterfaceRequestor.h"
-#include "nsIInterfaceRequestorUtils.h"
-#include "nsIDocShell.h"
-#include "nsIMsgCompose.h"
 #include "nsIPrefBranch.h"
 #include "nsIPrefService.h"
 #include "nsIMsgComposeService.h"
 #include "nsIMsgCopyService.h"
 #include "nsICryptoHash.h"
 #include "nsIStringBundle.h"
-#include "nsIMsgFilterPlugin.h"
 #include "nsIMutableArray.h"
 #include "nsArrayUtils.h"
 #include "nsIMsgFilterCustomAction.h"
@@ -937,6 +930,12 @@ nsresult nsParseMailMessageState::ParseHeaders ()
 {
   char *buf = m_headers.GetBuffer();
   uint32_t buf_length = m_headers.GetBufferPos();
+  if (buf_length == 0)
+  {
+    // No header of an expected type is present. Consider this a successful
+    // parse so email still shows on summary and can be accessed and deleted.
+    return NS_OK;
+  }
   char *buf_end = buf + buf_length;
   if (!(buf_length > 1 && (buf[buf_length - 1] == '\r' ||
         buf[buf_length - 1] == '\n')))

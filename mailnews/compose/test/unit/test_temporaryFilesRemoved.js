@@ -6,7 +6,7 @@
  * Test that temporary files for draft are surely removed.
  */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gMsgCompose;
 var gExpectedFiles;
@@ -28,7 +28,7 @@ var progressListener = {
         iid.equals(Ci.nsISupports))
       return this;
 
-    throw Components.results.NS_NOINTERFACE;
+    throw Cr.NS_NOINTERFACE;
   }
 };
 
@@ -54,7 +54,7 @@ function collect_expected_temporary_files() {
 
 function check_files_not_exist(files) {
   files.forEach(function(file) {
-    do_check_false(file.exists());
+    Assert.ok(!file.exists());
   });
 }
 
@@ -67,7 +67,7 @@ function check_result() {
 
 function run_test() {
   gExpectedFiles = collect_expected_temporary_files();
-  do_register_cleanup(function() {
+  registerCleanupFunction(function() {
     gExpectedFiles.forEach(function(file) {
       if (file.exists())
         file.remove(false);

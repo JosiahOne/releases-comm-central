@@ -25,7 +25,7 @@ var myEmail2 = "otherme@example.com";
 var identity;
 var identity2;
 
-Cu.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 function setupModule(module) {
   collector.getModule("folder-display-helpers").installInto(module);
@@ -837,7 +837,7 @@ function testReplyToSelfNotOriginalSourceMsgReplyAll() {
     open_compose_with_reply_to_all,
     // To: original To
     // Cc: original Cc (auto-Ccs would have been included here already)
-    // Bcc: auto-bcc minus addressess already in To/Cc
+    // Bcc: auto-bcc minus addresses already in To/Cc
     // Reply-To: original Reply-To
     {
       "addr_to": ["Bart <bart@example.com>",

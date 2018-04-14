@@ -5,10 +5,10 @@
  * adapted from test_imapFilterActions.js
  */
 
-Components.utils.import("resource:///modules/folderUtils.jsm");
-Components.utils.import("resource:///modules/iteratorUtils.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/Task.jsm");
+ChromeUtils.import("resource:///modules/folderUtils.jsm");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Task.jsm");
 
 var nsMsgSearchScope = Ci.nsMsgSearchScope;
 var nsMsgSearchAttrib = Ci.nsMsgSearchAttrib;
@@ -38,8 +38,8 @@ var gMessageSubject = "Hello, did you receive my bugmail?";
 var gMessageInBody = "an HTML message";
 
 // various object references
-var gDbService = Components.classes["@mozilla.org/msgDatabase/msgDBService;1"]
-                             .getService(Components.interfaces.nsIMsgDBService);
+var gDbService = Cc["@mozilla.org/msgDatabase/msgDBService;1"]
+                             .getService(Ci.nsIMsgDBService);
 
 // Definition of tests. The test function name is the filter action
 // being tested, with "Body" appended to tests that use delayed
@@ -86,7 +86,7 @@ var gTestArray =
     // In non-postplugin, count here is 0 and not 1.  Need to investigate.
     testCounts(false, 1, 0, 0);
     let thread = db().GetThreadContainingMsgHdr(gHeader);
-    do_check_neq(0, thread.flags & Ci.nsMsgMessageFlags.Ignored);
+    Assert.notEqual(0, thread.flags & Ci.nsMsgMessageFlags.Ignored);
   },
   function *WatchThread() {
     gAction.type = Ci.nsMsgFilterAction.WatchThread;
@@ -94,14 +94,14 @@ var gTestArray =
     // In non-postplugin, count here is 0 and not 1.  Need to investigate.
     testCounts(false, 1, 0, 0);
     let thread = db().GetThreadContainingMsgHdr(gHeader);
-    do_check_neq(0, thread.flags & Ci.nsMsgMessageFlags.Watched);
+    Assert.notEqual(0, thread.flags & Ci.nsMsgMessageFlags.Watched);
   },
   function *KillSubthread() {
     gAction.type = Ci.nsMsgFilterAction.KillSubthread;
     yield setupTest(gFilter, gAction);
     // In non-postplugin, count here is 0 and not 1.  Need to investigate.
     testCounts(false, 1, 0, 0);
-    do_check_neq(0, gHeader.flags & Ci.nsMsgMessageFlags.Ignored);
+    Assert.notEqual(0, gHeader.flags & Ci.nsMsgMessageFlags.Ignored);
   },
   // this tests for marking message as junk
   function *JunkScore() {

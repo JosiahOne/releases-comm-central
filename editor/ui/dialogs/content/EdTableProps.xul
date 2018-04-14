@@ -7,9 +7,12 @@
 <?xml-stylesheet href="chrome://editor/skin/editor.css" type="text/css"?>
 <?xml-stylesheet href="chrome://editor/skin/EditorDialog.css" type="text/css"?>
 
-<?xul-overlay href="chrome://editor/content/EdDialogOverlay.xul"?> 
-
-<!DOCTYPE dialog SYSTEM "chrome://editor/locale/EditorTableProperties.dtd">
+<!DOCTYPE dialog [
+<!ENTITY % edTableProperties SYSTEM "chrome://editor/locale/EditorTableProperties.dtd">
+%edTableProperties;
+<!ENTITY % edDialogOverlay SYSTEM "chrome://editor/locale/EdDialogOverlay.dtd">
+%edDialogOverlay;
+]>
 
 <dialog title="&tableWindow.title;"
     id="tableDlg"
@@ -131,8 +134,11 @@
         <separator class="groove"/>
         <hbox flex="1" align="center">
           <spacer flex="1"/>
-          <!-- From EdDialogOvlerlay.xul -->
-          <button id="AdvancedEditButton"/>
+          <button id="AdvancedEditButton"
+            oncommand="onAdvancedEdit();"
+            label="&AdvancedEditButton.label;"
+            accesskey="&AdvancedEditButton.accessKey;"
+            tooltiptext="&AdvancedEditButton.tooltip;"/>
         </hbox>
         <spacer flex="1"/>
       </vbox><!-- Table Panel -->
@@ -153,7 +159,8 @@
             <hbox flex="1">
               <button id="PreviousButton"
                       oncommand="MoveSelection(0)"
-                      flex="1">
+                      flex="1"
+                      align="center">
                 <image/>
                 <label value="&cellSelectPrevious.label;"
                        accesskey="&cellSelectPrevious.accessKey;"
@@ -162,7 +169,8 @@
               <button id="NextButton"
                       oncommand="MoveSelection(1)"
                       class="align-right"
-                      flex="1">
+                      flex="1"
+                      align="center">
                 <image/>
                 <label value="&cellSelectNext.label;"
                        accesskey="&cellSelectNext.accessKey;"
@@ -171,7 +179,7 @@
             </hbox>
           </vbox>
           <spacer class="bigspacer"/>
-            <description class="wrap" flex="1">&applyBeforeChange.label;</description> 
+            <description class="wrap" flex="1">&applyBeforeChange.label;</description>
         </groupbox>
         <hbox align="center">
           <!-- cell size groupbox -->
@@ -255,12 +263,15 @@
         <separator class="groove"/>
         <hbox align="center">
           <description class="wrap" flex="1" style="width: 1em">&cellUseCheckboxHelp.label;</description>
-          <!-- From EdDialogOvlerlay.xul -->
-          <button id="AdvancedEditButton2"/>
+          <button id="AdvancedEditButton2"
+                  oncommand="onAdvancedEdit()"
+                  label="&AdvancedEditButton.label;"
+                  accesskey="&AdvancedEditButton.accessKey;"
+                  tooltiptext="&AdvancedEditButton.tooltip;"/>
         </hbox>
         <spacer flex="1"/>
       </vbox><!-- Cell Panel -->
-    </tabpanels> 
+    </tabpanels>
   </tabbox>
   <spacer class="spacer"/>
 </dialog>

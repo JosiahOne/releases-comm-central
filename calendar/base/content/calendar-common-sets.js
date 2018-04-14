@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /* exported injectCalendarCommandController, removeCalendarCommandController,
  *          setupContextItemType, minimonthPick, getSelectedItems,
@@ -275,16 +275,15 @@ var calendarController = {
             // Common Commands
             case "calendar_new_event_command":
                 createEventWithDialog(getSelectedCalendar(),
-                                      cal.getDefaultStartDate(currentView().selectedDay));
+                                      cal.dtz.getDefaultStartDate(currentView().selectedDay));
                 break;
             case "calendar_new_event_context_command": {
                 let newStart = currentView().selectedDateTime;
                 if (!newStart) {
-                    newStart = cal.getDefaultStartDate(currentView().selectedDay);
+                    newStart = cal.dtz.getDefaultStartDate(currentView().selectedDay);
                 }
                 createEventWithDialog(getSelectedCalendar(), newStart,
-                                      null, null, null,
-                                      newStart.isDate == true);
+                                      null, null, null, newStart.isDate);
                 break;
             }
             case "calendar_modify_event_command":
@@ -295,7 +294,7 @@ var calendarController = {
                 if (!focusedElement && this.defaultController && !this.isCalendarInForeground()) {
                     this.defaultController.doCommand(aCommand);
                 } else {
-                    let focusedRichListbox = cal.getParentNodeOrThis(focusedElement, "richlistbox");
+                    let focusedRichListbox = cal.view.getParentNodeOrThis(focusedElement, "richlistbox");
                     if (focusedRichListbox && focusedRichListbox.id == "agenda-listbox") {
                         agendaListbox.editSelectedItem();
                     } else if (focusedElement && focusedElement.className == "calendar-task-tree") {
@@ -314,7 +313,7 @@ var calendarController = {
                 if (!focusedElement && this.defaultController && !this.isCalendarInForeground()) {
                     this.defaultController.doCommand(aCommand);
                 } else {
-                    let focusedRichListbox = cal.getParentNodeOrThis(focusedElement, "richlistbox");
+                    let focusedRichListbox = cal.view.getParentNodeOrThis(focusedElement, "richlistbox");
                     if (focusedRichListbox && focusedRichListbox.id == "agenda-listbox") {
                         agendaListbox.deleteSelectedItem(false);
                     } else if (focusedElement && focusedElement.className == "calendar-task-tree") {
@@ -328,12 +327,12 @@ var calendarController = {
             case "calendar_new_todo_command":
                 createTodoWithDialog(getSelectedCalendar(),
                                      null, null, null,
-                                     cal.getDefaultStartDate(currentView().selectedDay));
+                                     cal.dtz.getDefaultStartDate(currentView().selectedDay));
                 break;
             case "calendar_new_todo_context_command": {
                 let initialDate = currentView().selectedDateTime;
                 if (!initialDate || initialDate.isDate) {
-                    initialDate = cal.getDefaultStartDate(currentView().selectedDay);
+                    initialDate = cal.dtz.getDefaultStartDate(currentView().selectedDay);
                 }
                 createTodoWithDialog(getSelectedCalendar(),
                                      null, null, null,
@@ -343,23 +342,23 @@ var calendarController = {
             case "calendar_new_todo_todaypane_command":
                 createTodoWithDialog(getSelectedCalendar(),
                                      null, null, null,
-                                     cal.getDefaultStartDate(agendaListbox.today.start));
+                                     cal.dtz.getDefaultStartDate(agendaListbox.today.start));
                 break;
             case "calendar_delete_todo_command":
                 deleteToDoCommand();
                 break;
             case "calendar_modify_todo_command":
-                modifyTaskFromContext(null, cal.getDefaultStartDate(currentView().selectedDay));
+                modifyTaskFromContext(null, cal.dtz.getDefaultStartDate(currentView().selectedDay));
                 break;
             case "calendar_modify_todo_todaypane_command":
-                modifyTaskFromContext(null, cal.getDefaultStartDate(agendaListbox.today.start));
+                modifyTaskFromContext(null, cal.dtz.getDefaultStartDate(agendaListbox.today.start));
                 break;
 
             case "calendar_new_calendar_command":
-                cal.openCalendarWizard(window);
+                cal.window.openCalendarWizard(window);
                 break;
             case "calendar_edit_calendar_command":
-                cal.openCalendarProperties(window, getSelectedCalendar());
+                cal.window.openCalendarProperties(window, getSelectedCalendar());
                 break;
             case "calendar_delete_calendar_command":
                 promptDeleteCalendar(getSelectedCalendar());
@@ -386,7 +385,7 @@ var calendarController = {
                 break;
 
             case "calendar_reload_remote_calendars":
-                cal.getCompositeCalendar(window).refresh();
+                cal.view.getCompositeCalendar(window).refresh();
                 break;
             case "calendar_show_unifinder_command":
                 toggleUnifinder();
@@ -481,7 +480,7 @@ var calendarController = {
                     selected_events_requires_network++;
                 }
 
-                if (cal.isInvitation(item)) {
+                if (cal.itip.isInvitation(item)) {
                     selected_events_invitation++;
                 } else if (item.organizer) {
                     // If we are the organizer and there are attendees, then
@@ -522,7 +521,7 @@ var calendarController = {
      * calendar.
      */
     get writable() {
-        return cal.getCalendarManager().getCalendars({}).some(cal.isCalendarWritable);
+        return cal.getCalendarManager().getCalendars({}).some(cal.acl.isCalendarWritable);
     },
 
     /**
@@ -588,7 +587,7 @@ var calendarController = {
         let calendars = cal.getCalendarManager().getCalendars({});
         let count = calendars.length;
         for (let calendar of calendars) {
-            if (!cal.isCalendarWritable(calendar)) {
+            if (!cal.acl.isCalendarWritable(calendar)) {
                 count--;
             }
         }
@@ -620,7 +619,7 @@ var calendarController = {
         let selected_tasks_invitation = 0;
 
         for (let item of selectedTasks) {
-            if (cal.isInvitation(item)) {
+            if (cal.itip.isInvitation(item)) {
                 selected_tasks_invitation++;
             } else if (item.organizer) {
                 // If we are the organizer and there are attendees, then
@@ -642,7 +641,7 @@ var calendarController = {
     get todo_items_writable() {
         let selectedTasks = getSelectedTasks();
         for (let task of selectedTasks) {
-            if (cal.isCalendarWritable(task.calendar)) {
+            if (cal.acl.isCalendarWritable(task.calendar)) {
                 return true;
             }
         }
@@ -739,7 +738,7 @@ var calendarController2 = {
                 break;
             case "button_print":
             case "cmd_print":
-                cal.calPrint(window);
+                cal.window.openPrintDialog(window);
                 break;
 
             // Thunderbird commands
@@ -804,36 +803,46 @@ function removeCalendarCommandController() {
  * Handler function to set up the item context menu, depending on the given
  * items. Changes the delete menuitem to fit the passed items.
  *
- * @param event         The DOM popupshowing event that is triggered by opening
- *                        the context menu.
- * @param items         An array of items (usually the selected items) to adapt
- *                        the context menu for.
- * @return              True, to show the popup menu.
+ * @param  {DOMEvent}              aEvent   The DOM popupshowing event that is
+ *                                   triggered by opening the context menu
+ * @param  {Array.<calIItemBase>}  aItems   An array of items (usually the selected
+ *                                            items) to adapt the context menu for
+ * @return {Boolean}                        True, to show the popup menu.
  */
-function setupContextItemType(event, items) {
+function setupContextItemType(aEvent, aItems) {
     function adaptModificationMenuItem(aMenuItemId, aItemType) {
         let menuItem = document.getElementById(aMenuItemId);
         if (menuItem) {
-            menuItem.setAttribute("label", cal.calGetString("calendar", "delete" + aItemType + "Label"));
-            menuItem.setAttribute("accesskey", cal.calGetString("calendar", "delete" + aItemType + "Accesskey"));
+            menuItem.setAttribute(
+                "label",
+                cal.calGetString("calendar", `delete${aItemType}Label`)
+            );
+            menuItem.setAttribute(
+                "accesskey",
+                cal.calGetString("calendar", `delete${aItemType}Accesskey`)
+            );
         }
     }
-    if (items.some(cal.isEvent) && items.some(cal.isToDo)) {
-        event.target.setAttribute("type", "mixed");
-        adaptModificationMenuItem("calendar-item-context-menu-delete-menuitem", "Item");
-    } else if (items.length && cal.isEvent(items[0])) {
-        event.target.setAttribute("type", "event");
-        adaptModificationMenuItem("calendar-item-context-menu-delete-menuitem", "Event");
-    } else if (items.length && cal.isToDo(items[0])) {
-        event.target.setAttribute("type", "todo");
-        adaptModificationMenuItem("calendar-item-context-menu-delete-menuitem", "Task");
+    if (aItems.some(cal.item.isEvent) && aItems.some(cal.item.isToDo)) {
+        aEvent.target.setAttribute("type", "mixed");
+        adaptModificationMenuItem("calendar-item-context-menu-delete-menuitem",
+                                  "Item");
+    } else if (aItems.length && cal.item.isEvent(aItems[0])) {
+        aEvent.target.setAttribute("type", "event");
+        adaptModificationMenuItem("calendar-item-context-menu-delete-menuitem",
+                                  "Event");
+    } else if (aItems.length && cal.item.isToDo(aItems[0])) {
+        aEvent.target.setAttribute("type", "todo");
+        adaptModificationMenuItem("calendar-item-context-menu-delete-menuitem",
+                                  "Task");
     } else {
-        event.target.removeAttribute("type");
-        adaptModificationMenuItem("calendar-item-context-menu-delete-menuitem", "Item");
+        aEvent.target.removeAttribute("type");
+        adaptModificationMenuItem("calendar-item-context-menu-delete-menuitem",
+                                  "Item");
     }
 
     let menu = document.getElementById("calendar-item-context-menu-attendance-menu");
-    setupAttendanceMenu(menu, items);
+    setupAttendanceMenu(menu, aItems);
 
     return true;
 }
@@ -848,7 +857,7 @@ function setupContextItemType(event, items) {
  */
 function minimonthPick(aNewDate) {
     if (gCurrentMode == "calendar" || gCurrentMode == "task") {
-        let cdt = cal.jsDateToDateTime(aNewDate, currentView().timezone);
+        let cdt = cal.dtz.jsDateToDateTime(aNewDate, currentView().timezone);
         cdt.isDate = true;
         currentView().goToDay(cdt);
 
@@ -910,11 +919,11 @@ function calendarUpdateNewItemsCommand() {
     // re-calculate command status
     CalendarNewEventsCommandEnabled = false;
     CalendarNewTasksCommandEnabled = false;
-    let calendars = cal.getCalendarManager().getCalendars({}).filter(cal.isCalendarWritable).filter(cal.userCanAddItemsToCalendar);
-    if (calendars.some(cal.isEventCalendar)) {
+    let calendars = cal.getCalendarManager().getCalendars({}).filter(cal.acl.isCalendarWritable).filter(cal.acl.userCanAddItemsToCalendar);
+    if (calendars.some(cal.item.isEventCalendar)) {
         CalendarNewEventsCommandEnabled = true;
     }
-    if (calendars.some(cal.isTaskCalendar)) {
+    if (calendars.some(cal.item.isTaskCalendar)) {
         CalendarNewTasksCommandEnabled = true;
     }
 
@@ -933,7 +942,7 @@ function calendarUpdateDeleteCommand(selectedItems) {
 
     /* we must disable "delete" when at least one item cannot be deleted */
     for (let item of selectedItems) {
-        if (!cal.userCanDeleteItemsFromCalendar(item.calendar)) {
+        if (!cal.acl.userCanDeleteItemsFromCalendar(item.calendar)) {
             CalendarDeleteCommandEnabled = false;
             break;
         }

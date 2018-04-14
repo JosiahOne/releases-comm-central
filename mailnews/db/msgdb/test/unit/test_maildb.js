@@ -13,21 +13,21 @@ var kNumTestMessages = 10;
 var gTestArray =
 [
   function test_db_open() {
-    dbService = Components.classes["@mozilla.org/msgDatabase/msgDBService;1"]
-                            .getService(Components.interfaces.nsIMsgDBService);
+    dbService = Cc["@mozilla.org/msgDatabase/msgDBService;1"]
+                            .getService(Ci.nsIMsgDBService);
     // Get the root folder
     let root = localAccountUtils.incomingServer.rootFolder;
     root.createSubfolder("dbTest", null);
     gTestFolder = root.getChildNamed("dbTest");
     let db = dbService.openFolderDB(gTestFolder, true);
-    do_check_neq(db, null);
+    Assert.notEqual(db, null);
     db.dBFolderInfo.highWater = 10;
     db.Close(true);
     db = dbService.openFolderDB(gTestFolder, true);
-    do_check_neq(db, null);
-    do_check_eq(db.dBFolderInfo.highWater, 10);
+    Assert.notEqual(db, null);
+    Assert.equal(db.dBFolderInfo.highWater, 10);
     db.dBFolderInfo.onKeyAdded(15);
-    do_check_eq(db.dBFolderInfo.highWater, 15);
+    Assert.equal(db.dBFolderInfo.highWater, 15);
     db.Close(true);
     db.ForceClosed();
     db = null;
@@ -70,7 +70,7 @@ function doTest(test)
     var testFn = gTestArray[test-1];
     // Set a limit of 10 seconds; if the notifications haven't arrived by then there's a problem.
     do_timeout(10000, function(){
-        if (gCurTestNum == test) 
+        if (gCurTestNum == test)
           do_throw("Notifications not received in 10000 ms for operation " + testFn.name);
         }
       );
@@ -99,7 +99,7 @@ function openMore(db)
     mailTestUtils.do_timeout_function(0, openMore, null, [db]);
   else {
     // just check that we can get something out of the db.
-    do_check_eq(db.dBFolderInfo.numMessages, kNumTestMessages);
+    Assert.equal(db.dBFolderInfo.numMessages, kNumTestMessages);
     db.Close(true);
     db.ForceClosed();
     db = null;

@@ -4,8 +4,8 @@
 
 // This tests that renaming non-ASCII name folder works.
 
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -40,9 +40,9 @@ function* test_rename() {
   yield false;
 
   let folder = rootFolder.getChildNamed("folder \u00e1");
-  do_check_true(folder.msgDatabase.summaryValid);
-  do_check_eq("folder &AOE-", folder.filePath.leafName);
-  do_check_eq("folder \u00e1", folder.prettyName);
+  Assert.ok(folder.msgDatabase.summaryValid);
+  Assert.equal("folder &AOE-", folder.filePath.leafName);
+  Assert.equal("folder \u00e1", folder.prettyName);
 
   yield true;
 }

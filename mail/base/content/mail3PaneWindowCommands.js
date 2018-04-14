@@ -7,10 +7,10 @@
  * consisting of folder pane, thread pane and message pane.
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource:///modules/MailUtils.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource://gre/modules/PluralForm.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/MailUtils.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
 
 // Controller object for folder pane
 var FolderPaneController =
@@ -136,6 +136,7 @@ var DefaultController =
       case "cmd_editAsNew":
       case "cmd_editDraftMsg":
       case "cmd_newMsgFromTemplate":
+      case "cmd_editTemplateMsg":
       case "cmd_createFilterFromMenu":
       case "cmd_delete":
       case "cmd_cancel":
@@ -317,7 +318,7 @@ var DefaultController =
         return gFolderDisplay.selectedCount > 0;
       case "cmd_saveAsTemplate":
         if (gFolderDisplay.selectedCount > 1)
-          return false;   // else fall thru
+          return false;   // else fall through
       case "cmd_reply":
       case "button_reply":
       case "cmd_replySender":
@@ -334,6 +335,7 @@ var DefaultController =
       case "cmd_editAsNew":
       case "cmd_editDraftMsg":
       case "cmd_newMsgFromTemplate":
+      case "cmd_editTemplateMsg":
       case "cmd_openMessage":
       case "button_print":
       case "cmd_print":
@@ -449,7 +451,7 @@ var DefaultController =
       case "cmd_undoCloseTab":
         return (document.getElementById("tabmail").recentlyClosedTabs.length > 0);
       case "cmd_markAllRead":
-        return IsFolderSelected() && gDBView &&
+        return IsFolderSelected() && gDBView && gDBView.msgFolder &&
                gDBView.msgFolder.getNumUnread(false) > 0;
       case "cmd_markReadByDate":
         return IsFolderSelected();
@@ -529,7 +531,7 @@ var DefaultController =
         let folders = gFolderTreeView.getSelectedFolders();
         let canCompact = function canCompact(folder) {
           return !folder.isServer &&
-            !(folder.flags & Components.interfaces.nsMsgFolderFlags.Virtual) &&
+            !(folder.flags & Ci.nsMsgFolderFlags.Virtual) &&
             (folder.server.type != "imap" || folder.server.canCompactFoldersOnServer) &&
             folder.isCommandEnabled("button_compact");
         }
@@ -656,6 +658,9 @@ var DefaultController =
       case "cmd_newMsgFromTemplate":
         MsgNewMessageFromTemplate(null);
         break;
+      case "cmd_editTemplateMsg":
+        MsgEditTemplateMessage(null);
+        break;
       case "cmd_createFilterFromMenu":
         MsgCreateFilter();
         break;
@@ -677,7 +682,7 @@ var DefaultController =
         break;
       case "cmd_cancel":
         let message = gFolderDisplay.selectedMessage;
-        message.folder.QueryInterface(Components.interfaces.nsIMsgNewsFolder)
+        message.folder.QueryInterface(Ci.nsIMsgNewsFolder)
                       .cancelMessage(message, msgWindow);
         break;
       case "button_shiftDelete":
@@ -1185,8 +1190,8 @@ function IsSendUnsentMsgsEnabled(unsentMsgsFolder)
     return false;
 
   var msgSendlater =
-    Components.classes["@mozilla.org/messengercompose/sendlater;1"]
-              .getService(Components.interfaces.nsIMsgSendLater);
+    Cc["@mozilla.org/messengercompose/sendlater;1"]
+      .getService(Ci.nsIMsgSendLater);
 
   // If we're currently sending unsent msgs, disable this cmd.
   if (msgSendlater.sendingMessages)
@@ -1222,7 +1227,7 @@ function IsSubscribeEnabled()
   // it will properly show those.
   let servers = MailServices.accounts.allServers;
   for (let server of fixIterator(servers,
-                                 Components.interfaces.nsIMsgIncomingServer)) {
+                                 Ci.nsIMsgIncomingServer)) {
     if (server.type == "imap" || server.type == "nntp")
       return true;
   }
@@ -1370,7 +1375,7 @@ function CanRenameDeleteJunkMail(aFolderUri)
 
     for (var i = 0; i < allServers.length; i++)
     {
-      var currentServer = allServers.queryElementAt(i, Components.interfaces.nsIMsgIncomingServer);
+      var currentServer = allServers.queryElementAt(i, Ci.nsIMsgIncomingServer);
       var settings = currentServer.spamSettings;
       // If junk mail control or move junk mail to folder option is disabled then
       // allow the folder to be removed/renamed since the folder is not used in this case.

@@ -80,7 +80,7 @@ nsMsgSearchAttribEntry SearchAttribEntryTable[] =
     {nsMsgSearchAttrib::Size,       "size"},
     // this used to be nsMsgSearchAttrib::SenderInAddressBook
     // we used to have two Sender menuitems
-    // for backward compatability, we can still parse
+    // for backward compatibility, we can still parse
     // the old style.  see bug #179803
     {nsMsgSearchAttrib::Sender,     "from in ab"},
     {nsMsgSearchAttrib::JunkStatus, "junk status"},
@@ -787,7 +787,8 @@ nsresult nsMsgSearchTerm::MatchArbitraryHeader (nsIMsgSearchScopeTerm *scope,
 
   while (searchingHeaders)
   {
-    if (bodyHandler->GetNextLine(buf) < 0 || EMPTY_MESSAGE_LINE(buf))
+    nsCString charsetIgnored;
+    if (bodyHandler->GetNextLine(buf, charsetIgnored) < 0 || EMPTY_MESSAGE_LINE(buf))
       searchingHeaders = false;
     bool isContinuationHeader = searchingHeaders ? NS_IsAsciiWhitespace(buf.CharAt(0))
                                                    : false;
@@ -957,22 +958,21 @@ nsresult nsMsgSearchTerm::MatchBody (nsIMsgSearchScopeTerm *scope, uint64_t offs
     (PL_strchr (m_value.string, '=') == nullptr);
 
   nsCString compare;
+  nsCString charset;
   while (!endOfFile && result == boolContinueLoop)
   {
-    if (bodyHan->GetNextLine(buf) >= 0)
+    if (bodyHan->GetNextLine(buf, charset) >= 0)
     {
       bool softLineBreak = false;
       // Do in-place decoding of quoted printable
       if (isQuotedPrintable)
       {
         softLineBreak = StringEndsWith(buf, NS_LITERAL_CSTRING("="));
-        MsgStripQuotedPrintable ((unsigned char*)buf.get());
-        // in case the string shrunk, reset the length. If soft line break,
-        // chop off the last char as well.
-        size_t bufLength = strlen(buf.get());
+        MsgStripQuotedPrintable(buf);
+        // If soft line break, chop off the last char as well.
+        size_t bufLength = buf.Length();
         if ((bufLength > 0) && softLineBreak)
-          --bufLength;
-        buf.SetLength(bufLength);
+          buf.SetLength(bufLength - 1);
       }
       compare.Append(buf);
       // If this line ends with a soft line break, loop around
@@ -986,7 +986,9 @@ nsresult nsMsgSearchTerm::MatchBody (nsIMsgSearchScopeTerm *scope, uint64_t offs
         char startChar = (char) compare.CharAt(0);
         if (startChar != '\r' && startChar != '\n')
         {
-          rv = MatchString(compare, folderCharset, &result);
+          rv = MatchString(compare,
+                           charset.IsEmpty() ? folderCharset : charset.get(),
+                           &result);
           lines++;
         }
         compare.Truncate();

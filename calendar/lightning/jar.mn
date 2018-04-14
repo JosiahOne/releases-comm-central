@@ -33,6 +33,8 @@ lightning.jar:
 % overlay chrome://lightning/content/messenger-overlay-sidebar.xul chrome://lightning/content/suite-overlay-sidebar.xul application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
 % overlay chrome://calendar/content/calendarCreation.xul chrome://lightning/content/lightning-calendar-creation.xul
 % overlay chrome://calendar/content/calendar-properties-dialog.xul chrome://lightning/content/lightning-calendar-properties.xul
+% overlay chrome://lightning/content/lightning-calendar-creation.xul chrome://lightning/content/caldav-lightning-calendar-creation.xul
+% overlay chrome://lightning/content/lightning-calendar-properties.xul chrome://lightning/content/caldav-lightning-calendar-properties.xul
 % override chrome://lightning/skin/accountCentral.css chrome://lightning-common/skin/suite-accountCentral.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
 % content lightning %content/lightning/
     content/lightning/imip-bar.js                          (content/imip-bar.js)
@@ -65,16 +67,23 @@ lightning.jar:
     content/lightning/lightning-item-iframe.js             (content/lightning-item-iframe.js)
     content/lightning/html-item-editing/lightning-item-iframe.html      (content/html-item-editing/lightning-item-iframe.html)
     content/lightning/html-item-editing/react-code.js                   (content/html-item-editing/react-code.js)
+    content/lightning/caldav-lightning-calendar-creation.xul    (../providers/caldav/content/caldav-lightning-calendar-creation.xul)
+    content/lightning/caldav-lightning-calendar-creation.js     (../providers/caldav/content/caldav-lightning-calendar-creation.js)
+    content/lightning/caldav-lightning-calendar-properties.xul  (../providers/caldav/content/caldav-lightning-calendar-properties.xul)
+    content/lightning/caldav-lightning-calendar-properties.js   (../providers/caldav/content/caldav-lightning-calendar-properties.js)
+    content/lightning/caldav-lightning-utils.js                 (../providers/caldav/content/caldav-lightning-utils.js)
+
 % skin lightning classic/1.0 chrome/skin/linux/lightning/
 % skin lightning classic/1.0 chrome/skin/osx/lightning/ os=Darwin
 % skin lightning classic/1.0 chrome/skin/windows/lightning/ os=WINNT
 % skin lightning-common classic/1.0 chrome/skin/lightning-common/
 % style chrome://messenger/content/messageWindow.xul chrome://lightning/skin/lightning.css
-% style chrome://global/content/customizeToolbar.xul chrome://lightning/skin/lightning-toolbar.css
+% style chrome://messenger/content/customizeToolbar.xul chrome://lightning/skin/lightning-toolbar.css
 % style chrome://calendar/content/calendar-event-dialog.xul chrome://communicator/skin/communicator.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
-% style chrome://global/content/customizeToolbar.xul chrome://lightning-common/skin/lightning.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
-% style chrome://global/content/customizeToolbar.xul chrome://calendar-common/skin/dialogs/calendar-event-dialog.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
+% style chrome://messenger/content/customizeToolbar.xul chrome://lightning-common/skin/lightning.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
+% style chrome://messenger/content/customizeToolbar.xul chrome://calendar-common/skin/dialogs/calendar-event-dialog.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
     ../skin/lightning-common/mode-switch-icons.png            (themes/common/images/mode-switch-icons.png)
+    ../skin/lightning-common/todayButton-arrow.svg            (themes/common/images/todayButton-arrow.svg)
     ../skin/lightning-common/suite-accountCentral.css         (themes/common/suite-accountCentral.css)
 
 # Linux theme files
@@ -87,10 +96,6 @@ lightning.jar:
 # OS X theme files
     ../skin/osx/lightning/accountCentral.css                  (themes/osx/accountCentral.css)
     ../skin/osx/lightning/imip.css                            (themes/osx/imip.css)
-    ../skin/osx/lightning/collapse.png                        (themes/osx/collapse.png)
-    ../skin/osx/lightning/collapse@2x.png                     (themes/osx/collapse@2x.png)
-    ../skin/osx/lightning/expand.png                          (themes/osx/expand.png)
-    ../skin/osx/lightning/expand@2x.png                       (themes/osx/expand@2x.png)
     ../skin/osx/lightning/lightning.css                       (themes/osx/lightning.css)
     ../skin/osx/lightning/lightning-toolbar.css               (themes/osx/lightning-toolbar.css)
     ../skin/osx/lightning/lightning-widgets.css               (themes/osx/lightning-widgets.css)

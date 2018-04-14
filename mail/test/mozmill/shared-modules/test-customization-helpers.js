@@ -7,9 +7,9 @@ var MODULE_NAME = "customization-helpers";
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers"];
 
-Cu.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 var elib = {};
-Cu.import('resource://mozmill/modules/elementslib.js', elib);
+ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
 
 var USE_SHEET_PREF = "toolbar.customization.usesheet";
 
@@ -28,7 +28,7 @@ function installInto(module) {
 }
 
 /**
- * Initalize the help for a customization dialog
+ * Initialize the help for a customization dialog
  * @param {} aToolbarId
  *   the ID of the toolbar to be customized
  * @param {} aOpenElementId
@@ -59,7 +59,7 @@ CustomizeDialogHelper.prototype = {
     // either a normal window or embedded into a sheet.
     if (!this._openInWindow) {
       ctc = wh.wait_for_frame_load(aController.e("customizeToolbarSheetIFrame"),
-        "chrome://global/content/customizeToolbar.xul");
+        "chrome://messenger/content/customizeToolbar.xul");
     }
     else {
       ctc = wh.wait_for_existing_window(this._windowType);

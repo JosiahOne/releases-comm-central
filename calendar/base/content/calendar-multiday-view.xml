@@ -92,7 +92,7 @@
 
       <method name="relayout">
         <body><![CDATA[
-            Components.utils.import("resource://calendar/modules/calUtils.jsm");
+            ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
             let topbox = document.getAnonymousElementByAttribute(this, "anonid", "topbox");
             let orient = topbox.getAttribute("orient");
 
@@ -147,7 +147,7 @@
                 let box;
                 if (dur == 60) {
                     jsTime.setHours(theHour, 0, 0);
-                    timeString = timeFormatter.formatTime(cal.jsDateToDateTime(jsTime, cal.floating()));
+                    timeString = timeFormatter.formatTime(cal.dtz.jsDateToDateTime(jsTime, cal.dtz.floating));
                     box = makeTimeBox(timeString, durPix);
                 } else {
                     box = makeTimeBox("", durPix);
@@ -244,10 +244,10 @@
 
     <implementation>
       <constructor><![CDATA[
-          Components.utils.import("resource://calendar/modules/calUtils.jsm");
+          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
           this.mEventInfos = [];
-          this.mTimezone = cal.UTC();
+          this.mTimezone = cal.dtz.UTC;
           this.mSelectedItemIds = {};
       ]]></constructor>
 
@@ -333,7 +333,7 @@
         <setter><![CDATA[
             this.mDate = val;
 
-            if (!cal.compareObjects(val.timezone, this.mTimezone)) {
+            if (!cal.data.compareObjects(val.timezone, this.mTimezone)) {
                 this.mTimezone = val.timezone;
                 if (!this.mLayoutBatchCount) {
                     this.recalculateStartEndMinutes();
@@ -521,11 +521,11 @@
             let stdate = aOccurrence.startDate || aOccurrence.entryDate || aOccurrence.dueDate;
             let enddate = aOccurrence.endDate || aOccurrence.dueDate || aOccurrence.entryDate;
 
-            if (!cal.compareObjects(stdate.timezone, this.mTimezone)) {
+            if (!cal.data.compareObjects(stdate.timezone, this.mTimezone)) {
                 stdate = stdate.getInTimezone(this.mTimezone);
             }
 
-            if (!cal.compareObjects(enddate.timezone, this.mTimezone)) {
+            if (!cal.data.compareObjects(enddate.timezone, this.mTimezone)) {
                 enddate = enddate.getInTimezone(this.mTimezone);
             }
 
@@ -1203,7 +1203,7 @@
                         prevEnd.hour = 0;
                         prevEnd.minute = this.mStartMin;
                     }
-                    prevEnd.timezone = cal.floating();
+                    prevEnd.timezone = cal.dtz.floating;
                     // the reason why we need to calculate time durations
                     // based on floating timezones is that we need avoid
                     // dst gaps in this case. converting the date/times to
@@ -1211,13 +1211,13 @@
                     // we explicitly don't use getInTimezone() as it would
                     // be slightly more expensive in terms of performance.
                     let floatstart = start.clone();
-                    floatstart.timezone = cal.floating();
+                    floatstart.timezone = cal.dtz.floating;
                     let dur = floatstart.subtractDate(prevEnd);
                     if (dur.inSeconds) {
                         col.push({ duration: dur });
                     }
                     let floatend = end.clone();
-                    floatend.timezone = cal.floating();
+                    floatend.timezone = cal.dtz.floating;
                     col.push({
                         event: data.itemInfo.event,
                         endDate: end,
@@ -1347,7 +1347,7 @@
         <parameter name="event"/>
         <body><![CDATA[
             let col = document.calendarEventColumnDragging;
-            if (col && event.keyCode == event.DOM_VK_ESCAPE) {
+            if (col && event.key == "Escape") {
                 window.removeEventListener("mousemove", col.onEventSweepMouseMove);
                 window.removeEventListener("mouseup", col.onEventSweepMouseUp);
                 window.removeEventListener("keypress", col.onEventSweepKeypress);
@@ -1799,8 +1799,8 @@
         <parameter name="aMouseY"/>
         <parameter name="aSnapInt"/>
         <body><![CDATA[
-            if (!cal.isCalendarWritable(aOccurrence.calendar) ||
-                !cal.userCanModifyItem(aOccurrence) ||
+            if (!cal.acl.isCalendarWritable(aOccurrence.calendar) ||
+                !cal.acl.userCanModifyItem(aOccurrence) ||
                 (aOccurrence.calendar instanceof Components.interfaces.calISchedulingSupport && aOccurrence.calendar.isInvitation(aOccurrence)) ||
                 aOccurrence.calendar.getProperty("capabilities.events.supported") === false) {
                 return;
@@ -1942,7 +1942,7 @@
         <parameter name="aFirstColumn"/>
         <parameter name="aLastColumn"/>
         <body><![CDATA[
-            Components.utils.import("resource://calendar/modules/calUtils.jsm");
+            ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
             if (!this.mDragState) {
                 return;
             }
@@ -1961,13 +1961,13 @@
 
             let jsTime = new Date();
             jsTime.setHours(starthr, startmin);
-            let startstr = timeFormatter.formatTime(cal.jsDateToDateTime(jsTime, cal.floating()));
+            let startstr = timeFormatter.formatTime(cal.dtz.jsDateToDateTime(jsTime, cal.dtz.floating));
             jsTime.setHours(endhr, endmin);
-            let endstr = timeFormatter.formatTime(cal.jsDateToDateTime(jsTime, cal.floating()));
+            let endstr = timeFormatter.formatTime(cal.dtz.jsDateToDateTime(jsTime, cal.dtz.floating));
 
             // Tasks without Entry or Due date have a string as first label
             // instead of the time.
-            if (cal.isToDo(this.mDragState.dragOccurrence)) {
+            if (cal.item.isToDo(this.mDragState.dragOccurrence)) {
                 if (!this.mDragState.dragOccurrence.dueDate) {
                     startstr = cal.calGetString("calendar", "dragLabelTasksWithOnlyEntryDate");
                 } else if (!this.mDragState.dragOccurrence.entryDate) {
@@ -2047,7 +2047,7 @@
 
           // If the selected calendar is readOnly, we don't want any sweeping.
           let calendar = getSelectedCalendar();
-          if (!cal.isCalendarWritable(calendar) ||
+          if (!cal.acl.isCalendarWritable(calendar) ||
               calendar.getProperty("capabilities.events.supported") === false) {
               return;
           }
@@ -2104,7 +2104,7 @@
     <implementation>
       <field name="mItemBoxes">null</field>
       <constructor><![CDATA[
-          Components.utils.import("resource://calendar/modules/calUtils.jsm");
+          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
           this.mItemBoxes = [];
       ]]></constructor>
@@ -2173,8 +2173,8 @@
       <method name="onDropItem">
         <parameter name="aItem"/>
         <body><![CDATA[
-            let newItem = cal.moveItem(aItem, this.mDate);
-            newItem = cal.setItemToAllDay(newItem, true);
+            let newItem = cal.item.moveToDate(aItem, this.mDate);
+            newItem = cal.item.setToAllDay(newItem, true);
             return newItem;
         ]]></body>
       </method>
@@ -2227,7 +2227,7 @@
               // will make the box scroll here.
 
               // TODO We could scroll by the height of exactly one event box, but
-              // since a normal box's boxObject doesn't implement nsIScrollBoxObject,
+              // since a normal box's boxObject doesn't implement ScrollBoxObject,
               // there is no way to scroll by pixels. Using a xul:scrollbox has
               // problems since the equalsize attribute isn't inherited by the
               // inner box, and even if that is worked around, something makes the
@@ -2261,12 +2261,14 @@
                 <xul:image anonid="item-icon"
                            class="calendar-item-image"
                            xbl:inherits="progress,allday,itemType,todoType"/>
-                <xul:description anonid="event-name" class="calendar-event-details-core" flex="1"/>
-                <xul:textbox anonid="event-name-textbox"
-                             class="plain calendar-event-details-core calendar-event-name-textbox"
-                             flex="1"
-                             hidden="true"
-                             wrap="true"/>
+                <xul:vbox flex="1">
+                  <xul:label anonid="event-name" class="calendar-event-details-core title-desc" crop="end"/>
+                  <xul:textbox anonid="event-name-textbox"
+                               class="plain calendar-event-details-core calendar-event-name-textbox"
+                               hidden="true"
+                               wrap="true"/>
+                  <xul:label anonid="event-location" class="calendar-event-details-core location-desc" crop="end"/>
+                </xul:vbox>
               </xul:hbox>
               <xul:stack mousethrough="always">
                 <xul:calendar-category-box anonid="category-box" xbl:inherits="categories" pack="end" />
@@ -2305,7 +2307,7 @@
 
     <implementation>
       <constructor><![CDATA[
-          Components.utils.import("resource://calendar/modules/calUtils.jsm");
+          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
           this.orient = this.getAttribute("orient");
       ]]></constructor>
@@ -2522,8 +2524,8 @@
 
     <implementation implements="calICalendarView">
       <constructor><![CDATA[
-          Components.utils.import("resource://gre/modules/Preferences.jsm");
-          Components.utils.import("resource://calendar/modules/calUtils.jsm");
+          ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
           // get day start/end hour from prefs and set on the view
           this.setDayStartEndMinutes(Preferences.get("calendar.view.daystarthour", 8) * 60,
@@ -2605,7 +2607,7 @@
         <parameter name="aPpmChanged"/>
         <parameter name="aViewChanged"/>
         <body><![CDATA[
-            let now = cal.now();
+            let now = cal.dtz.now();
             let nowMinutes = now.hour * 60 + now.minute;
             if (aUpdateTheTimer) {
                 let prefInt = this.mTimeIndicatorInterval;
@@ -3040,13 +3042,13 @@
 
       <method name="centerSelectedItems">
         <body><![CDATA[
-            let displayTZ = cal.calendarDefaultTimezone();
+            let displayTZ = cal.dtz.defaultTimezone;
             let lowMinute = 24 * 60;
             let highMinute = 0;
 
             for (let item of this.mSelectedItems) {
-                let startDateProperty = cal.calGetStartDateProp(item);
-                let endDateProperty = cal.calGetEndDateProp(item);
+                let startDateProperty = cal.dtz.startDateProp(item);
+                let endDateProperty = cal.dtz.endDateProp(item);
 
                 let occs = [];
                 if (item.recurrenceInfo) {
@@ -3092,7 +3094,7 @@
                     }
                     // If crosses midnite in current TZ, set end just
                     // before midnite after start so start/title usually visible.
-                    if (!cal.sameDay(occStart, occEnd)) {
+                    if (!cal.dtz.sameDay(occStart, occEnd)) {
                         occEnd = occStart.clone();
                         occEnd.day = occStart.day;
                         occEnd.hour = 23;
@@ -3366,7 +3368,7 @@
                 }
                 setUpDayHeaderBox(dayHeaderBox, date);
 
-                if (this.mDaysOffArray.indexOf(date.weekday) >= 0) {
+                if (this.mDaysOffArray.includes(date.weekday)) {
                     dayEventsBox.dayOff = true;
                     dayHeaderBox.setAttribute("weekend", "true");
                 } else {
@@ -3524,9 +3526,9 @@
 
             let occMap = {};
             for (let occ of aOccurrences) {
-                let startDate = occ[cal.calGetStartDateProp(occ)]
+                let startDate = occ[cal.dtz.startDateProp(occ)]
                                 .getInTimezone(this.mStartDate.timezone);
-                let endDate = occ[cal.calGetEndDateProp(occ)]
+                let endDate = occ[cal.dtz.endDateProp(occ)]
                                 .getInTimezone(this.mEndDate.timezone) || startDate;
                 if (startDate.compare(this.mStartDate) >= 0 &&
                     endDate.compare(this.mEndDate) <= 0) {
@@ -3616,8 +3618,8 @@
       <method name="adjustScrollbarSpacersForAlldayEvents">
         <parameter name="aEvent"/>
         <body><![CDATA[
-            let startDate = aEvent[cal.calGetStartDateProp(aEvent)];
-            let endDate = aEvent[cal.calGetEndDateProp(aEvent)];
+            let startDate = aEvent[cal.dtz.startDateProp(aEvent)];
+            let endDate = aEvent[cal.dtz.endDateProp(aEvent)];
             if ((startDate && startDate.isDate) ||
                 (endDate && endDate.isDate)) {
                 // If this is an all day event, then the header with allday

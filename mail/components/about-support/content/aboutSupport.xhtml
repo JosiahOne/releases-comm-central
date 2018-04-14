@@ -22,8 +22,6 @@
 
     <link rel="icon" type="image/png" id="favicon"
           href="chrome://branding/content/icon48.png"/>
-    <link rel="stylesheet" href="chrome://global/skin/in-content/common.css"
-          type="text/css"/>
     <link rel="stylesheet" href="chrome://global/skin/aboutSupport.css"
           type="text/css"/>
 <!-- Added for TB -->
@@ -35,8 +33,6 @@
 <!-- End of TB addition -->
     <script type="application/javascript"
             src="chrome://messenger/content/about-support/aboutSupport.js"/>
-    <script type="application/javascript"
-            src="chrome://global/content/resetProfile.js"/>
 <!-- Added for TB -->
     <script type="application/javascript"
             src="chrome://messenger/content/about-support/accounts.js"/>
@@ -45,10 +41,10 @@
 <!-- End of TB addition -->
   </head>
 
-  <body dir="&locale.dir;">
+  <body dir="&locale.dir;" class="wide-container">
 
 #ifndef ANDROID
-    <div id="action-box">
+    <div id="action-box" class="notice-box">
       <div id="reset-box">
         <h3>&refreshProfile.title;</h3>
         <button id="reset-box-button">
@@ -266,12 +262,12 @@
             </td>
           </tr>
 
-          <tr>
+          <tr id="policies-status-row">
             <th class="column">
-              Stylo
+              &aboutSupport.enterprisePolicies;
             </th>
 
-            <td id="stylo-box">
+            <td id="policies-status">
             </td>
           </tr>
 
@@ -459,6 +455,53 @@
           </tr>
         </thead>
         <tbody id="extensions-tbody">
+        </tbody>
+      </table>
+
+      <!-- - - - - - - - - - - - - - - - - - - - - -->
+
+      <h2 class="major-section" id="security-software-title">
+        &aboutSupport.securitySoftwareTitle;
+      </h2>
+
+      <table id="security-software-table">
+        <thead>
+          <tr>
+            <th>
+              &aboutSupport.securitySoftwareType;
+            </th>
+            <th>
+              &aboutSupport.securitySoftwareName;
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th class="column">
+              &aboutSupport.securitySoftwareAntivirus;
+            </th>
+
+            <td id="security-software-antivirus">
+            </td>
+          </tr>
+
+          <tr>
+            <th class="column">
+              &aboutSupport.securitySoftwareAntiSpyware;
+            </th>
+
+            <td id="security-software-antispyware">
+            </td>
+          </tr>
+
+          <tr>
+            <th class="column">
+              &aboutSupport.securitySoftwareFirewall;
+            </th>
+
+            <td id="security-software-firewall">
+            </td>
+          </tr>
         </tbody>
       </table>
 

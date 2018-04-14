@@ -91,7 +91,7 @@ function UpdateDependent(aCustomEnabled)
 function ToggleElements(aCustomEnabled)
 {
   var buttons = document.getElementById("color-rows").getElementsByTagName("button");
-  
+
   for (var i = 0; i < buttons.length; i++)
   {
     let isLocked = CheckLocked(buttons[i].id);
@@ -158,9 +158,9 @@ function SetBgAndFgColors(aSysPrefEnabled)
 
 function ChooseImageFile()
 {
-  const nsIFilePicker = Components.interfaces.nsIFilePicker;
-  var fp = Components.classes["@mozilla.org/filepicker;1"]
-                     .createInstance(nsIFilePicker);
+  const nsIFilePicker = Ci.nsIFilePicker;
+  var fp = Cc["@mozilla.org/filepicker;1"]
+             .createInstance(nsIFilePicker);
   var editorBundle = document.getElementById("bundle_editor");
   var title = editorBundle.getString("SelectImageFile");
   fp.init(window, title, nsIFilePicker.modeOpen);

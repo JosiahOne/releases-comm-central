@@ -15,7 +15,7 @@
 #include "nsString.h"
 #include "nsWeakReference.h"
 #include "nsIObserver.h"
-#include "nsIWordBreaker.h"
+#include "mozilla/intl/WordBreaker.h"
 
 #include "mozilla/ArenaAllocator.h"
 
@@ -110,7 +110,7 @@ public:
     Token* get(const char* word);
 
     // The training set keeps an occurrence count on each word. This count
-    // is supposed to count the # of messsages it occurs in.
+    // is supposed to count the # of messages it occurs in.
     // When add/remove is called while tokenizing a message and NOT the training set,
     //
     Token* add(const char* word, uint32_t count = 1);
@@ -151,7 +151,7 @@ private:
     void UnescapeCString(nsCString& aCString);
     nsresult ScannerNext(const char16_t *text, int32_t length, int32_t pos,
                          bool isLastBuffer, int32_t *begin, int32_t *end, bool *_retval);
-    nsCOMPtr<nsIWordBreaker> mWordBreaker;
+    RefPtr<mozilla::intl::WordBreaker> mWordBreaker;
 };
 
 /**

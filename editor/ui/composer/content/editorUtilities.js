@@ -2,7 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 /**** NAMESPACES ****/
 const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
@@ -13,14 +14,14 @@ const XUL_NS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 // Object to attach commonly-used widgets (all dialogs should use this)
 var gDialog = {};
 
-var kOutputEncodeBasicEntities = Components.interfaces.nsIDocumentEncoder.OutputEncodeBasicEntities;
-var kOutputEncodeHTMLEntities = Components.interfaces.nsIDocumentEncoder.OutputEncodeHTMLEntities;
-var kOutputEncodeLatin1Entities = Components.interfaces.nsIDocumentEncoder.OutputEncodeLatin1Entities;
-var kOutputEncodeW3CEntities = Components.interfaces.nsIDocumentEncoder.OutputEncodeW3CEntities;
-var kOutputFormatted = Components.interfaces.nsIDocumentEncoder.OutputFormatted;
-var kOutputLFLineBreak = Components.interfaces.nsIDocumentEncoder.OutputLFLineBreak;
-var kOutputSelectionOnly = Components.interfaces.nsIDocumentEncoder.OutputSelectionOnly;
-var kOutputWrap = Components.interfaces.nsIDocumentEncoder.OutputWrap;
+var kOutputEncodeBasicEntities = Ci.nsIDocumentEncoder.OutputEncodeBasicEntities;
+var kOutputEncodeHTMLEntities = Ci.nsIDocumentEncoder.OutputEncodeHTMLEntities;
+var kOutputEncodeLatin1Entities = Ci.nsIDocumentEncoder.OutputEncodeLatin1Entities;
+var kOutputEncodeW3CEntities = Ci.nsIDocumentEncoder.OutputEncodeW3CEntities;
+var kOutputFormatted = Ci.nsIDocumentEncoder.OutputFormatted;
+var kOutputLFLineBreak = Ci.nsIDocumentEncoder.OutputLFLineBreak;
+var kOutputSelectionOnly = Ci.nsIDocumentEncoder.OutputSelectionOnly;
+var kOutputWrap = Ci.nsIDocumentEncoder.OutputWrap;
 
 var gStringBundle;
 var gFilePickerDirectory;
@@ -148,11 +149,11 @@ function GetSelectionAsText()
 
 
 /************* Get Current Editor and associated interfaces or info ***************/
-const nsIPlaintextEditor = Components.interfaces.nsIPlaintextEditor;
-const nsIHTMLEditor = Components.interfaces.nsIHTMLEditor;
-const nsITableEditor = Components.interfaces.nsITableEditor;
-const nsIEditorStyleSheets = Components.interfaces.nsIEditorStyleSheets;
-const nsIEditingSession = Components.interfaces.nsIEditingSession;
+const nsIPlaintextEditor = Ci.nsIPlaintextEditor;
+const nsIHTMLEditor = Ci.nsIHTMLEditor;
+const nsITableEditor = Ci.nsITableEditor;
+const nsIEditorStyleSheets = Ci.nsIEditorStyleSheets;
+const nsIEditingSession = Ci.nsIEditingSession;
 
 function GetCurrentEditor()
 {
@@ -168,8 +169,8 @@ function GetCurrentEditor()
 
     // Do QIs now so editor users won't have to figure out which interface to use
     // Using "instanceof" does the QI for us.
-    editor instanceof Components.interfaces.nsIPlaintextEditor;
-    editor instanceof Components.interfaces.nsIHTMLEditor;
+    editor instanceof Ci.nsIPlaintextEditor;
+    editor instanceof Ci.nsIHTMLEditor;
   } catch (e) { dump (e)+"\n"; }
 
   return editor;
@@ -301,7 +302,7 @@ function IsHTMLSourceChanged()
 function newCommandParams()
 {
   try {
-    return Components.classes["@mozilla.org/embedcomp/command-params;1"].createInstance(Components.interfaces.nsICommandParams);
+    return Cc["@mozilla.org/embedcomp/command-params;1"].createInstance(Ci.nsICommandParams);
   }
   catch(e) { dump("error thrown in newCommandParams: "+e+"\n"); }
   return null;
@@ -389,7 +390,7 @@ function SetElementEnabled(element, doEnable)
 function GetFileProtocolHandler()
 {
   let handler = Services.io.getProtocolHandler("file");
-  return handler.QueryInterface(Components.interfaces.nsIFileProtocolHandler);
+  return handler.QueryInterface(Ci.nsIFileProtocolHandler);
 }
 
 function GetStringPref(name)
@@ -418,7 +419,7 @@ function SetFilePickerDirectory(filePicker, fileType)
       gFilePickerDirectory = filePicker.displayDirectory;
 
       let location = Services.prefs.getComplexValue("editor.lastFileLocation."+fileType,
-                                                    Components.interfaces.nsIFile);
+                                                    Ci.nsIFile);
       if (location)
         filePicker.displayDirectory = location;
     }
@@ -434,10 +435,10 @@ function SaveFilePickerDirectory(filePicker, fileType)
     try {
       var fileDir;
       if (filePicker.file.parent)
-        fileDir = filePicker.file.parent.QueryInterface(Components.interfaces.nsIFile);
+        fileDir = filePicker.file.parent.QueryInterface(Ci.nsIFile);
 
         Services.prefs.setComplexValue("editor.lastFileLocation." + fileType,
-                                       Components.interfaces.nsIFile, fileDir);
+                                       Ci.nsIFile, fileDir);
 
         Services.prefs.savePrefFile(null);
     } catch (e) {}
@@ -522,10 +523,10 @@ function MakeRelativeUrl(url)
   let docPath = Services.io.newURI(docUrl, GetCurrentEditor().documentCharacterSet).pathQueryRef;
   let urlPath = Services.io.newURI(inputUrl, GetCurrentEditor().documentCharacterSet).pathQueryRef;
 
-  // We only return "urlPath", so we can convert
-  //  the entire docPath for case-insensitive comparisons
-  var os = GetOS();
-  var doCaseInsensitive = (docScheme == "file" && os == gWin);
+  // We only return "urlPath", so we can convert the entire docPath for
+  // case-insensitive comparisons.
+  var doCaseInsensitive = (docScheme == "file" &&
+                           AppConstants.platform == "win");
   if (doCaseInsensitive)
     docPath = docPath.toLowerCase();
 
@@ -575,23 +576,23 @@ function MakeRelativeUrl(url)
 
       if (urlDir == docDir)
       {
-
         // Remove matching dir+"/" from each path
-        //  and continue to next dir
+        // and continue to next dir.
         docPath = docPath.slice(nextDocSlash+1);
         urlPath = urlPath.slice(nextUrlSlash+1);
       }
       else
       {
-        // No match, we're done
+        // No match, we're done.
         done = true;
 
         // Be sure we are on the same local drive or volume
         //   (the first "dir" in the path) because we can't
         //   relativize to different drives/volumes.
         // UNIX doesn't have volumes, so we must not do this else
-        //  the first directory will be misinterpreted as a volume name
-        if (firstDirTest && docScheme == "file" && os != gUNIX)
+        // the first directory will be misinterpreted as a volume name.
+        if (firstDirTest && docScheme == "file" &&
+            AppConstants.platform != "unix")
           return inputUrl;
       }
     }
@@ -667,8 +668,7 @@ function GetDocumentBaseUrl()
 function GetDocumentUrl()
 {
   try {
-    var aDOMHTMLDoc = GetCurrentEditor().document.QueryInterface(Components.interfaces.nsIDOMHTMLDocument);
-    return aDOMHTMLDoc.URL;
+    return GetCurrentEditor().document.URL;;
   }
   catch (e) {}
   return "";
@@ -728,7 +728,7 @@ function GetFilename(urlspec)
     let uri = Services.io.newURI(urlspec);
     if (uri)
     {
-      let url = uri.QueryInterface(Components.interfaces.nsIURL);
+      let url = uri.QueryInterface(Ci.nsIURL);
       if (url)
         filename = url.fileName;
     }
@@ -891,7 +891,7 @@ function Clone(obj)
 }
 
 /**
- * Utility funtions to handle shortended data: URLs in EdColorProps.js and EdImageOverlay.js.
+ * Utility functions to handle shortended data: URLs in EdColorProps.js and EdImageOverlay.js.
  */
 
 /**

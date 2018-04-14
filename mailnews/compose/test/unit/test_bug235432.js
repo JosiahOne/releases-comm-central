@@ -3,8 +3,8 @@
  * Test for bug 235432
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var testmail = do_get_file("data/message1.eml");
 var expectedTemporaryFile;
@@ -71,7 +71,7 @@ function copyFileMessageInLocalFolder(aMessageFile,
                                     aMessageWindow);
 }
 
-// The attatchment file can not be obtained from js test,
+// The attachment file can not be obtained from js test,
 // so we have to generate the file name here.
 function createExpectedTemporaryFile() {
   function createTemporaryFile() {
@@ -82,7 +82,7 @@ function createExpectedTemporaryFile() {
   }
 
   let dummyFile = createTemporaryFile();
-  do_register_cleanup(function() {
+  registerCleanupFunction(function() {
     dummyFile.remove(false);
   });
 
@@ -95,7 +95,7 @@ function createExpectedTemporaryFile() {
 function OnStopCopy(aStatus) {
   msgSend.abort();
 
-  do_check_false(expectedTemporaryFile.exists());
+  Assert.ok(!expectedTemporaryFile.exists());
 
   do_test_finished();
 }
@@ -149,5 +149,5 @@ function send_message_later(aMessageHeaderKeys, aStatus) {
                                null,
                                "",
                                Ci.nsIMsgCompType.New);
-  do_check_true(expectedTemporaryFile.exists());
+  Assert.ok(expectedTemporaryFile.exists());
 }

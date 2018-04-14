@@ -3,7 +3,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #include "nsCOMPtr.h"
-#include "nsIURL.h"
 #include "mimeebod.h"
 #include "prmem.h"
 #include "plstr.h"
@@ -154,7 +153,7 @@ MimeExternalBody_make_url(const char *ct,
   {
     if (!site || !name)
       return 0;
-	  
+	
     slen = strlen(name) + strlen(site) + (dir ? strlen(dir) : 0) + 20;
     s = (char *) PR_MALLOC(slen);
 
@@ -291,7 +290,7 @@ MimeExternalBody_parse_eof (MimeObject *obj, bool abort_p)
     /* the *internal* content-type */
     ct = MimeHeaders_get(bod->hdrs, HEADER_CONTENT_TYPE,
                          true, false);
-						 
+						
     uint32_t hlen = ((at ? strlen(at) : 0) +
                     (lexp ? strlen(lexp) : 0) +
                     (size ? strlen(size) : 0) +

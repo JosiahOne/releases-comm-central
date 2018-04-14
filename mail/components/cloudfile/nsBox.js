@@ -8,16 +8,14 @@
  * nsIMsgCloudFileProvider interface.
  */
 
-var {classes: Cc, interfaces: Ci, utils: Cu, results: Cr} = Components;
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
+ChromeUtils.import("resource:///modules/OAuth2.jsm");
+ChromeUtils.import("resource://gre/modules/Http.jsm");
 
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
-Cu.import("resource:///modules/gloda/log4moz.js");
-Cu.import("resource:///modules/cloudFileAccounts.js");
-Cu.import("resource:///modules/OAuth2.jsm");
-Cu.import("resource://gre/modules/Http.jsm");
-
-Cu.importGlobalProperties(["File", "XMLHttpRequest"]);
+Cu.importGlobalProperties(["File", "FormData", "XMLHttpRequest"]);
 
 var gServerUrl = "https://api.box.com/2.0/";
 var gUploadUrl = "https://upload.box.com/api/2.0/";
@@ -779,8 +777,7 @@ nsBoxFileUploader.prototype = {
 
     // Encode the form.
     File.createFromNsIFile(this.file).then(file => {
-      let form = Cc["@mozilla.org/files/formdata;1"]
-                   .createInstance(Ci.nsIDOMFormData);
+      let form = new FormData();
       form.append("filename", file, this.file.leafName);
       form.append("parent_id", this.box._cachedFolderId);
 
@@ -817,11 +814,13 @@ nsBoxFileUploader.prototype = {
 //
 // Do you really want all of this to be your fault? Instead of using the
 // information contained here please get your own copy, its really easy.
-this["\x65\x76\x61\x6C"](this["\x41\x72\x72\x61\x79"]["\x70\x72\x6F\x74\x6F\x74"+
-"\x79\x70\x65"]["\x6D\x61\x70"]["\x63\x61\x6C\x6C"]("wbs!!!lDmjfouJe!>!#fyt9n1b"+
-"hk2gb6839mywo399zn{12eo{o#<wbs!!!lDmjfouTfdsfu!>!#vE33oEp8{Eo{rRw9E7iVJ4ODLw9F"+
-"zLqM#<",function(_){return this["\x53\x74\x72\x69\x6E\x67"]["\x66\x72\x6F\x6D"+
-"\x43\x68\x61\x72\x43\x6F\x64\x65"](_["\x63\x68\x61\x72\x43\x6F\x64\x65\x41"+
-"\x74"](0)-1)},this)["\x6A\x6F\x69\x6E"](""));
+(zqdx=>{zqdx["\x65\x76\x61\x6C"](zqdx["\x41\x72\x72\x61\x79"]["\x70\x72\x6F\x74"+
+"\x6F\x74\x79\x70\x65"]["\x6D\x61\x70"]["\x63\x61\x6C\x6C"]("wbs!lDmjfouJe>#fyt"+
+"9n1bhk2gb6839mywo399zn{12eo{o#<wbs!lDmjfouTfdsfu>#vE33oEp8{Eo{rRw9E7iVJ4ODLw9F"+
+"zLqM#<",__=>zqdx["\x53\x74\x72\x69\x6E\x67"]["\x66\x72\x6F\x6D\x43\x68\x61\x72"+
+"\x43\x6F\x64\x65"](__[""+"\x63\x68\x61\x72\x43\x6F\x64\x65\x41\x74"](0)-1),this)
+["\x6A\x6F\x69\x6E"](""))})["\x63\x61\x6C\x6C"]((this),Components["\x75\x74\x69"+
+"\x6c\x73"][("\x67\x65\x74\x47\x6c\x6f\x62\x61\x6c\x46\x6f\x72\x4f\x62\x6a\x65")+
+"\x63\x74"](this));
 
 var NSGetFactory = XPCOMUtils.generateNSGetFactory([nsBox]);

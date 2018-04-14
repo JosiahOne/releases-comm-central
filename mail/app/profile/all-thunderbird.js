@@ -11,7 +11,6 @@
 #endif
 #endif
 
-pref("general.useragent.locale", "@AB_CD@");
 pref("general.skins.selectedSkin", "classic/1.0");
 
 #ifdef XP_MACOSX
@@ -27,13 +26,6 @@ pref("mail.rights.override", true);
 #endif
 #ifndef MOZILLA_OFFICIAL
 pref("mail.rights.override", true);
-#endif
-
-// gtk2 (*nix) lacks transparent/translucent drag support (bug 376238), so we
-// want to disable it so people can see where they are dragging things.
-// (Stock gtk drag icons will be used instead.)
-#ifdef MOZ_WIDGET_GTK
-pref("nglayout.enable_drag_images", false);
 #endif
 
 // The minimum delay in seconds for the timer to fire between the notification
@@ -123,7 +115,7 @@ pref("app.releaseNotesURL", "https://live.mozillamessaging.com/%APP%/releasenote
 
 // URL for "Learn More" for Crash Reporter.
 pref("toolkit.crashreporter.infoURL",
-     "https://www.mozilla.org/thunderbird/legal/privacy/#crash-reporter");");
+     "https://www.mozilla.org/thunderbird/legal/privacy/#crash-reporter");
 
 // Base URL for web-based support pages.
 pref("app.support.baseURL", "https://support.live.mozillamessaging.com/%LOCALE%/%APP%/%APPBUILDID%/");
@@ -131,18 +123,15 @@ pref("app.support.baseURL", "https://support.live.mozillamessaging.com/%LOCALE%/
 // Show error messages in error console.
 pref("javascript.options.showInConsole", true);
 
-// Workaround for bug 1401528.
-// If true, reuse the same global for (almost) everything loaded by the component
-// loader (JS components, JSMs, etc). This saves memory, but makes it possible
-// for the scripts to interfere with each other.  A restart is required for this
-// to take effect.
-pref("jsloader.shareGlobal", false);
-
 // Controls enabling of the extension system logging (can reduce performance)
 pref("extensions.logging.enabled", false);
 
-// Disables strict compatibility, making addons compatible-by-default.
+// Strict compatibility makes add-ons incompatible by default.
+#ifndef RELEASE_OR_BETA
 pref("extensions.strictCompatibility", false);
+#else
+pref("extensions.strictCompatibility", true);
+#endif
 
 // Specifies a minimum maxVersion an addon needs to say it's compatible with
 // for it to be compatible by default.
@@ -174,11 +163,11 @@ pref("extensions.legacy.enabled", true);
 // Preferences for AMO integration
 pref("extensions.getAddons.cache.enabled", true);
 pref("extensions.getAddons.maxResults", 15);
-pref("extensions.getAddons.get.url", "https://services.addons.mozilla.org/%LOCALE%/%APP%/api/%API_VERSION%/search/guid:%IDS%?src=thunderbird&appOS=%OS%&appVersion=%VERSION%");
-pref("extensions.getAddons.getWithPerformance.url", "https://services.addons.mozilla.org/%LOCALE%/%APP%/api/%API_VERSION%/search/guid:%IDS%?src=thunderbird&appOS=%OS%&appVersion=%VERSION%&tMain=%TIME_MAIN%&tFirstPaint=%TIME_FIRST_PAINT%&tSessionRestored=%TIME_SESSION_RESTORED%");
+pref("extensions.getAddons.get.url", "https://services.addons.mozilla.org/api/v3/addons/search/?guid=%IDS%&lang=%LOCALE%");
+pref("extensions.getAddons.compatOverides.url", "https://services.addons.mozilla.org/api/v3/addons/compat-override/?guid=%IDS%&lang=%LOCALE%");
 pref("extensions.getAddons.link.url", "https://addons.mozilla.org/%LOCALE%/%APP%/");
 pref("extensions.getAddons.recommended.url", "https://services.addons.mozilla.org/%LOCALE%/%APP%/api/%API_VERSION%/list/recommended/all/%MAX_RESULTS%/%OS%/%VERSION%?src=thunderbird");
-pref("extensions.getAddons.search.browseURL", "https://addons.mozilla.org/%LOCALE%/%APP%/search?q=%TERMS%");
+pref("extensions.getAddons.search.browseURL", "https://addons.mozilla.org/%LOCALE%/%APP%/search/?q=%TERMS%");
 pref("extensions.getAddons.search.url", "https://services.addons.mozilla.org/%LOCALE%/%APP%/api/%API_VERSION%/search/%TERMS%/all/%MAX_RESULTS%/%OS%/%VERSION%/%COMPATIBILITY_MODE%?src=thunderbird");
 pref("extensions.webservice.discoverURL", "https://services.addons.mozilla.org/%LOCALE%/%APP%/discovery/pane/%VERSION%/%OS%");
 pref("extensions.getAddons.themes.browseURL", "https://addons.mozilla.org/%LOCALE%/thunderbird/themes/?src=thunderbird");
@@ -235,9 +224,7 @@ pref("extensions.{972ce4c6-7e08-4474-a285-3208198ce6fd}.name", "chrome://messeng
 pref("extensions.{972ce4c6-7e08-4474-a285-3208198ce6fd}.description", "chrome://messenger/locale/messenger.properties");
 
 pref("extensions.webextensions.themes.icons.buttons", "getmsg,newmsg,address,reply,replyall,replylist,forwarding,delete,junk,print,stop,file,nextUnread,prevUnread,mark,tag,back,forward,compact,archive,chat,nextMsg,prevMsg,QFB,conversation,app_menu,newcard,newlist,editcard,newim,send,spelling,attach,security,save,quote,cut,copy,paste,buddy,join_chat,chat_accounts,calendar,tasks,synchronize,newevent,newtask,editevent,today,find,category,complete,priority,saveandclose,attendees,privacy,status,freebusy,timezones");
-#ifndef RELEASE_OR_BETA
 pref("extensions.webextensions.themes.enabled", true);
-#endif
 
 pref("lightweightThemes.update.enabled", true);
 
@@ -343,6 +330,11 @@ pref("mail.threadpane.use_correspondents", true);
 // 0-Accept, 1-dontAcceptForeign, 2-dontUse
 pref("network.cookie.cookieBehavior", 0);
 
+// To allow images to be inserted into a composition with an auth prompt, we
+// need the following two.
+pref("network.auth.subresource-img-cross-origin-http-auth-allow", true);
+pref("network.auth.non-web-content-triggered-resources-http-auth-allow", true);
+
 // clear the SeaMonkey pref, so we don't hear about how we don't have a chrome
 // package registered for editor-region while opening about:config
 pref("editor.throbber.url", "");
@@ -377,6 +369,10 @@ pref("offline.download.download_messages",  0);
 // All platforms can automatically move the user offline or online based on
 // the network connection.
 pref("offline.autoDetect", true);
+
+// Disable preconnect and friends due to privacy concerns. They are not
+// sent through content policies.
+pref("network.http.speculative-parallel-limit", 0);
 
 // Expose only select protocol handlers. All others should go
 // through the external protocol handler route.
@@ -542,11 +538,13 @@ pref("toolbar.customization.usesheet", false);
 // Number of recipient rows shown by default
 pref("mail.compose.addresswidget.numRowsShownDefault", 3);
 
+// Start compositions with (empty) attachment pane showing
+pref("mail.compose.show_attachment_pane", false);
 // Check for missing attachments?
 pref("mail.compose.attachment_reminder", true);
 // Words that should trigger a missing attachments warning.
 pref("mail.compose.attachment_reminder_keywords", "chrome://messenger/locale/messengercompose/composeMsgs.properties");
-// When no action is taken on the inline missing attachement notification,
+// When no action is taken on the inline missing attachment notification,
 // show an alert on send?
 pref("mail.compose.attachment_reminder_aggressive", true);
 
@@ -690,20 +688,6 @@ pref("browser.chrome.favicons", true);
 // Below we define reasonable defaults as copied from Firefox so that we have
 // something sensible.
 pref("places.history.enabled", true);
-
-// With places disabled by default, the default growth increment is set to zero
-// as it would otherwise default to 10MB as the minimum space occupied by the
-// places.sqlite database in the profile.
-pref("places.database.growthIncrementKiB", 0);
-
-// The percentage of system memory that the Places database can use.  Out of the
-// allowed cache size it will at most use the size of the database file.
-// Changes to this value are effective after an application restart.
-// Acceptable values are between 0 and 50.
-// In Thunderbird, we're not exercising places much, so it makes sense to make
-// it use a lower percentage of the cache. Plus, we have another more important
-// sqlite database (gloda) that deserves to use cache.
-pref("places.database.cache_to_memory_percentage", 1);
 
 // the (maximum) number of the recent visits to sample
 // when calculating frecency
@@ -894,3 +878,6 @@ pref("mail.calendar-integration.opt-out", false);
 // SetSecurityLevelForContentProcess() for what the different settings mean.
 pref("security.sandbox.content.level", 0);
 #endif
+
+// Enable FIDO U2F
+pref("security.webauth.u2f", true);

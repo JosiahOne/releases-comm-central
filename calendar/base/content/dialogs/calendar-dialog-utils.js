@@ -4,17 +4,18 @@
 
 /* exported gInTab, gMainWindow, gTabmail, intializeTabOrWindowVariables,
  *          dispose, setDialogId, loadReminders, saveReminder,
- *          commonUpdateReminder, updateLink, rearrangeAttendees
+ *          commonUpdateReminder, updateLink, rearrangeAttendees,
+ *          adaptScheduleAgent
  */
 
-Components.utils.import("resource://gre/modules/PluralForm.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
-Components.utils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calAlarmUtils.jsm");
-Components.utils.import("resource://calendar/modules/calIteratorUtils.jsm");
-Components.utils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
 
 // Variables related to whether we are in a tab or a window dialog.
 var gInTab = false;
@@ -140,7 +141,7 @@ function editReminder() {
     args.item = window.calendarItem;
     args.timezone = window.gStartTimezone ||
                     window.gEndTimezone ||
-                    cal.calendarDefaultTimezone();
+                    cal.dtz.defaultTimezone;
 
     args.calendar = getCurrentCalendar();
 
@@ -457,7 +458,7 @@ function commonUpdateReminder(aSuppressDialogs) {
     // approach as with recurring tasks. in case the reminder is related
     // to the entry date we check the entry date automatically and disable
     // the checkbox. the same goes for end related reminder and the due date.
-    if (cal.isToDo(window.calendarItem)) {
+    if (cal.item.isToDo(window.calendarItem)) {
         // In general, (re-)enable the due/entry checkboxes. This will be
         // changed in case the alarms are related to START/END below.
         enableElementWithLock("todo-has-duedate", "reminder-lock");
@@ -621,7 +622,7 @@ function setupAttendees() {
                 let tooltip = cal.calGetString("calendar", "dialog.tooltip.attendee.combined",
                                                [roleString, partstatString]);
 
-                let del = cal.resolveDelegation(attendee, window.attendees);
+                let del = cal.itip.resolveDelegation(attendee, window.attendees);
                 if (del.delegators != "") {
                     del.delegators = cal.calGetString("calendar",
                                                       "dialog.attendee.append.delegatedFrom",
@@ -691,4 +692,57 @@ function determineAttendeesInRow() {
     let minWidth = window.maxLabelWidth || 200;
     let inRow = Math.floor(document.width / minWidth);
     return inRow > 1 ? inRow : 1;
+}
+
+/**
+ * Adapts the scheduling responsibility for caldav servers according to RfC 6638
+ * based on forceEmailScheduling preference for the respective calendar
+ *
+ * @param {calIEvent|calIToDo} aItem      Item to apply the change on
+ */
+function adaptScheduleAgent(aItem) {
+    if (aItem.calendar && aItem.calendar.type == "caldav" &&
+        aItem.calendar.getProperty("capabilities.autoschedule.supported")) {
+        let identity = aItem.calendar.getProperty("imip.identity");
+        let orgEmail = identity &&
+                       identity.QueryInterface(Components.interfaces.nsIMsgIdentity).email;
+        let organizerAction = aItem.organizer && orgEmail &&
+                              aItem.organizer.id == "mailto:" + orgEmail;
+        if (aItem.calendar.getProperty("forceEmailScheduling")) {
+            cal.LOG("Enforcing clientside email based scheduling.");
+            // for attendees, we change schedule-agent only in case of an
+            // organizer triggered action
+            if (organizerAction) {
+                aItem.getAttendees({}).forEach((aAttendee) => {
+                    // overwritting must always happen consistently for all
+                    // attendees regarding SERVER or CLIENT but must not override
+                    // e.g. NONE, so we only overwrite if the param is set to
+                    // SERVER or doesn't exist
+                    if (aAttendee.getProperty("SCHEDULE-AGENT") == "SERVER" ||
+                        !aAttendee.getProperty("SCHEDULE-AGENT")) {
+                        aAttendee.setProperty("SCHEDULE-AGENT", "CLIENT");
+                        aAttendee.deleteProperty("SCHEDULE-STATUS");
+                        aAttendee.deleteProperty("SCHEDULE-FORCE-SEND");
+                    }
+                });
+            } else if (aItem.organizer &&
+                       (aItem.organizer.getProperty("SCHEDULE-AGENT") == "SERVER" ||
+                        !aItem.organizer.getProperty("SCHEDULE-AGENT"))) {
+                // for organizer, we change the schedule-agent only in case of
+                // an attendee triggered action
+                aItem.organizer.setProperty("SCHEDULE-AGENT", "CLIENT");
+                aItem.organizer.deleteProperty("SCHEDULE-STATUS");
+                aItem.organizer.deleteProperty("SCHEDULE-FORCE-SEND");
+            }
+        } else if (organizerAction) {
+            aItem.getAttendees({}).forEach((aAttendee) => {
+                if (aAttendee.getProperty("SCHEDULE-AGENT") == "CLIENT") {
+                    aAttendee.deleteProperty("SCHEDULE-AGENT");
+                }
+            });
+        } else if (aItem.organizer &&
+                   aItem.organizer.getProperty("SCHEDULE-AGENT") == "CLIENT") {
+            aItem.organizer.deleteProperty("SCHEDULE-AGENT");
+        }
+    }
 }

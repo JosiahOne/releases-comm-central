@@ -3,6 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+Cu.importGlobalProperties(["XMLSerializer"]);
+
 /**
  * The feed parser. Depends on FeedItem.js, Feed.js.
  *
@@ -11,8 +13,7 @@
  */
 function FeedParser() {
   this.parsedItems = [];
-  this.mSerializer = Cc["@mozilla.org/xmlextras/xmlserializer;1"].
-                     createInstance(Ci.nsIDOMSerializer);
+  this.mSerializer = new XMLSerializer();
 }
 
 FeedParser.prototype =
@@ -22,7 +23,7 @@ FeedParser.prototype =
   // parseFeed returns an empty feed in addition to calling aFeed.onParseError.
   parseFeed: function (aFeed, aDOM)
   {
-    if (!(aDOM instanceof Ci.nsIDOMXMLDocument))
+    if (ChromeUtils.getClassName(aDOM) !== "XMLDocument")
     {
       // No xml doc.
       aFeed.onParseError(aFeed);
@@ -57,7 +58,7 @@ FeedParser.prototype =
                           aFeed.mFeedType +" : " +aFeed.url);
       // aSource can be misencoded (XMLHttpRequest converts to UTF-8 by default),
       // but the DOM is almost always right because it uses the hints in the
-      // XML file.  This is slower, but not noticably so.  Mozilla doesn't have
+      // XML file.  This is slower, but not noticeably so.  Mozilla doesn't have
       // the XMLHttpRequest.responseBody property that IE has, which provides
       // access to the unencoded response.
       let xmlString = this.mSerializer.serializeToString(doc);
@@ -978,16 +979,17 @@ FeedParser.prototype =
   },
 
   /**
-   * Ensure <link> type tags start with http[s]:// for values stored in mail
-   * headers (content-base and remote enclosures), particularly to prevent
-   * data: uris, javascript, and other spoofing.
+   * Ensure <link> type tags start with http[s]://, ftp:// or magnet:
+   * for values stored in mail headers (content-base and remote enclosures),
+   * particularly to prevent data: uris, javascript, and other spoofing.
    *
    * @param {String} link - An intended http url string.
-   * @return {String}     - A clean string starting with http, else null.
+   * @return {String}     - A clean string starting with http, ftp or magnet,
+   *                        else null.
    */
   validLink: function(link)
   {
-    if (/^https?:\/\//.test(link))
+    if (/^((https?|ftp):\/\/|magnet:)/.test(link))
       return this.removeUnprintableASCII(link.trim());
 
     return null;

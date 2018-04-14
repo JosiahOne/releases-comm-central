@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/DownloadUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/DownloadUtils.jsm");
 
 function Startup()
 {
@@ -25,8 +25,8 @@ var CacheObserver = {
 
   /* nsISupports */
   QueryInterface: XPCOMUtils.generateQI(
-    [Components.interfaces.nsICacheStorageConsumptionObserver,
-     Components.interfaces.nsISupportsWeakReference])
+    [Ci.nsICacheStorageConsumptionObserver,
+     Ci.nsISupportsWeakReference])
 };
 
 // because the cache is in kilobytes, and the UI is in megabytes.
@@ -57,8 +57,7 @@ function ReadCacheFolder(aField)
     catch (ex) {}
   }
 
-  if (file)
-  {
+  if (file) {
     aField.file = file;
     aField.label = (/Mac/.test(navigator.platform)) ? file.leafName : file.path;
   }
@@ -66,24 +65,29 @@ function ReadCacheFolder(aField)
 
 function CacheSelectFolder()
 {
-  var pref = document.getElementById("browser.cache.disk.parent_directory");
-  const nsIFilePicker = Components.interfaces.nsIFilePicker;
-  var fp = Components.classes["@mozilla.org/filepicker;1"]
-                     .createInstance(nsIFilePicker);
-  var prefutilitiesBundle = document.getElementById("bundle_prefutilities");
-  var title = prefutilitiesBundle.getString("cachefolder");
+  const nsIFilePicker = Ci.nsIFilePicker;
+  let fp = Cc["@mozilla.org/filepicker;1"]
+             .createInstance(nsIFilePicker);
+  let title = document.getElementById("bundle_prefutilities")
+                      .getString("cachefolder");
 
   fp.init(window, title, nsIFilePicker.modeGetFolder);
-  fp.displayDirectory = pref.value;
+  fp.displayDirectory = 
+    document.getElementById("browser.cache.disk.parent_directory").value;
   fp.appendFilters(nsIFilePicker.filterAll);
-  if (fp.show() == nsIFilePicker.returnOK)
-    pref.value = fp.file;
+
+  fp.open(rv => {
+    if (rv != nsIFilePicker.returnOK || !fp.file) {
+      return;
+    }
+    document.getElementById("browser.cache.disk.parent_directory").value = fp.file;
+  });
 }
 
 function ClearDiskAndMemCache()
 {
-  Components.classes["@mozilla.org/netwerk/cache-storage-service;1"]
-            .getService(Components.interfaces.nsICacheStorageService).clear();
+  Cc["@mozilla.org/netwerk/cache-storage-service;1"]
+    .getService(Ci.nsICacheStorageService).clear();
   updateActualCacheSize();
 }
 
@@ -103,7 +107,7 @@ function ReadSmartSizeEnabled()
 
 function updateActualCacheSize()
 {
-  Components.classes["@mozilla.org/netwerk/cache-storage-service;1"]
-            .getService(Components.interfaces.nsICacheStorageService)
-            .asyncGetDiskConsumption(CacheObserver);
+  Cc["@mozilla.org/netwerk/cache-storage-service;1"]
+    .getService(Ci.nsICacheStorageService)
+    .asyncGetDiskConsumption(CacheObserver);
 }

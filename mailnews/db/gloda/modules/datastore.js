@@ -9,19 +9,14 @@
 
 this.EXPORTED_SYMBOLS = ["GlodaDatastore"];
 
-var Cc = Components.classes;
-var Ci = Components.interfaces;
-var Cr = Components.results;
-var Cu = Components.utils;
+ChromeUtils.import("resource:///modules/IOUtils.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
-Cu.import("resource:///modules/IOUtils.js");
-Cu.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 
-Cu.import("resource:///modules/gloda/log4moz.js");
-
-Cu.import("resource:///modules/gloda/datamodel.js");
-Cu.import("resource:///modules/gloda/databind.js");
-Cu.import("resource:///modules/gloda/collection.js");
+ChromeUtils.import("resource:///modules/gloda/datamodel.js");
+ChromeUtils.import("resource:///modules/gloda/databind.js");
+ChromeUtils.import("resource:///modules/gloda/collection.js");
 
 var MIN_CACHE_SIZE = 8 * 1048576;
 var MAX_CACHE_SIZE = 64 * 1048576;
@@ -153,7 +148,7 @@ var QueryFromQueryResolver = {
  * Handles the results from a GlodaDatastore.queryFromQuery call in cooperation
  *  with the |QueryFromQueryResolver| collection listener.  We do a lot of
  *  legwork related to satisfying references to other noun instances on the
- *  noun instances the user directy queried.  Messages reference identities
+ *  noun instances the user directly queried.  Messages reference identities
  *  reference contacts which in turn (implicitly) reference identities again.
  *  We have to spin up those other queries and stitch things together.
  *
@@ -389,7 +384,7 @@ QueryFromQueryCallback.prototype = {
         }
       }
       catch (e) {
-        Components.utils.reportError(e);
+        Cu.reportError(e);
         QFQ_LOG.error("Exception:", e);
       }
     }
@@ -1950,7 +1945,7 @@ var GlodaDatastore = {
   /** Authoritative map from folder ID to folder URI */
   _folderByID: {},
 
-  /** Intialize our _folderByURI/_folderByID mappings, called by _init(). */
+  /** Initialize our _folderByURI/_folderByID mappings, called by _init(). */
   _getAllFolderMappings: function gloda_ds_getAllFolderMappings() {
     let stmt = this._createSyncStatement(
       "SELECT id, folderURI, dirtyStatus, name, indexingPriority \

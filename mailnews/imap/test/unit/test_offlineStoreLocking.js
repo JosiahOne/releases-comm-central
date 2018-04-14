@@ -9,8 +9,8 @@ load("../../../resources/asyncTestUtils.js");
 load("../../../resources/messageGenerator.js");
 load("../../../resources/alertTestUtils.js");
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 
 // Globals
@@ -48,14 +48,14 @@ function checkOfflineStore(prevOfflineStoreSize) {
       let header = enumerator.getNext();
       // this will verify that the message in the offline store
       // starts with "From " - otherwise, it returns an error.
-      if (header instanceof Components.interfaces.nsIMsgDBHdr &&
+      if (header instanceof Ci.nsIMsgDBHdr &&
          (header.flags & Ci.nsMsgMessageFlags.Offline))
         IMAPPump.inbox.getOfflineFileStream(header.messageKey, offset, size).close();
     }
   }
   // check that the offline store shrunk by at least 100 bytes.
   // (exact calculation might be fragile).
-  do_check_true(prevOfflineStoreSize > IMAPPump.inbox.filePath.fileSize + 100);
+  Assert.ok(prevOfflineStoreSize > IMAPPump.inbox.filePath.fileSize + 100);
 }
 
 var tests = [
@@ -98,7 +98,7 @@ var tests = [
 
     // Because we're streaming the message while compaction is going on,
     // we should not have stored it for offline use.
-    do_check_false(gStreamedHdr.flags & Ci.nsMsgMessageFlags.Offline);
+    Assert.equal(false, gStreamedHdr.flags & Ci.nsMsgMessageFlags.Offline);
 
     yield false;
   },
@@ -143,7 +143,7 @@ var tests = [
   function* verifyNoOfflineMsg() {
     try {
     let movedMsg = IMAPPump.inbox.msgDatabase.getMsgHdrForMessageID(gMovedMsgId);
-    do_check_false(movedMsg.flags & Ci.nsMsgMessageFlags.Offline);
+    Assert.equal(false, movedMsg.flags & Ci.nsMsgMessageFlags.Offline);
     } catch (ex) {dump(ex);}
     yield false;
     yield false;
@@ -182,7 +182,7 @@ function setup() {
 
 // nsIMsgCopyServiceListener implementation - runs next test when copy
 // is completed.
-var CopyListener = 
+var CopyListener =
 {
   OnStartCopy: function() {},
   OnProgress: function(aProgress, aProgressMax) {},
@@ -195,7 +195,7 @@ var CopyListener =
   OnStopCopy: function(aStatus)
   {
     // Check: message successfully copied.
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     async_driver();
   }
 };

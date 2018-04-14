@@ -6,7 +6,7 @@
  *   extractHeaderAddressName
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 function run_test() {
   // In this array, the sub arrays consist of the following elements:
@@ -61,15 +61,15 @@ function run_test() {
 
   // Test - empty strings
 
-  do_check_eq(MailServices.headerParser.extractHeaderAddressMailboxes(""), "");
-  do_check_eq(MailServices.headerParser.extractHeaderAddressNames(""), "");
-  do_check_eq(MailServices.headerParser.extractHeaderAddressName(""), "");
+  Assert.equal(MailServices.headerParser.extractHeaderAddressMailboxes(""), "");
+  Assert.equal(MailServices.headerParser.extractHeaderAddressNames(""), "");
+  Assert.equal(MailServices.headerParser.extractHeaderAddressName(""), "");
 
   // Test - extractHeaderAddressMailboxes
 
   for (let i = 0; i < checks.length; ++i) {
-    do_check_eq(MailServices.headerParser.extractHeaderAddressMailboxes(checks[i][0]), checks[i][1]);
-    do_check_eq(MailServices.headerParser.extractHeaderAddressNames(checks[i][0]), checks[i][2]);
-    do_check_eq(MailServices.headerParser.extractHeaderAddressName(checks[i][0]), checks[i][3]);
+    Assert.equal(MailServices.headerParser.extractHeaderAddressMailboxes(checks[i][0]), checks[i][1]);
+    Assert.equal(MailServices.headerParser.extractHeaderAddressNames(checks[i][0]), checks[i][2]);
+    Assert.equal(MailServices.headerParser.extractHeaderAddressName(checks[i][0]), checks[i][3]);
   }
 }

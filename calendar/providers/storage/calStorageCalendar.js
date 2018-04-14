@@ -2,14 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://calendar/modules/calAlarmUtils.jsm");
-Components.utils.import("resource://calendar/modules/calProviderUtils.jsm");
-Components.utils.import("resource://calendar/modules/calStorageUpgrade.jsm");
-Components.utils.import("resource://calendar/modules/calStorageHelpers.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calProviderUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calStorageUpgrade.jsm");
+ChromeUtils.import("resource://calendar/modules/calStorageHelpers.jsm");
 
 var USECS_PER_SECOND = 1000000;
 var kCalICalendar = Components.interfaces.calICalendar;
@@ -206,12 +206,14 @@ calStorageCalendar.prototype = {
             let localDB = cal.getCalendarDirectory();
             localDB.append("local.sqlite");
             localDB = Services.storage.openDatabase(localDB);
+            localDB.defaultTransactionType = Components.interfaces.mozIStorageConnection.TRANSACTION_EXCLUSIVE;
 
             // First, we need to check if this is from 0.9, i.e we need to
             // migrate from storage.sdb to local.sqlite.
             let storageSdb = Services.dirsvc.get("ProfD", Components.interfaces.nsIFile);
             storageSdb.append("storage.sdb");
             this.mDB = Services.storage.openDatabase(storageSdb);
+            this.mDB.defaultTransactionType = Components.interfaces.mozIStorageConnection.TRANSACTION_EXCLUSIVE;
             if (this.mDB.tableExists("cal_events")) {
                 cal.LOG("[calStorageCalendar] Migrating storage.sdb -> local.sqlite");
                 upgradeDB(this.mDB); // upgrade schema before migating data
@@ -231,7 +233,7 @@ calStorageCalendar.prototype = {
                 }
                 try {
                     // hold lock on storage.sdb until we've migrated data from storage.sdb:
-                    this.mDB.beginTransactionAs(Components.interfaces.mozIStorageConnection.TRANSACTION_EXCLUSIVE);
+                    this.mDB.beginTransaction();
                     try {
                         if (this.mDB.tableExists("cal_events")) { // check again (with lock)
                             // take over data and drop from storage.sdb tables:
@@ -272,7 +274,7 @@ calStorageCalendar.prototype = {
             // WARNING: This is a somewhat fragile process. Great care should be
             // taken during future schema upgrades to make sure this still
             // works.
-            this.mDB.beginTransactionAs(Components.interfaces.mozIStorageConnection.TRANSACTION_EXCLUSIVE);
+            this.mDB.beginTransaction();
             try {
                 /**
                  * Helper function to migrate all tables from one id to the next
@@ -632,9 +634,9 @@ calStorageCalendar.prototype = {
         }
 
         let item_iid = null;
-        if (cal.isEvent(item)) {
+        if (cal.item.isEvent(item)) {
             item_iid = Components.interfaces.calIEvent;
-        } else if (cal.isToDo(item)) {
+        } else if (cal.item.isToDo(item)) {
             item_iid = Components.interfaces.calITodo;
         } else {
             this.notifyOperationComplete(aListener,
@@ -772,7 +774,7 @@ calStorageCalendar.prototype = {
                     expandedItems = expandedItems.filter(checkUnrespondedInvitation);
                 }
             } else if ((!wantUnrespondedInvitations || checkUnrespondedInvitation(item)) &&
-                       cal.checkIfInRange(item, aRangeStart, aRangeEnd)) {
+                       cal.item.checkIfInRange(item, aRangeStart, aRangeEnd)) {
                 // If no occurrences are wanted, check only the parent item.
                 // This will be changed with bug 416975.
                 expandedItems = [item];
@@ -962,11 +964,11 @@ calStorageCalendar.prototype = {
                                                   Components.interfaces.calIOperationListener.GET, aItem.id, flag);
                 }
             };
-            if (cal.isEvent(aItem)) {
+            if (cal.item.isEvent(aItem)) {
                 this.prepareStatement(this.mSelectEvent);
                 this.mSelectEvent.params.id = aID;
                 this.mSelectEvent.executeAsync(listener);
-            } else if (cal.isToDo(aItem)) {
+            } else if (cal.item.isToDo(aItem)) {
                 this.prepareStatement(this.mSelectTodo);
                 this.mSelectTodo.params.id = aID;
                 this.mSelectTodo.executeAsync(listener);
@@ -980,7 +982,7 @@ calStorageCalendar.prototype = {
 
     setOfflineJournalFlag: function(aItem, flag) {
         let aID = aItem.id;
-        if (cal.isEvent(aItem)) {
+        if (cal.item.isEvent(aItem)) {
             this.prepareStatement(this.mEditEventOfflineFlag);
             this.mEditEventOfflineFlag.params.id = aID;
             this.mEditEventOfflineFlag.params.offline_journal = flag || null;
@@ -991,7 +993,7 @@ calStorageCalendar.prototype = {
             } finally {
                 this.mEditEventOfflineFlag.reset();
             }
-        } else if (cal.isToDo(aItem)) {
+        } else if (cal.item.isToDo(aItem)) {
             this.prepareStatement(this.mEditTodoOfflineFlag);
             this.mEditTodoOfflineFlag.params.id = aID;
             this.mEditTodoOfflineFlag.params.offline_journal = flag || null;
@@ -1543,7 +1545,7 @@ calStorageCalendar.prototype = {
     cacheItem: function(item) {
         this.mItemCache[item.id] = item;
         if (item.recurrenceInfo) {
-            if (cal.isEvent(item)) {
+            if (cal.item.isEvent(item)) {
                 this.mRecEventCache[item.id] = item;
             } else {
                 this.mRecTodoCache[item.id] = item;
@@ -1730,7 +1732,7 @@ calStorageCalendar.prototype = {
                             // for events DTEND/DUE is enforced by calEvent/calTodo, so suppress DURATION:
                             break;
                         case "CATEGORIES": {
-                            let cats = cal.categoriesStringToArray(row.value);
+                            let cats = cal.category.stringToArray(row.value);
                             item.setCategories(cats.length, cats);
                             break;
                         }
@@ -1781,7 +1783,7 @@ calStorageCalendar.prototype = {
 
             let rec = item.recurrenceInfo;
 
-            if (cal.isEvent(item)) {
+            if (cal.item.isEvent(item)) {
                 this.mSelectEventExceptions.params.id = item.id;
                 this.prepareStatement(this.mSelectEventExceptions);
                 try {
@@ -1796,7 +1798,7 @@ calStorageCalendar.prototype = {
                 } finally {
                     this.mSelectEventExceptions.reset();
                 }
-            } else if (cal.isToDo(item)) {
+            } else if (cal.item.isToDo(item)) {
                 this.mSelectTodoExceptions.params.id = item.id;
                 this.prepareStatement(this.mSelectTodoExceptions);
                 try {
@@ -2005,9 +2007,9 @@ calStorageCalendar.prototype = {
         flags |= this.writeRelations(item, olditem);
         flags |= this.writeAlarms(item, olditem);
 
-        if (cal.isEvent(item)) {
+        if (cal.item.isEvent(item)) {
             this.writeEvent(item, olditem, flags);
-        } else if (cal.isToDo(item)) {
+        } else if (cal.item.isToDo(item)) {
             this.writeTodo(item, olditem, flags);
         } else {
             throw Components.results.NS_ERROR_UNEXPECTED;
@@ -2164,7 +2166,7 @@ calStorageCalendar.prototype = {
         let cats = item.getCategories({});
         if (cats.length > 0) {
             ret = CAL_ITEM_FLAG.HAS_PROPERTIES;
-            this.writeProperty(item, "CATEGORIES", cal.categoriesArrayToString(cats));
+            this.writeProperty(item, "CATEGORIES", cal.category.arrayToString(cats));
         }
 
         return ret;

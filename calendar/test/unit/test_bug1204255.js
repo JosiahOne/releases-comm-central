@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function run_test() {
     // Test attendee duplicate handling for bug 1204255
@@ -58,7 +58,7 @@ function test_newAttendee() {
             attendee.commonName = input.cname;
             event.addAttendee(attendee);
         }
-        let readAttendee = event.getAttendeeById(cal.prependMailTo(test.expected.id));
+        let readAttendee = event.getAttendeeById(cal.email.prependMailTo(test.expected.id));
         equal(readAttendee.id, test.expected.id);
         equal(readAttendee.participationStatus, test.expected.partstat, "partstat matches for " + test.expected.id);
         equal(readAttendee.commonName, test.expected.cname, "commonName matches for " + test.expected.id);

@@ -5,9 +5,7 @@
 
 #include "nsISupports.idl"
 #include "MailNewsTypes2.idl"
-// #include "nsIImapUrl.idl" // for imapMessageFlagsType
-
-typedef unsigned short imapMessageFlagsType;
+#include "nsIImapUrl.idl" // for imapMessageFlagsType
 
 typedef long nsOfflineImapOperationType;
 
@@ -42,7 +40,7 @@ interface nsIMsgOfflineImapOperation : nsISupports
   attribute string sourceFolderURI;
   void addKeywordToAdd(in string aKeyword);
   void addKeywordToRemove(in string aKeyword);
-  readonly attribute string keywordsToAdd; 
+  readonly attribute string keywordsToAdd;
   readonly attribute string keywordsToRemove;
   readonly attribute long numberOfCopies;
   void addMessageCopyOperation(in string destinationBox);

@@ -6,7 +6,6 @@
 #include "nsAbManager.h"
 #include "nsAbBaseCID.h"
 #include "nsAddrDatabase.h"
-#include "nsIAbMDBDirectory.h"
 #include "nsIOutputStream.h"
 #include "nsNetUtil.h"
 #include "nsMsgI18N.h"
@@ -15,7 +14,6 @@
 #include "nsAppDirectoryServiceDefs.h"
 #include "plstr.h"
 #include "prmem.h"
-#include "nsIServiceManager.h"
 #include "mozIDOMWindow.h"
 #include "plbase64.h"
 #include "nsIWindowWatcher.h"
@@ -31,9 +29,7 @@
 #include "nsIObserverService.h"
 #include "nsDirPrefs.h"
 #include "nsThreadUtils.h"
-#include "nsIAbDirFactory.h"
 #include "nsComponentManagerUtils.h"
-#include "nsIIOService.h"
 #include "nsAbQueryStringToExpression.h"
 #include "mozilla/ArrayUtils.h"
 #include "mozilla/Services.h"
@@ -50,7 +46,7 @@ struct ExportAttributesTableStruct
 // see bugs bug #116692 and #118454
 #define MOZ_AB_OBJECTCLASS "mozillaAbPersonAlpha"
 
-// for now, the oder of the attributes with true for includeForPlainText
+// for now, the order of the attributes with true for includeForPlainText
 // should be in the same order as they are in the import code
 // see importMsgProperties and nsImportStringBundle.
 //

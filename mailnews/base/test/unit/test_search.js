@@ -10,7 +10,7 @@
  */
 load("../../../resources/searchTestUtils.js");
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var nsMsgSearchScope = Ci.nsMsgSearchScope;
 var nsMsgSearchAttrib = Ci.nsMsgSearchAttrib;
@@ -266,7 +266,7 @@ function run_test()
 {
   localAccountUtils.loadLocalMailAccount();
 
-  var copyListener = 
+  var copyListener =
   {
     OnStartCopy: function() {},
     OnProgress: function(aProgress, aProgressMax) {},
@@ -297,7 +297,7 @@ function testSearch()
     dump("testing dbHeader " + test.dbHeader + "\n");
     customValue = mailTestUtils.firstMsgHdr(localAccountUtils.inboxFolder)
                                .getProperty(test.dbHeader);
-    do_check_eq(customValue, test.testString);
+    Assert.equal(customValue, test.testString);
     do_timeout(0, testSearch);
   }
   else if (test)

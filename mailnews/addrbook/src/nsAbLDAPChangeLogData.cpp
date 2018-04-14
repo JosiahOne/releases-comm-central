@@ -7,7 +7,6 @@
 #include "nsAbLDAPChangeLogData.h"
 #include "nsAbLDAPChangeLogQuery.h"
 #include "nsILDAPMessage.h"
-#include "nsIAbCard.h"
 #include "nsIAddrBookSession.h"
 #include "nsAbBaseCID.h"
 #include "nsAbUtils.h"
@@ -204,7 +203,7 @@ nsresult nsAbLDAPProcessChangeLogData::OnLDAPSearchResult(nsILDAPMessage *aMessa
                 rv = OnFindingChangesDone();
                 // If success we return from here since
                 // this changes state to kReplicatingChanges
-                // and it falls thru into the if clause below.
+                // and it falls through into the if clause below.
                 if (NS_SUCCEEDED(rv))
                     return rv;
                 break;

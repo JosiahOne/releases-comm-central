@@ -5,7 +5,7 @@
  * Test code <copied from="test_pop3GetNewMail.js">
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var server;
 var daemon;
@@ -65,9 +65,9 @@ var urlListener =
   OnStopRunningUrl: function (url, result) {
     try {
       if (thisTest.expectSuccess)
-        do_check_eq(result, 0);
+        Assert.equal(result, 0);
       else
-        do_check_neq(result, 0);
+        Assert.notEqual(result, 0);
 
       var transaction = server.playTransaction();
       do_check_transaction(transaction, thisTest.transaction);

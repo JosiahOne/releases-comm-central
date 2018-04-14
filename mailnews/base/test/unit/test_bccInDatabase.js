@@ -6,7 +6,7 @@
  * Testing of bcc in message summary file added in bug 481667
  */
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var hdr;
 
@@ -14,7 +14,7 @@ function run_test()
 {
   localAccountUtils.loadLocalMailAccount();
 
-  var copyListener = 
+  var copyListener =
   {
     OnStartCopy: function() {},
     OnProgress: function(aProgress, aProgressMax) {},
@@ -37,9 +37,9 @@ function continueTest()
   //dump("\nbccList >" + hdr.bccList);
   //dump("\nccList >" + hdr.ccList);
   //dump("\n");
-  do_check_true(hdr.bccList.includes("Another Person"));
-  do_check_true(hdr.bccList.includes("<u1@example.com>"));
-  do_check_false(hdr.bccList.includes("IDoNotExist"));
+  Assert.ok(hdr.bccList.includes("Another Person"));
+  Assert.ok(hdr.bccList.includes("<u1@example.com>"));
+  Assert.ok(!hdr.bccList.includes("IDoNotExist"));
   hdr = null;
   do_test_finished();
 }

@@ -8,15 +8,15 @@ load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
 load("../../../resources/messageGenerator.js");
 
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 var gEmptyLocal1, gEmptyLocal2;
 var gLastKey;
 var gMessages = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
 var gCopyService = MailServices.copy;
 
-Components.utils.import("resource:///modules/folderUtils.jsm");
-Components.utils.import("resource:///modules/iteratorUtils.jsm");
+ChromeUtils.import("resource:///modules/folderUtils.jsm");
+ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 var tests = [
   setup,
@@ -76,15 +76,15 @@ var tests = [
   },
   function verifyFolders() {
     let folder1 = IMAPPump.inbox.getChildNamed("empty 1");
-    do_check_eq(folderCount(folder1), 2);
+    Assert.equal(folderCount(folder1), 2);
     let folder2 = IMAPPump.inbox.getChildNamed("empty 2");
-    do_check_true(folder2 !== null);
+    Assert.ok(folder2 !== null);
     // folder 1 and 2 should each now have two messages in them.
-    do_check_true(folder1 !== null);
-    do_check_eq(folderCount(folder2), 2);
+    Assert.ok(folder1 !== null);
+    Assert.equal(folderCount(folder2), 2);
     // The local inbox folder should now be empty, since the second
     // operation was a move.
-    do_check_eq(folderCount(localAccountUtils.inboxFolder), 0);
+    Assert.equal(folderCount(localAccountUtils.inboxFolder), 0);
   },
   teardown
 ];
@@ -136,13 +136,13 @@ var CopyListener =
   OnStopCopy: function(aStatus)
   {
     // Check: message successfully copied.
-    do_check_eq(aStatus, 0);
+    Assert.equal(aStatus, 0);
     async_driver();
   }
 };
 
 asyncUrlListener.callback = function(aUrl, aExitCode) {
-  do_check_eq(aExitCode, 0);
+  Assert.equal(aExitCode, 0);
 };
 
 function teardown() {

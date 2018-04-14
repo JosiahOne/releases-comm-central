@@ -10,9 +10,7 @@
 #include "nsIMsgMailNewsUrl.h"
 #include "nsIMsgHdr.h"
 #include "nsNNTPProtocol.h"
-#include "nsINNTPArticleList.h"
 #include "nsIOutputStream.h"
-#include "nsIMemory.h"
 #include "nsIPipe.h"
 #include "nsCOMPtr.h"
 #include "nsMsgI18N.h"
@@ -31,9 +29,9 @@
 #include "mozilla/SlicedInputStream.h"
 #include "mozilla/mailnews/MimeHeaderParser.h"
 #include "nsContentUtils.h"
+#include "nsIURIMutator.h"
 
 #include "prprf.h"
-#include <algorithm>
 
 /* include event sink interfaces for news */
 
@@ -55,8 +53,6 @@
 #include "nsIMsgFolder.h"
 #include "nsIMsgNewsFolder.h"
 #include "nsIDocShell.h"
-
-#include "nsIMsgFilterList.h"
 
 // for the memory cache...
 #include "nsICacheEntry.h"
@@ -348,7 +344,9 @@ NS_IMETHODIMP nsNNTPProtocol::Initialize(nsIURI *aURL, nsIMsgWindow *aMsgWindow)
              nsINntpUrl::DEFAULT_NNTPS_PORT : nsINntpUrl::DEFAULT_NNTP_PORT;
     }
 
-    rv = m_url->SetPort(port);
+    // Don't mutate/clone here.
+    nsCOMPtr<nsIMsgMailNewsUrl> mailnewsurl = do_QueryInterface(m_url);
+    rv = mailnewsurl->SetPortInternal(port);
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
@@ -830,16 +828,17 @@ nsresult nsNNTPProtocol::OpenCacheEntry()
 
   // Truncate of the query part so we don't duplicate urls in the cache for
   // various message parts.
-  nsCOMPtr<nsIURI> newUri;
-  uri->Clone(getter_AddRefs(newUri));
   nsAutoCString path;
-  newUri->GetPathQueryRef(path);
+  uri->GetPathQueryRef(path);
   int32_t pos = path.FindChar('?');
+  nsCOMPtr<nsIURI> newUri;
   if (pos != kNotFound) {
     path.SetLength(pos);
-    newUri->SetPathQueryRef(path);
+    rv = NS_MutateURI(uri).SetPathQueryRef(path).Finalize(newUri);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
-  return cacheStorage->AsyncOpenURI(newUri, EmptyCString(), nsICacheStorage::OPEN_NORMALLY, this);
+  return cacheStorage->AsyncOpenURI(newUri ? newUri : uri, EmptyCString(),
+                                    nsICacheStorage::OPEN_NORMALLY, this);
 }
 
 NS_IMETHODIMP nsNNTPProtocol::AsyncOpen(nsIStreamListener *listener, nsISupports *ctxt)

@@ -1,7 +1,7 @@
 // Bug 37465 -- assertions with no accounts
 
-Components.utils.import("resource:///modules/mailServices.js");
-Components.utils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function run_test() {
   var daemon = setupNNTPDaemon();
@@ -13,10 +13,10 @@ function run_test() {
                                  "/1@regular.invalid");
   let newsUri = uri.QueryInterface(Ci.nsINntpUrl)
                    .QueryInterface(Ci.nsIMsgMailNewsUrl);
-  do_check_eq(uri.port, server.port);
-  do_check_eq(newsUri.server, null);
-  do_check_eq(newsUri.messageID, "1@regular.invalid");
-  do_check_eq(newsUri.folder, null);
+  Assert.equal(uri.port, server.port);
+  Assert.equal(newsUri.server, null);
+  Assert.equal(newsUri.messageID, "1@regular.invalid");
+  Assert.equal(newsUri.folder, null);
 
   // Run the URI and make sure we get the message
   let channel = Services.io.newChannelFromURI2(uri,
@@ -32,7 +32,7 @@ function run_test() {
   while (!articleTextListener.finished)
     thread.processNextEvent(true);
 
-  do_check_eq(articleTextListener.data,
+  Assert.equal(articleTextListener.data,
     daemon.getArticle("<1@regular.invalid>").fullText);
 
   // Shut down connections

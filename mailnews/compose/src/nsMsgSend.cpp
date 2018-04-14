@@ -30,7 +30,6 @@
 #include "nsCExternalHandlerService.h"
 #include "nsIMIMEService.h"
 #include "nsIDocument.h"
-#include "nsIDOMDocument.h"
 #include "nsMsgCompCID.h"
 #include "nsIAbAddressCollector.h"
 #include "nsAbBaseCID.h"
@@ -83,6 +82,7 @@
 #include "nsIMsgProtocolInfo.h"
 #include "mozIDOMWindow.h"
 #include "mozilla/Preferences.h"
+#include "nsIURIMutator.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -429,6 +429,8 @@ void nsMsgComposeAndSend::GenerateMessageId()
 NS_IMETHODIMP
 nsMsgComposeAndSend::GatherMimeAttachments()
 {
+  nsCOMPtr<nsIMsgSend> kungFuDeathGrip(this);
+
   bool shouldDeleteDeliveryState = true;
   nsresult status;
   uint32_t    i;
@@ -1258,9 +1260,9 @@ mime_encoder_output_fn(const char *buf, int32_t size, void *closure)
 }
 
 nsresult
-nsMsgComposeAndSend::GetEmbeddedObjectInfo(nsIDOMNode *node, nsMsgAttachmentData *attachment, bool *acceptObject)
+nsMsgComposeAndSend::GetEmbeddedObjectInfo(Element *domElement, nsMsgAttachmentData *attachment, bool *acceptObject)
 {
-  NS_ENSURE_ARG_POINTER(node);
+  NS_ENSURE_ARG_POINTER(domElement);
   NS_ENSURE_ARG_POINTER(attachment);
   NS_ENSURE_ARG_POINTER(acceptObject);
 
@@ -1272,12 +1274,6 @@ nsMsgComposeAndSend::GetEmbeddedObjectInfo(nsIDOMNode *node, nsMsgAttachmentData
   // Reset this structure to null!
   *acceptObject = false;
 
-  // We're only interested in body, image, link and anchors which are all
-  // elements.
-  nsCOMPtr<nsIDOMElement> domElement = do_QueryInterface(node);
-  if (!domElement)
-    return NS_OK;
-
   bool isImage = false;
   nsAutoString mozDoNotSendAttr;
   domElement->GetAttribute(NS_LITERAL_STRING(ATTR_MOZ_DO_NOT_SEND), mozDoNotSendAttr);
@@ -1286,13 +1282,12 @@ nsMsgComposeAndSend::GetEmbeddedObjectInfo(nsIDOMNode *node, nsMsgAttachmentData
   if (!(mozDoNotSendAttr.IsEmpty() || mozDoNotSendAttr.LowerCaseEqualsLiteral("false")))
     return NS_OK;
 
-  // Now, we know the types of objects this node can be, so we will do
-  // our query interface here and see what we come up with
-  nsCOMPtr<Element> nodeAsElement = do_QueryInterface(node);
-  RefPtr<HTMLImageElement>  image  = HTMLImageElement::FromContentOrNull(nodeAsElement);
-  RefPtr<HTMLLinkElement>   link   = HTMLLinkElement::FromContentOrNull(nodeAsElement);
-  RefPtr<HTMLAnchorElement> anchor = HTMLAnchorElement::FromContentOrNull(nodeAsElement);
-  RefPtr<HTMLBodyElement>   body   = HTMLBodyElement::FromContentOrNull(nodeAsElement);
+  // We're only interested in body, image, link and anchors which are all
+  // elements. Let's see what we have.
+  RefPtr<HTMLImageElement>  image  = HTMLImageElement::FromNode(domElement);
+  RefPtr<HTMLLinkElement>   link   = HTMLLinkElement::FromNode(domElement);
+  RefPtr<HTMLAnchorElement> anchor = HTMLAnchorElement::FromNode(domElement);
+  RefPtr<HTMLBodyElement>   body   = HTMLBodyElement::FromNode(domElement);
 
   // First, try to see if the body as a background image
   if (body)
@@ -1324,36 +1319,21 @@ nsMsgComposeAndSend::GetEmbeddedObjectInfo(nsIDOMNode *node, nsMsgAttachmentData
     {
       // Well, the first time failed...which means we probably didn't get
       // the full path name...
-      //
-      nsIDOMDocument    *ownerDocument = nullptr;
-      node->GetOwnerDocument(&ownerDocument);
-      if (ownerDocument)
-      {
-        nsIDocument     *doc = nullptr;
-        if (NS_FAILED(ownerDocument->QueryInterface(NS_GET_IID(nsIDocument),(void**)&doc)) || !doc)
-          return NS_ERROR_OUT_OF_MEMORY;
+      nsAutoCString spec;
+      rv = image->OwnerDoc()->GetDocumentURI()->GetSpec(spec);
+      NS_ENSURE_SUCCESS(rv, rv);
 
-        nsAutoCString spec;
-        nsIURI *uri = doc->GetDocumentURI();
+      // Ok, now get the path to the root doc and tack on the name we
+      // got from the GetSrc() call....
+      NS_ConvertUTF8toUTF16 workURL(spec);
 
-        if (!uri)
-          return NS_ERROR_OUT_OF_MEMORY;
-
-        rv = uri->GetSpec(spec);
-        NS_ENSURE_SUCCESS(rv, rv);
-
-        // Ok, now get the path to the root doc and tack on the name we
-        // got from the GetSrc() call....
-        NS_ConvertUTF8toUTF16 workURL(spec);
-
-        int32_t loc = workURL.RFindChar('/');
-        if (loc >= 0)
-          workURL.SetLength(loc+1);
-        workURL.Append(tUrl);
-        NS_ConvertUTF16toUTF8 workurlC(workURL);
-        if (NS_FAILED(nsMsgNewURL(getter_AddRefs(attachment->m_url), workurlC)))
-          return NS_OK; // Continue and send it without this image.
-      }
+      int32_t loc = workURL.RFindChar('/');
+      if (loc >= 0)
+        workURL.SetLength(loc+1);
+      workURL.Append(tUrl);
+      NS_ConvertUTF16toUTF8 workurlC(workURL);
+      if (NS_FAILED(nsMsgNewURL(getter_AddRefs(attachment->m_url), workurlC)))
+        return NS_OK; // Continue and send it without this image.
     }
     isImage = true;
 
@@ -1472,7 +1452,7 @@ nsMsgComposeAndSend::GetMultipartRelatedCount(bool forceToBeCalculated /*=false*
       RefPtr<nsMsgAttachmentData> attachment(new nsMsgAttachmentData);
 
       int32_t i;
-      nsCOMPtr<nsIDOMNode> node;
+      nsCOMPtr<Element> domElement;
 
       for (i = count - 1, count = 0; i >= 0; i --)
       {
@@ -1481,11 +1461,11 @@ nsMsgComposeAndSend::GetMultipartRelatedCount(bool forceToBeCalculated /*=false*
         // now we need to get the element in the array and do the magic
         // to process this element.
         //
-        node = do_QueryElementAt(mEmbeddedObjectList, i, &rv);
+        domElement = do_QueryElementAt(mEmbeddedObjectList, i, &rv);
         bool acceptObject = false;
-        if (node)
+        if (domElement)
         {
-          rv = GetEmbeddedObjectInfo(node, attachment, &acceptObject);
+          rv = GetEmbeddedObjectInfo(domElement, attachment, &acceptObject);
         }
         else // outlook import case
         {
@@ -1583,12 +1563,11 @@ nsMsgComposeAndSend::GetBodyFromEditor()
 
   if (aCharset && *aCharset)
   {
+    bool isAsciiOnly = NS_IsAscii(bodyText);
     rv = nsMsgI18NConvertFromUnicode(nsDependentCString(aCharset),
                                      nsDependentString(bodyText),
                                      outCString,
                                      true);
-    bool isAsciiOnly = NS_IsAscii(outCString.get()) &&
-      !nsMsgI18Nstateful_charset(mCompFields->GetCharacterSet());
     if (mCompFields->GetForceMsgEncoding())
       isAsciiOnly = false;
     mCompFields->SetBodyIsAsciiOnly(isAsciiOnly);
@@ -1657,8 +1636,8 @@ nsMsgComposeAndSend::GetBodyFromEditor()
 //
 typedef struct
 {
-  nsIDOMNode    *node;
-  char          *url;
+  Element *element;
+  char *url;
 } domSaveStruct;
 
 nsresult
@@ -1686,23 +1665,24 @@ nsMsgComposeAndSend::ProcessMultipartRelated(int32_t *aMailboxCount, int32_t *aN
     memset(domSaveArray, 0, sizeof(domSaveStruct) * multipartCount);
   }
 
-  for (i = mPreloadedAttachmentCount; i < (mPreloadedAttachmentCount + multipartCount);)
+  i = mPreloadedAttachmentCount;
+  while (i < mPreloadedAttachmentCount + multipartCount)
   {
     // Ok, now we need to get the element in the array and do the magic
     // to process this element.
     //
 
     locCount++;
-    nsCOMPtr<nsIDOMNode> node = do_QueryElementAt(mEmbeddedObjectList, locCount);
-    if (node)
+    nsCOMPtr<Element> domElement = do_QueryElementAt(mEmbeddedObjectList, locCount);
+    if (domElement)
     {
       bool acceptObject = false;
-      rv = GetEmbeddedObjectInfo(node, attachment, &acceptObject);
+      rv = GetEmbeddedObjectInfo(domElement, attachment, &acceptObject);
       NS_ENSURE_SUCCESS(rv, NS_ERROR_MIME_MPART_ATTACHMENT_ERROR);
       if (!acceptObject)
         continue;
       nsString nodeValue;
-      node->GetNodeValue(nodeValue);
+      domElement->GetNodeValue(nodeValue);
       LossyCopyUTF16toASCII(nodeValue, m_attachments[i]->m_contentId);
     }
     else
@@ -1727,9 +1707,9 @@ nsMsgComposeAndSend::ProcessMultipartRelated(int32_t *aMailboxCount, int32_t *aN
     m_attachments[i]->mNodeIndex = locCount;
 
     j++;
-    domSaveArray[j].node = node;
+    domSaveArray[j].element = domElement;
 
-    // check if we have alreay attached this object, don't need to attach it twice
+    // check if we have already attached this object, don't need to attach it twice
     duplicateOf = -1;
     for (k = mPreloadedAttachmentCount; k < i; k++)
     {
@@ -1820,20 +1800,19 @@ nsMsgComposeAndSend::ProcessMultipartRelated(int32_t *aMailboxCount, int32_t *aN
     // Content-ID for this object. This will be necessary for generating
     // the HTML we need.
     //
-    nsString domURL;
-    if (!m_attachments[duplicateOf == -1 ? i : duplicateOf]->m_contentId.IsEmpty())
+    if (domSaveArray[j].element &&
+        !m_attachments[duplicateOf == -1 ? i : duplicateOf]->m_contentId.IsEmpty())
     {
       nsString   newSpec(NS_LITERAL_STRING("cid:"));
       newSpec.AppendASCII(m_attachments[duplicateOf == -1 ? i : duplicateOf]->m_contentId.get());
 
-      // Now, we know the types of objects this node can be, so we will do
-      // our query interface here and see what we come up with
-      nsCOMPtr<Element> nodeAsElement = do_QueryInterface(domSaveArray[j].node);
-      RefPtr<HTMLImageElement>  image  = HTMLImageElement::FromContentOrNull(nodeAsElement);
-      RefPtr<HTMLLinkElement>   link   = HTMLLinkElement::FromContentOrNull(nodeAsElement);
-      RefPtr<HTMLAnchorElement> anchor = HTMLAnchorElement::FromContentOrNull(nodeAsElement);
-      RefPtr<HTMLBodyElement>   body   = HTMLBodyElement::FromContentOrNull(nodeAsElement);
+      // We know the types of objects this element can be, let's see what we come up with.
+      RefPtr<HTMLImageElement>  image  = HTMLImageElement::FromNode(domSaveArray[j].element);
+      RefPtr<HTMLLinkElement>   link   = HTMLLinkElement::FromNode(domSaveArray[j].element);
+      RefPtr<HTMLAnchorElement> anchor = HTMLAnchorElement::FromNode(domSaveArray[j].element);
+      RefPtr<HTMLBodyElement>   body   = HTMLBodyElement::FromNode(domSaveArray[j].element);
 
+      nsString domURL;
       IgnoredErrorResult rv2;
       if (anchor)
       {
@@ -1870,16 +1849,14 @@ nsMsgComposeAndSend::ProcessMultipartRelated(int32_t *aMailboxCount, int32_t *aN
   //
   for (i = 0; i < multipartCount; i++)
   {
-    if ( (!domSaveArray[i].node) || (!domSaveArray[i].url) )
+    if (!domSaveArray[i].element || !domSaveArray[i].url)
       continue;
 
-    // Now, we know the types of objects this node can be, so we will do
-    // our query interface here and see what we come up with
-    nsCOMPtr<Element> nodeAsElement = do_QueryInterface(domSaveArray[i].node);
-    RefPtr<HTMLImageElement>  image  = HTMLImageElement::FromContentOrNull(nodeAsElement);
-    RefPtr<HTMLLinkElement>   link   = HTMLLinkElement::FromContentOrNull(nodeAsElement);
-    RefPtr<HTMLAnchorElement> anchor = HTMLAnchorElement::FromContentOrNull(nodeAsElement);
-    RefPtr<HTMLBodyElement>   body   = HTMLBodyElement::FromContentOrNull(nodeAsElement);
+    // We know the types of objects this element can be, let's see what we come up with.
+    RefPtr<HTMLImageElement>  image  = HTMLImageElement::FromNode(domSaveArray[i].element);
+    RefPtr<HTMLLinkElement>   link   = HTMLLinkElement::FromNode(domSaveArray[i].element);
+    RefPtr<HTMLAnchorElement> anchor = HTMLAnchorElement::FromNode(domSaveArray[i].element);
+    RefPtr<HTMLBodyElement>   body   = HTMLBodyElement::FromNode(domSaveArray[i].element);
 
       // STRING USE WARNING: hoisting the following conversion might save code-space, since it happens along every path
 
@@ -2078,29 +2055,30 @@ nsMsgComposeAndSend::AddCompFieldLocalAttachments()
             nsCOMPtr<nsIMIMEService> mimeFinder (do_GetService(NS_MIMESERVICE_CONTRACTID, &rv));
             if (NS_SUCCEEDED(rv) && mimeFinder)
             {
-              nsCOMPtr<nsIURL> fileUrl(do_CreateInstance(NS_STANDARDURL_CONTRACTID));
-              if (fileUrl)
+              nsCOMPtr<nsIURL> fileUrl;
+              rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID)
+                     .Apply(NS_MutatorMethod(&nsIURLMutator::SetFileName,
+                                             m_attachments[newLoc]->m_realName,
+                                             nullptr))
+                     .Finalize(fileUrl);
+              if (NS_SUCCEEDED(rv))
               {
                 nsAutoCString fileExt;
-                //First try using the real file name
-                rv = fileUrl->SetFileName(m_attachments[newLoc]->m_realName);
-                if (NS_SUCCEEDED(rv))
-                {
-                  rv = fileUrl->GetFileExtension(fileExt);
-                  if (NS_SUCCEEDED(rv) && !fileExt.IsEmpty()) {
-                    nsAutoCString type;
-                    mimeFinder->GetTypeFromExtension(fileExt, type);
-  #ifndef XP_MACOSX
-                    if (!type.EqualsLiteral("multipart/appledouble"))  // can't do apple double on non-macs
-  #endif
-                    m_attachments[newLoc]->m_type = type;
-                  }
+                // First try using the real file name.
+                rv = fileUrl->GetFileExtension(fileExt);
+                if (NS_SUCCEEDED(rv) && !fileExt.IsEmpty()) {
+                  nsAutoCString type;
+                  mimeFinder->GetTypeFromExtension(fileExt, type);
+#ifndef XP_MACOSX
+                  if (!type.EqualsLiteral("multipart/appledouble"))  // can't do apple double on non-macs
+#endif
+                  m_attachments[newLoc]->m_type = type;
                 }
 
                 //Then try using the url if we still haven't figured out the content type
                 if (m_attachments[newLoc]->m_type.IsEmpty())
                 {
-                  rv = fileUrl->SetSpec(url);
+                  rv = NS_MutateURI(fileUrl).SetSpec(url).Finalize(fileUrl);
                   if (NS_SUCCEEDED(rv))
                   {
                     rv = fileUrl->GetFileExtension(fileExt);
@@ -2199,9 +2177,10 @@ nsMsgComposeAndSend::AddCompFieldRemoteAttachments(uint32_t   aStartLocation,
         if (! nsMsgIsLocalFile(url.get()))
         {
           // Check for message attachment, see nsMsgMailNewsUrl::GetIsMessageUri.
-          nsCOMPtr<nsIURI> nsiuri = do_CreateInstance(NS_STANDARDURL_CONTRACTID);
-          NS_ENSURE_STATE(nsiuri);
-          nsiuri->SetSpec(url);
+          nsCOMPtr<nsIURI> nsiuri;
+          rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(url).Finalize(nsiuri);
+          NS_ENSURE_SUCCESS(rv, rv);
+
           nsAutoCString scheme;
           nsiuri->GetScheme(scheme);
           bool isAMessageAttachment =
@@ -2798,7 +2777,7 @@ nsMsgComposeAndSend::InitCompositionFields(nsMsgCompFields *fields,
 
 // Add default headers to outgoing messages see Bug #61520
 // mail.identity.<id#>.headers pref is a comma separated value of pref names
-// containging headers to add headers are stored in
+// containing headers to add headers are stored in
 // mail.identity.<id#>.header.<header name> grab all the headers, mime encode
 // them and add them to the other custom headers.
 nsresult
@@ -2953,7 +2932,7 @@ nsMsgComposeAndSend::AddMailReplyToHeader() {
                              recipients_without_mailing_lists);
 
     // ... If the result is equal to the input, none of the recipients
-    // occure in the MRT addresses and therefore we stop here.
+    // occur in the MRT addresses and therefore we stop here.
     if (recipients_no_dups == recipients_without_mailing_lists)
       return NS_OK;
   }
@@ -3025,7 +3004,7 @@ nsMsgComposeAndSend::Init(
 {
   nsresult      rv = NS_OK;
 
-  //Let make sure we retreive the correct number of related parts. It may have changed since last time
+  //Let make sure we retrieve the correct number of related parts. It may have changed since last time
   GetMultipartRelatedCount(true);
 
   nsString msg;
@@ -3165,7 +3144,7 @@ NS_IMETHODIMP nsMsgComposeAndSend::SendDeliveryCallback(nsIURI *aUrl, bool inIsN
     if (NS_FAILED(aExitCode))
     {
 #ifdef __GNUC__
-// Temporary workaroung until bug 783526 is fixed.
+// Temporary workaround until bug 783526 is fixed.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch"
 #endif
@@ -3410,7 +3389,7 @@ nsMsgComposeAndSend::DeliverFileAsMail()
       msgStatus = do_QueryInterface(mStatusFeedback);
 
     nsCOMPtr<nsIURI> runningUrl;
-    rv = smtpService->SendMailMessage(mTempFile, buf, mUserIdentity,
+    rv = smtpService->SendMailMessage(mTempFile, buf, mUserIdentity, mCompFields->GetFrom(),
                                       mSmtpPassword, deliveryListener, msgStatus,
                                       callbacks, mCompFields->GetDSN(),
                                       getter_AddRefs(runningUrl),
@@ -3890,17 +3869,17 @@ nsMsgComposeAndSend::NotifyListenerOnStopCopy(nsresult aStatus)
     {
       case nsMsgDeliverNow:
       case nsMsgSendUnsent:
-        rv = bundle->FormatStringFromName("promptToSaveSentLocally",
+        rv = bundle->FormatStringFromName("promptToSaveSentLocally2",
                                           formatStrings, 3,
                                           msg);
         break;
       case nsMsgSaveAsDraft:
-        rv = bundle->FormatStringFromName("promptToSaveDraftLocally",
+        rv = bundle->FormatStringFromName("promptToSaveDraftLocally2",
                                           formatStrings, 3,
                                           msg);
         break;
       case nsMsgSaveAsTemplate:
-        rv = bundle->FormatStringFromName("promptToSaveTemplateLocally",
+        rv = bundle->FormatStringFromName("promptToSaveTemplateLocally2",
                                           formatStrings, 3,
                                           msg);
         break;
@@ -3911,11 +3890,11 @@ nsMsgComposeAndSend::NotifyListenerOnStopCopy(nsresult aStatus)
     int32_t buttonPressed = 0;
     bool showCheckBox = false;
     uint32_t buttonFlags = (nsIPrompt::BUTTON_POS_0 * nsIPrompt::BUTTON_TITLE_IS_STRING) +
-                           (nsIPrompt::BUTTON_POS_1 * nsIPrompt::BUTTON_TITLE_CANCEL) +
+                           (nsIPrompt::BUTTON_POS_1 * nsIPrompt::BUTTON_TITLE_DONT_SAVE) +
                            (nsIPrompt::BUTTON_POS_2 * nsIPrompt::BUTTON_TITLE_SAVE);
     nsString dialogTitle, buttonLabelRetry;
     bundle->GetStringFromName("SaveDialogTitle", dialogTitle);
-    bundle->GetStringFromName("buttonLabelRetry", buttonLabelRetry);
+    bundle->GetStringFromName("buttonLabelRetry2", buttonLabelRetry);
     prompt->ConfirmEx(dialogTitle.get(), msg.get(), buttonFlags, buttonLabelRetry.get(),
                       nullptr, nullptr, nullptr, &showCheckBox, &buttonPressed);
     if (buttonPressed == 0)
@@ -4134,6 +4113,8 @@ nsMsgComposeAndSend::CreateAndSendMessage(
               MSG_ComposeType                   aType
               )
 {
+  nsCOMPtr<nsIMsgSend> kungFuDeathGrip(this);
+
   nsresult      rv;
   /* First thing to do is to reset the send errors report */
   mSendReport->Reset();
@@ -4288,7 +4269,7 @@ nsMsgGetEnvelopeLine(void)
   // Use PR_FormatTimeUSEnglish() to format the date in US English format,
   // then figure out what our local GMT offset is, and append it (since
   // PR_FormatTimeUSEnglish() can't do that.) Generate four digit years as
-  // per RFC 1123 (superceding RFC 822.)
+  // per RFC 1123 (superseding RFC 822.)
   //
   PR_ExplodeTime(PR_Now(), PR_LocalTimeParameters, &now);
   PR_FormatTimeUSEnglish(buffer, sizeof(buffer),

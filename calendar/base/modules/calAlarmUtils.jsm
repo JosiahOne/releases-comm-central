@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 this.EXPORTED_SYMBOLS = ["cal"]; // even though it's defined in calUtils.jsm, import needs this
 cal.alarms = {
@@ -15,7 +15,7 @@ cal.alarms = {
      * @param aItem     The item to apply the default alarm values to.
      */
     setDefaultValues: function(aItem) {
-        let type = cal.isEvent(aItem) ? "event" : "todo";
+        let type = cal.item.isEvent(aItem) ? "event" : "todo";
         if (Preferences.get("calendar.alarms.onfor" + type + "s", 0) == 1) {
             let alarmOffset = cal.createDuration();
             let alarm = cal.createAlarm();
@@ -31,7 +31,7 @@ cal.alarms = {
             alarmOffset.isNegative = true;
             if (type == "todo" && !aItem.entryDate) {
                 // You can't have an alarm if the entryDate doesn't exist.
-                aItem.entryDate = cal.now();
+                aItem.entryDate = cal.dtz.now();
             }
             alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_START;
             alarm.offset = alarmOffset;
@@ -60,9 +60,9 @@ cal.alarms = {
         } else {
             let returnDate;
             if (aAlarm.related == aAlarm.ALARM_RELATED_START) {
-                returnDate = aItem[cal.calGetStartDateProp(aItem)];
+                returnDate = aItem[cal.dtz.startDateProp(aItem)];
             } else if (aAlarm.related == aAlarm.ALARM_RELATED_END) {
-                returnDate = aItem[cal.calGetEndDateProp(aItem)];
+                returnDate = aItem[cal.dtz.endDateProp(aItem)];
             }
 
             if (returnDate && aAlarm.offset) {
@@ -70,12 +70,12 @@ cal.alarms = {
                 // have a well defined startTime.  We just consider the start/end
                 // to be midnight in the user's timezone.
                 if (returnDate.isDate) {
-                    let timezone = cal.calendarDefaultTimezone();
+                    let timezone = cal.dtz.defaultTimezone;
                     // This returns a copy, so no extra cloning needed.
                     returnDate = returnDate.getInTimezone(timezone);
                     returnDate.isDate = false;
                 } else if (returnDate.timezone.tzid == "floating") {
-                    let timezone = cal.calendarDefaultTimezone();
+                    let timezone = cal.dtz.defaultTimezone;
                     returnDate = returnDate.getInTimezone(timezone);
                 } else {
                     // Clone the date to correctly add the duration.
@@ -105,9 +105,9 @@ cal.alarms = {
         if (aAlarm.related == aAlarm.ALARM_RELATED_ABSOLUTE) {
             let returnDate;
             if (aRelated === undefined || aRelated == aAlarm.ALARM_RELATED_START) {
-                returnDate = aItem[cal.calGetStartDateProp(aItem)];
+                returnDate = aItem[cal.dtz.startDateProp(aItem)];
             } else if (aRelated == aAlarm.ALARM_RELATED_END) {
-                returnDate = aItem[cal.calGetEndDateProp(aItem)];
+                returnDate = aItem[cal.dtz.endDateProp(aItem)];
             }
 
             if (returnDate && aAlarm.alarmDate) {

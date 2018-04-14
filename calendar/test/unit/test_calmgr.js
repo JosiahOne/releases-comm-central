@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
  * Tests the calICalendarManager interface
@@ -153,8 +153,8 @@ add_test(function test_calobserver() {
     // Add an item
     let item = cal.createEvent();
     item.id = cal.getUUID();
-    item.startDate = cal.now();
-    item.endDate = cal.now();
+    item.startDate = cal.dtz.now();
+    item.endDate = cal.dtz.now();
     memory.addItem(item, null);
     checkCounters(1, 0, 0);
 

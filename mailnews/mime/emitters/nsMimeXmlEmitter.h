@@ -8,14 +8,9 @@
 #include "mozilla/Attributes.h"
 #include "prio.h"
 #include "nsMimeBaseEmitter.h"
-#include "nsMimeRebuffer.h"
-#include "nsIStreamListener.h"
-#include "nsIOutputStream.h"
-#include "nsIURI.h"
-#include "nsIChannel.h"
 
 class nsMimeXmlEmitter : public nsMimeBaseEmitter {
-public: 
+public:
     nsMimeXmlEmitter ();
     virtual       ~nsMimeXmlEmitter (void);
 
@@ -40,7 +35,7 @@ public:
 protected:
 
     // For header determination...
-    bool                mXMLHeaderStarted; 
+    bool                mXMLHeaderStarted;
     int32_t             mAttachCount;
 };
 

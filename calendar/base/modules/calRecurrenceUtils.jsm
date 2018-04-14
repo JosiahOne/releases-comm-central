@@ -4,8 +4,8 @@
 
 /* exported recurrenceRule2String, splitRecurrenceRules, checkRecurrenceRule */
 
-Components.utils.import("resource://gre/modules/PluralForm.jsm");
-Components.utils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 this.EXPORTED_SYMBOLS = ["recurrenceRule2String", "splitRecurrenceRules", "checkRecurrenceRule"];
 
@@ -307,7 +307,7 @@ function recurrenceRule2String(recurrenceInfo, startDate, endDate, allDay) {
                 }
             }
 
-            let kDefaultTimezone = cal.calendarDefaultTimezone();
+            let kDefaultTimezone = cal.dtz.defaultTimezone;
 
             let detailsString;
             if (!endDate || allDay) {

@@ -1,10 +1,10 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
- 
+
  // tests that localization strings added in bug 484147 are defined in preferences
- 
-Components.utils.import("resource://gre/modules/Services.jsm");
+
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gValidityManager = Cc['@mozilla.org/mail/search/validityManager;1']
                            .getService(Ci.nsIMsgSearchValidityManager);
@@ -55,7 +55,7 @@ function run_test()
         dump("\nNo valid property for scope = " + scope
               + " attribute = " + attribute
               + " property = " + property);
-      do_check_true(valid);
+      Assert.ok(valid);
     }
   }
 }

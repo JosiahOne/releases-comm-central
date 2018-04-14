@@ -1,5 +1,8 @@
 #filter substitution
 
+toolkit.jar:
+   content/global/autocomplete.xml                                  (autocomplete/autocomplete.xml)
+
 comm.jar:
 % content communicator %content/communicator/ contentaccessible=yes
 % content help %content/communicator/helpviewer/
@@ -38,7 +41,7 @@ comm.jar:
 % overlay chrome://messenger/content/AccountManager.xul chrome://communicator/content/helpMessengerOverlay.xul
 % overlay chrome://messenger/content/FilterEditor.xul chrome://communicator/content/helpMessengerOverlay.xul
 % overlay chrome://messenger/content/junkMailInfo.xul chrome://communicator/content/helpMessengerOverlay.xul
-% overlay chrome://messenger/content/msgSelectOffline.xul chrome://communicator/content/helpMessengerOverlay.xul
+% overlay chrome://messenger/content/msgSelectOfflineFolders.xul chrome://communicator/content/helpMessengerOverlay.xul
 % overlay chrome://messenger/content/subscribe.xul chrome://communicator/content/helpMessengerOverlay.xul
 % overlay chrome://messenger/content/mailViewList.xul chrome://communicator/content/helpMessengerOverlay.xul
 % overlay chrome://messenger/content/mailViewSetup.xul chrome://communicator/content/helpMessengerOverlay.xul
@@ -62,7 +65,7 @@ comm.jar:
    content/communicator/certError.xhtml
    content/communicator/certError.xml
    content/communicator/charsetOverlay.xul
-   content/communicator/communicator.css
+*  content/communicator/communicator.css
    content/communicator/contentAreaClick.js
    content/communicator/contentAreaContextOverlay.xul
    content/communicator/defaultClientDialog.js
@@ -79,7 +82,6 @@ comm.jar:
    content/communicator/nsContextMenu.js
    content/communicator/openLocation.js
    content/communicator/openLocation.xul
-   content/communicator/passwordManager.xul
    content/communicator/safeMode.js
    content/communicator/safeMode.xul
    content/communicator/sanitize.xul
@@ -104,10 +106,18 @@ comm.jar:
    content/communicator/platformCommunicatorOverlay.xul             (unix/platformCommunicatorOverlay.xul)
 #endif
 #endif
+   content/communicator/autocomplete.css                            (autocomplete/autocomplete.css)
+   content/communicator/customizeToolbar.css                        (../../common/src/customizeToolbar.css)
+   content/communicator/customizeToolbar.js                         (../../common/src/customizeToolbar.js)
+*  content/communicator/customizeToolbar.xul                        (../../common/src/customizeToolbar.xul)
+*  content/communicator/bindings/datetimepicker.xml                 (../../common/bindings/datetimepicker.xml)
    content/communicator/bindings/findbar.xml                        (bindings/findbar.xml)
    content/communicator/bindings/general.xml                        (bindings/general.xml)
+   content/communicator/bindings/generalBindings.xml                (../../common/bindings/generalBindings.xml)
    content/communicator/bindings/notification.xml                   (bindings/notification.xml)
-   content/communicator/bindings/toolbar.xml                        (bindings/toolbar.xml)
+*  content/communicator/bindings/preferences.xml                    (../../common/bindings/preferences.xml)
+*  content/communicator/bindings/toolbar.xml                        (../../common/bindings/toolbar.xml)   
+   content/communicator/bindings/toolbar-xpfe.xml                   (bindings/toolbar-xpfe.xml)
 *  content/communicator/bindings/prefwindow.xml                     (bindings/prefwindow.xml)
    content/communicator/bookmarks/bm-panel.js                       (bookmarks/bm-panel.js)
    content/communicator/bookmarks/bm-panel.xul                      (bookmarks/bm-panel.xul)
@@ -137,9 +147,6 @@ comm.jar:
 *  content/communicator/helpviewer/help.js                          (helpviewer/help.js)
 *  content/communicator/helpviewer/helpContextOverlay.xul           (helpviewer/helpContextOverlay.xul)
 *  content/communicator/helpviewer/platformClasses.css              (helpviewer/platformClasses.css)
-   content/communicator/directory/directory.html                    (directory/directory.html)
-   content/communicator/directory/directory.js                      (directory/directory.js)
-   content/communicator/directory/directory.xul                     (directory/directory.xul)
    content/communicator/downloads/downloadmanager.js                (downloads/downloadmanager.js)
    content/communicator/downloads/downloadmanager.xul               (downloads/downloadmanager.xul)
    content/communicator/downloads/DownloadProgressListener.js       (downloads/DownloadProgressListener.js)
@@ -212,6 +219,7 @@ comm.jar:
    content/communicator/pref/pref-links.xul                         (pref/pref-links.xul)
    content/communicator/pref/pref-locationbar.js                    (pref/pref-locationbar.js)
    content/communicator/pref/pref-locationbar.xul                   (pref/pref-locationbar.xul)
+*  content/communicator/pref/pref-media.xul                         (pref/pref-media.xul)
    content/communicator/pref/pref-mousewheel.js                     (pref/pref-mousewheel.js)
    content/communicator/pref/pref-mousewheel.xul                    (pref/pref-mousewheel.xul)
    content/communicator/pref/pref-navigator.js                      (pref/pref-navigator.js)
@@ -227,7 +235,7 @@ comm.jar:
    content/communicator/pref/pref-proxies.xul                       (pref/pref-proxies.xul)
    content/communicator/pref/pref-proxies-advanced.xul              (pref/pref-proxies-advanced.xul)
    content/communicator/pref/pref-scripts.js                        (pref/pref-scripts.js)
-*  content/communicator/pref/pref-scripts.xul                       (pref/pref-scripts.xul)
+   content/communicator/pref/pref-scripts.xul                       (pref/pref-scripts.xul)
    content/communicator/pref/pref-search.js                         (pref/pref-search.js)
    content/communicator/pref/pref-search.xul                        (pref/pref-search.xul)
    content/communicator/pref/pref-security.js                       (pref/pref-security.js)
@@ -236,8 +244,6 @@ comm.jar:
    content/communicator/pref/pref-smartupdate.xul                   (pref/pref-smartupdate.xul)
    content/communicator/pref/pref-spelling.js                       (pref/pref-spelling.js)
    content/communicator/pref/pref-spelling.xul                      (pref/pref-spelling.xul)
-   content/communicator/pref/pref-sync.js                           (pref/pref-sync.js)
-   content/communicator/pref/pref-sync.xul                          (pref/pref-sync.xul)
    content/communicator/pref/pref-tabs.xul                          (pref/pref-tabs.xul)
    content/communicator/profile/profileSelection.js                 (profile/profileSelection.js)
    content/communicator/profile/profileSelection.xul                (profile/profileSelection.xul)
@@ -258,22 +264,6 @@ comm.jar:
    content/communicator/sidebar/sidebarOverlay.css                  (sidebar/sidebarOverlay.css)
    content/communicator/sidebar/sidebarOverlay.js                   (sidebar/sidebarOverlay.js)
    content/communicator/sidebar/sidebarOverlay.xul                  (sidebar/sidebarOverlay.xul)
-   content/communicator/aboutSyncTabs.xul                           (sync/aboutSyncTabs.xul)
-   content/communicator/aboutSyncTabs.js                            (sync/aboutSyncTabs.js)
-   content/communicator/aboutSyncTabs.css                           (sync/aboutSyncTabs.css)
-   content/communicator/aboutSyncTabs-bindings.xml                  (sync/aboutSyncTabs-bindings.xml)
-   content/communicator/sync/syncAddDevice.xul                      (sync/syncAddDevice.xul)
-   content/communicator/sync/syncAddDevice.js                       (sync/syncAddDevice.js)
-   content/communicator/sync/syncSetup.xul                          (sync/syncSetup.xul)
-   content/communicator/sync/syncSetup.js                           (sync/syncSetup.js)
-   content/communicator/sync/syncGenericChange.xul                  (sync/syncGenericChange.xul)
-   content/communicator/sync/syncGenericChange.js                   (sync/syncGenericChange.js)
-   content/communicator/sync/syncKey.xhtml                          (sync/syncKey.xhtml)
-   content/communicator/sync/syncNotification.xml                   (sync/syncNotification.xml)
-   content/communicator/sync/syncQuota.xul                          (sync/syncQuota.xul)
-   content/communicator/sync/syncQuota.js                           (sync/syncQuota.js)
-   content/communicator/sync/syncUtils.js                           (sync/syncUtils.js)
-   content/communicator/sync/syncUI.js                              (sync/syncUI.js)
 
    # L10n resource overrides
 % resource search-plugins chrome://communicator/locale/searchplugins/

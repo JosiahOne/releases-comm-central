@@ -26,7 +26,7 @@ load("../../../resources/alertTestUtils.js");
 load("../../../resources/messageGenerator.js");
 
 // Globals
-Components.utils.import("resource:///modules/mailServices.js");
+ChromeUtils.import("resource:///modules/mailServices.js");
 
 setupIMAPPump();
 
@@ -57,7 +57,7 @@ function* test_createTargetFolder()
   IMAPPump.incomingServer.rootFolder.createSubfolder("targetFolder", null);
   yield false;
   gTargetFolder = IMAPPump.incomingServer.rootFolder.getChildNamed("targetFolder");
-  do_check_true(gTargetFolder instanceof Ci.nsIMsgImapMailFolder);
+  Assert.ok(gTargetFolder instanceof Ci.nsIMsgImapMailFolder);
   // set folder to be checked for new messages when inbox is checked.
   gTargetFolder.setFlag(Ci.nsMsgFolderFlags.CheckNew);
 }
@@ -91,7 +91,7 @@ function* test_moveMessageToTargetFolder()
   let observer = gAutoSyncManager.QueryInterface(Ci.nsIObserver);
   observer.observe(null, "mail:appIdle", "back");
   let msgHdr = mailTestUtils.firstMsgHdr(IMAPPump.inbox);
-  do_check_true(msgHdr !== null);
+  Assert.ok(msgHdr !== null);
 
   // Now move this message to the target folder.
   let messages = Cc["@mozilla.org/array;1"]
@@ -122,13 +122,13 @@ function endTest()
   let numMsgs = 0;
   while (enumerator.hasMoreElements()) {
     numMsgs++;
-    do_check_neq(enumerator.getNext()
-                  .QueryInterface(Ci.nsIMsgDBHdr).flags & msgFlagOffline, 0);
+    Assert.notEqual(enumerator.getNext()
+                     .QueryInterface(Ci.nsIMsgDBHdr).flags & msgFlagOffline, 0);
   }
-  do_check_eq(2, numMsgs);
-  do_check_eq(gAutoSyncListener._waitingForUpdateList.length, 0);
-  do_check_false(gAutoSyncListener._waitingForDiscovery);
-  do_check_false(gAutoSyncListener._waitingForUpdate);
+  Assert.equal(2, numMsgs);
+  Assert.equal(gAutoSyncListener._waitingForUpdateList.length, 0);
+  Assert.ok(!gAutoSyncListener._waitingForDiscovery);
+  Assert.ok(!gAutoSyncListener._waitingForUpdate);
   teardownIMAPPump();
 }
 
@@ -188,7 +188,7 @@ var gAutoSyncListener =
     try {
       let queueName = "";
       dump("folder added into Q " + this.qName(queue) + " " + folder.URI + "\n");
-      if (folder instanceof Components.interfaces.nsIMsgFolder &&
+      if (folder instanceof Ci.nsIMsgFolder &&
           queue == nsIAutoSyncMgrListener.PriorityQueue) {
       }
     } catch (e) {
@@ -198,7 +198,7 @@ var gAutoSyncListener =
   onFolderRemovedFromQ : function(queue, folder) {
     try {
       dump("folder removed from Q " + this.qName(queue) + " " + folder.URI + "\n");
-      if (folder instanceof Components.interfaces.nsIMsgFolder &&
+      if (folder instanceof Ci.nsIMsgFolder &&
           queue == nsIAutoSyncMgrListener.PriorityQueue) {
       }
     } catch (e) {
@@ -216,7 +216,7 @@ var gAutoSyncListener =
   onDownloadCompleted : function(folder) {
     try {
       dump("folder download completed" + folder.URI + "\n");
-      if (folder instanceof Components.interfaces.nsIMsgFolder) {
+      if (folder instanceof Ci.nsIMsgFolder) {
         let index = mailTestUtils.non_strict_index_of(this._waitingForUpdateList, folder);
         if (index != -1)
           this._waitingForUpdateList.splice(index, 1);
@@ -232,7 +232,7 @@ var gAutoSyncListener =
   },
 
   onDownloadError : function(folder) {
-    if (folder instanceof Components.interfaces.nsIMsgFolder) {
+    if (folder instanceof Ci.nsIMsgFolder) {
       dump("OnDownloadError: " + folder.prettyName + "\n");
     }
   },

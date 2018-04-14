@@ -13,7 +13,7 @@ function Startup()
 {
   // Define globals
   gFPHandler = Services.io.getProtocolHandler("file")
-                          .QueryInterface(Components.interfaces.nsIFileProtocolHandler);
+                          .QueryInterface(Ci.nsIFileProtocolHandler);
   gSoundUrlPref = document.getElementById("browser.download.finished_sound_url");
   SetSoundEnabled(document.getElementById("browser.download.finished_download_sound").value);
 
@@ -21,7 +21,7 @@ function Startup()
   // notify on download completion
   // see bug #158711
   var downloadDoneNotificationAlertUI = document.getElementById("finishedNotificationAlert");
-  downloadDoneNotificationAlertUI.hidden = !("@mozilla.org/alerts-service;1" in Components.classes);
+  downloadDoneNotificationAlertUI.hidden = !("@mozilla.org/alerts-service;1" in Cc);
 }
 
 /**
@@ -44,27 +44,29 @@ function ReadUseDownloadDir()
   */
 function ChooseFolder()
 {
-  const nsIFilePicker = Components.interfaces.nsIFilePicker;
-
-  var fp = Components.classes["@mozilla.org/filepicker;1"]
-                     .createInstance(nsIFilePicker);
-  var prefutilitiesBundle = document.getElementById("bundle_prefutilities");
-  var title = prefutilitiesBundle.getString("downloadfolder");
+  const nsIFilePicker = Ci.nsIFilePicker;
+  let fp = Cc["@mozilla.org/filepicker;1"]
+             .createInstance(nsIFilePicker);
+  let title = document.getElementById("bundle_prefutilities")
+                      .getString("downloadfolder");
   fp.init(window, title, nsIFilePicker.modeGetFolder);
   fp.appendFilters(nsIFilePicker.filterAll);
 
-  var folderListPref = document.getElementById("browser.download.folderList");
-  fp.displayDirectory = IndexToFolder(folderListPref.value); // file
-
-  if (fp.show() == nsIFilePicker.returnOK) {
-    var currentDirPref = document.getElementById("browser.download.dir");
-    currentDirPref.value = fp.file;
-    folderListPref.value = FolderToIndex(fp.file);
+  fp.displayDirectory = 
+    IndexToFolder(document.getElementById("browser.download.folderList")
+                          .value);
+  fp.open(rv => {
+    if (rv != nsIFilePicker.returnOK || !fp.file) {
+      return;
+    }
+    document.getElementById("browser.download.dir").value = fp.file;
+    document.getElementById("browser.download.folderList").value = 
+      FolderToIndex(fp.file);
     // Note, the real prefs will not be updated yet, so dnld manager's
     // userDownloadsDirectory may not return the right folder after
     // this code executes. displayDownloadDirPref will be called on
     // the assignment above to update the UI.
-  }
+  });
 }
 
 /**
@@ -100,9 +102,9 @@ function DisplayDownloadDirPref()
   */
 function GetDownloadsFolder()
 {
-  return Components.classes["@mozilla.org/download-manager;1"]
-                   .getService(Components.interfaces.nsIDownloadManager)
-                   .defaultDownloadsDirectory;
+  return Cc["@mozilla.org/download-manager;1"]
+           .getService(Ci.nsIDownloadManager)
+           .defaultDownloadsDirectory;
 }
 
 /**

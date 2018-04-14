@@ -8,9 +8,9 @@
  *  or not.
  */
 
-Components.utils.import("resource:///modules/gloda/log4moz.js");
-Components.utils.import("resource:///modules/IOUtils.js");
-Components.utils.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+ChromeUtils.import("resource:///modules/IOUtils.js");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var _mailnewsTestLogger;
 var _xpcshellLogger;
@@ -22,7 +22,7 @@ var _logHelperInterestedListeners = false;
 /**
  * Let test code extend the list of allowed XPCOM errors.
  */
-var logHelperAllowedErrors = [Components.results.NS_ERROR_FAILURE];
+var logHelperAllowedErrors = [Cr.NS_ERROR_FAILURE];
 
 /**
  * Let other test helping code decide whether to register for potentially
@@ -63,7 +63,7 @@ var _errorConsoleTunnel = {
     try {
       // meh, let's just use mark_failure for now.
       // and let's avoid feedback loops (happens in mozmill)
-      if ((aMessage instanceof Components.interfaces.nsIScriptError) &&
+      if ((aMessage instanceof Ci.nsIScriptError) &&
         (!aMessage.errorMessage.includes("Error console says")))
         {
           // Unfortunately changes to mozilla-central are throwing lots
@@ -75,8 +75,8 @@ var _errorConsoleTunnel = {
           let matches = /exception: (\d+)/.exec(aMessage);
           let XPCOMresult = null;
           if (matches) {
-            for (let result in Components.results) {
-              if (matches[1] == Components.results[result])
+            for (let result in Cr) {
+              if (matches[1] == Cr[result])
               {
                 XPCOMresult = result;
                 break;
@@ -86,11 +86,11 @@ var _errorConsoleTunnel = {
             if (logHelperAllowedErrors.some(e => e == matches[1]))
             {
               if (XPCOMresult)
-                do_print("Ignoring XPCOM error: " + message);
+                info("Ignoring XPCOM error: " + message);
               return;
             }
             else
-              do_print("Found XPCOM error: " + message);
+              info("Found XPCOM error: " + message);
           }
           mark_failure(["Error console says", aMessage]);
         }
@@ -255,7 +255,7 @@ function mark_sub_test_end() {
 
 /**
  * Express that all tests were run to completion.  This helps the listener
- *  distinguish between succesful termination and abort-style termination where
+ *  distinguish between successful termination and abort-style termination where
  *  the process just keeled over and on one told us.
  *
  * This also tells us to clean up.

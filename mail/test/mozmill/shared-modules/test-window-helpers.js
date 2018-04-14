@@ -4,20 +4,20 @@
 
 var MODULE_NAME = "window-helpers";
 
-Cu.import('resource:///modules/iteratorUtils.jsm');
-Cu.import('resource://gre/modules/NetUtil.jsm');
-Cu.import("resource://gre/modules/Services.jsm");
+ChromeUtils.import('resource:///modules/iteratorUtils.jsm');
+ChromeUtils.import('resource://gre/modules/NetUtil.jsm');
+ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var mozmill = {};
-Cu.import('resource://mozmill/modules/mozmill.js', mozmill);
+ChromeUtils.import("chrome://mozmill/content/modules/mozmill.js", mozmill);
 var controller = {};
-Cu.import('resource://mozmill/modules/controller.js', controller);
+ChromeUtils.import("chrome://mozmill/content/modules/controller.js", controller);
 var elib = {};
-Cu.import('resource://mozmill/modules/elementslib.js', elib);
+ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
 var frame = {};
-Cu.import('resource://mozmill/modules/frame.js', frame);
+ChromeUtils.import("chrome://mozmill/content/modules/frame.js", frame);
 var utils = {};
-Cu.import('resource://mozmill/modules/utils.js', utils);
+ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
 
 /**
  * Timeout to use when waiting for the first window ever to load.  This is
@@ -951,10 +951,10 @@ var AugmentEverybodyWith = {
      * @param aRootPopup  The base popup. The caller is expected to activate it
      *     (by clicking/rightclicking the right widget). We will only wait for it
      *     to open if it is in the process.
-     * @param aActions  A list of objects where each object has a single
-     *     attribute with a single value.  We pick the menu option whose DOM
-     *     node has an attribute with that name and value.  We click whatever we
-     *     find.  We throw if we don't find what you were asking for.
+     * @param aActions  An array of objects where each object has attributes
+     *     with a value defined. We pick the menu item whose DOM node matches
+     *     all the attributes with the specified names and value. We click whatever
+     *     we find. We throw if the element being asked for is not found.
      * @param aKeepOpen  If set to true the popups are not closed after last click.
      *
      * @return  An array of popup elements that were left open. It will be
@@ -979,8 +979,7 @@ var AugmentEverybodyWith = {
          */
         let findMatch = function(aNode) {
           // Ignore some elements and just use their children instead.
-          if (aNode.localName == "hbox" || aNode.localName == "vbox" ||
-              aNode.localName == "splitmenu") {
+          if (aNode.localName == "hbox" || aNode.localName == "vbox" ) {
             for (let i = 0; i < aNode.children.length; i++) {
               let childMatch = findMatch(aNode.children[i]);
               if (childMatch)
@@ -1010,13 +1009,31 @@ var AugmentEverybodyWith = {
             break;
         }
 
-        if (!matchingNode)
+        if (!matchingNode) {
           throw new Error("Did not find matching menu item for action index " +
                           iAction + ": " + JSON.stringify(actionObj));
+        }
 
-        this.click(new elib.Elem(matchingNode));
-        if ("menupopup" in matchingNode) {
-          curPopup = matchingNode.menupopup;
+        if ((matchingNode.localName == "splitmenu") &&
+            ((iAction < aActions.length - 1) || aKeepOpen)) {
+          // For splitmenus, click the submenu arrow to open its menupopup,
+          // unless this is the last item being searched for. In that case,
+          // click the main item.
+          this.click(new elib.Elem(matchingNode.menu));
+        } else
+          this.click(new elib.Elem(matchingNode));
+
+        let newPopup = null;
+        if ("menupopup" in matchingNode)
+          newPopup = matchingNode.menupopup;
+        else if ((matchingNode.localName == "splitmenu") &&
+                 ("menupopup" in matchingNode.menu)) {
+          // We should actually fetch matchingNode.menu.menupopup here,
+          // but it doesn't seem to work.
+          newPopup = matchingNode.querySelector("menupopup");
+        }
+        if (newPopup) {
+          curPopup = newPopup;
           closeStack.push(curPopup);
           utils.waitFor(function() { return curPopup.state == "open"; },
                         "Popup never opened at action depth " + iAction +
@@ -1052,7 +1069,7 @@ var AugmentEverybodyWith = {
     },
 
     /**
-     * Get dropmarker arrow element from 
+     * Get dropmarker arrow element from
      *
      * @param aNode  An element containing a dropmarker, e.g. menulist or menu-button
      */
@@ -1401,17 +1418,17 @@ function _augment_helper(aController, aAugmentDef) {
       let traceFunc;
       if (traceDef.hasOwnProperty("doBefore")) {
         let beforeFunc = traceDef.doBefore;
-        traceFunc = function() {
-          beforeFunc.apply(useThis ? this : baseObj, arguments);
-          return origFunc.apply(this, arguments);
+        traceFunc = function(...aArgs) {
+          beforeFunc.apply(useThis ? this : baseObj, aArgs);
+          return origFunc.apply(this, aArgs);
         }
       }
       else {
-        traceFunc = function() {
+        traceFunc = function(...aArgs) {
           mark_action("winhelp", reportAs,
-                      showArgs ? Array.from(arguments) : []);
+                      showArgs ? aArgs : []);
           try {
-            return origFunc.apply(this, arguments);
+            return origFunc.apply(this, aArgs);
           }
           catch(ex) {
             mark_failure(["exception in", reportAs, "ex:", ex]);
@@ -1432,20 +1449,6 @@ function _augment_helper(aController, aAugmentDef) {
 var INPUT_PEEK_EVENTS = ["click", "keypress"];
 
 var UNIQUE_WINDOW_ID_ATTR = "__winHelper_uniqueId";
-
-var DOM_KEYCODE_TO_NAME = {};
-function populateDomKeycodeMap() {
-  let nsIDOMKeyEvent = Ci.nsIDOMKeyEvent;
-
-  for (let key in nsIDOMKeyEvent) {
-
-    if (key.startsWith("DOM_VK_")) {
-      let val = nsIDOMKeyEvent[key];
-      DOM_KEYCODE_TO_NAME[val] = key;
-    }
-  }
-}
-populateDomKeycodeMap();
 
 /**
  * Given something you would find on event.target (should be a DOM node /
@@ -1607,20 +1610,25 @@ function __bubbled_click_handler(event) {
 
 function describeKeyEvent(event) {
   let s;
-  if (event.keyCode) {
-    s = DOM_KEYCODE_TO_NAME[event.keyCode];
+  if (event.key && event.key != "") {
+    s = event.key;
+    if (s.trim() == "")
+      s = "'" + event.key + "'";
   }
   else if (event.charCode) {
     s = "'" + String.fromCharCode(event.charCode) + "'";
   }
+  else if (event.keyCode) {
+    s = event.keyCode;
+  }
   else {
-    s = "no keyCode/charCode?";
+    s = "no key/keyCode/charCode?";
   }
 
   if (event.shiftKey)
     s = "shift-" + s;
   if (event.ctrlKey)
-    s = "ctrl-"; + s
+    s = "ctrl-" + s;
   if (event.altKey)
     s = "alt-" + s;
   if (event.metaKey)

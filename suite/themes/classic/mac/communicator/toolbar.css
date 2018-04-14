@@ -8,6 +8,10 @@
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 
+.toolbar-primary {
+  min-height: 24px;
+}
+
 toolbargrippy {
   display: none;
   -moz-box-orient: vertical;
@@ -50,16 +54,4 @@ toolbargrippy[tbgrippy-collapsed="true"] > .toolbargrippy-texture {
 
 .collapsed-tray-spacer {
   border-bottom: 1px solid ThreeDShadow;
-}
-
-/* ::::: solid background status bar panel ::::: */
-
-.statusbarpanel-backgroundbox {
-  -moz-box-align: stretch;
-  padding: 0px;
-}
-
-.statusbarpanel-backgroundbox > .statusbarpanel-contentbox {
-  padding: 0px 1px;
-  -moz-box-align: center;
 }
