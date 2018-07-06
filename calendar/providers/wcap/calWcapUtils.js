@@ -3,13 +3,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* exported getCalendarSearchService, getDomParser, isParent, filterXmlNodes,
- *          getIcalUTC, getDatetimeFromIcalProp
+ *          getIcalUTC, getDatetimeFromIcalProp, getWcapString
  */
 
-ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://gre/modules/Services.jsm");
+
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+
+Cu.importGlobalProperties(["DOMParser"]);
 
 var g_bShutdown = false;
 
@@ -151,8 +153,7 @@ function getCalendarSearchService() {
 
 function getDomParser() {
     if (!getDomParser.m_obj) {
-        getDomParser.m_obj = Components.classes["@mozilla.org/xmlextras/domparser;1"]
-                                       .getService(Components.interfaces.nsIDOMParser);
+        getDomParser.m_obj = new DOMParser();
     }
     return getDomParser.m_obj;
 }
@@ -217,4 +218,8 @@ function getPref(prefName, defaultValue) {
     let ret = Preferences.get(prefName, defaultValue);
     log(ret, "getPref(): prefName=" + prefName);
     return ret;
+}
+
+function getWcapString(aStringName, aParams) {
+    return cal.l10n.getString("wcap", aStringName, aParams);
 }

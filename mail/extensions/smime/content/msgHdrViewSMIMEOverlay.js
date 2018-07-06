@@ -17,6 +17,17 @@ var gSMIMEBundle = null;
 
 var nsICMSMessageErrors = Ci.nsICMSMessageErrors;
 
+/// Get the necko URL for the message URI.
+function neckoURLForMessageURI(aMessageURI)
+{
+  let msgSvc = Cc["@mozilla.org/messenger;1"]
+    .createInstance(Ci.nsIMessenger)
+    .messageServiceFromURI(aMessageURI);
+  let neckoURI = {};
+  msgSvc.GetUrlForUri(aMessageURI, neckoURI, null);
+  return neckoURI.value.spec;
+}
+
 var smimeHeaderSink =
 {
   maxWantedNesting: function()
@@ -117,8 +128,11 @@ var smimeHeaderSink =
 
     if (gEncryptedURIService)
     {
+      // Remember the message URI and the corresponding necko URI.
       gMyLastEncryptedURI = gFolderDisplay.selectedMessageUris[0];
       gEncryptedURIService.rememberEncrypted(gMyLastEncryptedURI);
+      gEncryptedURIService.rememberEncrypted(
+        neckoURLForMessageURI(gMyLastEncryptedURI));
     }
 
     switch (aEncryptionStatus)
@@ -147,12 +161,7 @@ var smimeHeaderSink =
     }
   },
 
-  QueryInterface : function(iid)
-  {
-    if (iid.equals(Ci.nsIMsgSMIMEHeaderSink) || iid.equals(Ci.nsISupports))
-      return this;
-    throw Cr.NS_NOINTERFACE;
-  }
+  QueryInterface: ChromeUtils.generateQI(["nsIMsgSMIMEHeaderSink"]),
 };
 
 function forgetEncryptedURI()
@@ -160,6 +169,8 @@ function forgetEncryptedURI()
   if (gMyLastEncryptedURI && gEncryptedURIService)
   {
     gEncryptedURIService.forgetEncrypted(gMyLastEncryptedURI);
+    gEncryptedURIService.forgetEncrypted(
+      neckoURLForMessageURI(gMyLastEncryptedURI));
     gMyLastEncryptedURI = null;
   }
 }

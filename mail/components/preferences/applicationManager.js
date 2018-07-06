@@ -9,6 +9,7 @@ var gAppManagerDialog = {
     this.handlerInfo = window.arguments[0];
 
     var bundle = document.getElementById("appManagerBundle");
+    gApplicationsPane._prefsBundle = document.getElementById("bundlePreferences");
 
     var description = gApplicationsPane._describeType(this.handlerInfo);
     var key = (this.handlerInfo.wrappedHandlerInfo instanceof Ci.nsIMIMEInfo) ?
@@ -54,7 +55,7 @@ var gAppManagerDialog = {
     var list = document.getElementById("appList");
     this._removed.push(list.selectedItem.app);
     var index = list.selectedIndex;
-    list.removeItemAt(index);
+    list.selectedItem.remove();
     if (list.getRowCount() == 0) {
       // The list is now empty, make the bottom part disappear
       document.getElementById("appDetails").hidden = true;

@@ -4,18 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /*
-
   Outlook (Win32) settings
-
 */
 
 #include "nsCOMPtr.h"
 #include "nscore.h"
 #include "nsMsgUtils.h"
 #include "nsOutlookImport.h"
-#include "nsIComponentManager.h"
-#include "nsIServiceManager.h"
-#include "nsIImportService.h"
 #include "nsIMsgAccountManager.h"
 #include "nsIMsgAccount.h"
 #include "nsIImportSettings.h"
@@ -89,8 +84,8 @@ NS_IMPL_ISUPPORTS(nsOutlookSettings, nsIImportSettings)
 
 NS_IMETHODIMP nsOutlookSettings::AutoLocate(char16_t **description, nsIFile **location, bool *_retval)
 {
-    NS_PRECONDITION(description != nullptr, "null ptr");
-    NS_PRECONDITION(_retval != nullptr, "null ptr");
+    NS_ASSERTION(description != nullptr, "null ptr");
+    NS_ASSERTION(_retval != nullptr, "null ptr");
   if (!description || !_retval)
     return NS_ERROR_NULL_POINTER;
 
@@ -114,7 +109,7 @@ NS_IMETHODIMP nsOutlookSettings::SetLocation(nsIFile *location)
 
 NS_IMETHODIMP nsOutlookSettings::Import(nsIMsgAccount **localMailAccount, bool *_retval)
 {
-  NS_PRECONDITION(_retval != nullptr, "null ptr");
+  NS_ASSERTION(_retval != nullptr, "null ptr");
 
   if (OutlookSettings::DoImport(localMailAccount)) {
     *_retval = true;

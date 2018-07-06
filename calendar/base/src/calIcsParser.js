@@ -3,8 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
 
 function calIcsParser() {
     this.wrappedJSObject = this;
@@ -13,18 +12,9 @@ function calIcsParser() {
     this.mComponents = [];
     this.mProperties = [];
 }
-var calIcsParserClassID = Components.ID("{6fe88047-75b6-4874-80e8-5f5800f14984}");
-var calIcsParserInterfaces = [Components.interfaces.calIIcsParser];
 calIcsParser.prototype = {
-    classID: calIcsParserClassID,
-    QueryInterface: XPCOMUtils.generateQI(calIcsParserInterfaces),
-    classInfo: XPCOMUtils.generateCI({
-        classID: calIcsParserClassID,
-        contractID: "@mozilla.org/calendar/ics-parser;1",
-        classDescription: "Calendar ICS Parser",
-        interfaces: calIcsParserInterfaces,
-        flags: Components.interfaces.nsIClassInfo.THREADSAFE
-    }),
+    QueryInterface: ChromeUtils.generateQI([Ci.calIIcsParser]),
+    classID: Components.ID("{6fe88047-75b6-4874-80e8-5f5800f14984}"),
 
     processIcalComponent: function(rootComp, aAsyncParsing) {
         let calComp;
@@ -56,13 +46,13 @@ calIcsParser.prototype = {
 
         while (calComp) {
             // Get unknown properties from the VCALENDAR
-            for (let prop of cal.ical.propertyIterator(calComp)) {
+            for (let prop of cal.iterate.icalProperty(calComp)) {
                 if (prop.propertyName != "VERSION" && prop.propertyName != "PRODID") {
                     this.mProperties.push(prop);
                 }
             }
 
-            for (let subComp of cal.ical.subcomponentIterator(calComp)) {
+            for (let subComp of cal.iterate.icalSubcomponent(calComp)) {
                 state.submit(subComp);
             }
             calComp = rootComp.getNextSubcomponent("VCALENDAR");
@@ -102,8 +92,8 @@ calIcsParser.prototype = {
                 if (Components.classes["@mozilla.org/alerts-service;1"]) {
                     let notifier = Components.classes["@mozilla.org/alerts-service;1"]
                                              .getService(Components.interfaces.nsIAlertsService);
-                    let title = cal.calGetString("calendar", "TimezoneErrorsAlertTitle");
-                    let text = cal.calGetString("calendar", "TimezoneErrorsSeeConsole");
+                    let title = cal.l10n.getCalString("TimezoneErrorsAlertTitle");
+                    let text = cal.l10n.getCalString("TimezoneErrorsSeeConsole");
                     try {
                         notifier.showAlertNotification("", title, text, false, null, null, title);
                     } catch (e) {
@@ -167,32 +157,7 @@ calIcsParser.prototype = {
         // because likely, the file is utf8. The multibyte chars show up as multiple
         // 'chars' in this string. So call it an array of octets for now.
 
-        let octetArray = [];
-        let binaryIS = Components.classes["@mozilla.org/binaryinputstream;1"]
-                                 .createInstance(Components.interfaces.nsIBinaryInputStream);
-        binaryIS.setInputStream(aStream);
-        octetArray = binaryIS.readByteArray(binaryIS.available());
-
-        // Some other apps (most notably, sunbird 0.2) happily splits an UTF8
-        // character between the octets, and adds a newline and space between them,
-        // for ICS folding. Unfold manually before parsing the file as utf8.This is
-        // UTF8 safe, because octets with the first bit 0 are always one-octet
-        // characters. So the space or the newline never can be part of a multi-byte
-        // char.
-        for (let i = octetArray.length - 2; i >= 0; i--) {
-            if (octetArray[i] == "\n" && octetArray[i + 1] == " ") {
-                octetArray = octetArray.splice(i, 2);
-            }
-        }
-
-        // Interpret the byte-array as a UTF8-string, and convert into a
-        // javascript string.
-        let unicodeConverter = Components.classes["@mozilla.org/intl/scriptableunicodeconverter"]
-                                         .createInstance(Components.interfaces.nsIScriptableUnicodeConverter);
-        // ICS files are always UTF8
-        unicodeConverter.charset = "UTF-8";
-        let stringData = unicodeConverter.convertFromByteArray(octetArray, octetArray.length);
-
+        let stringData = NetUtil.readInputStreamToString(aStream, aStream.available(), { charset: "utf-8" });
         this.parseString(stringData, aTzProvider, aAsyncParsing);
     },
 
@@ -267,7 +232,7 @@ parserState.prototype = {
                 // choose whether to alert, or show user the problem items and ask
                 // for fixes, or something else.
                 let msgArgs = [tzid, item.title, cal.getDateFormatter().formatDateTime(date)];
-                let msg = cal.calGetString("calendar", "unknownTimezoneInItem", msgArgs);
+                let msg = cal.l10n.getCalString("unknownTimezoneInItem", msgArgs);
 
                 cal.ERROR(msg + "\n" + item.icalString);
                 this.tzErrors[hid] = true;

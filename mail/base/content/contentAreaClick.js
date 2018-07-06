@@ -179,17 +179,12 @@ function openLinkExternally(url)
     uri = Services.io.newURI(url);
 
   // This can fail if there is a problem with the places database.
-  try {
-    PlacesUtils.asyncHistory.updatePlaces({
-      uri: uri,
-      visits:  [{
-        visitDate: Date.now() * 1000,
-        transitionType: Ci.nsINavHistoryService.TRANSITION_LINK
-      }]
-    });
-  } catch (ex) {
-    Cu.reportError(ex);
-  }
+  PlacesUtils.history.insert({
+    url, // accepts both string and nsIURI
+    visits: [{
+      date: new Date(),
+    }]
+  }).catch(Cu.reportError);
 
   Cc["@mozilla.org/uriloader/external-protocol-service;1"]
     .getService(Ci.nsIExternalProtocolService)
@@ -201,6 +196,18 @@ function openLinkExternally(url)
  * this to the external browser for now, since in most cases this is meant to
  * open an actionable tab.
  */
+function openWebLinkIn(url, where, params) {
+  if (!params) {
+    params = {};
+  }
+
+  if (!params.triggeringPrincipal) {
+    params.triggeringPrincipal = Services.scriptSecurityManager.createNullPrincipal({});
+  }
+
+  openUILinkIn(url, where, params);
+}
+
 function openUILinkIn(url, where, options) {
   openLinkExternally(url);
 }

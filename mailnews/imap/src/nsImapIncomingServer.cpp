@@ -7,7 +7,7 @@
 #include "nsMsgImapCID.h"
 
 #include "netCore.h"
-#include "nsIMAPHostSessionList.h"
+#include "nsIIMAPHostSessionList.h"
 #include "nsImapIncomingServer.h"
 #include "nsIMsgAccountManager.h"
 #include "nsIMsgIdentity.h"
@@ -24,7 +24,6 @@
 #include "nsIMsgFolder.h"
 #include "nsIMsgWindow.h"
 #include "nsImapMailFolder.h"
-#include "nsImapUtils.h"
 #include "nsIRDFService.h"
 #include "nsRDFCID.h"
 #include "nsIMsgMailNewsUrl.h"
@@ -38,7 +37,6 @@
 #include "nsIMsgMailSession.h"
 #include "nsIMAPNamespace.h"
 #include "nsArrayUtils.h"
-#include "nsITimer.h"
 #include "nsMsgUtils.h"
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
@@ -292,9 +290,6 @@ NS_IMPL_SERVERPREF_BOOL(nsImapIncomingServer, CleanupInboxOnExit,
 
 NS_IMPL_SERVERPREF_BOOL(nsImapIncomingServer, OfflineDownload,
                         "offline_download")
-
-NS_IMPL_SERVERPREF_INT(nsImapIncomingServer, EmptyTrashThreshhold,
-                       "empty_trash_threshhold")
 
 NS_IMPL_SERVERPREF_BOOL(nsImapIncomingServer, DownloadBodiesOnGetNewMail,
                         "download_bodies_on_get_new_mail")
@@ -1142,7 +1137,7 @@ NS_IMETHODIMP nsImapIncomingServer::PossibleImapMailbox(const nsACString& folder
     // If there is a hierarchy, there is a parent.
     // Don't strip off slash if it's the first character
     parentName.SetLength(leafPos);
-    folderName.Cut(0, leafPos + 1);	// get rid of the parent name
+    folderName.Cut(0, leafPos + 1);  // get rid of the parent name
     haveParent = true;
     parentUri.Append('/');
     parentUri.Append(parentName);
@@ -2504,12 +2499,6 @@ nsImapIncomingServer::AddTo(const nsACString &aName, bool addAsSubscribed,
 NS_IMETHODIMP
 nsImapIncomingServer::StopPopulating(nsIMsgWindow *aMsgWindow)
 {
-  nsCOMPtr<nsISubscribeListener> listener;
-  (void) GetSubscribeListener(getter_AddRefs(listener));
-
-  if (listener)
-    listener->OnDonePopulating();
-
   nsresult rv = EnsureInner();
   NS_ENSURE_SUCCESS(rv,rv);
   return mInner->StopPopulating(aMsgWindow);
@@ -2991,6 +2980,14 @@ nsImapIncomingServer::GetSupportsSubscribeSearch(bool *retVal)
   NS_ENSURE_ARG_POINTER(retVal);
   *retVal = false;
   return NS_OK;
+}
+
+NS_IMETHODIMP
+nsImapIncomingServer::GetFolderView(nsITreeView **aView)
+{
+  nsresult rv = EnsureInner();
+  NS_ENSURE_SUCCESS(rv,rv);
+  return mInner->GetFolderView(aView);
 }
 
 NS_IMETHODIMP

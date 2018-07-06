@@ -48,6 +48,8 @@ var migrations = {
         sameDay: "sameDay",
         jsDateToDateTime: "jsDateToDateTime",
         dateTimeToJsDate: "dateTimeToJsDate",
+        fromRFC3339: "fromRFC3339",
+        toRFC3339: "toRFC3339",
 
         // The following are now getters
         calendarDefaultTimezone: "defaultTimezone",
@@ -76,6 +78,16 @@ var migrations = {
         setItemProperty: "setItemProperty",
         getEventDefaultTransparency: "getEventDefaultTransparency"
     },
+    iterate: {
+        itemIterator: "items",
+        forEach: "forEach",
+        ical: {
+            calendarComponentIterator: "items",
+            subcomponentIterator: "icalSubcomponent",
+            propertyIterator: "icalProperty",
+            paramIterator: "icalParameter"
+        }
+    },
     itip: {
         getPublishLikeItemCopy: "getPublishLikeItemCopy",
         isInvitation: "isInvitation",
@@ -83,6 +95,17 @@ var migrations = {
         resolveDelegation: "resolveDelegation",
         getInvitedAttendee: "getInvitedAttendee",
         getAttendeesBySender: "getAttendeesBySender"
+    },
+    provider: {
+        prepHttpChannel: "prepHttpChannel",
+        sendHttpRequest: "sendHttpRequest",
+        createStreamLoader: "createStreamLoader",
+        convertByteArray: "convertByteArray",
+        InterfaceRequestor_getInterface: "InterfaceRequestor_getInterface",
+        getImipTransport: "getImipTransport",
+        getEmailIdentityOfCalendar: "getEmailIdentityOfCalendar",
+        promptOverwrite: "promptOverwrite",
+        getCalendarDirectory: "getCalendarDirectory"
     },
     unifinder: {
         sortEntryComparer: "sortEntryComparer",
@@ -93,8 +116,7 @@ var migrations = {
     },
     view: {
         isMouseOverBox: "isMouseOverBox",
-        calRadioGroupSelectItem: "radioGroupSelectItem",
-        applyAttributeToMenuChildren: "applyAttributeToMenuChildren",
+        // calRadioGroupSelectItem and applyAttributeToMenuChildren are no longer available.
         removeChildElementsByAttribute: "removeChildElementsByAttribute",
         getParentNodeOrThis: "getParentNodeOrThis",
         getParentNodeOrThisByAttribute: "getParentNodeOrThisByAttribute",
@@ -111,6 +133,7 @@ var migrations = {
     }
 };
 
+
 /**
  * Generate a forward function on the given global, for the namespace from the
  * migrations data.
@@ -120,7 +143,7 @@ var migrations = {
  * @param from          The function/property name being migrated from
  * @param to            The function/property name being migrated to
  */
-function generateForward(global, namespace, from, to) {
+function generateForward(global, namespace, from, to, targetGlobal=null) {
     // Protect from footguns
     if (typeof global[from] != "undefined") {
         throw new Error(from + " is already defined on the cal. namespace!");
@@ -128,7 +151,7 @@ function generateForward(global, namespace, from, to) {
 
     global[from] = function(...args) {
         let suffix = "";
-        let target = global[namespace][to];
+        let target = (targetGlobal || global)[namespace][to];
         if (typeof target == "function") {
             target = target(...args);
             suffix = "()";
@@ -150,7 +173,50 @@ function generateForward(global, namespace, from, to) {
 function injectCalUtilsCompat(global) {
     for (let [namespace, nsdata] of Object.entries(migrations)) {
         for (let [from, to] of Object.entries(nsdata)) {
-            generateForward(global, namespace, from, to);
+            if (typeof to == "object") {
+                global[from] = {};
+                for (let [frominner, toinner] of Object.entries(to)) {
+                    generateForward(global[from], namespace, frominner, toinner, global);
+                }
+            } else {
+                generateForward(global, namespace, from, to);
+            }
         }
     }
+
+    // calGetString is special, as the argument order and kind has changed as well
+    global.calGetString = function(aBundleName, aStringName, aParams, aComponent="calendar") {
+        Deprecated.warning("calUtils' cal.calGetString() has changed to cal.l10n.get*String()" +
+                           " and the parameter order has changed",
+                           "https://bugzilla.mozilla.org/show_bug.cgi?id=905097",
+                           Components.stack.caller);
+        return global.l10n.getAnyString(aComponent, aBundleName, aStringName, aParams);
+    };
+
+    global.ProviderBase = class extends global.provider.BaseClass {
+        initProviderBase() {
+            Deprecated.warning("calProviderUtils' cal.ProviderBase() has changed to cal.provider.BaseClass()",
+                               "https://bugzilla.mozilla.org/show_bug.cgi?id=905097",
+                               Components.stack.caller);
+            super.initProviderBase();
+        }
+    };
+
+    global.BadCertHandler = class extends global.provider.BadCertHandler {
+        constructor() {
+            Deprecated.warning("calProviderUtils' cal.BadCertHandler() has changed to cal.provider.BadCertHandler()",
+                               "https://bugzilla.mozilla.org/show_bug.cgi?id=905097",
+                               Components.stack.caller);
+            super();
+        }
+    };
+
+    global.FreeBusyInterval = class extends global.provider.FreeBusyInterval {
+        constructor() {
+            Deprecated.warning("calProviderUtils' cal.FreeBusyInterval() has changed to cal.provider.FreeBusyInterval()",
+                               "https://bugzilla.mozilla.org/show_bug.cgi?id=905097",
+                               Components.stack.caller);
+            super();
+        }
+    };
 }

@@ -6,12 +6,12 @@
 #include "mozilla/mailnews/MimeHeaderParser.h"
 #include "nspr.h"
 #include "nsSMimeJSHelper.h"
+#include "nsMsgComposeSecure.h"
 #include "nsCOMPtr.h"
 #include "nsMemory.h"
 #include "nsString.h"
 #include "nsIX509CertDB.h"
 #include "nsIX509CertValidity.h"
-#include "nsIServiceManager.h"
 #include "nsServiceManagerUtils.h"
 #include "nsCRTGlue.h"
 
@@ -114,7 +114,7 @@ NS_IMETHODIMP nsSMimeJSHelper::GetRecipientCertsInfo(
         ToLowerCase(email, email_lowercase);
 
         nsCOMPtr<nsIX509Cert> cert;
-        if (NS_SUCCEEDED(certdb->FindCertByEmailAddress(
+        if (NS_SUCCEEDED(nsMsgComposeSecure::FindCertByEmailAddress(
                            email_lowercase, getter_AddRefs(cert))))
         {
           cert.forget(iCert);
@@ -221,7 +221,7 @@ NS_IMETHODIMP nsSMimeJSHelper::GetNoCertAddresses(
       ToLowerCase(mailboxes[i], email_lowercase);
 
       nsCOMPtr<nsIX509Cert> cert;
-      if (NS_SUCCEEDED(certdb->FindCertByEmailAddress(
+      if (NS_SUCCEEDED(nsMsgComposeSecure::FindCertByEmailAddress(
                          email_lowercase, getter_AddRefs(cert))))
         haveCert[i] = true;
 

@@ -2,10 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
 
 /**
  * HTML Export Plugin
@@ -14,25 +11,16 @@ function calHtmlExporter() {
     this.wrappedJSObject = this;
 }
 
-var calHtmlExporterClassID = Components.ID("{72d9ab35-9b1b-442a-8cd0-ae49f00b159b}");
-var calHtmlExporterInterfaces = [Components.interfaces.calIExporter];
 calHtmlExporter.prototype = {
-    classID: calHtmlExporterClassID,
-    QueryInterface: XPCOMUtils.generateQI(calHtmlExporterInterfaces),
-
-    classInfo: XPCOMUtils.generateCI({
-        classID: calHtmlExporterClassID,
-        contractID: "@mozilla.org/calendar/export;1?type=html",
-        classDescription: "Calendar HTML Exporter",
-        interfaces: calHtmlExporterInterfaces
-    }),
+    QueryInterface: ChromeUtils.generateQI([Ci.calIExporter]),
+    classID: Components.ID("{72d9ab35-9b1b-442a-8cd0-ae49f00b159b}"),
 
     getFileTypes: function(aCount) {
         aCount.value = 1;
         let wildmat = "*.html; *.htm";
-        let label = cal.calGetString("calendar", "filterHtml", [wildmat]);
+        let label = cal.l10n.getCalString("filterHtml", [wildmat]);
         return [{
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIFileType]),
+            QueryInterface: ChromeUtils.generateQI([Ci.calIFileType]),
             defaultExtension: "html",
             extensionFilter: wildmat,
             description: label
@@ -42,7 +30,7 @@ calHtmlExporter.prototype = {
     exportToStream: function(aStream, aCount, aItems, aTitle) {
         let document = cal.xml.parseFile("chrome://calendar-common/skin/printing/calHtmlExport.html");
         let itemContainer = document.getElementById("item-container");
-        document.getElementById("title").textContent = aTitle || cal.calGetString("calendar", "HTMLTitle");
+        document.getElementById("title").textContent = aTitle || cal.l10n.getCalString("HTMLTitle");
 
         // Sort aItems
         aItems.sort((a, b) => {
@@ -63,7 +51,7 @@ calHtmlExporter.prototype = {
 
             let setupTextRow = function(classKey, propValue, prefixKey) {
                 if (propValue) {
-                    let prefix = cal.calGetString("calendar", prefixKey);
+                    let prefix = cal.l10n.getCalString(prefixKey);
                     itemNode.querySelector("." + classKey + "key").textContent = prefix;
                     itemNode.querySelector("." + classKey).textContent = propValue;
                 } else {
@@ -80,7 +68,7 @@ calHtmlExporter.prototype = {
             let endDate = item[cal.dtz.endDateProp(item)];
             if (startDate || endDate) {
                 // This is a task with a start or due date, format accordingly
-                let prefixWhen = cal.calGetString("calendar", "htmlPrefixWhen");
+                let prefixWhen = cal.l10n.getCalString("htmlPrefixWhen");
                 itemNode.querySelector(".intervalkey").textContent = prefixWhen;
 
                 let startNode = itemNode.querySelector(".dtstart");
@@ -96,7 +84,7 @@ calHtmlExporter.prototype = {
                 }
             }
 
-            let itemTitle = (item.isCompleted ? cal.calGetString("calendar", "htmlTaskCompleted", [item.title]) : item.title);
+            let itemTitle = (item.isCompleted ? cal.l10n.getCalString("htmlTaskCompleted", [item.title]) : item.title);
             setupTextRow("summary", itemTitle, "htmlPrefixTitle");
 
             setupTextRow("location", item.getProperty("LOCATION"), "htmlPrefixLocation");

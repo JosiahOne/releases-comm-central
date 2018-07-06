@@ -22,7 +22,7 @@ function calCompositeCalendarObserverHelper(compCalendar) {
 calCompositeCalendarObserverHelper.prototype = {
     pendingLoads: null,
 
-    QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIObserver]),
+    QueryInterface: ChromeUtils.generateQI([Ci.calIObserver]),
 
     onStartBatch: function() {
         this.compCalendar.mObservers.notify("onStartBatch");
@@ -89,7 +89,7 @@ var calCompositeCalendarInterfaces = [
 ];
 calCompositeCalendar.prototype = {
     classID: calCompositeCalendarClassID,
-    QueryInterface: XPCOMUtils.generateQI(calCompositeCalendarInterfaces),
+    QueryInterface: ChromeUtils.generateQI(calCompositeCalendarInterfaces),
     classInfo: XPCOMUtils.generateCI({
         classID: calCompositeCalendarClassID,
         contractID: "@mozilla.org/calendar/calendar;1?type=composite",
@@ -101,7 +101,7 @@ calCompositeCalendar.prototype = {
     // calICalendarProvider interface
     //
     get prefChromeOverlay() { return null; },
-    get displayName() { return cal.calGetString("calendar", "compositeName"); },
+    get displayName() { return cal.l10n.getCalString("compositeName"); },
 
     createCalendar: function() {
         throw NS_ERROR_NOT_IMPLEMENTED;
@@ -441,6 +441,8 @@ function calCompositeGetListenerHelper(aCompositeCalendar, aRealListener, aMaxIt
 }
 
 calCompositeGetListenerHelper.prototype = {
+    QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
+
     mNumQueries: 0,
     mRealListener: null,
     mOpGroup: null,
@@ -466,8 +468,6 @@ calCompositeGetListenerHelper.prototype = {
         }
         return this.mOpGroup;
     },
-
-    QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
 
     onOperationComplete: function(aCalendar, aStatus, aOperationType, aId, aDetail) {
         if (!this.mRealListener) {

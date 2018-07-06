@@ -4,26 +4,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-
 /*
+ * Text import addressbook interfaces
+ */
 
-  Text import addressbook interfaces
-
-*/
 #include "nscore.h"
-#include "nsIServiceManager.h"
 #include "nsCOMPtr.h"
 #include "nsIImportService.h"
 #include "nsMsgI18N.h"
-#include "nsIComponentManager.h"
 #include "nsTextImport.h"
-#include "nsIMemory.h"
 #include "nsIMutableArray.h"
 #include "nsIImportGeneric.h"
 #include "nsIImportAddressBooks.h"
 #include "nsIImportABDescriptor.h"
 #include "nsIImportFieldMap.h"
-#include "nsIOutputStream.h"
 #include "nsIAddrDatabase.h"
 #include "nsIAbLDIFService.h"
 #include "nsAbBaseCID.h"
@@ -149,7 +143,7 @@ NS_IMETHODIMP nsTextImport::GetSupports(char **supports)
 
 NS_IMETHODIMP nsTextImport::GetSupportsUpgrade(bool *pUpgrade)
 {
-  NS_PRECONDITION(pUpgrade != nullptr, "null ptr");
+  NS_ASSERTION(pUpgrade != nullptr, "null ptr");
   if (! pUpgrade)
     return NS_ERROR_NULL_POINTER;
 
@@ -209,8 +203,8 @@ NS_IMPL_ISUPPORTS(ImportAddressImpl, nsIImportAddressBooks)
 
 NS_IMETHODIMP ImportAddressImpl::GetAutoFind(char16_t **addrDescription, bool *_retval)
 {
-  NS_PRECONDITION(addrDescription != nullptr, "null ptr");
-  NS_PRECONDITION(_retval != nullptr, "null ptr");
+  NS_ASSERTION(addrDescription != nullptr, "null ptr");
+  NS_ASSERTION(_retval != nullptr, "null ptr");
   if (! addrDescription || !_retval)
     return NS_ERROR_NULL_POINTER;
 
@@ -228,9 +222,9 @@ NS_IMETHODIMP ImportAddressImpl::GetAutoFind(char16_t **addrDescription, bool *_
 
 NS_IMETHODIMP ImportAddressImpl::GetDefaultLocation(nsIFile **ppLoc, bool *found, bool *userVerify)
 {
-  NS_PRECONDITION(found != nullptr, "null ptr");
-  NS_PRECONDITION(ppLoc != nullptr, "null ptr");
-  NS_PRECONDITION(userVerify != nullptr, "null ptr");
+  NS_ASSERTION(found != nullptr, "null ptr");
+  NS_ASSERTION(ppLoc != nullptr, "null ptr");
+  NS_ASSERTION(userVerify != nullptr, "null ptr");
   if (! found || !userVerify || !ppLoc)
     return NS_ERROR_NULL_POINTER;
 
@@ -244,8 +238,8 @@ NS_IMETHODIMP ImportAddressImpl::GetDefaultLocation(nsIFile **ppLoc, bool *found
 
 NS_IMETHODIMP ImportAddressImpl::FindAddressBooks(nsIFile *pLoc, nsIArray **ppArray)
 {
-  NS_PRECONDITION(pLoc != nullptr, "null ptr");
-  NS_PRECONDITION(ppArray != nullptr, "null ptr");
+  NS_ASSERTION(pLoc != nullptr, "null ptr");
+  NS_ASSERTION(ppArray != nullptr, "null ptr");
   if (!pLoc || !ppArray)
     return NS_ERROR_NULL_POINTER;
 
@@ -368,9 +362,9 @@ ImportAddressImpl::ImportAddressBook(nsIImportABDescriptor *pSource,
                                      char16_t ** pSuccessLog,
                                      bool * fatalError)
 {
-  NS_PRECONDITION(pSource != nullptr, "null ptr");
-  NS_PRECONDITION(pDestination != nullptr, "null ptr");
-  NS_PRECONDITION(fatalError != nullptr, "null ptr");
+  NS_ASSERTION(pSource != nullptr, "null ptr");
+  NS_ASSERTION(pDestination != nullptr, "null ptr");
+  NS_ASSERTION(fatalError != nullptr, "null ptr");
 
   m_bytesImported = 0;
 
@@ -520,8 +514,8 @@ void ImportAddressImpl::SanitizeSampleData(nsString& val)
 
 NS_IMETHODIMP ImportAddressImpl::GetSampleData(int32_t index, bool *pFound, char16_t **pStr)
 {
-  NS_PRECONDITION(pFound != nullptr, "null ptr");
-  NS_PRECONDITION(pStr != nullptr, "null ptr");
+  NS_ASSERTION(pFound != nullptr, "null ptr");
+  NS_ASSERTION(pStr != nullptr, "null ptr");
   if (!pFound || !pStr)
     return NS_ERROR_NULL_POINTER;
 

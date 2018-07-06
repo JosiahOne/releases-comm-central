@@ -53,6 +53,11 @@
   --toolbarbutton-icon-fill-opacity: 1;
 }
 
+:root[lwt-popup-brighttext] {
+  --arrowpanel-dimmed: rgba(249, 249, 250, .1);
+  --arrowpanel-dimmed-further: rgba(249, 249, 250, .15);
+}
+
 toolbar[brighttext] {
   --toolbarbutton-icon-fill-attention: var(--lwt-toolbarbutton-icon-fill-attention, #45a1ff);
 }
@@ -76,6 +81,7 @@ toolbar[brighttext] {
   --toolbarbutton-checkedhover-backgroundcolor: rgba(255, 255, 255, .5);
 }
 
+#FindToolbar:-moz-lwtheme,
 #ab-toolbox > toolbar:-moz-lwtheme,
 .mail-toolbox > toolbar:-moz-lwtheme,
 #compose-toolbox > toolbar:-moz-lwtheme,
@@ -132,8 +138,6 @@ toolbar[brighttext] {
     position: relative;
     z-index: 1;
     -moz-box-align: center;
-    padding-top: 2px;
-    padding-bottom: 2px;
   }
 
   /* Render titlebar command buttons according to system config.
@@ -183,6 +187,20 @@ toolbar[brighttext] {
 toolbar:not(.inline-toolbar):not(:-moz-lwtheme) {
   -moz-appearance: menubar;
   color: -moz-menubartext;
+}
+
+.inline-toolbar {
+  -moz-appearance: none;
+  min-height: 0;
+  padding: 0;
+}
+
+.inline-toolbar toolbarseparator {
+  height: 28px;
+}
+
+.inline-toolbar toolbarspacer {
+  height: 23px;
 }
 
 /*
@@ -242,15 +260,6 @@ toolbarbutton[type="menu-button"] {
   -moz-box-align: stretch;
   -moz-appearance: dualbutton;
   -moz-box-orient: horizontal !important;
-}
-
-toolbarbutton[type="menu-button"],
-toolbarbutton[type="menu-button"]:hover,
-toolbarbutton[type="menu-button"]:hover:active,
-toolbarbutton[type="menu-button"][open="true"],
-toolbarbutton[type="menu-button"][disabled="true"],
-toolbarbutton[type="menu-button"][disabled="true"]:hover,
-toolbarbutton[type="menu-button"][disabled="true"]:hover:active {
   padding: 0 !important;
 }
 
@@ -310,6 +319,16 @@ toolbox[labelalign="end"] .toolbarbutton-1[type="menu"] {
   color: inherit;
 }
 
+.toolbarbutton-1[type="menu-button"] {
+  -moz-appearance: none;
+}
+
+.findbar-button {
+  -moz-appearance: none;
+  color: inherit;
+  padding: 5px;
+}
+
 .findbar-button,
 .toolbarbutton-1:not([type="menu-button"]),
 .toolbarbutton-1 > .toolbarbutton-menubutton-button,
@@ -348,6 +367,7 @@ toolbox[labelalign="end"] .toolbarbutton-1[type="menu"] {
   transition-duration: 10ms;
 }
 
+.findbar-button[checked=true]:not(:active):hover,
 .toolbarbutton-1[checked=true]:not(:active):hover {
   background-color: var(--toolbarbutton-checkedhover-backgroundcolor);
   transition: background-color .4s;

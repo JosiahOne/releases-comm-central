@@ -115,7 +115,22 @@ var snapshotFormatters = {
           policiesText = strings.GetStringFromName("policies.error");
           break;
       }
-      $("policies-status").textContent = policiesText;
+
+      if (data.policiesStatus == Services.policies.ACTIVE) {
+        let activePolicies = $.new("a", policiesText);
+        activePolicies.addEventListener("click", function(event) {
+          let activePoliciesJson = {};
+          activePoliciesJson.policies = Services.policies.getActivePolicies();
+          let activePoliciesJsonBlob = new Blob([JSON.stringify(activePoliciesJson)],
+                                                {type: "application/json"});
+          let jsonURL = URL.createObjectURL(activePoliciesJsonBlob);
+          window.open(jsonURL);
+          URL.revokeObjectURL(jsonURL);
+        });
+        $("policies-status").appendChild(activePolicies);
+      } else {
+        $("policies-status").textContent = policiesText;
+      }
     } else {
       $("policies-status-row").hidden = true;
     }
@@ -249,22 +264,6 @@ var snapshotFormatters = {
         $.new("td", feature.name),
         $.new("td", feature.version),
         $.new("td", feature.id),
-      ]);
-    }));
-  },
-
-  experiments: function experiments(data) {
-    $.append($("experiments-tbody"), data.map(function(experiment) {
-      return $.new("tr", [
-        $.new("td", experiment.name),
-        $.new("td", experiment.id),
-        $.new("td", experiment.description),
-        $.new("td", experiment.active),
-        $.new("td", experiment.endDate),
-        $.new("td", [
-          $.new("a", experiment.detailURL, null, {href : experiment.detailURL, })
-        ]),
-        $.new("td", experiment.branch),
       ]);
     }));
   },
@@ -519,6 +518,7 @@ var snapshotFormatters = {
     addRowFromKey("features", "supportsHardwareH264", "hardwareH264");
     addRowFromKey("features", "direct2DEnabled", "#Direct2D");
     addRowFromKey("features", "usesTiling");
+    // addRowFromKey("features", "contentUsesTiling"); - For content processes in Firefox.
     addRowFromKey("features", "offMainThreadPaintEnabled");
     addRowFromKey("features", "offMainThreadPaintWorkerCount");
 

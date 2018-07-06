@@ -154,9 +154,9 @@ tabProgressListener.prototype =
       this.mProgressListener.onRefreshAttempted(aWebProgress, aURI, aDelay,
         aSameURI);
   },
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener,
-                                         Ci.nsIWebProgressListener2,
-                                         Ci.nsISupportsWeakReference])
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIWebProgressListener,
+                                          Ci.nsIWebProgressListener2,
+                                          Ci.nsISupportsWeakReference])
 };
 
 var DOMLinkHandler = {
@@ -179,10 +179,6 @@ var DOMLinkHandler = {
 
       let targetDoc = link.ownerDocument;
       let uri = makeURI(link.href, targetDoc.characterSet);
-
-      // Is this a failed icon?
-      if (specialTabs.mFaviconService.isFailedFavicon(uri))
-        return;
 
       // Verify that the load of this icon is legal.
       // Some error or special pages can load their favicon.
@@ -251,8 +247,72 @@ var kTelemetryServerOwner = "toolkit.telemetry.server_owner";
 var kTelemetryPromptRev   = 2;
 
 var contentTabBaseType = {
-  inContentWhitelist: ['about:addons', 'about:preferences'],
-  shouldSwitchTo: function onSwitchTo({contentPage: aContentPage}) {
+  // List of URLs that will receive special treatment when opened in a tab.
+  // Note that about:preferences is loaded via a different mechanism.
+  inContentWhitelist: [
+    "about:addons",
+    "about:blank",
+    "about:*"
+  ],
+
+  // Code to run if a particular document is loaded in a tab.
+  // The array members (functions) are for the respective document URLs
+  // as specified in inContentWhitelist.
+  inContentOverlays: [
+    // about:addons
+    function (aDocument, aTab) {
+      let contentStylesheet = aDocument.createProcessingInstruction(
+        "xml-stylesheet",
+        'href="chrome://messenger/content/extensionsOverlay.css" type="text/css"');
+        aDocument.insertBefore(contentStylesheet, aDocument.documentElement);
+
+      let extBundle =
+        new StringBundle("chrome://messenger/locale/extensionsOverlay.properties");
+
+      // Add navigation buttons for back and forward on the addons page.
+      let hbox = aDocument.createElement("hbox");
+      hbox.setAttribute("id", "nav-header");
+      hbox.setAttribute("align", "center");
+      hbox.setAttribute("pack", "center");
+
+      let button1 = aDocument.createElement("toolbarbutton");
+      button1.setAttribute("id", "back-btn");
+      button1.setAttribute("class", "nav-button header-button");
+      button1.setAttribute("command", "cmd_back");
+      button1.setAttribute("tooltiptext", extBundle.get("cmdBackTooltip"));
+      button1.setAttribute("disabled", "true");
+
+      let button2 = aDocument.createElement("toolbarbutton");
+      button2.setAttribute("id", "forward-btn");
+      button2.setAttribute("class", "nav-button header-button");
+      button2.setAttribute("command", "cmd_forward");
+      button2.setAttribute("tooltiptext", extBundle.get("cmdForwardTooltip"));
+      button2.setAttribute("disabled", "true");
+      hbox.appendChild(button1);
+      hbox.appendChild(button2);
+
+      aDocument.getElementById("category-box")
+               .insertBefore(hbox, aDocument.getElementById("categories"));
+
+      // Switch off the context menu.
+      aTab.browser.removeAttribute("context");
+    },
+
+    // Let's not mess with about:blank.
+    null,
+
+    // Other about:* pages.
+    function (aDocument, aTab) {
+      // Provide context menu for about:* pages.
+      aTab.browser.setAttribute("context", "aboutPagesContext");
+    }
+  ],
+
+  shouldSwitchTo: function onSwitchTo({contentPage: aContentPage, duplicate: aDuplicate}) {
+    if (aDuplicate) {
+      return -1;
+    }
+
     let tabmail = document.getElementById("tabmail");
     let tabInfo = tabmail.tabInfo;
 
@@ -262,8 +322,7 @@ var contentTabBaseType = {
 
     let contentUrl = aContentPage.replace(regEx, "");
 
-    for (let selectedIndex = 0; selectedIndex < tabInfo.length;
-         ++selectedIndex) {
+    for (let selectedIndex = 0; selectedIndex < tabInfo.length; ++selectedIndex) {
       if (tabInfo[selectedIndex].mode.name == this.name &&
           tabInfo[selectedIndex].browser.currentURI.spec
                                 .replace(regEx, "") == contentUrl) {
@@ -302,24 +361,23 @@ var contentTabBaseType = {
     return aTab.browser;
   },
 
-  hideChromeForLocation: function hideChromeForLocation(aLocation) {
-    return this.inContentWhitelist.includes(aLocation);
-  },
-
-  /* _setUpLoadListener attaches a load listener to the tab browser that
-   * checks the loaded URL to see if it matches the inContentWhitelist.
-   * If so, then we apply the disablechrome attribute to the contentTab
-   * container.
-   */
   _setUpLoadListener: function setUpLoadListener(aTab) {
     let self = this;
 
     function onLoad(aEvent) {
       let doc = aEvent.originalTarget;
-      if (self.hideChromeForLocation(doc.defaultView.location.href)) {
-        aTab.root.setAttribute("disablechrome", "true");
-      } else {
-        doc.documentElement.removeAttribute("disablechrome");
+      let url = doc.defaultView.location.href;
+
+      // If this document has an overlay defined, run it now.
+      let ind = self.inContentWhitelist.indexOf(url);
+      if (ind < 0) {
+        // Try a wildcard.
+        ind = self.inContentWhitelist.indexOf(url.replace(/:.*/, ":*"));
+      }
+      if (ind >= 0) {
+        let overlayFunction = self.inContentOverlays[ind];
+        if (overlayFunction)
+          overlayFunction(doc, aTab);
       }
     }
 
@@ -768,8 +826,9 @@ var specialTabs = {
     restoreTab: function onRestoreTab(aTabmail, aPersistedState) {
       aTabmail.openTab("contentTab", { contentPage: aPersistedState.tabURI,
                                        clickHandler: aPersistedState.clickHandler,
+                                       duplicate: aPersistedState.duplicate,
                                        background: true } );
-    },
+    }
   },
 
   /**
@@ -1521,10 +1580,7 @@ var specialTabs = {
     // Use documentURIObject in the check for shouldLoadFavIcon so that we do
     // the right thing with about:-style error pages.
     else if (this._shouldLoadFavIcon(docURIObject)) {
-      let url = docURIObject.prePath + "/favicon.ico";
-
-      if (!specialTabs.mFaviconService.isFailedFavicon(makeURI(url)))
-        icon = url;
+      icon = docURIObject.prePath + "/favicon.ico";
     }
 
     specialTabs.setTabIcon(aTab, icon);

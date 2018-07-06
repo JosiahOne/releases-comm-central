@@ -57,12 +57,6 @@ var cal = {
                                     Components.interfaces.calIRecurrenceInfo,
                                     "item"),
 
-    createLocaleCollator: function() {
-        return Components.classes["@mozilla.org/intl/collation-factory;1"]
-                         .getService(Components.interfaces.nsICollationFactory)
-                         .CreateCollation();
-    },
-
     getCalendarManager: _service("@mozilla.org/calendar/manager;1",
                                  Components.interfaces.calICalendarManager),
     getIcsService: _service("@mozilla.org/calendar/ics-service;1",
@@ -90,6 +84,7 @@ var cal = {
      * Shortcut to cal.console.log()
      */
     LOG: gCalendarConsole.log,
+    LOGverbose: gCalendarConsole.debug,
 
     /**
      * Logs a calendar warning to the console. Shortcut to cal.console.warn()
@@ -109,7 +104,7 @@ var cal = {
      * @param aWindow The window to show the message in, or null for any window.
      */
     showError: function(aMsg, aWindow=null) {
-        Services.prompt.alert(aWindow, cal.calGetString("calendar", "genericErrorTitle"), aMsg);
+        Services.prompt.alert(aWindow, cal.l10n.getCalString("genericErrorTitle"), aMsg);
     },
 
     /**
@@ -155,46 +150,55 @@ var cal = {
     },
 
     /**
-     * Loads an array of calendar scripts into the passed scope.
+     * Generates a QueryInterface method on the given global. To be used as follows:
      *
-     * @param scriptNames an array of calendar script names
-     * @param scope       scope to load into
-     * @param baseDir     base dir; defaults to calendar-js/
+     *     class calThing {
+     *       QueryInterface(aIID) { return cal.generateClassQI(this, aIID, [Ci.calIThing]); }
+     *
+     *       ...
+     *     }
+     *
+     * The function is cached, once this is called QueryInterface is replaced with
+     * cal.generateQI()'s result.
+     *
+     * @param {Object} aGlobal      The object to define the method on
+     * @param {nsIIDRef} aIID       The IID to query for
+     * @param {nsIIDRef[]}          The interfaces that this object implements
+     * @return {nsQIResult}         The object queried for aIID
      */
-    loadScripts: function(scriptNames, scope, baseDir) {
-        if (!baseDir) {
-            baseDir = __LOCATION__.parent.parent.clone();
-            baseDir.append("calendar-js");
-        }
-
-        for (let script of scriptNames) {
-            if (!script) {
-                // If the array element is null, then just skip this script.
-                continue;
-            }
-            let scriptFile = baseDir.clone();
-            scriptFile.append(script);
-            let scriptUrlSpec = Services.io.newFileURI(scriptFile).spec;
-            try {
-                Services.scriptloader.loadSubScript(scriptUrlSpec, scope);
-            } catch (exc) {
-                Components.utils.reportError(exc + " (" + scriptUrlSpec + ")");
-            }
-        }
+    generateClassQI: function(aGlobal, aIID, aInterfaces) {
+        Object.defineProperty(aGlobal, "QueryInterface", { value: cal.generateQI(aInterfaces) });
+        return aGlobal.QueryInterface(aIID);
     },
 
-    loadingNSGetFactory: function(scriptNames, components, scope) {
-        return function(cid) {
-            if (!this.inner) {
-                let global = Components.utils.getGlobalForObject(scope);
-                cal.loadScripts(scriptNames, global);
-                if (typeof components == "function") {
-                    components = components.call(global);
+
+    /**
+     * Generates the QueryInterface function. This is a replacement for XPCOMUtils.generateQI, which
+     * is being replaced. Unfortunately Lightning's code depends on some of its classes providing
+     * nsIClassInfo, which causes xpconnect/xpcom to make all methods available, e.g. for an event
+     * both calIItemBase and calIEvent.
+     *
+     * @param {Array<String|nsIIDRef>} aInterfaces      The interfaces to generate QI for.
+     * @return {Function}                               The QueryInterface function
+     */
+    generateQI: function(aInterfaces) {
+        if (aInterfaces.length == 1) {
+            cal.WARN("When generating QI for one interface, please use ChromeUtils.generateQI", cal.STACK(10));
+            return ChromeUtils.generateQI(aInterfaces);
+        } else {
+            /* Note that Ci[Ci.x] == Ci.x for all x */
+            let names = [];
+            if (aInterfaces) {
+                for (let i = 0; i < aInterfaces.length; i++) {
+                    let iface = aInterfaces[i];
+                    let name = (iface && iface.name) || String(iface);
+                    if (name in Ci) {
+                        names.push(name);
+                    }
                 }
-                this.inner = XPCOMUtils.generateNSGetFactory(components);
             }
-            return this.inner(cid);
-        };
+            return makeQI(names);
+        }
     },
 
     /**
@@ -261,7 +265,7 @@ var cal = {
                 adapter[method] = function() {};
             }
         }
-        adapter.QueryInterface = XPCOMUtils.generateQI([iface]);
+        adapter.QueryInterface = ChromeUtils.generateQI([iface]);
 
         return adapter;
     },
@@ -277,35 +281,6 @@ var cal = {
         // generate uuids without braces to avoid problems with
         // CalDAV servers that don't support filenames with {}
         return uuidGen.generateUUID().toString().replace(/[{}]/g, "");
-    },
-
-    /**
-     * Sort an array of strings according to the current locale.
-     * Modifies aStringArray, returning it sorted.
-     */
-    sortArrayByLocaleCollator: function(aStringArray) {
-        let localeCollator = cal.createLocaleCollator();
-        function compare(a, b) { return localeCollator.compareString(0, a, b); }
-        aStringArray.sort(compare);
-        return aStringArray;
-    },
-
-    /**
-     * Gets the month name string in the right form depending on a base string.
-     *
-     * @param aMonthNum     The month numer to get, 1-based.
-     * @param aBundleName   The Bundle to get the string from
-     * @param aStringBase   The base string name, .monthFormat will be appended
-     */
-    formatMonth: function(aMonthNum, aBundleName, aStringBase) {
-        let monthForm = cal.calGetString(aBundleName, aStringBase + ".monthFormat") || "nominative";
-
-        if (monthForm == "nominative") {
-            // Fall back to the default name format
-            monthForm = "name";
-        }
-
-        return cal.calGetString("dateFormat", "month." + aMonthNum + "." + monthForm);
     },
 
     /**
@@ -392,23 +367,44 @@ var cal = {
     registerForShutdownCleanup: shutdownCleanup
 };
 
+/**
+ * Update the logging preferences for the calendar console based on the sate of verbose logging and
+ * normal calendar logging.
+ */
+function updateLogPreferences() {
+    if (cal.verboseLogEnabled) {
+        gCalendarConsole.maxLogLevel = "all";
+    } else if (cal.debugLogEnabled) {
+        gCalendarConsole.maxLogLevel = "log";
+    } else {
+        gCalendarConsole.maxLogLevel = "warn";
+    }
+}
+
 // Preferences
-XPCOMUtils.defineLazyPreferenceGetter(cal, "debugLogEnabled", "calendar.debug.log", false, (pref, prev, value) => {
-    gCalendarConsole.maxLogLevel = value ? "all" : "warn";
-});
+XPCOMUtils.defineLazyPreferenceGetter(cal, "debugLogEnabled", "calendar.debug.log", false, updateLogPreferences);
+XPCOMUtils.defineLazyPreferenceGetter(cal, "verboseLogEnabled", "calendar.debug.log.verbose", false, updateLogPreferences);
 XPCOMUtils.defineLazyPreferenceGetter(cal, "threadingEnabled", "calendar.threading.disabled", false);
 
 // Sub-modules for calUtils
-XPCOMUtils.defineLazyModuleGetter(cal, "acl", "resource://calendar/modules/calACLUtils.jsm", "calacl");
-XPCOMUtils.defineLazyModuleGetter(cal, "category", "resource://calendar/modules/calCategoryUtils.jsm", "calcategory");
-XPCOMUtils.defineLazyModuleGetter(cal, "data", "resource://calendar/modules/calDataUtils.jsm", "caldata");
-XPCOMUtils.defineLazyModuleGetter(cal, "dtz", "resource://calendar/modules/calDateTimeUtils.jsm", "caldtz");
-XPCOMUtils.defineLazyModuleGetter(cal, "email", "resource://calendar/modules/calEmailUtils.jsm", "calemail");
-XPCOMUtils.defineLazyModuleGetter(cal, "item", "resource://calendar/modules/calItemUtils.jsm", "calitem");
-XPCOMUtils.defineLazyModuleGetter(cal, "itip", "resource://calendar/modules/calItipUtils.jsm", "calitip");
-XPCOMUtils.defineLazyModuleGetter(cal, "unifinder", "resource://calendar/modules/calUnifinderUtils.jsm", "calunifinder");
-XPCOMUtils.defineLazyModuleGetter(cal, "view", "resource://calendar/modules/calViewUtils.jsm", "calview");
-XPCOMUtils.defineLazyModuleGetter(cal, "window", "resource://calendar/modules/calWindowUtils.jsm", "calwindow");
+XPCOMUtils.defineLazyModuleGetter(cal, "acl", "resource://calendar/modules/utils/calACLUtils.jsm", "calacl");
+XPCOMUtils.defineLazyModuleGetter(cal, "alarms", "resource://calendar/modules/utils/calAlarmUtils.jsm", "calalarms");
+XPCOMUtils.defineLazyModuleGetter(cal, "async", "resource://calendar/modules/utils/calAsyncUtils.jsm", "calasync");
+XPCOMUtils.defineLazyModuleGetter(cal, "auth", "resource://calendar/modules/utils/calAuthUtils.jsm", "calauth");
+XPCOMUtils.defineLazyModuleGetter(cal, "category", "resource://calendar/modules/utils/calCategoryUtils.jsm", "calcategory");
+XPCOMUtils.defineLazyModuleGetter(cal, "data", "resource://calendar/modules/utils/calDataUtils.jsm", "caldata");
+XPCOMUtils.defineLazyModuleGetter(cal, "dtz", "resource://calendar/modules/utils/calDateTimeUtils.jsm", "caldtz");
+XPCOMUtils.defineLazyModuleGetter(cal, "email", "resource://calendar/modules/utils/calEmailUtils.jsm", "calemail");
+XPCOMUtils.defineLazyModuleGetter(cal, "item", "resource://calendar/modules/utils/calItemUtils.jsm", "calitem");
+XPCOMUtils.defineLazyModuleGetter(cal, "iterate", "resource://calendar/modules/utils/calIteratorUtils.jsm", "caliterate");
+XPCOMUtils.defineLazyModuleGetter(cal, "itip", "resource://calendar/modules/utils/calItipUtils.jsm", "calitip");
+XPCOMUtils.defineLazyModuleGetter(cal, "l10n", "resource://calendar/modules/utils/calL10NUtils.jsm", "call10n");
+XPCOMUtils.defineLazyModuleGetter(cal, "print", "resource://calendar/modules/utils/calPrintUtils.jsm", "calprint");
+XPCOMUtils.defineLazyModuleGetter(cal, "provider", "resource://calendar/modules/utils/calProviderUtils.jsm", "calprovider");
+XPCOMUtils.defineLazyModuleGetter(cal, "unifinder", "resource://calendar/modules/utils/calUnifinderUtils.jsm", "calunifinder");
+XPCOMUtils.defineLazyModuleGetter(cal, "view", "resource://calendar/modules/utils/calViewUtils.jsm", "calview");
+XPCOMUtils.defineLazyModuleGetter(cal, "window", "resource://calendar/modules/utils/calWindowUtils.jsm", "calwindow");
+XPCOMUtils.defineLazyModuleGetter(cal, "xml", "resource://calendar/modules/utils/calXMLUtils.jsm", "calxml");
 
 /**
  * Returns a function that provides access to the given service.
@@ -462,13 +458,29 @@ function shutdownCleanup(obj, prop) {
     shutdownCleanup.mEntries.push({ mObj: obj, mProp: prop });
 }
 
-// Interim import of all symbols into cal:
-// This should serve as a clean start for new code, e.g. new code could use
-// cal.createDatetime instead of plain createDatetime NOW.
-cal.loadScripts(["calUtils.js"], cal);
-// Some functions in calUtils.js refer to other in the same file, thus include
-// the code in global scope (although only visible to this module file), too:
-cal.loadScripts(["calUtils.js"], Components.utils.getGlobalForObject(cal));
+/**
+ * This is the makeQI function from XPCOMUtils.jsm, it is separate to avoid leaks
+ *
+ * @param {Array<String|nsIIDRef>} aInterfaces      The interfaces to make QI for.
+ * @return {Function}                               The QueryInterface function.
+ */
+function makeQI(aInterfaces) {
+    return function(iid) {
+        if (iid.equals(Ci.nsISupports)) {
+            return this;
+        }
+        if (iid.equals(Ci.nsIClassInfo) && "classInfo" in this) {
+            return this.classInfo;
+        }
+        for (let i = 0; i < aInterfaces.length; i++) {
+            if (Ci[aInterfaces[i]].equals(iid)) {
+                return this;
+            }
+        }
+
+        throw Cr.NS_ERROR_NO_INTERFACE;
+    };
+}
 
 // Backwards compatibility for bug 905097. Please remove with Thunderbird 61.
 ChromeUtils.import("resource://calendar/modules/calUtilsCompat.jsm");

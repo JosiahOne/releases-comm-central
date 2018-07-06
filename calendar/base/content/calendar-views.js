@@ -10,7 +10,6 @@
  */
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
@@ -20,14 +19,7 @@ ChromeUtils.import("resource://gre/modules/Preferences.jsm");
  * @see calIcalendarViewController
  */
 var calendarViewController = {
-    QueryInterface: function(aIID) {
-        if (!aIID.equals(Components.interfaces.calICalendarViewController) &&
-            !aIID.equals(Components.interfaces.nsISupports)) {
-            throw Components.results.NS_ERROR_NO_INTERFACE;
-        }
-
-        return this;
-    },
+    QueryInterface: ChromeUtils.generateQI([Ci.calICalendarViewController]),
 
     /**
      * Creates a new event
@@ -38,7 +30,7 @@ var calendarViewController = {
         if (aStartTime && aEndTime && !aStartTime.isDate && !aEndTime.isDate) {
             let item = cal.createEvent();
             setDefaultItemValues(item, aCalendar, aStartTime, aEndTime);
-            item.title = cal.calGetString("calendar", "newEvent");
+            item.title = cal.l10n.getCalString("newEvent");
             doTransaction("add", item, item.calendar, null, null);
         } else {
             createEventWithDialog(aCalendar, aStartTime, null, null, null, aForceAllday);
@@ -416,7 +408,7 @@ function updateStyleSheetForViews(aCalendar) {
  */
 var categoryPrefBranch;
 var categoryManagement = {
-    QueryInterface: XPCOMUtils.generateQI([Components.interfaces.nsIObserver]),
+    QueryInterface: ChromeUtils.generateQI([Ci.nsIObserver]),
 
     initCategories: function() {
         categoryPrefBranch = Services.prefs.getBranch("calendar.category.color.");
@@ -654,7 +646,7 @@ function editSelectedEvents() {
 function selectAllEvents() {
     let items = [];
     let listener = {
-        QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+        QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
         onOperationComplete: function(aCalendar, aStatus, aOperationType, aId, aDetail) {
             currentView().setSelectedItems(items.length, items, false);
         },
@@ -702,17 +694,17 @@ cal.navigationBar = {
                 secondWeekNo = cal.getWeekInfoService().getWeekTitle(aEndDate);
             }
             if (secondWeekNo == firstWeekNo) {
-                weekLabel.value = cal.calGetString("calendar", "singleShortCalendarWeek", [firstWeekNo]);
-                weekLabel.tooltipText = cal.calGetString("calendar", "singleLongCalendarWeek", [firstWeekNo]);
+                weekLabel.value = cal.l10n.getCalString("singleShortCalendarWeek", [firstWeekNo]);
+                weekLabel.tooltipText = cal.l10n.getCalString("singleLongCalendarWeek", [firstWeekNo]);
             } else {
-                weekLabel.value = cal.calGetString("calendar", "severalShortCalendarWeeks", [firstWeekNo, secondWeekNo]);
-                weekLabel.tooltipText = cal.calGetString("calendar", "severalLongCalendarWeeks", [firstWeekNo, secondWeekNo]);
+                weekLabel.value = cal.l10n.getCalString("severalShortCalendarWeeks", [firstWeekNo, secondWeekNo]);
+                weekLabel.tooltipText = cal.l10n.getCalString("severalLongCalendarWeeks", [firstWeekNo, secondWeekNo]);
             }
             docTitle = intervalLabel.value;
         }
         if (document.getElementById("modeBroadcaster").getAttribute("mode") == "calendar") {
             document.title = (docTitle ? docTitle + " - " : "") +
-                cal.calGetString("brand", "brandFullName", null, "branding");
+                cal.l10n.getAnyString("branding", "brand", "brandFullName");
         }
         let viewTabs = document.getElementById("view-tabs");
         viewTabs.selectedIndex = getViewDeck().selectedIndex;

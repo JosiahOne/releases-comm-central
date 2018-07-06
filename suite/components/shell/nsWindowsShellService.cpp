@@ -10,7 +10,6 @@
 #include "mozilla/gfx/2D.h"
 #include "mozilla/RefPtr.h"
 #include "nsIContent.h"
-#include "nsIDOMElement.h"
 #include "nsIImageLoadingContent.h"
 #include "nsIOutputStream.h"
 #include "nsIPrefService.h"
@@ -33,6 +32,7 @@
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
 #include "mozilla/WindowsVersion.h"
+#include "mozilla/dom/Element.h"
 
 #include "windows.h"
 #include "shellapi.h"
@@ -157,7 +157,7 @@ OpenKeyForReading(HKEY aKeyRoot, const wchar_t* aKeyName, HKEY* aKey)
 //   That aliases to this class:
 //   HKCU\SOFTWARE\Classes\SeaMonkeyEML\ (default)        REG_SZ    SeaMonkey (Mail) Document
 //                                      FriendlyTypeName  REG_SZ    SeaMonkey (Mail) Document
-//     DefaultIcon                      (default)         REG_SZ    <appfolder>\chrome\icons\default\misc-file.ico
+//     DefaultIcon                      (default)         REG_SZ    <appfolder>\chrome\icons\default\html-file.ico
 //     shell\open\command               (default)         REG_SZ    <apppath> "%1"
 //
 // - Windows Vista Protocol Handler
@@ -738,11 +738,11 @@ WriteBitmap(nsIFile* aFile, imgIContainer* aImage)
 }
 
 NS_IMETHODIMP
-nsWindowsShellService::SetDesktopBackground(nsIDOMElement* aElement,
+nsWindowsShellService::SetDesktopBackground(dom::Element* aElement,
                                             int32_t aPosition)
 {
   nsCOMPtr<nsIContent> content(do_QueryInterface(aElement));
-  if (!content || !content->IsHTMLElement(nsGkAtoms::img)) {
+  if (!aElement || !aElement->IsHTMLElement(nsGkAtoms::img)) {
     // XXX write background loading stuff!
     return NS_ERROR_NOT_AVAILABLE;
   }

@@ -7,8 +7,6 @@ var gGeneralPane = {
   mPane: null,
   mStartPageUrl: "",
 
-  _loadInContent: Services.prefs.getBoolPref("mail.preferences.inContent"),
-
   init: function ()
   {
     this.mPane = document.getElementById("paneGeneral");
@@ -52,26 +50,14 @@ var gGeneralPane = {
 
   customizeMailAlert: function()
   {
-    if (this._loadInContent) {
-      gSubDialog.open("chrome://messenger/content/preferences/notifications.xul",
-                      "resizable=no");
-    } else {
-      document.documentElement
-              .openSubDialog("chrome://messenger/content/preferences/notifications.xul",
-                              "", null);
-    }
+    gSubDialog.open("chrome://messenger/content/preferences/notifications.xul",
+                    "resizable=no");
   },
 
   configureDockOptions: function()
   {
-    if (this._loadInContent) {
-      gSubDialog.open("chrome://messenger/content/preferences/dockoptions.xul",
-                      "resizable=no");
-    } else {
-      document.documentElement
-              .openSubDialog("chrome://messenger/content/preferences/dockoptions.xul",
-                              "", null);
-    }
+    gSubDialog.open("chrome://messenger/content/preferences/dockoptions.xul",
+                    "resizable=no");
   },
 
   convertURLToLocalFile: function(aFileURL)
@@ -95,7 +81,7 @@ var gGeneralPane = {
     if (soundUrlLocation.value)
     {
       soundUrlLocation.label = this.convertURLToLocalFile(soundUrlLocation.value).leafName;
-      soundUrlLocation.image = "moz-icon://" + soundUrlLocation.label + "?size=16";
+      soundUrlLocation.style.backgroundImage = "url(moz-icon://" + soundUrlLocation.label + "?size=16)";
     }
     return undefined;
   },

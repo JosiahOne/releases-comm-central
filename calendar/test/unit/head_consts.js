@@ -7,6 +7,7 @@
  *          createTodoFromIcalString, createEventFromIcalString, createDate, Cc, Ci, Cr, Cu
  */
 
+ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 ChromeUtils.import("resource://gre/modules/FileUtils.jsm");
@@ -19,12 +20,31 @@ ChromeUtils.defineModuleGetter(this, "NetUtil", "resource://gre/modules/NetUtil.
 updateAppInfo();
 
 (function() {
+    let manager = Cc["@mozilla.org/component-manager-extra;1"].getService(Ci.nsIComponentManagerExtra);
+
     let bindir = Services.dirsvc.get("CurProcD", Components.interfaces.nsIFile);
+    if (!AppConstants.NIGHTLY_BUILD) {
+        bindir.append("distribution");
+    }
     bindir.append("extensions");
-    bindir.append("{e2fda1a4-762b-4020-b5ad-a41df1933103}");
-    bindir.append("chrome.manifest");
-    dump("Loading" + bindir.path + "\n");
-    Components.manager.autoRegister(bindir);
+
+    let xpiFile = bindir.clone();
+    xpiFile.append("{e2fda1a4-762b-4020-b5ad-a41df1933103}.xpi");
+
+    if (xpiFile.exists()) {
+        dump("Loading " + xpiFile.path + "\n");
+        manager.addLegacyExtensionManifestLocation(xpiFile);
+    } else {
+        // The XPI file is created by the automation, and not available on a local build.
+        // Use the unpacked version instead.
+        bindir.append("{e2fda1a4-762b-4020-b5ad-a41df1933103}");
+        dump("Loading " + bindir.path + "\n");
+        manager.addLegacyExtensionManifestLocation(bindir);
+    }
+
+    // Make sure to load the backend loader as early as possible, as xpcshell doesn't have the
+    // normal app flow with profile-after-change et al.
+    Components.classes["@mozilla.org/calendar/backend-loader;1"].getService();
 })();
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
@@ -172,8 +192,7 @@ function compareItemsSpecific(aLeftItem, aRightItem, aPropArray) {
     }
     for (let i = 0; i < aPropArray.length; i++) {
         equal(getProps(aLeftItem, aPropArray[i]),
-              getProps(aRightItem, aPropArray[i]),
-              Components.stack.caller);
+              getProps(aRightItem, aPropArray[i]));
     }
 }
 

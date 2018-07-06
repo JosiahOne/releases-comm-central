@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calIteratorUtils.jsm");
 
 function calIcsSerializer() {
     this.wrappedJSObject = this;
@@ -11,17 +10,9 @@ function calIcsSerializer() {
     this.mProperties = [];
     this.mComponents = [];
 }
-var calIcsSerializerClassID = Components.ID("{207a6682-8ff1-4203-9160-729ec28c8766}");
-var calIcsSerializerInterfaces = [Components.interfaces.calIIcsSerializer];
 calIcsSerializer.prototype = {
-    classID: calIcsSerializerClassID,
-    QueryInterface: XPCOMUtils.generateQI(calIcsSerializerInterfaces),
-    classInfo: XPCOMUtils.generateCI({
-        classID: calIcsSerializerClassID,
-        contractID: "@mozilla.org/calendar/ics-serializer;1",
-        classDescription: "Calendar ICS Serializer",
-        interfaces: calIcsSerializerInterfaces,
-    }),
+    QueryInterface: ChromeUtils.generateQI([Ci.calIIcsSerializer]),
+    classID: Components.ID("{207a6682-8ff1-4203-9160-729ec28c8766}"),
 
     addItems: function(aItems, aCount) {
         if (aCount > 0) {
@@ -74,7 +65,7 @@ calIcsSerializer.prototype = {
             calComp.addSubcomponent(comp);
         }
 
-        for (let item of cal.itemIterator(this.mItems)) {
+        for (let item of cal.iterate.items(this.mItems)) {
             calComp.addSubcomponent(item.icalComponent);
         }
 

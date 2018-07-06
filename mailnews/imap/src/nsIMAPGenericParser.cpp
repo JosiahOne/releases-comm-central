@@ -5,8 +5,6 @@
 
 #include "msgCore.h"  // for pre-compiled headers
 
-#include "nsImapCore.h"
-#include "nsImapProtocol.h"
 #include "nsIMAPGenericParser.h"
 #include "nsString.h"
 
@@ -55,7 +53,7 @@ void nsIMAPGenericParser::SetSyntaxError(bool error, const char *msg)
       fParserState |= stateSyntaxErrorFlag;
   else
       fParserState &= ~stateSyntaxErrorFlag;
-  NS_ASSERTION(!error, "syntax error in generic parser");	
+  NS_ASSERTION(!error, "syntax error in generic parser");
 }
 
 void nsIMAPGenericParser::SetConnected(bool connected)
@@ -176,7 +174,7 @@ void nsIMAPGenericParser::AdvanceToNextLine()
 // advances |fLineOfTokens| by |bytesToAdvance| bytes
 void nsIMAPGenericParser::AdvanceTokenizerStartingPoint(int32_t bytesToAdvance)
 {
-  NS_PRECONDITION(bytesToAdvance>=0, "bytesToAdvance must not be negative");
+  NS_ASSERTION(bytesToAdvance>=0, "bytesToAdvance must not be negative");
   if (!fStartOfLineOfTokens)
   {
     AdvanceToNextToken();  // the tokenizer was not yet initialized, do it now
@@ -208,9 +206,9 @@ void nsIMAPGenericParser::AdvanceTokenizerStartingPoint(int32_t bytesToAdvance)
 char *nsIMAPGenericParser::CreateAstring()
 {
   if (*fNextToken == '{')
-    return CreateLiteral();		// literal
+    return CreateLiteral();  // literal
   if (*fNextToken == '"')
-    return CreateQuoted();		// quoted
+    return CreateQuoted();  // quoted
   return CreateAtom(true); // atom
 }
 
@@ -285,12 +283,12 @@ char *nsIMAPGenericParser::CreateString()
 {
   if (*fNextToken == '{')
   {
-    char *rv = CreateLiteral();		// literal
+    char *rv = CreateLiteral();  // literal
     return (rv);
   }
   if (*fNextToken == '"')
   {
-    char *rv = CreateQuoted();		// quoted
+    char *rv = CreateQuoted();  // quoted
     return (rv);
   }
   SetSyntaxError(true, "string does not start with '{' or '\"'");

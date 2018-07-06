@@ -61,10 +61,10 @@
       <field name="mObserver"><![CDATA[
           // the calIObserver, calICompositeObserver, and calIAlarmServiceObserver
           ({
-              QueryInterface: XPCOMUtils.generateQI([
-                  Components.interfaces.calIObserver,
-                  Components.interfaces.calIAlarmServiceObserver,
-                  Components.interfaces.calICompositeObserver
+              QueryInterface: cal.generateQI([
+                  Ci.calIObserver,
+                  Ci.calIAlarmServiceObserver,
+                  Ci.calICompositeObserver
               ]),
 
               calView: this,
@@ -451,7 +451,7 @@
         <parameter name="aCalendar"/>
         <body><![CDATA[
             let refreshJob = {
-                QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+                QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
                 calView: this,
                 calendar: null,
                 calId: null,
@@ -881,12 +881,12 @@
         <setter><![CDATA[
             this.mDate = val;
             let dateFormatter = cal.getDateFormatter();
-            let label = cal.calGetString("calendar", "dayHeaderLabel", [
+            let label = cal.l10n.getCalString("dayHeaderLabel", [
                 dateFormatter.shortDayName(val.weekday),
                 dateFormatter.formatDateWithoutYear(val)
             ]);
             this.shortName.setAttribute("value", label);
-            label = cal.calGetString("calendar", "dayHeaderLabel", [
+            label = cal.l10n.getCalString("dayHeaderLabel", [
                 dateFormatter.dayName(val.weekday),
                 dateFormatter.formatDateWithoutYear(val)
             ]);

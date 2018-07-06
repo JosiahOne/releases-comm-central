@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
@@ -33,9 +32,8 @@ function calAlarmService() {
     this.mObservers = new cal.data.ListenerSet(Components.interfaces.calIAlarmServiceObserver);
 
     this.calendarObserver = {
+        QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIObserver]),
         alarmService: this,
-
-        QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIObserver]),
 
         // calIObserver:
         onStartBatch: function() { },
@@ -79,9 +77,8 @@ function calAlarmService() {
     };
 
     this.calendarManagerObserver = {
+        QueryInterface: ChromeUtils.generateQI([Components.interfaces.calICalendarManagerObserver]),
         alarmService: this,
-
-        QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calICalendarManagerObserver]),
 
         onCalendarRegistered: function(aCalendar) {
             this.alarmService.observeCalendar(aCalendar);
@@ -113,7 +110,7 @@ calAlarmService.prototype = {
     mTimezone: null,
 
     classID: calAlarmServiceClassID,
-    QueryInterface: XPCOMUtils.generateQI(calAlarmServiceInterfaces),
+    QueryInterface: cal.generateQI(calAlarmServiceInterfaces),
     classInfo: XPCOMUtils.generateCI({
         classID: calAlarmServiceClassID,
         contractID: "@mozilla.org/calendar/alarm-service;1",
@@ -497,7 +494,7 @@ calAlarmService.prototype = {
 
     findAlarms: function(aCalendars, aStart, aUntil) {
         let getListener = {
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIOperationListener]),
             alarmService: this,
             addRemovePromise: PromiseUtils.defer(),
             batchCount: 0,
@@ -525,7 +522,7 @@ calAlarmService.prototype = {
                 this.batchCount++;
                 this.results = true;
 
-                cal.forEach(aItems, (item) => {
+                cal.iterate.forEach(aItems, (item) => {
                     try {
                         this.alarmService.removeAlarmsForItem(item);
                         this.alarmService.addAlarmsForItem(item);

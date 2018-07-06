@@ -49,7 +49,7 @@ function EditorTestSelection()
 
   dump("Selection contains:\n");
   // 3rd param = column to wrap
-  dump(selection.QueryInterface(Ci.nsISelectionPrivate)
+  dump(selection
        .toStringWithFormat("text/plain",
                            kOutputFormatted | kOutputSelectionOnly,
                            0) + "\n");
@@ -221,8 +221,9 @@ function EditorShowEmbeddedObjects()
   try {
     var objectArray = GetCurrentEditor().getEmbeddedObjects();
     dump(objectArray.length + " embedded objects\n");
-    for (let i = 0; i < objectArray.length; ++i)
-      dump(objectArray.queryElementAt(i, Ci.nsIDOMNode) + "\n");
+    // FIXME nsIDOMNode has been removed.
+    // for (let i = 0; i < objectArray.length; ++i)
+    //   dump(objectArray.queryElementAt(i, Ci.nsIDOMNode) + "\n");
   } catch(e) {}
 }
 

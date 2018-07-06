@@ -4,9 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /*
-
   Windows Live Mail (Win32) settings
-
 */
 
 #include "nsCOMPtr.h"
@@ -14,8 +12,6 @@
 #include "nsString.h"
 #include "nsMsgUtils.h"
 #include "nsWMImport.h"
-#include "nsIComponentManager.h"
-#include "nsIServiceManager.h"
 #include "nsIMsgAccountManager.h"
 #include "nsIMsgAccount.h"
 #include "nsIImportSettings.h"
@@ -31,13 +27,9 @@
 #include "nsIImapIncomingServer.h"
 #include "nsINntpIncomingServer.h"
 #include "stdlib.h"
+#include "nsIDocument.h"
 #include "nsIFile.h"
-#include "nsISimpleEnumerator.h"
-#include "nsIMutableArray.h"
-#include "nsIDOMDocument.h"
 #include "nsNetUtil.h"
-#include "nsIFileStreams.h"
-#include "nsIDOMParser.h"
 #include "nsTArray.h"
 #include <windows.h>
 #include "nsIWindowsRegKey.h"
@@ -48,21 +40,21 @@ class WMSettings {
 public:
   static bool DoImport(nsIMsgAccount **ppAccount);
   static bool DoIMAPServer(nsIMsgAccountManager *pMgr,
-                             nsIDOMDocument *xmlDoc,
+                             nsIDocument *xmlDoc,
                              const nsString& serverName,
                              nsIMsgAccount **ppAccount);
   static bool DoPOP3Server(nsIMsgAccountManager *pMgr,
-                             nsIDOMDocument *xmlDoc,
+                             nsIDocument *xmlDoc,
                              const nsString& serverName,
                              nsIMsgAccount **ppAccount);
   static bool DoNNTPServer(nsIMsgAccountManager *pMgr,
-                             nsIDOMDocument *xmlDoc,
+                             nsIDocument *xmlDoc,
                              const nsString& serverName,
                              nsIMsgAccount **ppAccount);
   static void SetIdentities(nsIMsgAccountManager *pMgr, nsIMsgAccount *pAcc,
-                            nsIDOMDocument *xmlDoc, nsAutoString &userName,
+                            nsIDocument *xmlDoc, nsAutoString &userName,
                             int32_t authMethodIncoming, bool isNNTP);
-  static void SetSmtpServer(nsIDOMDocument *xmlDoc, nsIMsgIdentity *id,
+  static void SetSmtpServer(nsIDocument *xmlDoc, nsIMsgIdentity *id,
                             nsAutoString& inUserName, int32_t authMethodIncoming);
 };
 
@@ -92,8 +84,8 @@ NS_IMPL_ISUPPORTS(nsWMSettings, nsIImportSettings)
 NS_IMETHODIMP nsWMSettings::AutoLocate(char16_t **description,
                                        nsIFile **location, bool *_retval)
 {
-  NS_PRECONDITION(description != nullptr, "null ptr");
-  NS_PRECONDITION(_retval != nullptr, "null ptr");
+  NS_ASSERTION(description != nullptr, "null ptr");
+  NS_ASSERTION(_retval != nullptr, "null ptr");
   if (!description || !_retval)
     return NS_ERROR_NULL_POINTER;
 
@@ -117,7 +109,7 @@ NS_IMETHODIMP nsWMSettings::SetLocation(nsIFile *location)
 NS_IMETHODIMP nsWMSettings::Import(nsIMsgAccount **localMailAccount,
                                    bool *_retval)
 {
-  NS_PRECONDITION(_retval != nullptr, "null ptr");
+  NS_ASSERTION(_retval != nullptr, "null ptr");
 
   if (WMSettings::DoImport(localMailAccount)) {
     *_retval = true;
@@ -179,7 +171,7 @@ bool WMSettings::DoImport(nsIMsgAccount **ppAccount)
   // Loop through *.oeaccounts files looking for POP3 & IMAP & NNTP accounts
   // Ignore LDAP for now!
   int accounts = 0;
-  nsCOMPtr<nsIDOMDocument> xmlDoc;
+  nsCOMPtr<nsIDocument> xmlDoc;
 
   for (int32_t i = fileArray.Count() - 1 ; i >= 0; i--){
     nsWMUtils::MakeXMLdoc(getter_AddRefs(xmlDoc), fileArray[i]);
@@ -221,7 +213,7 @@ bool WMSettings::DoImport(nsIMsgAccount **ppAccount)
 }
 
 bool WMSettings::DoIMAPServer(nsIMsgAccountManager *pMgr,
-                                nsIDOMDocument *xmlDoc,
+                                nsIDocument *xmlDoc,
                                 const nsString& serverName,
                                 nsIMsgAccount **ppAccount)
 {
@@ -330,7 +322,7 @@ bool WMSettings::DoIMAPServer(nsIMsgAccountManager *pMgr,
 }
 
 bool WMSettings::DoPOP3Server(nsIMsgAccountManager *pMgr,
-                                nsIDOMDocument *xmlDoc,
+                                nsIDocument *xmlDoc,
                                 const nsString& serverName,
                                 nsIMsgAccount **ppAccount)
 {
@@ -491,7 +483,7 @@ bool WMSettings::DoPOP3Server(nsIMsgAccountManager *pMgr,
 }
 
 bool WMSettings::DoNNTPServer(nsIMsgAccountManager *pMgr,
-                                nsIDOMDocument *xmlDoc,
+                                nsIDocument *xmlDoc,
                                 const nsString& serverName,
                                 nsIMsgAccount **ppAccount)
 {
@@ -594,7 +586,7 @@ bool WMSettings::DoNNTPServer(nsIMsgAccountManager *pMgr,
 }
 
 void WMSettings::SetIdentities(nsIMsgAccountManager *pMgr, nsIMsgAccount *pAcc,
-                               nsIDOMDocument *xmlDoc, nsAutoString &inUserName,
+                               nsIDocument *xmlDoc, nsAutoString &inUserName,
                                int32_t authMethodIncoming, bool isNNTP)
 {
   // Get the relevant information for an identity
@@ -648,7 +640,7 @@ void WMSettings::SetIdentities(nsIMsgAccountManager *pMgr, nsIMsgAccount *pAcc,
     SetSmtpServer(xmlDoc, id, inUserName, authMethodIncoming);
 }
 
-void WMSettings::SetSmtpServer(nsIDOMDocument *xmlDoc, nsIMsgIdentity *id,
+void WMSettings::SetSmtpServer(nsIDocument *xmlDoc, nsIMsgIdentity *id,
                                nsAutoString& inUserName, int32_t authMethodIncoming)
 {
   nsresult errorCode;

@@ -11,10 +11,8 @@
 #include "mozilla/RefPtr.h"
 #include "nsCOMPtr.h"
 #include "nsICertPickDialogs.h"
-#include "nsIDOMWindow.h"
 #include "nsIDialogParamBlock.h"
 #include "nsIInterfaceRequestor.h"
-#include "nsIServiceManager.h"
 #include "nsIX509CertValidity.h"
 #include "nsMemory.h"
 #include "nsMsgComposeSecure.h"
@@ -22,6 +20,7 @@
 #include "nsNSSComponent.h"
 #include "nsNSSDialogHelper.h"
 #include "nsNSSHelper.h"
+#include "nsNSSCertHelper.h"
 #include "nsReadableUtils.h"
 #include "nsString.h"
 #include "pkix/pkixtypes.h"
@@ -35,19 +34,11 @@ MOZ_TYPE_SPECIFIC_UNIQUE_PTR_TEMPLATE(UniqueCERTCertNicknames,
 CERTCertNicknames*
 getNSSCertNicknamesFromCertList(const UniqueCERTCertList& certList)
 {
-  static NS_DEFINE_CID(kNSSComponentCID, NS_NSSCOMPONENT_CID);
-
-  nsresult rv;
-
-  nsCOMPtr<nsINSSComponent> nssComponent(do_GetService(kNSSComponentCID, &rv));
-  if (NS_FAILED(rv))
-    return nullptr;
-
   nsAutoString expiredString, notYetValidString;
   nsAutoString expiredStringLeadingSpace, notYetValidStringLeadingSpace;
 
-  nssComponent->GetPIPNSSBundleString("NicknameExpired", expiredString);
-  nssComponent->GetPIPNSSBundleString("NicknameNotYetValid", notYetValidString);
+  GetPIPNSSBundleString("NicknameExpired", expiredString);
+  GetPIPNSSBundleString("NicknameNotYetValid", notYetValidString);
 
   expiredStringLeadingSpace.Append(' ');
   expiredStringLeadingSpace.Append(expiredString);

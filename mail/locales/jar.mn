@@ -8,6 +8,10 @@
 
 #filter substitution
 
+[localization] @AB_CD@.jar:
+  messenger                                                             (%messenger/**/*.ftl)
+
+
 @AB_CD@.jar:
 % locale messenger @AB_CD@ %locale/@AB_CD@/messenger/
   locale/@AB_CD@/messenger/aboutDialog.dtd                              (%chrome/messenger/aboutDialog.dtd)
@@ -73,7 +77,7 @@
   locale/@AB_CD@/messenger/msgHdrViewOverlay.dtd                        (%chrome/messenger/msgHdrViewOverlay.dtd)
   locale/@AB_CD@/messenger/editContactOverlay.dtd                       (%chrome/messenger/editContactOverlay.dtd)
   locale/@AB_CD@/messenger/editContactOverlay.properties                (%chrome/messenger/editContactOverlay.properties)
-  locale/@AB_CD@/messenger/extensionsOverlay.dtd                        (%chrome/messenger/extensionsOverlay.dtd)
+  locale/@AB_CD@/messenger/extensionsOverlay.properties                 (%chrome/messenger/extensionsOverlay.properties)
   locale/@AB_CD@/messenger/mailEditorOverlay.dtd                        (%chrome/messenger/mailEditorOverlay.dtd)
   locale/@AB_CD@/messenger/msgSynchronize.dtd                           (%chrome/messenger/msgSynchronize.dtd)
   locale/@AB_CD@/messenger/offline.properties                           (%chrome/messenger/offline.properties)
@@ -206,8 +210,6 @@
   locale/@AB_CD@/messenger/imAccounts.properties                        (%chrome/messenger/imAccounts.properties)
   locale/@AB_CD@/messenger/imAccountWizard.dtd                          (%chrome/messenger/imAccountWizard.dtd)
   locale/@AB_CD@/messenger/sanitize.dtd									(%chrome/messenger/sanitize.dtd)
-  locale/@AB_CD@/messenger/searchplugins/list.json                      (.deps/generated_@AB_CD@/list.json)
-  locale/@AB_CD@/messenger/searchplugins/                               (.deps/generated_@AB_CD@/*.xml)
 % locale messenger-mapi @AB_CD@ %locale/@AB_CD@/messenger-mapi/
   locale/@AB_CD@/messenger-mapi/mapi.properties                         (%chrome/messenger-mapi/mapi.properties)
 % locale messenger-newsblog @AB_CD@ %locale/@AB_CD@/messenger-newsblog/

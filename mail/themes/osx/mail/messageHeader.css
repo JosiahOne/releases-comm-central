@@ -287,22 +287,6 @@ toolbar[mode="icons"] > #otherActionsButton > .toolbarbutton-menu-dropmarker >
   min-height: 10px;
 }
 
-.inline-toolbar {
-  -moz-appearance: none;
-  -moz-box-pack: end;
-  min-width: 50px;
-  min-height: 14px;
-}
-
-.inline-toolbar toolbarseparator {
-  height: 20px;
-  margin-top: 2px;
-}
-
-.inline-toolbar toolbarspacer {
-  height: 22px;
-}
-
 #msgHeaderView textbox {
   color: inherit;
 }
@@ -326,11 +310,8 @@ toolbar[mode="icons"] > #otherActionsButton > .toolbarbutton-menu-dropmarker >
 .headerValue {
   min-width: 50px;
   white-space: normal;
-  color: black !important;
   line-height: 1.5em;
-
   -moz-appearance: none !important;
-
   padding: .1em 0px !important;
   margin: 0px !important;
   margin-bottom: 3px !important;
@@ -424,12 +405,6 @@ mail-emailaddress[selected="true"] > .emailDisplayButton {
   max-height: 7px; /* the height of the image */
   margin: 0.2em 2px 0; /* 0.2em just to move it off the top of the text */
   list-style-image: url("chrome://messenger/skin/icons/arrow-dn-7.png");
-}
-
-/* ::::: view expand and collapse twisties  ::::: */
-
-.expandHeaderViewButton {
-  list-style-image:url("chrome://messenger/skin/icons/twisty-open.gif");
 }
 
 /* ::::: collapsed view styles ::::: */

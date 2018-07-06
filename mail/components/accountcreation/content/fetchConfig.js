@@ -13,7 +13,6 @@ ChromeUtils.import("resource:///modules/mailServices.js");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource:///modules/JXON.js");
 
-
 function fetchConfigFromDisk(domain, successCallback, errorCallback)
 {
   return new TimeoutAbortable(runAsync(function()
@@ -24,10 +23,13 @@ function fetchConfigFromDisk(domain, successCallback, errorCallback)
       configLocation.append("isp");
       configLocation.append(sanitize.hostname(domain) + ".xml");
 
+      if (!configLocation.exists() || !configLocation.isReadable()) {
+        errorCallback("local file not found");
+        return;
+      }
       var contents =
         readURLasUTF8(Services.io.newFileURI(configLocation));
-      let domParser = Cc["@mozilla.org/xmlextras/domparser;1"]
-                       .createInstance(Ci.nsIDOMParser);
+      let domParser = new DOMParser();
       successCallback(readFromXML(JXON.build(
         domParser.parseFromString(contents, "text/xml"))));
     } catch (e) { errorCallback(e); }

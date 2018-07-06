@@ -226,7 +226,7 @@ ContactIdentityCompleter.prototype = {
 
     let contactQuery = Gloda.newQuery(Gloda.NOUN_CONTACT);
     contactQuery.nameLike(contactQuery.WILDCARD, aString,
-	contactQuery.WILDCARD);
+                          contactQuery.WILDCARD);
     pending.contactColl = contactQuery.getCollection(this, aResult);
     pending.contactColl.becomeExplicit();
 
@@ -498,7 +498,7 @@ function nsAutoCompleteGloda() {
 
 nsAutoCompleteGloda.prototype = {
   classID: Components.ID("{3bbe4d77-3f70-4252-9500-bc00c26f476d}"),
-  QueryInterface: XPCOMUtils.generateQI([
+  QueryInterface: ChromeUtils.generateQI([
       Ci.nsIAutoCompleteSearch]),
 
   startSearch: function(aString, aParam, aResult, aListener) {

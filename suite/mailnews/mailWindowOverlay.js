@@ -1129,7 +1129,7 @@ BatchMessageMover.prototype =
       let server = msgHdr.folder.server;
       let msgDate = new Date(msgHdr.date / 1000);  // convert date to JS date object
       let msgYear = msgDate.getFullYear().toString();
-      let monthFolderName = msgDate.toLocaleFormat("%Y-%m");
+      let monthFolderName = msgYear + "-" + (msgDate.getMonth() + 1).toString().padStart(2, "0");
 
       let archiveFolderUri;
       let archiveGranularity;
@@ -2600,7 +2600,7 @@ var gMessageNotificationBar =
 
   remoteOrigins: null,
 
-  setRemoteContentMsg: function(aMsgHdr, aContentURI)
+  setRemoteContentMsg: function(aMsgHdr, aContentURI, aCanOverride)
   {
     // remoteOrigins is a Set of all blockable Origins.
     if (!this.remoteOrigins)
@@ -2640,7 +2640,7 @@ var gMessageNotificationBar =
                             "remoteContent",
                             null,
                             this.mMsgNotificationBar.PRIORITY_WARNING_MEDIUM,
-                            buttons);
+                            (aCanOverride ? buttons : []));
   },
 
   // aUrl is the nsIURI for the message currently loaded in the message pane
@@ -2786,7 +2786,7 @@ function onRemoteContentOptionsShowing(aEvent)
 
 /**
  * Add privileges to display remote content for the given uri.
- * @param aItem |nsIDOMNode| Item that was selected. The origin
+ * @param aItem |Node| Item that was selected. The origin
  *        is extracted and converted to a uri and used to add
  *        permissions for the site.
  */

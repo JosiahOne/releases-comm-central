@@ -24,9 +24,23 @@ chat/**
 editor/**
 im/**
 ldap/**
-mail/**
 mailnews/**
 suite/**
+
+# mail exclusions
+mail/app/**
+mail/base/**
+mail/branding/**
+mail/config/**
+mail/extensions/**
+mail/installer/**
+mail/locales/**
+mail/test/**
+mail/themes/**
+
+# mail/components exclusions
+mail/components/*
+!mail/components/extensions
 
 # calendar/ exclusions
 
@@ -36,7 +50,3 @@ calendar/locales/en-US/lightning-l10n.js
 
 # third party library
 calendar/base/modules/ical.js
-
-# preprocessed files
-calendar/base/content/dialogs/calendar-migration-dialog.js
-calendar/base/content/calendar-dnd-listener.js

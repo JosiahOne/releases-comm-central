@@ -98,7 +98,7 @@ httpRequestObserver.prototype = {
     return null;
   },
 
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver]),
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIObserver]),
 }
 
 /**
@@ -174,8 +174,7 @@ TracingListener.prototype = {
       let data = this.chunks.join("");
 
       // Attempt to derive email account information
-      let domParser = Cc["@mozilla.org/xmlextras/domparser;1"]
-                       .createInstance(Ci.nsIDOMParser);
+      let domParser = new DOMParser();
       let accountConfig = accountCreationFuncs.readFromXML(JXON.build(
         domParser.parseFromString(data, "text/xml")));
       accountCreationFuncs.replaceVariables(accountConfig,
@@ -242,7 +241,7 @@ TracingListener.prototype = {
                                      aOffset, aCount);
   },
 
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIStreamListener,
-                                         Ci.nsIRequestObserver])
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIStreamListener,
+                                          Ci.nsIRequestObserver])
 
 }

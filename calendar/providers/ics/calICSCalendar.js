@@ -7,8 +7,6 @@ ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calProviderUtils.jsm");
 
 //
 // calICSCalendar.js
@@ -51,9 +49,9 @@ var calICSCalendarInterfaces = [
     Components.interfaces.nsIInterfaceRequestor,
 ];
 calICSCalendar.prototype = {
-    __proto__: cal.ProviderBase.prototype,
+    __proto__: cal.provider.BaseClass.prototype,
     classID: calICSCalendarClassID,
-    QueryInterface: XPCOMUtils.generateQI(calICSCalendarInterfaces),
+    QueryInterface: cal.generateQI(calICSCalendarInterfaces),
     classInfo: XPCOMUtils.generateCI({
         classID: calICSCalendarClassID,
         contractID: "@mozilla.org/calendar/calendar;1?type=ics",
@@ -81,7 +79,7 @@ calICSCalendar.prototype = {
     },
 
     get displayName() {
-        return cal.calGetString("calendar", "icsName");
+        return cal.l10n.getCalString("icsName");
     },
 
     createCalendar: function() {
@@ -238,13 +236,9 @@ calICSCalendar.prototype = {
         // This conversion is needed, because the stream only knows about
         // byte arrays, not about strings or encodings. The array of bytes
         // need to be interpreted as utf8 and put into a javascript string.
-        let unicodeConverter = Components.classes["@mozilla.org/intl/scriptableunicodeconverter"]
-                                         .createInstance(Components.interfaces.nsIScriptableUnicodeConverter);
-        // ics files are always utf8
-        unicodeConverter.charset = "UTF-8";
         let str;
         try {
-            str = unicodeConverter.convertFromByteArray(result, result.length);
+            str = new TextDecoder().decode(Uint8Array.from(result));
         } catch (e) {
             this.mObserver.onError(this.superCalendar, calIErrors.CAL_UTF8_DECODING_FAILED, e.toString());
             this.mObserver.onError(this.superCalendar, calIErrors.READ_FAILED, "");
@@ -310,7 +304,7 @@ calICSCalendar.prototype = {
         let self = this;
         let listener = {
             serializer: null,
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
             onOperationComplete: function(aCalendar, aStatus, aOperationType, aId, aDetail) {
                 let inLastWindowClosingSurvivalArea = false;
                 try {
@@ -516,7 +510,7 @@ calICSCalendar.prototype = {
             this.mAction = action;
         }
         modListener.prototype = {
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
             onGetResult: function() {},
             onOperationComplete: function() {
                 this.mAction.opCompleteArgs = arguments;
@@ -617,7 +611,7 @@ calICSCalendar.prototype = {
      * @see nsIInterfaceRequestor
      * @see calProviderUtils.jsm
      */
-    getInterface: cal.InterfaceRequestor_getInterface,
+    getInterface: cal.provider.InterfaceRequestor_getInterface,
 
     /**
      * Make a backup of the (remote) calendar
@@ -726,7 +720,7 @@ calICSCalendar.prototype = {
 
         let backupDir;
         try {
-            backupDir = cal.getCalendarDirectory();
+            backupDir = cal.provider.getCalendarDirectory();
             backupDir.append("backup");
             if (!backupDir.exists()) {
                 backupDir.create(Ci.nsIFile.DIRECTORY_TYPE, parseInt("0755", 8));
@@ -1006,14 +1000,9 @@ httpHooks.prototype = {
             let self = this; // need to reference in callback
 
             etagListener.onStreamComplete = function(aLoader, aContext, aStatus, aResultLength, aResult) {
-                let resultConverter = Components.classes["@mozilla.org/intl/scriptableunicodeconverter"]
-                                                .createInstance(Components
-                                                .interfaces.nsIScriptableUnicodeConverter);
-                resultConverter.charset = "UTF-8";
-
                 let multistatus;
                 try {
-                    let str = resultConverter.convertFromByteArray(aResult, aResultLength);
+                    let str = new TextDecoder().decode(Uint8Array.from(aResult));
                     multistatus = cal.xml.parseString(str);
                 } catch (ex) {
                     cal.LOG("[calICSCalendar] Failed to fetch channel etag");
@@ -1029,16 +1018,16 @@ httpHooks.prototype = {
                   "</D:prop>" +
                 "</D:propfind>";
 
-            let etagChannel = cal.prepHttpChannel(aChannel.URI, queryXml,
-                                                  "text/xml; charset=utf-8",
-                                                  this);
+            let etagChannel = cal.provider.prepHttpChannel(aChannel.URI, queryXml,
+                                                           "text/xml; charset=utf-8",
+                                                           this);
             etagChannel.setRequestHeader("Depth", "0", false);
             etagChannel.requestMethod = "PROPFIND";
             let streamLoader = Components.classes["@mozilla.org/network/stream-loader;1"]
                                          .createInstance(Components.interfaces
                                          .nsIStreamLoader);
 
-            cal.sendHttpRequest(streamLoader, etagChannel, etagListener);
+            cal.provider.sendHttpRequest(streamLoader, etagChannel, etagListener);
         }
         return true;
     },

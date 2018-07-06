@@ -163,7 +163,7 @@ net_pop3_load_state(const char* searchhost,
     return nullptr;
   }
 
-  nsCOMPtr <nsIFile> popState;
+  nsCOMPtr<nsIFile> popState;
   mailDirectory->Clone(getter_AddRefs(popState));
   if (!popState)
     return nullptr;
@@ -171,6 +171,11 @@ net_pop3_load_state(const char* searchhost,
 
   nsCOMPtr<nsIInputStream> fileStream;
   nsresult rv = NS_NewLocalFileInputStream(getter_AddRefs(fileStream), popState);
+  // It is OK if the file doesn't exist. No state is stored yet.
+  // Return empty list without warning.
+  if (rv == NS_ERROR_FILE_NOT_FOUND)
+    return result;
+  // Warn for other errors.
   NS_ENSURE_SUCCESS(rv, result);
 
   nsCOMPtr<nsILineInputStream> lineInputStream(do_QueryInterface(fileStream, &rv));
@@ -716,7 +721,7 @@ Pop3StatesEnum nsPop3Protocol::GetNextPasswordObtainState()
     return POP3_FINISH_OBTAIN_PASSWORD_BEFORE_PASSWORD;
   default:
     // Should never get here.
-    NS_NOTREACHED("Invalid next_state in GetNextPasswordObtainState");
+    MOZ_ASSERT_UNREACHABLE("Invalid next_state in GetNextPasswordObtainState");
   }
   return POP3_ERROR_DONE;
 }
@@ -931,7 +936,7 @@ NS_IMETHODIMP nsPop3Protocol::OnPromptStart(bool *aResult)
 
 NS_IMETHODIMP nsPop3Protocol::OnPromptAuthAvailable()
 {
-  NS_NOTREACHED("Did not expect to get POP3 protocol queuing up auth "
+  MOZ_ASSERT_UNREACHABLE("Did not expect to get POP3 protocol queuing up auth "
                 "connections for same server");
   return NS_OK;
 }

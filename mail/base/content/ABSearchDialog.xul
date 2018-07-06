@@ -4,6 +4,7 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<?xml-stylesheet href="chrome://messenger/content/bindings.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/searchDialog.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/addressbook/abResultsPane.css" type="text/css"?>
 
@@ -62,7 +63,7 @@
         <hbox align="center">
           <label value="&abSearchHeading.label;" accesskey="&abSearchHeading.accesskey;" control="abPopup"/>
           <menulist id="abPopup" oncommand="SelectDirectory(this.value);">
-            <menupopup id="abPopup-menupopup" class="addrbooksPopup"/>
+            <menupopup id="abPopup-menupopup" class="addrbooksPopup" alladdressbooks="true"/>
           </menulist>
           <spacer flex="10"/>
           <button id="search-button" oncommand="onSearchButton(event);" default="true"/>

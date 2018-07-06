@@ -92,7 +92,7 @@ function onLoad()
 
 function setupSearchRows(aSearchTerms)
 {
-  if (aSearchTerms && aSearchTerms.Count() > 0)
+  if (aSearchTerms && aSearchTerms.length > 0)
     initializeSearchRows(nsMsgSearchScope.offlineMail, aSearchTerms); // load the search terms for the folder
   else
     onMore(null);
@@ -140,7 +140,7 @@ function InitDialogWithVirtualFolder(aVirtualFolder)
   let folderBundle = document.getElementById("bundle_folder");
   let name = folderBundle.getFormattedString("verboseFolderFormat",
                [aVirtualFolder.prettyName, aVirtualFolder.server.prettyName]);
-  folderNameField.setAttribute("label", name);
+  folderNameField.setAttribute("value", name);
   // update the window title based on the name of the saved search
   document.title = gMessengerBundle.getFormattedString("editVirtualFolderPropertiesTitle",
                                                        [aVirtualFolder.prettyName]);

@@ -8,9 +8,9 @@ transforms:
     - taskgraph.transforms.name_sanity:transforms
     - taskgraph.transforms.beetmover_repackage_l10n:transforms
     - taskgraph.transforms.beetmover_repackage:transforms
-    - taskgraph.transforms.release_notifications:transforms
     - taskgraph.transforms.task:transforms
     - comm_taskgraph:remove_widevine_and_stub_installer
+    - comm_taskgraph:beetmover_add_langpack
 
 kind-dependencies:
     - repackage-signing

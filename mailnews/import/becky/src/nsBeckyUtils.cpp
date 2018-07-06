@@ -9,7 +9,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
 #include "nsString.h"
-#include "nsIUTF8ConverterService.h"
+#include "nsMsgI18N.h"
 #include "nsUConvCID.h"
 #include "nsNativeCharsetUtils.h"
 #include "nsIInputStream.h"
@@ -28,6 +28,7 @@
 #include "nsThreadUtils.h"
 
 #include "nsBeckyUtils.h"
+#include "SpecialSystemDirectory.h"
 
 nsresult
 nsBeckyUtils::FindUserDirectoryOnWindows7(nsIFile **aLocation)
@@ -36,9 +37,9 @@ nsBeckyUtils::FindUserDirectoryOnWindows7(nsIFile **aLocation)
 
   nsresult rv;
   nsCOMPtr<nsIFile> directory;
-  rv = GetSpecialDirectoryWithFileName(NS_WIN_DOCUMENTS_DIR,
-                                       "Becky",
-                                       getter_AddRefs(directory));
+  rv = GetSpecialSystemDirectory(Win_Documents, getter_AddRefs(directory));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = directory->AppendNative(NS_LITERAL_CSTRING("Becky"));
   NS_ENSURE_SUCCESS(rv, rv);
 
   bool exists = false;

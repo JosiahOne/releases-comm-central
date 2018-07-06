@@ -6,7 +6,6 @@ ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calProviderUtils.jsm");
 
 var REGISTRY_BRANCH = "calendar.registry.";
 var DB_SCHEMA_VERSION = 10;
@@ -27,7 +26,7 @@ var calCalendarManagerInterfaces = [
 ];
 calCalendarManager.prototype = {
     classID: calCalendarManagerClassID,
-    QueryInterface: XPCOMUtils.generateQI(calCalendarManagerInterfaces),
+    QueryInterface: cal.generateQI(calCalendarManagerInterfaces),
     classInfo: XPCOMUtils.generateCI({
         classID: calCalendarManagerClassID,
         contractID: "@mozilla.org/calendar/manager;1",
@@ -402,11 +401,11 @@ calCalendarManager.prototype = {
     alertAndQuit: function() {
         // We want to include the extension name in the error message rather
         // than blaming Thunderbird.
-        let hostAppName = cal.calGetString("brand", "brandShortName", null, "branding");
-        let calAppName = cal.calGetString("lightning", "brandShortName", null, "lightning");
-        let errorBoxTitle = cal.calGetString("calendar", "tooNewSchemaErrorBoxTitle", [calAppName]);
-        let errorBoxText = cal.calGetString("calendar", "tooNewSchemaErrorBoxTextLightning", [calAppName, hostAppName]);
-        let errorBoxButtonLabel = cal.calGetString("calendar", "tooNewSchemaButtonRestart", [hostAppName]);
+        let hostAppName = cal.l10n.getAnyString("branding", "brand", "brandShortName");
+        let calAppName = cal.l10n.getLtnString("brandShortName");
+        let errorBoxTitle = cal.l10n.getCalString("tooNewSchemaErrorBoxTitle", [calAppName]);
+        let errorBoxText = cal.l10n.getCalString("tooNewSchemaErrorBoxTextLightning", [calAppName, hostAppName]);
+        let errorBoxButtonLabel = cal.l10n.getCalString("tooNewSchemaButtonRestart", [hostAppName]);
 
         let promptSvc = Services.prompt;
 
@@ -459,10 +458,10 @@ calCalendarManager.prototype = {
                     this.alertAndQuit();
                     return null;
                 case Components.interfaces.calIErrors.STORAGE_UNKNOWN_TIMEZONES_ERROR:
-                    uiMessage = cal.calGetString("calendar", "unknownTimezonesError", [uri.spec]);
+                    uiMessage = cal.l10n.getCalString("unknownTimezonesError", [uri.spec]);
                     break;
                 default:
-                    uiMessage = cal.calGetString("calendar", "unableToCreateProvider", [uri.spec]);
+                    uiMessage = cal.l10n.getCalString("unableToCreateProvider", [uri.spec]);
                     break;
             }
             // Log the original exception via error console to provide more debug info
@@ -809,7 +808,7 @@ calMgrCalendarObserver.prototype = {
     storedReadOnly: null,
     calMgr: null,
 
-    QueryInterface: XPCOMUtils.generateQI([
+    QueryInterface: ChromeUtils.generateQI([
         Components.interfaces.nsIWindowMediatorListener,
         Components.interfaces.calIObserver
     ]),
@@ -955,8 +954,8 @@ calMgrCalendarObserver.prototype = {
                 message = props.GetStringFromName("icsMalformedError");
                 break;
             case calIErrors.MODIFICATION_FAILED:
-                errMsg = cal.calGetString("calendar", "errorWriting2", [aCalendar.name]);
-                message = cal.calGetString("calendar", "errorWritingDetails");
+                errMsg = cal.l10n.getCalString("errorWriting2", [aCalendar.name]);
+                message = cal.l10n.getCalString("errorWritingDetails");
                 if (aMessage) {
                     message = aMessage + "\n" + message;
                 }
@@ -971,8 +970,8 @@ calMgrCalendarObserver.prototype = {
         paramBlock.SetString(2, message);
 
         this.storedReadOnly = this.calendar.readOnly;
-        let errorCode = cal.calGetString("calendar", "errorCode", [errCode]);
-        let errorDescription = cal.calGetString("calendar", "errorDescription", [message]);
+        let errorCode = cal.l10n.getCalString("errorCode", [errCode]);
+        let errorDescription = cal.l10n.getCalString("errorDescription", [message]);
         let summary = errMsg + " " + errorCode + ". " + errorDescription;
 
         // Log warnings in error console.
@@ -1030,7 +1029,7 @@ function calDummyCalendar(type) {
     this.type = type;
 }
 calDummyCalendar.prototype = {
-    __proto__: cal.ProviderBase.prototype,
+    __proto__: cal.provider.BaseClass.prototype,
 
     getProperty: function(aName) {
         switch (aName) {

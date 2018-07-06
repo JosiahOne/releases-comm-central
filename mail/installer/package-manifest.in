@@ -50,6 +50,7 @@
 [@AB_CD@]
 @RESPATH@/@PREF_DIR@/all-l10n.js
 @RESPATH@/dictionaries/*
+@RESPATH@/localization/*
 #ifdef MOZ_BUNDLED_FONTS
 @RESPATH@/fonts/*
 #endif
@@ -158,7 +159,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @RESPATH@/defaults/messenger/mailViews.dat
 @RESPATH@/defaults/profile/prefs.js
-@RESPATH@/defaults/profile/mimeTypes.rdf
 
 @RESPATH@/isp/*
 
@@ -186,6 +186,9 @@
 @RESPATH@/chrome/toolkit.manifest
 @RESPATH@/chrome/comm@JAREXT@
 @RESPATH@/chrome/comm.manifest
+; Browser: Hack to get built_in_addons.json packaged
+@RESPATH@/chrome/browser@JAREXT@
+@RESPATH@/chrome/browser.manifest
 @RESPATH@/chrome/messenger@JAREXT@
 @RESPATH@/chrome/messenger.manifest
 #ifndef XP_UNIX
@@ -196,10 +199,6 @@
 #elifdef UNIX_BUT_NOT_MAC
 @RESPATH@/chrome/icons/default/*.png
 #endif
-@RESPATH@/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/install.rdf
-@RESPATH@/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/icon.png
-@RESPATH@/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/icon64.png
-@RESPATH@/extensions/{972ce4c6-7e08-4474-a285-3208198ce6fd}/chrome.manifest
 
 ; Gloda
 @RESPATH@/chrome/gloda@JAREXT@
@@ -318,8 +317,9 @@
 @RESPATH@/defaults/pref/mdn.js
 @RESPATH@/defaults/pref/smime.js
 @RESPATH@/defaults/pref/thunderbird-branding.js
-@RESPATH@/defaults/blocklists
-@RESPATH@/defaults/pinning
+@RESPATH@/defaults/settings/blocklists
+@RESPATH@/defaults/settings/pinning
+@RESPATH@/defaults/settings/main
 @RESPATH@/greprefs.js
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -412,7 +412,6 @@
 @RESPATH@/components/addonManager.js
 @RESPATH@/components/amContentHandler.js
 @RESPATH@/components/amInstallTrigger.js
-@RESPATH@/components/nsBlocklistService.js
 #ifdef MOZ_UPDATER
 @RESPATH@/components/nsUpdateService.manifest
 @RESPATH@/components/nsUpdateService.js
@@ -475,6 +474,7 @@
 @RESPATH@/components/CaptivePortalDetectComponents.manifest
 @RESPATH@/components/captivedetect.js
 @RESPATH@/components/servicesComponents.manifest
+@RESPATH@/components/servicesSettings.manifest
 @RESPATH@/components/cryptoComponents.manifest
 @RESPATH@/components/TelemetryStartup.js
 @RESPATH@/components/TelemetryStartup.manifest
@@ -491,6 +491,9 @@
 
 @RESPATH@/components/SlowScriptDebug.manifest
 @RESPATH@/components/SlowScriptDebug.js
+
+@RESPATH@/components/ClearDataService.manifest
+@RESPATH@/components/ClearDataService.js
 
 #ifdef MOZ_WEBRTC
 @RESPATH@/components/PeerConnection.js
@@ -572,6 +575,7 @@
 ; [Extensions]
 @RESPATH@/components/extensions-toolkit.manifest
 @RESPATH@/components/extension-process-script.js
+@RESPATH@/components/extensions-mail.manifest
 
 ; [Personal Security Manager]
 ;
@@ -662,7 +666,7 @@
 
 ; NOTE: This must match the config checks in
 ; /toolkit/components/backgroundhangmonitor/moz.build.
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_DEBUG) && !defined(MOZ_TSAN)
+#if defined(NIGHTLY_BUILD) && !defined(MOZ_DEBUG) && !defined(MOZ_TSAN) && !defined(MOZ_ASAN)
 @RESPATH@/components/BHRTelemetryService.js
 @RESPATH@/components/BHRTelemetryService.manifest
 #endif

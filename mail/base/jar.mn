@@ -9,22 +9,13 @@ messenger.jar:
 % override chrome://browser/content/browser-development-helpers.js chrome://messenger/content/browser-development-helpers.js
   content/messenger/browser-development-helpers.js (../../common/src/browser-development-helpers.js)
 #endif
-% overlay chrome://global/content/config.xul chrome://messenger/content/configEditorOverlay.xul
-% overlay about:addons chrome://messenger/content/extensionsOverlay.xul
-% style about:addons chrome://messenger/content/extensionsOverlay.css
-% style chrome://messenger/content/customizeToolbar.xul chrome://messenger/content/messenger.css
-% style chrome://messenger/content/customizeToolbar.xul chrome://messenger/skin/
-% style chrome://messenger/content/customizeToolbar.xul chrome://messenger/skin/addressbook/addressbook.css
-% style chrome://messenger/content/customizeToolbar.xul chrome://messenger/skin/messengercompose/messengercompose.css
-% style chrome://messenger/content/customizeToolbar.xul chrome://messenger/skin/smime/msgCompSMIMEOverlay.css
-% style chrome://messenger/content/customizeToolbar.xul chrome://messenger/skin/messageHeader.css
-% style chrome://messenger/content/customizeToolbar.xul chrome://messenger/skin/primaryToolbar.css
     content/messenger/mailWindow.js                 (content/mailWindow.js)
     content/messenger/messageDisplay.js             (content/messageDisplay.js)
+    content/messenger/extensions.xml                (content/extensions.xml)
     content/messenger/extensionsOverlay.css         (content/extensionsOverlay.css)
-    content/messenger/extensionsOverlay.xul         (content/extensionsOverlay.xul)
     content/messenger/folderDisplay.js              (content/folderDisplay.js)
     content/messenger/mailWindowOverlay.js          (content/mailWindowOverlay.js)
+    content/messenger/mail-compacttheme.js          (content/mail-compacttheme.js)
 *   content/messenger/mailOverlay.xul               (content/mailOverlay.xul)
 *   content/messenger/messageWindow.xul             (content/messageWindow.xul)
     content/messenger/messageWindow.js              (content/messageWindow.js)
@@ -43,11 +34,13 @@ messenger.jar:
     content/messenger/viewSource.js                 (../../common/src/viewSource.js)
 *   content/messenger/viewSource.xul                (../../common/src/viewSource.xul)
 *   content/messenger/datetimepicker.xml            (../../common/bindings/datetimepicker.xml)
+    content/messenger/listbox.xml                   (../../common/bindings/listbox.xml)
     content/messenger/numberbox.xml                 (../../common/bindings/numberbox.xml)
     content/messenger/generalBindings.xml           (../../common/bindings/generalBindings.xml)
 *   content/messenger/spinbuttons.xml               (../../common/bindings/spinbuttons.xml)
 *   content/messenger/textbox.xml                   (../../common/bindings/textbox.xml)
 *   content/messenger/toolbar.xml                   (../../common/bindings/toolbar.xml)
+    content/messenger/attachmentList.css            (content/attachmentList.css)
 *   content/messenger/bindings.css                  (content/bindings.css)
     content/messenger/nsDragAndDrop.js              (content/nsDragAndDrop.js)
     content/messenger/editContactPanel.js           (content/editContactPanel.js)
@@ -82,11 +75,12 @@ messenger.jar:
     content/messenger/tabmail.css                   (content/tabmail.css)
     content/messenger/newTagDialog.xul              (content/newTagDialog.xul)
     content/messenger/newTagDialog.js               (content/newTagDialog.js)
-    content/messenger/configEditorOverlay.xul       (content/configEditorOverlay.xul)
     content/messenger/composerOverlay.css           (content/composerOverlay.css)
     content/messenger/threadPane.js                 (content/threadPane.js)
     content/messenger/threadPaneColumnPicker.xml    (content/threadPaneColumnPicker.xml)
     content/messenger/protovis-r2.6-modded.js       (content/protovis-r2.6-modded.js)
+    content/messenger/dark.icon.svg                 (content/dark.icon.svg)
+    content/messenger/light.icon.svg                (content/light.icon.svg)
 #ifdef XP_MACOSX
     content/messenger/macMessengerMenu.js           (content/macMessengerMenu.js)
 #endif

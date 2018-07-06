@@ -38,9 +38,9 @@ public:
                                uint32_t aNewFlags, nsIDBChangeListener *aInstigator) override;
 
   NS_IMETHOD LoadMessageByViewIndex(nsMsgViewIndex aViewIndex) override;
-  NS_IMETHOD GetCellProperties(int32_t aRow, nsITreeColumn *aCol, nsAString& aProperties) override;
+  NS_IMETHOD GetCellProperties(int32_t aRow, nsTreeColumn *aCol, nsAString& aProperties) override;
   NS_IMETHOD GetRowProperties(int32_t aRow, nsAString& aProperties) override;
-  NS_IMETHOD CellTextForColumn(int32_t aRow, const char16_t *aColumnName,
+  NS_IMETHOD CellTextForColumn(int32_t aRow, const nsAString& aColumnName,
                                nsAString &aValue) override;
   NS_IMETHOD GetThreadContainingMsgHdr(nsIMsgDBHdr *msgHdr, nsIMsgThread **pThread) override;
   NS_IMETHOD AddColumnHandler(const nsAString& column, nsIMsgCustomColumnHandler* handler) override;

@@ -13,6 +13,7 @@
 #include "nsIMsgWindow.h"
 #include "nsIMimeMiscStatus.h"
 #include "nsIMsgHdr.h"
+#include "nsIEncryptedSMIMEURIsSrvc.h"
 #include "nsNetUtil.h"
 #include "nsIMsgComposeService.h"
 #include "nsMsgCompCID.h"
@@ -28,6 +29,7 @@
 #include "mozilla/dom/HTMLImageElement.h"
 #include "nsINntpUrl.h"
 #include "nsILoadInfo.h"
+#include "nsSandboxFlags.h"
 
 static const char kBlockRemoteImages[] = "mailnews.message_display.disable_remote_image";
 static const char kTrustedDomains[] =  "mail.trusteddomains";
@@ -147,10 +149,11 @@ nsMsgContentPolicy::ShouldLoad(nsIURI           *aContentLocation,
 {
   nsresult rv = NS_OK;
   uint32_t aContentType = aLoadInfo->GetExternalContentPolicyType();
-  nsCOMPtr<nsISupports> aRequestingContext
-    = aContentType == nsIContentPolicy::TYPE_DOCUMENT ?
-      aLoadInfo->ContextForTopLevelLoad() :
-      aLoadInfo->LoadingNode();
+  nsCOMPtr<nsISupports> aRequestingContext;
+  if (aContentType == nsIContentPolicy::TYPE_DOCUMENT)
+    aRequestingContext = aLoadInfo->ContextForTopLevelLoad();
+  else
+    aRequestingContext = aLoadInfo->LoadingNode();
   nsCOMPtr<nsIPrincipal> aRequestPrincipal = aLoadInfo->TriggeringPrincipal();
   nsCOMPtr<nsIPrincipal> loadingPrincipal = aLoadInfo->LoadingPrincipal();
   nsCOMPtr<nsIURI> aRequestingLocation;
@@ -305,26 +308,6 @@ nsMsgContentPolicy::ShouldLoad(nsIURI           *aContentLocation,
   if (ShouldBlockUnexposedProtocol(aContentLocation))
     return NS_OK;
 
-  // If we are allowing all remote content...
-  if (!mBlockRemoteImages)
-  {
-    *aDecision = nsIContentPolicy::ACCEPT;
-    return NS_OK;
-  }
-
-  // Extract the windowtype to handle compose windows separately from mail
-  if (aRequestingContext)
-  {
-    nsCOMPtr<nsIMsgCompose> msgCompose =
-      GetMsgComposeForContext(aRequestingContext);
-    // Work out if we're in a compose window or not.
-    if (msgCompose)
-    {
-      ComposeShouldLoad(msgCompose, aRequestingContext, aContentLocation,
-                        aDecision);
-      return NS_OK;
-    }
-  }
 
   // Find out the URI that originally initiated the set of requests for this
   // context.
@@ -346,6 +329,41 @@ nsMsgContentPolicy::ShouldLoad(nsIURI           *aContentLocation,
 #ifdef DEBUG_MsgContentPolicy
   fprintf(stderr, "originatorLocation = %s\n", originatorLocation->GetSpecOrDefault().get());
 #endif
+
+  // Don't load remote content for encrypted messages.
+  nsCOMPtr<nsIEncryptedSMIMEURIsService> encryptedURIService =
+    do_GetService("@mozilla.org/messenger-smime/smime-encrypted-uris-service;1", &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+  bool isEncrypted;
+  rv = encryptedURIService->IsEncrypted(aRequestingLocation->GetSpecOrDefault(), &isEncrypted);
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (isEncrypted)
+  {
+    *aDecision = nsIContentPolicy::REJECT_REQUEST;
+    NotifyContentWasBlocked(originatorLocation, aContentLocation, false);
+    return NS_OK;
+  }
+
+  // If we are allowing all remote content...
+  if (!mBlockRemoteImages)
+  {
+    *aDecision = nsIContentPolicy::ACCEPT;
+    return NS_OK;
+  }
+
+  // Extract the windowtype to handle compose windows separately from mail
+  if (aRequestingContext)
+  {
+    nsCOMPtr<nsIMsgCompose> msgCompose =
+      GetMsgComposeForContext(aRequestingContext);
+    // Work out if we're in a compose window or not.
+    if (msgCompose)
+    {
+      ComposeShouldLoad(msgCompose, aRequestingContext, aContentLocation,
+                        aDecision);
+      return NS_OK;
+    }
+  }
 
   // Allow content when using a remote page.
   bool isHttp;
@@ -543,9 +561,10 @@ class RemoteContentNotifierEvent : public mozilla::Runnable
 {
 public:
   RemoteContentNotifierEvent(nsIMsgWindow *aMsgWindow, nsIMsgDBHdr *aMsgHdr,
-                             nsIURI *aContentURI)
+                             nsIURI *aContentURI, bool aCanOverride = true)
     : mozilla::Runnable("RemoteContentNotifierEvent")
-    , mMsgWindow(aMsgWindow), mMsgHdr(aMsgHdr), mContentURI(aContentURI)
+    , mMsgWindow(aMsgWindow), mMsgHdr(aMsgHdr), mContentURI(aContentURI),
+    mCanOverride(aCanOverride)
   {}
 
   NS_IMETHOD Run()
@@ -555,7 +574,7 @@ public:
       nsCOMPtr<nsIMsgHeaderSink> msgHdrSink;
       (void)mMsgWindow->GetMsgHeaderSink(getter_AddRefs(msgHdrSink));
       if (msgHdrSink)
-        msgHdrSink->OnMsgHasRemoteContent(mMsgHdr, mContentURI);
+        msgHdrSink->OnMsgHasRemoteContent(mMsgHdr, mContentURI, mCanOverride);
     }
     return NS_OK;
   }
@@ -564,7 +583,61 @@ private:
   nsCOMPtr<nsIMsgWindow> mMsgWindow;
   nsCOMPtr<nsIMsgDBHdr> mMsgHdr;
   nsCOMPtr<nsIURI> mContentURI;
+  bool mCanOverride;
 };
+
+/**
+ * This function is used to show a blocked remote content notification.
+ */
+void
+nsMsgContentPolicy::NotifyContentWasBlocked(nsIURI *aOriginatorLocation,
+                                            nsIURI *aContentLocation,
+                                            bool aCanOverride)
+{
+  // Is it a mailnews url?
+  nsresult rv;
+  nsCOMPtr<nsIMsgMessageUrl> msgUrl(do_QueryInterface(aOriginatorLocation,
+                                                      &rv));
+  if (NS_FAILED(rv))
+  {
+    return;
+  }
+
+  nsCString resourceURI;
+  rv = msgUrl->GetUri(getter_Copies(resourceURI));
+  NS_ENSURE_SUCCESS_VOID(rv);
+
+  nsCOMPtr<nsIMsgMailNewsUrl> mailnewsUrl(do_QueryInterface(aOriginatorLocation, &rv));
+  NS_ENSURE_SUCCESS_VOID(rv);
+
+  nsCOMPtr<nsIMsgDBHdr> msgHdr;
+  rv = GetMsgDBHdrFromURI(resourceURI.get(), getter_AddRefs(msgHdr));
+  if (NS_FAILED(rv))
+  {
+    // Maybe we can get a dummy header.
+    nsCOMPtr<nsIMsgWindow> msgWindow;
+    rv = mailnewsUrl->GetMsgWindow(getter_AddRefs(msgWindow));
+    if (msgWindow)
+    {
+      nsCOMPtr<nsIMsgHeaderSink> msgHdrSink;
+      rv = msgWindow->GetMsgHeaderSink(getter_AddRefs(msgHdrSink));
+      if (msgHdrSink)
+        rv = msgHdrSink->GetDummyMsgHeader(getter_AddRefs(msgHdr));
+    }
+  }
+
+  nsCOMPtr<nsIMsgWindow> msgWindow;
+  (void)mailnewsUrl->GetMsgWindow(getter_AddRefs(msgWindow));
+  if (msgWindow)
+  {
+    nsCOMPtr<nsIRunnable> event =
+      new RemoteContentNotifierEvent(msgWindow, msgHdr, aContentLocation, aCanOverride);
+    // Post this as an event because it can cause dom mutations, and we
+    // get called at a bad time to be causing dom mutations.
+    if (event)
+      NS_DispatchToCurrentThread(event);
+  }
+}
 
 /**
  * This function is used to determine if we allow content for a remote message.
@@ -579,8 +652,8 @@ nsMsgContentPolicy::ShouldAcceptContentForPotentialMsg(nsIURI *aOriginatorLocati
                                                        nsIURI *aContentLocation,
                                                        int16_t *aDecision)
 {
-  NS_PRECONDITION(*aDecision == nsIContentPolicy::REJECT_REQUEST,
-                  "AllowContentForPotentialMessage expects default decision to be reject!");
+  NS_ASSERTION(*aDecision == nsIContentPolicy::REJECT_REQUEST,
+               "AllowContentForPotentialMessage expects default decision to be reject!");
 
   // Is it a mailnews url?
   nsresult rv;
@@ -650,8 +723,8 @@ void nsMsgContentPolicy::ComposeShouldLoad(nsIMsgCompose *aMsgCompose,
                                            nsIURI *aContentLocation,
                                            int16_t *aDecision)
 {
-  NS_PRECONDITION(*aDecision == nsIContentPolicy::REJECT_REQUEST,
-                  "ComposeShouldLoad expects default decision to be reject!");
+  NS_ASSERTION(*aDecision == nsIContentPolicy::REJECT_REQUEST,
+               "ComposeShouldLoad expects default decision to be reject!");
 
   nsCString originalMsgURI;
   nsresult rv = aMsgCompose->GetOriginalMsgURI(getter_Copies(originalMsgURI));
@@ -789,6 +862,13 @@ nsresult nsMsgContentPolicy::SetDisableItemsOnMailNewsUrlDocshells(
     rv = docShell->SetAllowContentRetargetingOnChildren(false);
     NS_ENSURE_SUCCESS(rv, rv);
     rv = docShell->SetAllowPlugins(false);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    uint32_t sandboxFlags;
+    rv = docShell->GetSandboxFlags(&sandboxFlags);
+    sandboxFlags |= SANDBOXED_FORMS;
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = docShell->SetSandboxFlags(sandboxFlags);
     NS_ENSURE_SUCCESS(rv, rv);
   }
   else {

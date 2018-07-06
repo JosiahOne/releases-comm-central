@@ -7,7 +7,6 @@
 #define NS_IMAPUTILS_H
 
 #include "nsString.h"
-#include "nsIMsgIncomingServer.h"
 #include "MailNewsTypes.h"
 #include "nsTArray.h"
 #include "nsIMailboxSpec.h"
@@ -68,7 +67,7 @@ public:
   bool      mDiscoveredFromLsub;
   bool      mOnlineVerified;
 
-  nsImapProtocol *mConnection;	// do we need this? It seems evil
+  nsImapProtocol *mConnection;  // do we need this? It seems evil
 
 private:
   virtual ~nsImapMailboxSpec();

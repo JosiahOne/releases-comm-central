@@ -3,6 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+
+// Load these modules, which will inject into calUtils.jsm on old versions, and
+// silently fail on newer versions.
+try {
+    ChromeUtils.import("resource://calendar/modules/calAsyncUtils.jsm");
+} catch (e) {}
 
 this.EXPORTED_SYMBOLS = ["cal"];
 
@@ -22,7 +29,9 @@ if (!cal.dtz) {
         endDateProp: (...args) => cal.calGetEndDateProp(...args),
         sameDay: (...args) => cal.sameDay(...args),
         jsDateToDateTime: (...args) => cal.jsDateToDateTime(...args),
-        dateTimeToJsDate: (...args) => cal.dateTimeToJsDate(...args)
+        dateTimeToJsDate: (...args) => cal.dateTimeToJsDate(...args),
+        fromRFC3339: (...args) => cal.fromRFC3339(...args),
+        toRFC3339: (...args) => cal.toRFC3339(...args)
     };
 }
 
@@ -52,8 +61,6 @@ if (!cal.item) {
 if (!cal.view || !cal.view.hashColor) {
     cal.view = Object.assign(cal.view || {}, {
         isMouseOverBox: (...args) => cal.isMouseOverBox(...args),
-        radioGroupSelectItem: (...args) => cal.calRadioGroupSelectItem(...args),
-        applyAttributeToMenuChildren: (...args) => cal.applyAttributeToMenuChildren(...args),
         removeChildElementsByAttribute: (...args) => cal.removeChildElementsByAttribute(...args),
         getParentNodeOrThis: (...args) => cal.getParentNodeOrThis(...args),
         getParentNodeOrThisByAttribute: (...args) => cal.getParentNodeOrThisByAttribute(...args),
@@ -86,4 +93,28 @@ if (typeof cal.itip == "undefined") {
 
 if (typeof cal.itip.isInvitation == "undefined") {
     cal.itip.isInvitation = function(aItem) { return cal.isInvitation(aItem); };
+}
+
+if (typeof cal.l10n == "undefined") {
+    cal.l10n = {
+        getAnyString: function(aComponent, aBundle, aString, aParams) {
+            return cal.calGetString(aBundle, aString, aParams, aComponent);
+        }
+    };
+}
+
+if (typeof cal.provider == "undefined") {
+    cal.provider = {
+        BaseClass: cal.ProviderBase,
+        prepHttpChannel: (...args) => cal.prepHttpChannel(...args),
+        sendHttpRequest: (...args) => cal.sendHttpRequest(...args),
+        createStreamLoader: (...args) => cal.createStreamLoader(...args),
+        InterfaceRequestor_getInterface: (...args) => cal.InterfaceRequestor_getInterface(...args),
+        convertByteArray: (...args) => cal.convertByteArray(...args),
+        promptOverwrite: (...args) => cal.promptOverwrite(...args)
+    };
+}
+
+if (typeof cal.generateQI == "undefined") {
+    cal.generateQI = XPCOMUtils.generateQI.bind(XPCOMUtils);
 }

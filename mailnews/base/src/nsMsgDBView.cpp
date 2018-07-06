@@ -29,7 +29,7 @@
 #include "nsMsgBaseCID.h"
 #include "nsISpamSettings.h"
 #include "nsIMsgAccountManager.h"
-#include "nsITreeColumns.h"
+#include "nsTreeColumns.h"
 #include "nsTextFormatter.h"
 #include "nsIMutableArray.h"
 #include "nsIMimeConverter.h"
@@ -46,6 +46,7 @@
 #include "nsIAbCard.h"
 #include "mozilla/Services.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/dom/DataTransfer.h"
 #include "mozilla/mailnews/MimeHeaderParser.h"
 #include "nsTArray.h"
 
@@ -1043,16 +1044,14 @@ nsMsgDBView::GetMessageEnumerator(nsISimpleEnumerator **enumerator)
 
 NS_IMETHODIMP
 nsMsgDBView::IsEditable(int32_t row,
-                        nsITreeColumn* col,
+                        nsTreeColumn* col,
                         bool* _retval)
 {
   NS_ENSURE_ARG_POINTER(col);
   NS_ENSURE_ARG_POINTER(_retval);
   // Attempt to retrieve a custom column handler. If it exists call it and
   // return.
-  const char16_t* colID;
-  col->GetIdConst(&colID);
-
+  const nsAString& colID = col->GetId();
   nsIMsgCustomColumnHandler* colHandler = GetColumnHandler(colID);
 
   if (colHandler)
@@ -1067,7 +1066,7 @@ nsMsgDBView::IsEditable(int32_t row,
 
 NS_IMETHODIMP
 nsMsgDBView::IsSelectable(int32_t row,
-                          nsITreeColumn* col,
+                          nsTreeColumn* col,
                           bool* _retval)
 {
   *_retval = false;
@@ -1076,7 +1075,7 @@ nsMsgDBView::IsSelectable(int32_t row,
 
 NS_IMETHODIMP
 nsMsgDBView::SetCellValue(int32_t row,
-                          nsITreeColumn* col,
+                          nsTreeColumn* col,
                           const nsAString& value)
 {
   return NS_OK;
@@ -1084,7 +1083,7 @@ nsMsgDBView::SetCellValue(int32_t row,
 
 NS_IMETHODIMP
 nsMsgDBView::SetCellText(int32_t row,
-                         nsITreeColumn* col,
+                         nsTreeColumn* col,
                          const nsAString& value)
 {
   return NS_OK;
@@ -1442,14 +1441,14 @@ nsMsgDBView::GetRowProperties(int32_t index,
 }
 
 NS_IMETHODIMP
-nsMsgDBView::GetColumnProperties(nsITreeColumn* col, nsAString& properties)
+nsMsgDBView::GetColumnProperties(nsTreeColumn* col, nsAString& properties)
 {
   return NS_OK;
 }
 
 NS_IMETHODIMP
 nsMsgDBView::GetCellProperties(int32_t aRow,
-                               nsITreeColumn *col,
+                               nsTreeColumn *col,
                                nsAString& properties)
 {
   if (!IsValidIndex(aRow))
@@ -1469,8 +1468,7 @@ nsMsgDBView::GetCellProperties(int32_t aRow,
     return NS_MSG_INVALID_DBVIEW_INDEX;
   }
 
-  const char16_t* colID;
-  col->GetIdConst(&colID);
+  const nsAString& colID = col->GetId();
   nsIMsgCustomColumnHandler* colHandler = GetColumnHandler(colID);
   if (colHandler != nullptr)
   {
@@ -1852,15 +1850,13 @@ nsMsgDBView::GetDBForViewIndex(nsMsgViewIndex index,
 
 NS_IMETHODIMP
 nsMsgDBView::GetImageSrc(int32_t aRow,
-                         nsITreeColumn* aCol,
+                         nsTreeColumn* aCol,
                          nsAString& aValue)
 {
   NS_ENSURE_ARG_POINTER(aCol);
   // Attempt to retrieve a custom column handler. If it exists call it and
   // return.
-  const char16_t* colID;
-  aCol->GetIdConst(&colID);
-
+  const nsAString& colID = aCol->GetId();
   nsIMsgCustomColumnHandler* colHandler = GetColumnHandler(colID);
 
   if (colHandler)
@@ -1874,7 +1870,7 @@ nsMsgDBView::GetImageSrc(int32_t aRow,
 
 NS_IMETHODIMP
 nsMsgDBView::GetCellValue(int32_t aRow,
-                          nsITreeColumn* aCol,
+                          nsTreeColumn* aCol,
                           nsAString& aValue)
 {
   if (!IsValidIndex(aRow))
@@ -1889,36 +1885,41 @@ nsMsgDBView::GetCellValue(int32_t aRow,
     return NS_MSG_INVALID_DBVIEW_INDEX;
   }
 
-  const char16_t* colID;
-  aCol->GetIdConst(&colID);
+  const nsAString& colID = aCol->GetId();
+
+  aValue.Truncate();
+  if (colID.IsEmpty())
+    return NS_OK;
 
   uint32_t flags;
   msgHdr->GetFlags(&flags);
 
-  aValue.Truncate();
   // Provide a string "value" for cells that do not normally have text.
   // Use empty string for the normal states "Read", "Not Starred",
   // "No Attachment" and "Not Junk".
-  switch (colID[0])
+  switch (colID.First())
   {
-    case 'a': // attachment column
-      if (flags & nsMsgMessageFlags::Attachment)
+    case 'a':
+      if (colID.EqualsLiteral("attachmentCol") &&
+          flags & nsMsgMessageFlags::Attachment)
       {
         nsString tmp_str;
         tmp_str.Adopt(GetString(u"messageHasAttachment"));
         aValue.Assign(tmp_str);
       }
       break;
-    case 'f': // flagged (starred) column
-      if (flags & nsMsgMessageFlags::Marked)
+    case 'f':
+      if (colID.EqualsLiteral("flaggedCol") &&
+          flags & nsMsgMessageFlags::Marked)
       {
         nsString tmp_str;
         tmp_str.Adopt(GetString(u"messageHasFlag"));
         aValue.Assign(tmp_str);
       }
       break;
-    case 'j': // junk column
-      if (JunkControlsEnabled(aRow))
+    case 'j':
+      if (colID.EqualsLiteral("junkStatusCol") &&
+          JunkControlsEnabled(aRow))
       {
         nsCString junkScoreStr;
         msgHdr->GetStringProperty("junkscore", getter_Copies(junkScoreStr));
@@ -1932,7 +1933,8 @@ nsMsgDBView::GetCellValue(int32_t aRow,
       }
       break;
     case 't':
-      if (colID[1] == 'h' && (m_viewFlags & nsMsgViewFlagsType::kThreadedDisplay))
+      if (colID.EqualsLiteral("threadCol") &&
+          (m_viewFlags & nsMsgViewFlagsType::kThreadedDisplay))
       {
         // thread column
         bool isContainer, isContainerEmpty, isContainerOpen;
@@ -1952,8 +1954,9 @@ nsMsgDBView::GetCellValue(int32_t aRow,
         }
       }
       break;
-    case 'u': // read/unread column
-      if (!(flags & nsMsgMessageFlags::Read))
+    case 'u':
+      if (colID.EqualsLiteral("unreadCol") &&
+          !(flags & nsMsgMessageFlags::Read))
       {
         nsString tmp_str;
         tmp_str.Adopt(GetString(u"messageUnread"));
@@ -2073,7 +2076,7 @@ nsMsgDBView::RemoveColumnHandler(const nsAString& aColID)
 //TODO: NS_ENSURE_SUCCESS
 nsIMsgCustomColumnHandler* nsMsgDBView::GetCurColumnHandler()
 {
-  return GetColumnHandler(m_curCustomColumn.get());
+  return GetColumnHandler(m_curCustomColumn);
 }
 
 NS_IMETHODIMP
@@ -2106,9 +2109,9 @@ nsMsgDBView::GetSecondaryCustomColumn(nsAString &result)
   return NS_OK;
 }
 
-nsIMsgCustomColumnHandler* nsMsgDBView::GetColumnHandler(const char16_t *colID)
+nsIMsgCustomColumnHandler* nsMsgDBView::GetColumnHandler(const nsAString &colID)
 {
-  size_t index = m_customColumnHandlerIDs.IndexOf(nsDependentString(colID));
+  size_t index = m_customColumnHandlerIDs.IndexOf(colID);
   return (index != m_customColumnHandlerIDs.NoIndex) ?
     m_customColumnHandlers[index] : nullptr;
 }
@@ -2119,7 +2122,7 @@ nsMsgDBView::GetColumnHandler(const nsAString& aColID,
 {
   NS_ENSURE_ARG_POINTER(aHandler);
   nsAutoString column(aColID);
-  NS_IF_ADDREF(*aHandler = GetColumnHandler(column.get()));
+  NS_IF_ADDREF(*aHandler = GetColumnHandler(column));
   return (*aHandler) ? NS_OK : NS_ERROR_FAILURE;
 }
 
@@ -2153,11 +2156,10 @@ bool nsMsgDBView::CustomColumnsInSortAndNotRegistered()
 
 NS_IMETHODIMP
 nsMsgDBView::GetCellText(int32_t aRow,
-                         nsITreeColumn* aCol,
+                         nsTreeColumn* aCol,
                          nsAString& aValue)
 {
-  const char16_t* colID;
-  aCol->GetIdConst(&colID);
+  const nsAString& colID = aCol->GetId();
 
   if (!IsValidIndex(aRow))
     return NS_MSG_INVALID_DBVIEW_INDEX;
@@ -2179,9 +2181,14 @@ nsMsgDBView::GetCellText(int32_t aRow,
 
 NS_IMETHODIMP
 nsMsgDBView::CellTextForColumn(int32_t aRow,
-                               const char16_t *aColumnName,
+                               const nsAString& aColumnName,
                                nsAString &aValue)
 {
+  if (aColumnName.IsEmpty()) {
+    aValue.Truncate();
+    return NS_OK;
+  }
+
   nsCOMPtr<nsIMsgDBHdr> msgHdr;
   nsresult rv = GetMsgHdrForViewIndex(aRow, getter_AddRefs(msgHdr));
 
@@ -2193,16 +2200,16 @@ nsMsgDBView::CellTextForColumn(int32_t aRow,
 
   nsCOMPtr<nsIMsgThread> thread;
 
-  switch (aColumnName[0])
+  switch (aColumnName.First())
   {
     case 's':
-      if (aColumnName[1] == 'u') // subject
+      if (aColumnName.EqualsLiteral("subjectCol"))
         rv = FetchSubject(msgHdr, m_flags[aRow], aValue);
-      else if (aColumnName[1] == 'e') // sender
+      else if (aColumnName.EqualsLiteral("senderCol"))
         rv = FetchAuthor(msgHdr, aValue);
-      else if (aColumnName[1] == 'i') // size
+      else if (aColumnName.EqualsLiteral("sizeCol"))
         rv = FetchSize(msgHdr, aValue);
-      else if (aColumnName[1] == 't') // status
+      else if (aColumnName.EqualsLiteral("statusCol"))
       {
         uint32_t flags;
         msgHdr->GetFlags(&flags);
@@ -2210,30 +2217,34 @@ nsMsgDBView::CellTextForColumn(int32_t aRow,
       }
       break;
     case 'r':
-      if (aColumnName[3] == 'i') // recipient
+      if (aColumnName.EqualsLiteral("recipientCol"))
         rv = FetchRecipients(msgHdr, aValue);
-      else if (aColumnName[3] == 'e') // received
+      else if (aColumnName.EqualsLiteral("receivedCol"))
         rv = FetchDate(msgHdr, aValue, true);
       break;
-    case 'd':  // date
-      rv = FetchDate(msgHdr, aValue);
+    case 'd':
+      if (aColumnName.EqualsLiteral("dateCol"))
+        rv = FetchDate(msgHdr, aValue);
       break;
-    case 'c': // correspondent
-      if (IsOutgoingMsg(msgHdr))
-        rv = FetchRecipients(msgHdr, aValue);
-      else
-        rv = FetchAuthor(msgHdr, aValue);
+    case 'c':
+      if (aColumnName.EqualsLiteral("correspondentCol")) {
+        if (IsOutgoingMsg(msgHdr))
+          rv = FetchRecipients(msgHdr, aValue);
+        else
+          rv = FetchAuthor(msgHdr, aValue);
+      }
       break;
-    case 'p': // priority
-      rv = FetchPriority(msgHdr, aValue);
+    case 'p':
+      if (aColumnName.EqualsLiteral("priorityCol"))
+        rv = FetchPriority(msgHdr, aValue);
       break;
-    case 'a': // account
-      if (aColumnName[1] == 'c') // account
+    case 'a':
+      if (aColumnName.EqualsLiteral("accountCol"))
         rv = FetchAccount(msgHdr, aValue);
       break;
     case 't':
       // total msgs in thread column
-      if (aColumnName[1] == 'o' &&
+      if (aColumnName.EqualsLiteral("totalCol") &&
           m_viewFlags & nsMsgViewFlagsType::kThreadedDisplay)
       {
         if (m_flags[aRow] & MSG_VIEW_FLAG_ISTHREAD)
@@ -2249,14 +2260,14 @@ nsMsgDBView::CellTextForColumn(int32_t aRow,
           }
         }
       }
-      else if (aColumnName[1] == 'a') // tags
+      else if (aColumnName.EqualsLiteral("tagsCol"))
       {
         rv = FetchTags(msgHdr, aValue);
       }
       break;
     case 'u':
       // unread msgs in thread col
-      if (aColumnName[6] == 'C' &&
+      if (aColumnName.EqualsLiteral("unreadCol") &&
           m_viewFlags & nsMsgViewFlagsType::kThreadedDisplay)
       {
         if (m_flags[aRow] & MSG_VIEW_FLAG_ISTHREAD)
@@ -2278,18 +2289,22 @@ nsMsgDBView::CellTextForColumn(int32_t aRow,
       break;
     case 'j':
     {
-      nsCString junkScoreStr;
-      msgHdr->GetStringProperty("junkscore", getter_Copies(junkScoreStr));
-      CopyASCIItoUTF16(junkScoreStr, aValue);
+      if (aColumnName.EqualsLiteral("junkStatusCol")) {
+        nsCString junkScoreStr;
+        msgHdr->GetStringProperty("junkscore", getter_Copies(junkScoreStr));
+        CopyASCIItoUTF16(junkScoreStr, aValue);
+      }
       break;
     }
-    case 'i': // id
+    case 'i':
     {
-      nsAutoString keyString;
-      nsMsgKey key;
-      msgHdr->GetMessageKey(&key);
-      keyString.AppendInt((int64_t)key);
-      aValue.Assign(keyString);
+      if (aColumnName.EqualsLiteral("idCol")) {
+        nsAutoString keyString;
+        nsMsgKey key;
+        msgHdr->GetMessageKey(&key);
+        keyString.AppendInt((int64_t)key);
+        aValue.Assign(keyString);
+      }
       break;
     }
     default:
@@ -2316,7 +2331,7 @@ nsMsgDBView::ToggleOpenState(int32_t index)
 }
 
 NS_IMETHODIMP
-nsMsgDBView::CycleHeader(nsITreeColumn* aCol)
+nsMsgDBView::CycleHeader(nsTreeColumn* aCol)
 {
   // Let HandleColumnClick() in threadPane.js handle it
   // since it will set / clear the sort indicators.
@@ -2325,13 +2340,12 @@ nsMsgDBView::CycleHeader(nsITreeColumn* aCol)
 
 NS_IMETHODIMP
 nsMsgDBView::CycleCell(int32_t row,
-                       nsITreeColumn* col)
+                       nsTreeColumn* col)
 {
   if (!IsValidIndex(row))
     return NS_MSG_INVALID_DBVIEW_INDEX;
 
-  const char16_t* colID;
-  col->GetIdConst(&colID);
+  const nsAString& colID = col->GetId();
 
   // Attempt to retrieve a custom column handler. If it exists call it and
   // return.
@@ -2349,19 +2363,22 @@ nsMsgDBView::CycleCell(int32_t row,
       m_flags[row] & MSG_VIEW_FLAG_DUMMY)
     return NS_OK;
 
-  switch (colID[0])
+  if (colID.IsEmpty())
+    return NS_OK;
+
+  switch (colID.First())
   {
-    case 'u': // unreadButtonColHeader
-      if (colID[6] == 'B')
+    case 'u':
+      if (colID.EqualsLiteral("unreadButtonColHeader"))
         ApplyCommandToIndices(nsMsgViewCommandType::toggleMessageRead,
                               (nsMsgViewIndex *) &row, 1);
      break;
-    case 't': // tag cell, threaded cell or total cell
-      if (colID[1] == 'h')
+    case 't':
+      if (colID.EqualsLiteral("threadCol"))
       {
         ExpandAndSelectThreadByIndex(row, false);
       }
-      else if (colID[1] == 'a')
+      else if (colID.EqualsLiteral("tagsCol"))
       {
         // XXX Do we want to keep this behaviour but switch it to tags?
         // We could enumerate over the tags and go to the next one - it looks
@@ -2369,18 +2386,20 @@ nsMsgDBView::CycleCell(int32_t row,
         // worth bothering with.
       }
       break;
-    case 'f': // flagged column
-      // toggle the flagged status of the element at row.
-      if (m_flags[row] & nsMsgMessageFlags::Marked)
-        ApplyCommandToIndices(nsMsgViewCommandType::unflagMessages,
-                              (nsMsgViewIndex *) &row, 1);
-      else
-        ApplyCommandToIndices(nsMsgViewCommandType::flagMessages,
-                              (nsMsgViewIndex *) &row, 1);
+    case 'f':
+      if (colID.EqualsLiteral("flaggedCol")) {
+        // toggle the flagged status of the element at row.
+        if (m_flags[row] & nsMsgMessageFlags::Marked)
+          ApplyCommandToIndices(nsMsgViewCommandType::unflagMessages,
+                                (nsMsgViewIndex *) &row, 1);
+        else
+          ApplyCommandToIndices(nsMsgViewCommandType::flagMessages,
+                                (nsMsgViewIndex *) &row, 1);
+      }
       break;
-    case 'j': // junkStatus column
+    case 'j':
     {
-      if (!JunkControlsEnabled(row))
+      if (!colID.EqualsLiteral("junkStatusCol") || !JunkControlsEnabled(row))
         return NS_OK;
 
       nsCOMPtr <nsIMsgDBHdr> msgHdr;
@@ -2423,7 +2442,7 @@ nsMsgDBView::PerformActionOnRow(const char16_t *action, int32_t row)
 NS_IMETHODIMP
 nsMsgDBView::PerformActionOnCell(const char16_t *action,
                                  int32_t row,
-                                 nsITreeColumn* col)
+                                 nsTreeColumn* col)
 {
   return NS_OK;
 }
@@ -4620,7 +4639,7 @@ nsMsgDBView::DecodeColumnSort(nsString &columnSortString)
         sortColumnInfo.mCustomColumnName.Append(*stringPtr++);
 
       sortColumnInfo.mColHandler =
-        GetColumnHandler(sortColumnInfo.mCustomColumnName.get());
+        GetColumnHandler(sortColumnInfo.mCustomColumnName);
 
       // Advance past '\r'.
       if (*stringPtr)
@@ -6287,7 +6306,7 @@ nsMsgDBView::ListIdsInThreadOrder(nsIMsgThread *threadHdr,
     {
       if (*pNumListed == numChildren)
       {
-        NS_NOTREACHED("thread corrupt in db");
+        MOZ_ASSERT_UNREACHABLE("thread corrupt in db");
         // If we've listed more messages than are in the thread, then the db
         // is corrupt, and we should invalidate it.
         // We'll use this rv to indicate there's something wrong with the db
@@ -6480,7 +6499,7 @@ nsMsgDBView::ListIdsInThread(nsIMsgThread *threadHdr,
 
     if (ignoredHeaders + *pNumListed < numChildren)
     {
-      NS_NOTREACHED("thread corrupt in db");
+      MOZ_ASSERT_UNREACHABLE("thread corrupt in db");
       // If we've listed fewer messages than are in the thread, then the db
       // is corrupt, and we should invalidate it.
       // We'll use this rv to indicate there's something wrong with the db
@@ -8562,7 +8581,7 @@ nsMsgDBView::GetImapDeleteModel(nsIMsgFolder *folder)
 NS_IMETHODIMP
 nsMsgDBView::CanDrop(int32_t index,
                      int32_t orient,
-                     nsISupports *dataTransfer,
+                     mozilla::dom::DataTransfer *dataTransfer,
                      bool *_retval)
 {
   NS_ENSURE_ARG_POINTER(_retval);
@@ -8579,7 +8598,7 @@ nsMsgDBView::CanDrop(int32_t index,
 NS_IMETHODIMP
 nsMsgDBView::Drop(int32_t row,
                   int32_t orient,
-                  nsISupports *dataTransfer)
+                  mozilla::dom::DataTransfer *dataTransfer)
 {
   return NS_OK;
 }

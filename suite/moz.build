@@ -6,8 +6,8 @@
 CONFIGURE_SUBST_FILES += ['installer/Makefile']
 
 DIRS += [
+    'base',
     'browser',
-    'common',
     'components',
     'extensions',
     'locales',
@@ -16,7 +16,7 @@ DIRS += [
     'themes/classic',
     'themes/modern',
     'security',
-    '../common/src',
+    '../common',
 ]
 
 if CONFIG['MAKENSISU']:

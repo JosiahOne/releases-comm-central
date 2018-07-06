@@ -27,6 +27,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nspr.h"
 #include "pkix/Result.h"
+#include "nsNSSCertificate.h"
 
 using namespace mozilla::mailnews;
 using namespace mozilla;
@@ -563,7 +564,7 @@ nsresult nsMsgComposeSecure::MimeInitEncryption(bool aSign, nsIMsgSendReport *se
      do_GetService(NS_MIME_CONVERTER_CONTRACTID, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
   nsCString encodedContentDescription;
-  mimeConverter->EncodeMimePartIIStr_UTF8(enc_content_desc_utf8, false, "UTF-8",
+  mimeConverter->EncodeMimePartIIStr_UTF8(enc_content_desc_utf8, false,
       sizeof("Content-Description: "),
       nsIMimeConverter::MIME_ENCODED_WORD_SIZE,
       encodedContentDescription);
@@ -960,8 +961,7 @@ nsresult nsMsgComposeSecure::MimeCryptoHackCerts(const char *aRecipients,
       nsCString mailbox_lowercase;
       ToLowerCase(mailboxes[i], mailbox_lowercase);
       nsCOMPtr<nsIX509Cert> cert;
-      res = certdb->FindCertByEmailAddress(mailbox_lowercase,
-                                           getter_AddRefs(cert));
+      res = FindCertByEmailAddress(mailbox_lowercase, getter_AddRefs(cert));
       if (NS_FAILED(res)) {
         // Failure to find a valid encryption cert is fatal.
         // Here I assume that mailbox is ascii rather than utf8.
@@ -1023,14 +1023,14 @@ NS_IMETHODIMP nsMsgComposeSecure::MimeCryptoWriteBlock (const char *buf, int32_t
   if (mDataHash) {
     PR_SetError(0,0);
     mDataHash->Update((const uint8_t*) buf, size);
-	  status = PR_GetError();
-	  if (status < 0) goto FAIL;
-	}
+    status = PR_GetError();
+    if (status < 0) goto FAIL;
+  }
 
   PR_SetError(0,0);
   if (mEncryptionContext) {
-	  /* If we're encrypting, or signing-and-encrypting, write this data
-		 by filtering it through the crypto library. */
+    /* If we're encrypting, or signing-and-encrypting, write this data
+       by filtering it through the crypto library. */
 
     /* We want to create equally sized encryption strings */
     const char *inputBytesIterator = buf;
@@ -1090,7 +1090,7 @@ make_multipart_signed_header_string(bool outer_p,
   *boundary_return = mime_make_separator("ms");
 
   if (!*boundary_return)
-	return NS_ERROR_OUT_OF_MEMORY;
+    return NS_ERROR_OUT_OF_MEMORY;
 
   switch (hash_type) {
   case nsICryptoHash::SHA1:
@@ -1112,22 +1112,22 @@ make_multipart_signed_header_string(bool outer_p,
   *header_return = PR_smprintf(
         "Content-Type: " MULTIPART_SIGNED "; "
         "protocol=\"" APPLICATION_PKCS7_SIGNATURE "\"; "
-				"micalg=%s; "
-				"boundary=\"%s\"" CRLF
-				CRLF
-				"%s%s"
-				"--%s" CRLF,
-				hashStr,
-				*boundary_return,
-				(outer_p ? crypto_multipart_blurb : ""),
-				(outer_p ? CRLF CRLF : ""),
-				*boundary_return);
+        "micalg=%s; "
+        "boundary=\"%s\"" CRLF
+        CRLF
+        "%s%s"
+        "--%s" CRLF,
+        hashStr,
+        *boundary_return,
+        (outer_p ? crypto_multipart_blurb : ""),
+        (outer_p ? CRLF CRLF : ""),
+        *boundary_return);
 
   if (!*header_return) {
-	  PR_Free(*boundary_return);
-	  *boundary_return = 0;
-	  return NS_ERROR_OUT_OF_MEMORY;
-	}
+    PR_Free(*boundary_return);
+    *boundary_return = 0;
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
 
   return NS_OK;
 }
@@ -1183,4 +1183,61 @@ mime_nested_encoder_output_fn (const char *buf, int32_t size, void *closure)
   nsCString bufWithNull;
   bufWithNull.Assign(buf, size);
   return state->MimeCryptoWriteBlock(bufWithNull.get(), size);
+}
+
+nsresult
+nsMsgComposeSecure::FindCertByEmailAddress(const nsACString& aEmailAddress,
+                                                 nsIX509Cert** _retval)
+{
+  nsresult rv = BlockUntilLoadableRootsLoaded();
+  if (NS_FAILED(rv)) {
+    return rv;
+  }
+
+  RefPtr<SharedCertVerifier> certVerifier(GetDefaultCertVerifier());
+  NS_ENSURE_TRUE(certVerifier, NS_ERROR_UNEXPECTED);
+
+  const nsCString& flatEmailAddress = PromiseFlatCString(aEmailAddress);
+  UniqueCERTCertList certlist(
+    PK11_FindCertsFromEmailAddress(flatEmailAddress.get(), nullptr));
+  if (!certlist)
+    return NS_ERROR_FAILURE;
+
+  // certlist now contains certificates with the right email address,
+  // but they might not have the correct usage or might even be invalid
+
+  if (CERT_LIST_END(CERT_LIST_HEAD(certlist), certlist))
+    return NS_ERROR_FAILURE; // no certs found
+
+  CERTCertListNode *node;
+  // search for a valid certificate
+  for (node = CERT_LIST_HEAD(certlist);
+       !CERT_LIST_END(node, certlist);
+       node = CERT_LIST_NEXT(node)) {
+
+    UniqueCERTCertList unusedCertChain;
+    mozilla::pkix::Result result =
+      certVerifier->VerifyCert(node->cert, certificateUsageEmailRecipient,
+                               mozilla::pkix::Now(),
+                               nullptr /*XXX pinarg*/,
+                               nullptr /*hostname*/,
+                               unusedCertChain,
+                               CertVerifier::FLAG_LOCAL_ONLY);
+    if (result == mozilla::pkix::Success) {
+      break;
+    }
+  }
+
+  if (CERT_LIST_END(node, certlist)) {
+    // no valid cert found
+    return NS_ERROR_FAILURE;
+  }
+
+  // node now contains the first valid certificate with correct usage
+  RefPtr<nsNSSCertificate> nssCert = nsNSSCertificate::Create(node->cert);
+  if (!nssCert)
+    return NS_ERROR_OUT_OF_MEMORY;
+
+  nssCert.forget(_retval);
+  return NS_OK;
 }

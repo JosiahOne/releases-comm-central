@@ -1969,9 +1969,9 @@
             // instead of the time.
             if (cal.item.isToDo(this.mDragState.dragOccurrence)) {
                 if (!this.mDragState.dragOccurrence.dueDate) {
-                    startstr = cal.calGetString("calendar", "dragLabelTasksWithOnlyEntryDate");
+                    startstr = cal.l10n.getCalString("dragLabelTasksWithOnlyEntryDate");
                 } else if (!this.mDragState.dragOccurrence.entryDate) {
-                    startstr = cal.calGetString("calendar", "dragLabelTasksWithOnlyDueDate");
+                    startstr = cal.l10n.getCalString("dragLabelTasksWithOnlyDueDate");
                 }
             }
             firstColumn.fgboxes.startlabel.setAttribute("value", startstr);
@@ -2395,7 +2395,7 @@
                 // Use <description> textContent so it can wrap.
                 evl.textContent = item.title;
             } else {
-                evl.textContent = cal.calGetString("calendar", "eventUntitled");
+                evl.textContent = cal.l10n.getCalString("eventUntitled");
             }
 
             let gripbar = document.getAnonymousElementByAttribute(this, "anonid", "gripbar1").boxObject.height;
@@ -3764,13 +3764,11 @@
             aMinute = Math.min(maxFirstMin, Math.max(0, aMinute));
 
             if (scrollBoxObject && scrollbox.scrollHeight > 0) {
-                let x = {}, y = {};
-                scrollBoxObject.getPosition(x, y);
                 let pos = Math.round(aMinute * this.mPixPerMin);
                 if (scrollbox.getAttribute("orient") == "horizontal") {
-                    scrollBoxObject.scrollTo(x.value, pos);
+                    scrollBoxObject.scrollTo(scrollBoxObject.positionX, pos);
                 } else {
-                    scrollBoxObject.scrollTo(pos, y.value);
+                    scrollBoxObject.scrollTo(pos, scrollBoxObject.positionY);
                 }
             }
 
@@ -3878,12 +3876,10 @@
           if (scrollBoxObject && scrollbox.scrollHeight > 0) {
               // We need to update the first visible minute, but only if the
               // scrollbox has been sized.
-              let x = {}, y = {};
-              scrollBoxObject.getPosition(x, y);
               if (scrollbox.getAttribute("orient") == "horizontal") {
-                  this.mFirstVisibleMinute = Math.round(y.value / this.mPixPerMin);
+                  this.mFirstVisibleMinute = Math.round(scrollBoxObject.positionY / this.mPixPerMin);
               } else {
-                  this.mFirstVisibleMinute = Math.round(x.value / this.mPixPerMin);
+                  this.mFirstVisibleMinute = Math.round(scrollBoxObject.positionX / this.mPixPerMin);
               }
           }
       ]]></handler>

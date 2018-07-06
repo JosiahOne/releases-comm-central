@@ -189,13 +189,12 @@ function togglePaneSplitter(splitterId)
 function openUILink(url, event)
 {
   if (!event.button) {
-    PlacesUtils.asyncHistory.updatePlaces({
-      uri: makeURI(url),
-      visits:  [{
-        visitDate: Date.now() * 1000,
-        transitionType: Ci.nsINavHistoryService.TRANSITION_LINK
+    PlacesUtils.history.insert({
+      url,
+      visits: [{
+        date: new Date()
       }]
-    });
+    }).catch(Cu.reportError);
     messenger.launchExternalURL(url);
   }
 }

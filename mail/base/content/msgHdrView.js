@@ -400,7 +400,7 @@ function OnAddressBookDataChanged(aAction, aParentDir, aItem) {
  * as we display the message through our mime converter.
  */
 var messageHeaderSink = {
-    QueryInterface: XPCOMUtils.generateQI(
+    QueryInterface: ChromeUtils.generateQI(
       [Ci.nsIMsgHeaderSink]),
     onStartHeaders: function()
     {
@@ -739,9 +739,9 @@ var messageHeaderSink = {
       OnMsgLoaded(url);
     },
 
-    onMsgHasRemoteContent: function(aMsgHdr, aContentURI)
+    onMsgHasRemoteContent: function(aMsgHdr, aContentURI, aCanOverride)
     {
-      gMessageNotificationBar.setRemoteContentMsg(aMsgHdr, aContentURI);
+      gMessageNotificationBar.setRemoteContentMsg(aMsgHdr, aContentURI, aCanOverride);
     },
 
     mSecurityInfo  : null,
@@ -1824,6 +1824,19 @@ function AttachmentInfo(contentType, url, name, uri,
   else {
     match = GlodaUtils.PART_RE.exec(url);
     this.partID = match && match[1];
+  }
+
+  // Make sure to communicate it if it's an external http attachment and not a
+  // local attachment. For feeds attachments (enclosures) are always remote,
+  // so there is nothing to communicate.
+  if (isExternalAttachment && url.startsWith("http") &&
+      !gFolderDisplay.selectedMessageIsFeed) {
+    if (this.name) {
+      this.name = url + " - " + this.name;
+    }
+    else {
+      this.name = url;
+    }
   }
 
   this.url = url;

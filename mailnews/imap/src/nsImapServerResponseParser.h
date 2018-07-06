@@ -7,7 +7,7 @@
 #define _nsIMAPServerResponseParser_H_
 
 #include "mozilla/Attributes.h"
-#include "nsIMAPHostSessionList.h"
+#include "nsIIMAPHostSessionList.h"
 #include "nsImapSearchResults.h"
 #include "nsString.h"
 #include "MailNewsTypes.h"
@@ -15,12 +15,10 @@
 #include "nsImapUtils.h"
 #include "nsAutoPtr.h"
 
-class nsIMAPNamespace;
-class nsIMAPNamespaceList;
 class nsIMAPBodyShell;
 class nsIMAPBodypart;
 class nsImapSearchResultIterator;
-class nsImapFlagAndUidState;
+class nsIImapFlagAndUidState;
 
 #include "nsIMAPGenericParser.h"
 
@@ -112,7 +110,7 @@ public:
   // Interrupt a Fetch, without really Interrupting (through netlib)
   bool GetLastFetchChunkReceived();
   void ClearLastFetchChunkReceived();
-  virtual uint16_t	SupportsUserFlags() { return fSupportsUserDefinedFlags; }
+  virtual uint16_t SupportsUserFlags() { return fSupportsUserDefinedFlags; }
   virtual uint16_t  SettablePermanentFlags() { return fSettablePermanentFlags;}
   void SetFlagState(nsIImapFlagAndUidState *state);
   bool GetDownloadingHeaders();
@@ -231,7 +229,7 @@ private:
 
   nsImapSearchResultSequence    *fSearchResults;
 
-  nsCOMPtr <nsIImapFlagAndUidState> fFlagState;		// NOT owned by us, it's a copy, do not destroy
+  nsCOMPtr <nsIImapFlagAndUidState> fFlagState;  // NOT owned by us, it's a copy, do not destroy
 
   eIMAPstate               fIMAPstate;
 
@@ -254,6 +252,9 @@ private:
   int32_t numberOfCharsInThisChunk;
   int32_t charsReadSoFar;
   bool fLastChunk;
+
+  // Flags split of \r and \n between chunks in msg_fetch_literal().
+  bool fNextChunkStartsWithNewline;
 
   // points to the current body shell, if any
   RefPtr<nsIMAPBodyShell> m_shell;

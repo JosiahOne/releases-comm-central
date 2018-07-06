@@ -4,8 +4,9 @@
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
 <?xml-stylesheet href="chrome://messenger/skin/filterDialog.css" type="text/css"?>
- <?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
- <?xml-stylesheet href="chrome://messenger/skin/searchBox.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/searchBox.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/content/bindings.css" type="text/css"?>
 
 <!DOCTYPE window [
 <!ENTITY % filtersDTD SYSTEM "chrome://messenger/locale/FilterListDialog.dtd">%filtersDTD;
@@ -43,7 +44,7 @@
                  expandFolders="nntp"
                  showFileHereLabel="true"
                  showAccountsFileHere="true"
-                 oncommand="onFilterFolderClick(event.target._folder);"/>
+                 oncommand="setFilterFolder(event.target._folder);"/>
     </menulist>
     <textbox id="searchBox"
              class="searchBox"
@@ -147,7 +148,7 @@
                          type="folder"
                          showFileHereLabel="true"
                          showAccountsFileHere="false"
-                         oncommand="onTargetSelect(event);"/>
+                         oncommand="setRunFolder(event.target._folder);"/>
             </menulist>
           <button id="runFiltersButton"
                   label="&runFilters.label;"

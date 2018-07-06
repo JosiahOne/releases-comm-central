@@ -4,9 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "nsMsgCompose.h"
-#include "nsIDOMDocument.h"
-#include "nsIDOMNode.h"
-#include "nsIDOMElement.h"
+#include "nsIDocument.h"
 #include "nsPIDOMWindow.h"
 #include "mozIDOMWindow.h"
 #include "nsISelectionController.h"
@@ -74,9 +72,8 @@
 #include "mozilla/dom/HTMLAnchorElement.h"
 #include "mozilla/dom/HTMLImageElement.h"
 #include "mozilla/dom/HTMLLinkElement.h"
+#include "mozilla/dom/Selection.h"
 #include "nsStreamConverter.h"
-#include "nsISelection.h"
-#include "nsJSEnvironment.h"
 #include "nsIObserverService.h"
 #include "nsIProtocolHandler.h"
 #include "nsContentUtils.h"
@@ -225,7 +222,7 @@ GetChildOffset(nsINode *aChild, nsINode *aParent, int32_t &aOffset)
 }
 
 nsresult
-GetNodeLocation(nsIDOMNode *inChild, nsCOMPtr<nsINode> *outParent, int32_t *outOffset)
+GetNodeLocation(nsINode *inChild, nsCOMPtr<nsINode> *outParent, int32_t *outOffset)
 {
   NS_ASSERTION((outParent && outOffset), "bad args");
   nsresult result = NS_ERROR_NULL_POINTER;
@@ -345,16 +342,15 @@ nsresult nsMsgCompose::ResetUrisForEmbeddedObjects()
       folder->GetBaseMessageURI(baseMsgUri);
       NS_ENSURE_SUCCESS(rv, rv);
 
-      nsCOMPtr<nsIDOMElement> domElement;
+      RefPtr<Element> domElement;
       for (i = 0; i < numNodes; i ++)
       {
         domElement = do_QueryElementAt(aNodeList, i);
         if (!domElement)
           continue;
 
-        nsCOMPtr<Element> imageElement = do_QueryInterface(domElement);
         RefPtr<mozilla::dom::HTMLImageElement> image =
-          mozilla::dom::HTMLImageElement::FromNodeOrNull(imageElement);
+          mozilla::dom::HTMLImageElement::FromNode(domElement);
         if (!image)
           continue;
         nsCString partNum;
@@ -524,7 +520,7 @@ nsMsgCompose::InsertDivWrappedTextAtSelection(const nsAString &aText,
   if (!m_editor)
     return;
 
-  nsCOMPtr<nsIDOMElement> divElem;
+  RefPtr<Element> divElem;
   nsCOMPtr<nsIHTMLEditor> htmlEditor(do_QueryInterface(m_editor));
 
   nsresult rv = htmlEditor->CreateElementWithDefaults(NS_LITERAL_STRING("div"),
@@ -533,7 +529,7 @@ nsMsgCompose::InsertDivWrappedTextAtSelection(const nsAString &aText,
   NS_ENSURE_SUCCESS_VOID(rv);
 
   // We need the document
-  nsCOMPtr<nsIDOMDocument> doc;
+  nsCOMPtr<nsIDocument> doc;
   rv = m_editor->GetDocument(getter_AddRefs(doc));
   NS_ENSURE_SUCCESS_VOID(rv);
 
@@ -548,24 +544,21 @@ nsMsgCompose::InsertDivWrappedTextAtSelection(const nsAString &aText,
     if (delimiter == kNotFound)
       delimiter = end;
 
-    nsCOMPtr<nsIDocument> doc2 = do_QueryInterface(doc);
     RefPtr<nsTextNode> textNode =
-      doc2->CreateTextNode(Substring(aText, start, delimiter - start));
+      doc->CreateTextNode(Substring(aText, start, delimiter - start));
 
-    nsCOMPtr<nsINode> divElem2 = do_QueryInterface(divElem);
     IgnoredErrorResult rv2;
-    divElem2->AppendChild(*textNode, rv2);
+    divElem->AppendChild(*textNode, rv2);
     if (rv2.Failed()) {
       return;
     }
 
     // Now create and insert a BR
-    nsCOMPtr<nsIDOMElement> brElem;
+    RefPtr<Element> brElem;
     rv = htmlEditor->CreateElementWithDefaults(NS_LITERAL_STRING("br"),
                                                getter_AddRefs(brElem));
     NS_ENSURE_SUCCESS_VOID(rv);
-    nsCOMPtr<nsINode> brElem2 = do_QueryInterface(brElem);
-    divElem2->AppendChild(*brElem2, rv2);
+    divElem->AppendChild(*brElem, rv2);
     if (rv2.Failed()) {
       return;
     }
@@ -584,16 +577,41 @@ nsMsgCompose::InsertDivWrappedTextAtSelection(const nsAString &aText,
   rv = GetNodeLocation(divElem, address_of(parent), &offset);
   if (NS_SUCCEEDED(rv))
   {
-    nsCOMPtr<nsISelection> selection;
+    RefPtr<Selection> selection;
     m_editor->GetSelection(getter_AddRefs(selection));
 
     if (selection)
-      selection->CollapseNative(parent, offset + 1);
+      selection->Collapse(parent, offset + 1);
   }
   if (divElem) {
     nsCOMPtr<Element> divElem2 = do_QueryInterface(divElem);
     IgnoredErrorResult rv2;
     divElem2->SetAttribute(NS_LITERAL_STRING("class"), classStr, rv2);
+  }
+}
+
+/*
+ * The following function replaces <plaintext> tags with <x-plaintext>.
+ * <plaintext> is a funny beast: It leads to everything following it
+ * being displayed verbatim, even a </plaintext> tag is ignored.
+ */
+static void
+remove_plaintext_tag(nsString &body)
+{
+  // Replace all <plaintext> and </plaintext> tags.
+  int32_t index = 0;
+  bool replaced = false;
+  while ((index = body.Find("<plaintext", /* ignoreCase = */ true, index)) != kNotFound) {
+    body.Insert(u"x-", index+1);
+    index += 12;
+    replaced = true;
+  }
+  if (replaced) {
+    index = 0;
+    while ((index = body.Find("</plaintext", /* ignoreCase = */ true, index)) != kNotFound) {
+      body.Insert(u"x-", index+2);
+      index += 13;
+    }
   }
 }
 
@@ -608,7 +626,7 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
   NS_ENSURE_TRUE(m_editor && m_identity, NS_ERROR_NOT_INITIALIZED);
 
   // First, get the nsIEditor interface for future use
-  nsCOMPtr<nsIDOMNode> nodeInserted;
+  nsCOMPtr<nsINode> nodeInserted;
 
   TranslateLineEnding(aPrefix);
   TranslateLineEnding(aBuf);
@@ -682,15 +700,17 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
     if (!aBuf.IsEmpty() && mailEditor)
     {
       // This leaves the caret at the right place to insert a bottom signature.
-      if (aHTMLEditor)
-        mailEditor->InsertAsCitedQuotation(aBuf,
+      if (aHTMLEditor) {
+        nsAutoString body(aBuf);
+        remove_plaintext_tag(body);
+        mailEditor->InsertAsCitedQuotation(body,
                                            mCiteReference,
                                            true,
                                            getter_AddRefs(nodeInserted));
-      else
+      } else {
         mailEditor->InsertAsQuotation(aBuf,
                                       getter_AddRefs(nodeInserted));
-
+      }
     }
 
     mInsertingQuotedContent = false;
@@ -734,6 +754,7 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
         nsString divTag;
         divTag.AssignLiteral("<div class=\"moz-forward-container\">");
         newBody.Insert(divTag, sizeof(MIME_FORWARD_HTML_PREFIX)-1-8);
+        remove_plaintext_tag(newBody);
         htmlEditor->RebuildDocumentFromSource(newBody);
       } else {
         htmlEditor->RebuildDocumentFromSource(aBuf);
@@ -779,9 +800,8 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
       if (!aBuf.IsEmpty())
       {
         nsresult rv;
-        nsCOMPtr<nsIDOMElement> divElem;
-        nsCOMPtr<Element> divElem2;
-        nsCOMPtr<nsIDOMElement> extraBr;
+        RefPtr<Element> divElem;
+        RefPtr<Element> extraBr;
 
         if (isForwarded) {
           // Special treatment for forwarded messages: Part 1.
@@ -789,23 +809,21 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
           rv = htmlEditor->CreateElementWithDefaults(NS_LITERAL_STRING("div"),
                                                      getter_AddRefs(divElem));
           NS_ENSURE_SUCCESS(rv, rv);
-          divElem2 = do_QueryInterface(divElem);
 
           nsAutoString attributeName;
           nsAutoString attributeValue;
           attributeName.AssignLiteral("class");
           attributeValue.AssignLiteral("moz-forward-container");
           IgnoredErrorResult rv1;
-          divElem2->SetAttribute(attributeName, attributeValue, rv1);
+          divElem->SetAttribute(attributeName, attributeValue, rv1);
 
           // We can't insert an empty <div>, so fill it with something.
           rv = htmlEditor->CreateElementWithDefaults(NS_LITERAL_STRING("br"),
                                                      getter_AddRefs(extraBr));
           NS_ENSURE_SUCCESS(rv, rv);
 
-          nsCOMPtr<nsINode> extraBr2 = do_QueryInterface(extraBr);
           ErrorResult rv2;
-          divElem2->AppendChild(*extraBr2, rv2);
+          divElem->AppendChild(*extraBr, rv2);
           if (rv2.Failed()) {
             return rv2.StealNSResult();
           }
@@ -815,7 +833,7 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
           NS_ENSURE_SUCCESS(rv, rv);
 
           // Position into the div, so out content goes there.
-          nsCOMPtr<nsISelection> selection;
+          RefPtr<Selection> selection;
           m_editor->GetSelection(getter_AddRefs(selection));
           rv = selection->Collapse(divElem, 0);
           NS_ENSURE_SUCCESS(rv, rv);
@@ -836,11 +854,11 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
             // and this <div>, so remove the <br> we don't want.
             nsCOMPtr<nsINode> brBeforeDiv;
             nsAutoString tagLocalName;
-            brBeforeDiv = divElem2->GetPreviousSibling();
+            brBeforeDiv = divElem->GetPreviousSibling();
             if (brBeforeDiv) {
               tagLocalName = brBeforeDiv->LocalName();
               if (tagLocalName.EqualsLiteral("br")) {
-                rv = m_editor->DeleteNode(brBeforeDiv->AsDOMNode());
+                rv = m_editor->DeleteNode(brBeforeDiv);
                 NS_ENSURE_SUCCESS(rv, rv);
               }
             }
@@ -882,7 +900,7 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
           break;
         }
 
-        nsCOMPtr<nsISelection> selection;
+        RefPtr<Selection> selection;
         nsCOMPtr<nsINode> parent;
         int32_t offset;
         nsresult rv;
@@ -904,7 +922,7 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
         }
 
         // place selection after mailcite
-        selection->CollapseNative(parent, offset+1);
+        selection->Collapse(parent, offset+1);
 
         // insert a break at current selection
         if (!paragraphMode || !aHTMLEditor)
@@ -912,7 +930,7 @@ nsMsgCompose::ConvertAndLoadComposeWindow(nsString& aPrefix,
 
         // i'm not sure if you need to move the selection back to before the
         // break. expirement.
-        selection->CollapseNative(parent, offset+1);
+        selection->Collapse(parent, offset+1);
 
         break;
       }
@@ -3068,7 +3086,7 @@ QuotingOutputStreamListener::InsertToCompose(nsIEditor *aEditor,
                                              bool aHTMLEditor)
 {
   // First, get the nsIEditor interface for future use
-  nsCOMPtr<nsIDOMNode> nodeInserted;
+  nsCOMPtr<nsINode> nodeInserted;
 
   TranslateLineEnding(mMsgBody);
 
@@ -3092,11 +3110,14 @@ QuotingOutputStreamListener::InsertToCompose(nsIEditor *aEditor,
     nsCOMPtr<nsIEditorMailSupport> mailEditor (do_QueryInterface(aEditor));
     if (mailEditor)
     {
-      if (aHTMLEditor)
-        mailEditor->InsertAsCitedQuotation(mMsgBody, EmptyString(), true,
+      if (aHTMLEditor) {
+        nsAutoString body(mMsgBody);
+        remove_plaintext_tag(body);
+        mailEditor->InsertAsCitedQuotation(body, EmptyString(), true,
                                            getter_AddRefs(nodeInserted));
-      else
+      } else {
         mailEditor->InsertAsQuotation(mMsgBody, getter_AddRefs(nodeInserted));
+      }
     }
     compose->SetInsertingQuotedContent(false);
   }
@@ -3106,7 +3127,7 @@ QuotingOutputStreamListener::InsertToCompose(nsIEditor *aEditor,
     nsCOMPtr<nsIPlaintextEditor> textEditor = do_QueryInterface(aEditor);
     if (textEditor)
     {
-      nsCOMPtr<nsISelection> selection;
+      RefPtr<Selection> selection;
       nsCOMPtr<nsINode> parent;
       int32_t offset;
       nsresult rv;
@@ -3120,10 +3141,10 @@ QuotingOutputStreamListener::InsertToCompose(nsIEditor *aEditor,
       if (selection)
       {
         // place selection after mailcite
-        selection->CollapseNative(parent, offset+1);
+        selection->Collapse(parent, offset+1);
         // insert a break at current selection
         textEditor->InsertLineBreak();
-        selection->CollapseNative(parent, offset+1);
+        selection->Collapse(parent, offset+1);
       }
       nsCOMPtr<nsISelectionController> selCon;
       aEditor->GetSelectionController(getter_AddRefs(selCon));
@@ -4704,7 +4725,7 @@ nsresult nsMsgCompose::NotifyStateListeners(int32_t aNotificationType, nsresult 
       break;
 
     default:
-      NS_NOTREACHED("Unknown notification");
+      MOZ_ASSERT_UNREACHABLE("Unknown notification");
       break;
     }
   }
@@ -5566,7 +5587,7 @@ nsMsgCompose::BodyConvertible(int32_t *_retval)
     NS_ENSURE_ARG_POINTER(_retval);
     NS_ENSURE_STATE(m_editor);
 
-    nsCOMPtr<nsIDOMDocument> rootDocument;
+    nsCOMPtr<nsIDocument> rootDocument;
     nsresult rv = m_editor->GetDocument(getter_AddRefs(rootDocument));
     if (NS_FAILED(rv))
       return rv;
@@ -5574,8 +5595,7 @@ nsMsgCompose::BodyConvertible(int32_t *_retval)
       return NS_ERROR_UNEXPECTED;
 
     // get the top level element, which contains <html>
-    nsCOMPtr<nsIDocument> rootDocument2 = do_QueryInterface(rootDocument);
-    nsCOMPtr<Element> rootElement = rootDocument2->GetDocumentElement();
+    nsCOMPtr<Element> rootElement = rootDocument->GetDocumentElement();
     if (!rootElement)
       return NS_ERROR_UNEXPECTED;
 
@@ -5599,7 +5619,7 @@ nsMsgCompose::GetIdentity(nsIMsgIdentity **aIdentity)
 nsresult
 nsMsgCompose::MoveToAboveQuote(void)
 {
-  nsCOMPtr<nsIDOMElement> rootElement;
+  RefPtr<Element> rootElement;
   nsresult rv = m_editor->GetRootElement(getter_AddRefs(rootElement));
   if (NS_FAILED(rv) || !rootElement) {
     return rv;
@@ -5656,7 +5676,7 @@ nsMsgCompose::MoveToAboveQuote(void)
       return rv;
     }
   }
-  nsCOMPtr<nsISelection> selection;
+  RefPtr<Selection> selection;
   m_editor->GetSelection(getter_AddRefs(selection));
   if (selection)
     rv = selection->Collapse(rootElement, offset);
@@ -5672,13 +5692,13 @@ nsMsgCompose::MoveToAboveQuote(void)
 nsresult
 nsMsgCompose::MoveToBeginningOfDocument(void)
 {
-  nsCOMPtr<nsIDOMElement> rootElement;
+  RefPtr<Element> rootElement;
   nsresult rv = m_editor->GetRootElement(getter_AddRefs(rootElement));
   if (NS_FAILED(rv) || !rootElement) {
     return rv;
   }
 
-  nsCOMPtr<nsISelection> selection;
+  RefPtr<Selection> selection;
   m_editor->GetSelection(getter_AddRefs(selection));
   if (selection)
     rv = selection->Collapse(rootElement, 0);
@@ -5696,7 +5716,7 @@ nsresult
 nsMsgCompose::MoveToEndOfDocument(void)
 {
   int32_t offset;
-  nsCOMPtr<nsIDOMElement> rootElement;
+  RefPtr<Element> rootElement;
   nsCOMPtr<nsINode> lastNode;
   nsresult rv = m_editor->GetRootElement(getter_AddRefs(rootElement));
   if (NS_FAILED(rv) || !rootElement) {
@@ -5714,7 +5734,7 @@ nsMsgCompose::MoveToEndOfDocument(void)
     return rv;
   }
 
-  nsCOMPtr<nsISelection> selection;
+  RefPtr<Selection> selection;
   m_editor->GetSelection(getter_AddRefs(selection));
   if (selection)
     rv = selection->Collapse(rootElement, offset + 1);
@@ -5734,7 +5754,7 @@ nsMsgCompose::SetIdentity(nsIMsgIdentity *aIdentity)
   if (! m_editor)
     return NS_ERROR_FAILURE;
 
-  nsCOMPtr<nsIDOMElement> rootElement;
+  RefPtr<Element> rootElement;
   rv = m_editor->GetRootElement(getter_AddRefs(rootElement));
   if (NS_FAILED(rv) || !rootElement)
     return rv;
@@ -5777,7 +5797,7 @@ nsMsgCompose::SetIdentity(nsIMsgIdentity *aIdentity)
     {
       m_editor->BeginTransaction();
       tempNode = node->GetPreviousSibling();
-      rv = m_editor->DeleteNode(node->AsDOMNode());
+      rv = m_editor->DeleteNode(node);
       if (NS_FAILED(rv))
       {
         m_editor->EndTransaction();
@@ -5789,7 +5809,7 @@ nsMsgCompose::SetIdentity(nsIMsgIdentity *aIdentity)
       {
         tagLocalName = tempNode->LocalName();
         if (tagLocalName.EqualsLiteral("br"))
-          m_editor->DeleteNode(tempNode->AsDOMNode());
+          m_editor->DeleteNode(tempNode);
       }
       m_editor->EndTransaction();
     }

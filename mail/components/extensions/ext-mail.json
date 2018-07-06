@@ -1,0 +1,24 @@
+{
+  "legacy": {
+    "url": "chrome://messenger/content/parent/ext-legacy.js",
+    "schema": "chrome://messenger/content/schemas/legacy.json",
+    "scopes": ["addon_parent"],
+    "manifest": ["legacy"]
+  },
+  "tabs": {
+    "url": "chrome://messenger/content/parent/ext-tabs.js",
+    "schema": "chrome://messenger/content/schemas/tabs.json",
+    "scopes": ["addon_parent"],
+    "paths": [
+      ["tabs"]
+    ]
+  },
+  "windows": {
+    "url": "chrome://messenger/content/parent/ext-windows.js",
+    "schema": "chrome://messenger/content/schemas/windows.json",
+    "scopes": ["addon_parent"],
+    "paths": [
+      ["windows"]
+    ]
+  }
+}

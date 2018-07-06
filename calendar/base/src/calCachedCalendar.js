@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calProviderUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
@@ -13,7 +12,7 @@ var cICL = Components.interfaces.calIChangeLog;
 var cIOL = Components.interfaces.calIOperationListener;
 
 var gNoOpListener = {
-    QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+    QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIOperationListener]),
     onGetResult: function(calendar, status, itemType, detail, count, items) {
     },
 
@@ -57,7 +56,7 @@ function calCachedCalendarObserverHelper(home, isCachedObserver) {
     this.isCachedObserver = isCachedObserver;
 }
 calCachedCalendarObserverHelper.prototype = {
-    QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIObserver]),
+    QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIObserver]),
     isCachedObserver: false,
 
     onStartBatch: function() {
@@ -133,6 +132,7 @@ function calCachedCalendar(uncachedCalendar) {
     this.offlineCachedItemFlags = {};
 }
 calCachedCalendar.prototype = {
+    /* eslint-disable mozilla/use-chromeutils-generateqi */
     QueryInterface: function(aIID) {
         if (aIID.equals(Components.interfaces.calISchedulingSupport) &&
             this.mUncachedCalendar.QueryInterface(aIID)) {
@@ -145,6 +145,7 @@ calCachedCalendar.prototype = {
             throw Components.results.NS_ERROR_NO_INTERFACE;
         }
     },
+    /* eslint-enable mozilla/use-chromeutils-generateqi */
 
     mCachedCalendar: null,
     mCachedObserver: null,
@@ -202,7 +203,7 @@ calCachedCalendar.prototype = {
                         break;
                     }
                     case "storage": {
-                        let file = cal.getCalendarDirectory();
+                        let file = cal.provider.getCalendarDirectory();
                         file.append("cache.sqlite");
                         cachedCalendar.uri = Services.io.newFileURI(file);
                         cachedCalendar.id = this.id;
@@ -230,7 +231,7 @@ calCachedCalendar.prototype = {
         let self = this;
         self.offlineCachedItems = {};
         let getListener = {
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIOperationListener]),
             onGetResult: function(aCalendar, aStatus, aItemType, aDetail, aCount, aItems) {
                 for (let item of aItems) {
                     self.offlineCachedItems[item.hashId] = item;
@@ -249,7 +250,7 @@ calCachedCalendar.prototype = {
     getOfflineModifiedItems: function(callbackFunc) {
         let self = this;
         let getListener = {
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIOperationListener]),
             onGetResult: function(aCalendar, aStatus, aItemType, aDetail, aCount, aItems) {
                 for (let item of aItems) {
                     self.offlineCachedItems[item.hashId] = item;
@@ -268,7 +269,7 @@ calCachedCalendar.prototype = {
     getOfflineDeletedItems: function(callbackFunc) {
         let self = this;
         let getListener = {
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIOperationListener]),
             onGetResult: function(aCalendar, aStatus, aItemType, aDetail, aCount, aItems) {
                 for (let item of aItems) {
                     self.offlineCachedItems[item.hashId] = item;
@@ -344,7 +345,7 @@ calCachedCalendar.prototype = {
 
         cal.LOG("[calCachedCalendar] Doing full sync for calendar " + this.uri.spec);
         let completeListener = {
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIOperationListener]),
             modifiedTimes: {},
             hasRenewedCalendar: false,
             getsCompleted: 0,
@@ -362,7 +363,7 @@ calCachedCalendar.prototype = {
                     }
 
                     this.getsReceived++;
-                    cal.forEach(aItems, (item) => {
+                    cal.iterate.forEach(aItems, (item) => {
                         // Adding items recd from the Memory Calendar
                         // These may be different than what the cache has
                         completeListener.modifiedTimes[item.id] = item.lastModifiedTime;
@@ -387,7 +388,7 @@ calCachedCalendar.prototype = {
                 }
 
                 if (Components.isSuccessCode(aStatus)) {
-                    cal.forEach(self.offlineCachedItems, (item) => {
+                    cal.iterate.forEach(self.offlineCachedItems, (item) => {
                         switch (self.offlineCachedItemFlags[item.hashId]) {
                             case cICL.OFFLINE_FLAG_CREATED_RECORD:
                                 // Created items are not present on the server, so its safe to adopt them
@@ -408,7 +409,7 @@ calCachedCalendar.prototype = {
                                 } else {
                                     // The item has been deleted from the server, ask if it should be added again
                                     cal.WARN("[calCachedCalendar] Item '" + item.title + "' has been deleted from the server");
-                                    if (cal.promptOverwrite("modify", item, null, null)) {
+                                    if (cal.provider.promptOverwrite("modify", item, null, null)) {
                                         self.adoptOfflineItem(item.clone(), null);
                                     }
                                 }
@@ -459,7 +460,7 @@ calCachedCalendar.prototype = {
 
     // aOldItem is already in the cache
     promptOverwrite: function(aMethod, aItem, aListener, aOldItem) {
-        let overwrite = cal.promptOverwrite(aMethod, aItem, aListener, aOldItem);
+        let overwrite = cal.provider.promptOverwrite(aMethod, aItem, aListener, aOldItem);
         if (overwrite) {
             if (aMethod == "modify") {
                 this.modifyOfflineItem(aItem, aOldItem, aListener);

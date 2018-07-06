@@ -15,7 +15,6 @@
 #include "nsIMsgMailNewsUrl.h"
 #include "nsIMsgAccountManager.h"
 #include "nsINntpIncomingServer.h"
-#include "nsIRequestObserver.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsISeekableStream.h"
 #include "nsIMsgCopyService.h"
@@ -526,7 +525,7 @@ void nsImapOfflineSync::ProcessMoveOperation(nsIMsgOfflineImapOperation *op)
   bool moveMatches = true;
   nsCOMPtr <nsIMsgOfflineImapOperation> currentOp = op;
   do
-  {	// loop for all messages with the same destination
+  {  // loop for all messages with the same destination
     if (moveMatches)
     {
       nsMsgKey curKey;
@@ -749,7 +748,7 @@ bool nsImapOfflineSync::CreateOfflineFolder(nsIMsgFolder *folder)
     if (mailnewsUrl)
       mailnewsUrl->RegisterListener(this);
   }
-  return NS_SUCCEEDED(rv) ? true : false;	// this is asynch, we have to return and be called again by the OfflineOpExitFunction
+  return NS_SUCCEEDED(rv) ? true : false;  // this is asynch, we have to return and be called again by the OfflineOpExitFunction
 }
 
 int32_t nsImapOfflineSync::GetCurrentUIDValidity()
@@ -899,7 +898,7 @@ nsresult nsImapOfflineSync::ProcessNextOperation()
       if (!m_singleFolderToUpdate)
         AdvanceToNextFolder();
       else
-        m_currentFolder = nullptr;	// force update of this folder now.
+        m_currentFolder = nullptr;  // force update of this folder now.
     }
 
   }

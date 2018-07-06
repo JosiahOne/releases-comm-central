@@ -51,11 +51,22 @@
   border: 0;
   background-color: transparent;
   -moz-user-focus: normal;
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#clsd");
+  list-style-image: url("chrome://global/skin/tree/twisty-collapsed.svg");
+  -moz-context-properties: fill, fill-opacity;
+  fill: currentColor;
+  fill-opacity: 1;
 }
 
 #attachmentToggle[checked="true"] {
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#open");
+  list-style-image: url("chrome://global/skin/tree/twisty-expanded.svg");
+}
+
+#attachmentToggle:hover {
+  fill: #4ed0f9;
+}
+
+#attachmentToggle:-moz-locale-dir(rtl) {
+  list-style-image: url("chrome://global/skin/tree/twisty-collapsed-rtl.svg");
 }
 
 #attachmentName:hover,
@@ -94,11 +105,6 @@
   -moz-user-select: text;
   -moz-user-focus: normal;
   cursor: text;
-}
-
-.inline-toolbar {
-  -moz-appearance: none;
-  -moz-box-pack: end;
 }
 
 #header-view-toolbox toolbarpaletteitem toolbarseparator,
@@ -214,12 +220,6 @@ window[inlinetoolbox] #newtoolbar {
   list-style-image: url("chrome://messenger/skin/icons/arrow-dn-grey.png");
 }
 
-/* ::::: view expand and collapse twisties  ::::: */
-
-.expandHeaderViewButton {
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#open");
-}
-
 #header-view-toolbox {
   float: right;
 }
@@ -247,30 +247,6 @@ window[inlinetoolbox] #newtoolbar {
   -moz-context-properties: fill, fill-opacity;
   fill: currentColor;
   fill-opacity: var(--toolbarbutton-icon-fill-opacity);
-}
-
-#attachmentToggle:hover {
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#clsd-hover");
-}
-
-#attachmentToggle[checked="true"]:hover {
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#open-hover");
-}
-
-#attachmentToggle:-moz-locale-dir(rtl) {
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#clsd-rtl");
-}
-
-#attachmentToggle[checked="true"]:-moz-locale-dir(rtl) {
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#open-rtl");
-}
-
-#attachmentToggle:hover:-moz-locale-dir(rtl) {
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#clsd-hover-rtl");
-}
-
-#attachmentToggle[checked="true"]:hover:-moz-locale-dir(rtl) {
-  list-style-image: url("chrome://global/skin/tree/twisty.svg#open-hover-rtl");
 }
 
 #attachmentSize {
@@ -453,15 +429,6 @@ toolbox[labelalign="end"] toolbar[mode="full"]
   list-style-image: url("chrome://messenger/skin/icons/toolbarbutton-arrow.svg");
   -moz-context-properties: fill;
   fill: currentColor;
-}
-
-.inline-toolbar toolbarpaletteitem toolbarseparator,
-.inline-toolbar toolbarseparator {
-  height: 24px;
-}
-
-.inline-toolbar toolbarspacer {
-  height: 20px;
 }
 
 .msgHeaderView-button,

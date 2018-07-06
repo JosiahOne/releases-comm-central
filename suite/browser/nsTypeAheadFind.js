@@ -331,12 +331,13 @@ typeAheadFind.prototype = {
     // Also watch for the cursor moving within the current field or window.
     var commandDispatcher = this.mEventTarget.ownerDocument.commandDispatcher;
     var editable = commandDispatcher.focusedElement;
-    if (editable instanceof Ci.nsIDOMNSEditableElement)
+    if (editable &&
+        ["HTMLInputElement", "HTMLTextAreaElement"]
+        .includes(ChromeUtils.getClassName(editable)))
       this.mSelection = editable.editor.selection;
     else
       this.mSelection = commandDispatcher.focusedWindow.getSelection();
-    this.mSelection.QueryInterface(Ci.nsISelectionPrivate)
-                   .addSelectionListener(this);
+    this.mSelection.addSelectionListener(this);
     return false;
   },
   startFind: function(aWindow, aLinks) {

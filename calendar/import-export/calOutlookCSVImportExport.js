@@ -2,9 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 var localeEn = {
@@ -79,7 +77,7 @@ var exportLineEnding = "\r\n";
 function getOutlookCsvFileTypes(aCount) {
     aCount.value = 1;
     let wildmat = "*.csv";
-    let label = cal.calGetString("calendar", "filterOutlookCsv", [wildmat]);
+    let label = cal.l10n.getCalString("filterOutlookCsv", [wildmat]);
     return [{
         defaultExtension: "csv",
         extensionFilter: wildmat,
@@ -91,17 +89,9 @@ function getOutlookCsvFileTypes(aCount) {
 function calOutlookCSVImporter() {
     this.wrappedJSObject = this;
 }
-var calOutlookCSVImporterClassID = Components.ID("{64a5d17a-0497-48c5-b54f-72b15c9e9a14}");
-var calOutlookCSVImporterInterfaces = [Components.interfaces.calIImporter];
 calOutlookCSVImporter.prototype = {
-    classID: calOutlookCSVImporterClassID,
-    QueryInterface: XPCOMUtils.generateQI(calOutlookCSVImporterInterfaces),
-    classInfo: XPCOMUtils.generateCI({
-        classID: calOutlookCSVImporterClassID,
-        contractID: "@mozilla.org/calendar/import;1?type=csv",
-        classDescription: "Calendar Outlook CSV Importer",
-        interfaces: calOutlookCSVImporterInterfaces
-    }),
+    QueryInterface: ChromeUtils.generateQI([Ci.calIImporter]),
+    classID: Components.ID("{64a5d17a-0497-48c5-b54f-72b15c9e9a14}"),
 
     getFileTypes: getOutlookCsvFileTypes,
 
@@ -412,17 +402,9 @@ calOutlookCSVImporter.prototype = {
 // Exporter
 function calOutlookCSVExporter() {
 }
-var calOutlookCSVExporterClassID = Components.ID("{48e6d3a6-b41b-4052-9ed2-40b27800bd4b}");
-var calOutlookCSVExporterInterfaces = [Components.interfaces.calIExporter];
 calOutlookCSVExporter.prototype = {
-    classID: calOutlookCSVExporterClassID,
-    QueryInterface: XPCOMUtils.generateQI(calOutlookCSVExporterInterfaces),
-    classInfo: XPCOMUtils.generateCI({
-        classID: calOutlookCSVExporterClassID,
-        contractID: "@mozilla.org/calendar/export;1?type=csv",
-        classDescription: "Calendar Outlook CSV Exporter",
-        interfaces: calOutlookCSVExporterInterfaces
-    }),
+    QueryInterface: ChromeUtils.generateQI([Ci.calIExporter]),
+    classID: Components.ID("{48e6d3a6-b41b-4052-9ed2-40b27800bd4b}"),
 
     getFileTypes: getOutlookCsvFileTypes,
 

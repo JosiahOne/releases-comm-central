@@ -26,6 +26,10 @@ ChromeUtils.defineModuleGetter(this, "OS", "resource://gre/modules/osfile.jsm");
 ChromeUtils.defineModuleGetter(this, "ShortcutUtils",
                                "resource://gre/modules/ShortcutUtils.jsm");
 
+XPCOMUtils.defineLazyModuleGetters(this, {
+  LightweightThemeManager: "resource://gre/modules/LightweightThemeManager.jsm",
+});
+
 /**
  * interfaces
  */
@@ -628,15 +632,8 @@ var progressListener = {
       // we can ignore this notification
     },
 
-    QueryInterface : function(iid)
-    {
-      if (iid.equals(Ci.nsIWebProgressListener) ||
-          iid.equals(Ci.nsISupportsWeakReference) ||
-          iid.equals(Ci.nsISupports))
-        return this;
-
-      throw Cr.NS_NOINTERFACE;
-    }
+    QueryInterface: ChromeUtils.generateQI(["nsIWebProgressListener",
+                                            "nsISupportsWeakReference"]),
 };
 
 var defaultController = {
@@ -687,10 +684,8 @@ var defaultController = {
           cmdToggleAttachmentPane.setAttribute("checked", "true");
         }
 
-        // Enable this command when the compose window isn't locked;
-        // disable for full, visible bucket (effective for menu only; command's
-        // shortcut key will still work via bucket's identical access key).
-        return (!gWindowLocked && !(bucket.itemCount > 0 && paneShown))
+        // Enable this command when the compose window isn't locked.
+        return !gWindowLocked;
       },
       doCommand: function() {
         toggleAttachmentPane();
@@ -1692,8 +1687,8 @@ uploadListener.prototype = {
     updateSendCommands(true);
   },
 
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIRequestObserver,
-                                         Ci.nsISupportsWeakReference])
+  QueryInterface: ChromeUtils.generateQI(["nsIRequestObserver",
+                                          "nsISupportsWeakReference"])
 };
 
 function deletionListener(aAttachment, aCloudProvider)
@@ -1718,8 +1713,8 @@ deletionListener.prototype = {
     }
   },
 
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIRequestObserver,
-                                         Ci.nsISupportsWeakReference])
+  QueryInterface: ChromeUtils.generateQI(["nsIRequestObserver",
+                                          "nsISupportsWeakReference"])
 };
 
 /**
@@ -2380,9 +2375,18 @@ attachmentWorker.onmessage = function(event, aManage = true)
 };
 
 /**
+ * Update attachment-related internal flags, UI, and commands.
  * Called when number of attachments changes.
+ *
+ * @param aShowPane {string} "show":  show the attachment pane
+ *                           "hide":  hide the attachment pane
+ *                           omitted: just update without changing pane visibility
+ * @param aContentChanged {Boolean} optional value to assign to gContentChanged;
+ *                                  defaults to true.
  */
-function AttachmentsChanged() {
+function AttachmentsChanged(aShowPane, aContentChanged = true) {
+  gContentChanged = aContentChanged;
+  updateAttachmentPane(aShowPane);
   attachmentBucketMarkEmptyBucket();
   manageAttachmentNotification(true);
   updateAttachmentItems();
@@ -2973,7 +2977,7 @@ function ComposeStartup(aParams)
 
   GetMsgSubjectElement().value = gMsgCompose.compFields.subject;
 
-  AddAttachments(gMsgCompose.compFields.attachments);
+  AddAttachments(gMsgCompose.compFields.attachments, null, false);
 
   if (Services.prefs.getBoolPref(
       "mail.compose.show_attachment_pane")) {
@@ -3109,6 +3113,7 @@ function ComposeLoad()
     return;
   }
 
+  CompactTheme.init();
   ToolbarIconColor.init();
 
   // initialize the customizeDone method on the customizeable toolbar
@@ -3147,6 +3152,7 @@ function ComposeUnload()
   RemoveMessageComposeOfflineQuitObserver();
   gAttachmentNotifier.shutdown();
   ToolbarIconColor.uninit();
+  CompactTheme.uninit();
 
   // Stop observing dictionary removals.
   dictionaryRemovalObserver.removeObserver();
@@ -4428,13 +4434,18 @@ function SetLastAttachDirectory(attachedLocalFile)
 
 function AttachFile()
 {
+  if (attachmentsCount() > 0) {
+    // If there are existing attachments already, restore attachment pane before
+    // showing the file picker so that user can see them while adding more.
+    toggleAttachmentPane("show");
+  }
+
   //Get file using nsIFilePicker and convert to URL
-  var fp = Cc["@mozilla.org/filepicker;1"]
-             .createInstance(nsIFilePicker);
+  let fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
   fp.init(window, getComposeBundle().getString("chooseFileToAttach"),
           nsIFilePicker.modeOpenMultiple);
 
-  var lastDirectory = GetLastAttachDirectory();
+  let lastDirectory = GetLastAttachDirectory();
   if (lastDirectory)
     fp.displayDirectory = lastDirectory;
 
@@ -4476,13 +4487,16 @@ function FileToAttachment(file)
  * Add a list of attachment objects as attachments. The attachment URLs must be
  * set.
  *
- * @param aAttachments an iterable list of nsIMsgAttachment objects to add as
- *        attachments. Anything iterable with fixIterator is accepted.
- * @param aCallback an optional callback function called immediately after
- *        adding each attachment. Takes one argument: the newly-added
- *        <attachmentitem> node.
+ * @param aAttachments  an iterable list of nsIMsgAttachment objects to add as
+ *                      attachments. Anything iterable with fixIterator is
+ *                      accepted.
+ * @param aCallback     an optional callback function called immediately after
+ *                      adding each attachment. Takes one argument:
+ *                      the newly-added <attachmentitem> node.
+ * @param aContentChanged {Boolean}  optional value to assign to gContentChanged
+ *                                   after adding attachments; defaults to true.
  */
-function AddAttachments(aAttachments, aCallback)
+function AddAttachments(aAttachments, aCallback, aContentChanged = true)
 {
   let bucket = document.getElementById("attachmentBucket");
   let addedAttachments = Cc["@mozilla.org/array;1"]
@@ -4566,16 +4580,12 @@ function AddAttachments(aAttachments, aCallback)
       bucket.currentIndex = bucket.getIndexOfItem(items[0]);
     }
 
-    gContentChanged = true;
-
-    updateAttachmentPane("show");
+    AttachmentsChanged("show", aContentChanged);
     dispatchAttachmentBucketEvent("attachments-added", addedAttachments);
-    AttachmentsChanged();
   } else if (attachmentsCount() > 0) {
     // We didn't succeed to add attachments (e.g. duplicate files),
-    // but user was trying to; so we must at least react by ensuring the panel
+    // but user was trying to; so we must at least react by ensuring the pane
     // is shown, which might be hidden by user with existing attachments.
-    // XXX To do: don't allow traceless hiding of pane with attachments.
     toggleAttachmentPane("show");
   }
 
@@ -4590,7 +4600,7 @@ function AddAttachments(aAttachments, aCallback)
  */
 function attachmentsCount()
 {
-  let bucketList = document.getElementById("attachmentBucket");
+  let bucketList = GetMsgAttachmentElement();
   return (bucketList) ? bucketList.itemCount : 0;
 }
 
@@ -4602,7 +4612,7 @@ function attachmentsCount()
  */
 function attachmentsSelectedCount()
 {
-  let bucketList = document.getElementById("attachmentBucket");
+  let bucketList = GetMsgAttachmentElement();
   return (bucketList) ? bucketList.selectedCount : 0;
 }
 
@@ -4770,6 +4780,9 @@ function Attachments2CompFields(compFields)
 
 function RemoveAllAttachments()
 {
+  // Ensure that attachment pane is shown before removing all attachments.
+  toggleAttachmentPane("show");
+
   let bucket = document.getElementById("attachmentBucket");
   if (bucket.itemCount == 0)
     return;
@@ -4780,7 +4793,7 @@ function RemoveAllAttachments()
                              .createInstance(Ci.nsIMutableArray);
 
   while (bucket.itemCount > 0) {
-    let item = bucket.removeItemAt(bucket.itemCount - 1);
+    let item = bucket.getItemAtIndex(bucket.itemCount - 1);
     if (item.attachment.size != -1) {
       gAttachmentsSize -= item.attachment.size;
     }
@@ -4801,25 +4814,24 @@ function RemoveAllAttachments()
     // Let's release the attachment object hold by the node else it won't go
     // away until the window is destroyed.
     item.attachment = null;
+    item.remove();
   }
 
   if (removedAttachments.length > 0) {
     // Bug workaround: Force update of selectedCount and selectedItem.
     bucket.clearSelection();
-    updateAttachmentPane("show");
-    gContentChanged = true;
-    dispatchAttachmentBucketEvent("attachments-removed", removedAttachments);
+
     AttachmentsChanged();
+    dispatchAttachmentBucketEvent("attachments-removed", removedAttachments);
   }
 }
 
 /**
- * Display/hide and update the content of the attachment bucket (specifically
- * the total file size of the attachments and the number of current attachments).
+ * Show or hide the attachment pane after updating its header bar information
+ * (number and total file size of attachments) and tooltip.
  *
- * @param aShowBucket true if the bucket should be shown, false otherwise
- *
- * Note: This is needed for add-on compatibility, for example in Enigmail.
+ * @param aShowBucket {Boolean} true: show the attachment pane
+ *                              false (or omitted): hide the attachment pane
  */
 function UpdateAttachmentBucket(aShowBucket)
 {
@@ -4848,6 +4860,10 @@ function updateAttachmentPane(aShowPane)
                 : "";
   document.getElementById("attachmentBucketCloseButton").collapsed = count > 0;
 
+  let placeholderTooltip = (count > 0) ? countStr : "";
+  document.getElementById("attachments-placeholder-box")
+          .setAttribute("tooltiptext", placeholderTooltip);
+
   attachmentBucketUpdateTooltips();
 
   // If aShowPane argument is omitted, it's just updating, so we're done.
@@ -4873,7 +4889,7 @@ function RemoveSelectedAttachment()
                              .createInstance(Ci.nsIMutableArray);
 
   for (let i = bucket.selectedCount - 1; i >= 0; i--) {
-    let item = bucket.removeItemAt(bucket.getIndexOfItem(bucket.getSelectedItem(i)));
+    let item = bucket.getSelectedItem(i);
     if (item.attachment.size != -1) {
       gAttachmentsSize -= item.attachment.size;
     }
@@ -4894,9 +4910,8 @@ function RemoveSelectedAttachment()
     // Let's release the attachment object held by the node else it won't go
     // away until the window is destroyed
     item.attachment = null;
+    item.remove();
   }
-
-  updateAttachmentPane();
 
   // Bug workaround: Force update of selectedCount and selectedItem, both wrong
   // after item removal, to avoid confusion for listening command controllers.
@@ -4909,9 +4924,8 @@ function RemoveSelectedAttachment()
                           (bucket.itemCount - 1)   // focus last item;
                         : -1)                      // else: nothing to focus.
 
-  gContentChanged = true;
-  dispatchAttachmentBucketEvent("attachments-removed", removedAttachments);
   AttachmentsChanged();
+  dispatchAttachmentBucketEvent("attachments-removed", removedAttachments);
 }
 
 function RenameSelectedAttachment()
@@ -5187,32 +5201,47 @@ function moveSelectedAttachments(aDirection)
   updateReorderAttachmentsItems();
 }
 
+function keyToggleAttachmentPaneOnCommand() {
+  // For easy and efficient UX with (access key == shortcut key), and working
+  // around a bug where focusing a tree from an associated access key will
+  // deselect first, remember that we're coming from key_toggleAttachmentPane
+  // before we go into command handling.
+  document.getElementById("cmd_toggleAttachmentPane").setAttribute("eventsource",
+                                                                   "key");
+  goDoCommand("cmd_toggleAttachmentPane");
+}
+
 /**
- * Toggle attachment pane view state: show or hide it (only if bucket is empty).
- * If aAction parameter is omitted, auto-cycling of view states, bias for "show".
- * Note: In the current UI layout, forcing "hide" is not recommended for full
- *       bucket as it may violate ux-error-prevention.
+ * Toggle attachment pane view state: show or hide it.
+ * If aAction parameter is omitted, toggle current view state.
  *
- * @param aAction {string} "show":  show attachment pane
- *                         "hide":  hide attachment pane
- *                         "focus": focus the attachment pane
+ * @param aAction {string} "show":   show attachment pane
+ *                         "hide":   hide attachment pane
  *                         "toggle": toggle attachment pane visibility
  */
 function toggleAttachmentPane(aAction = "toggle") {
   let bucket = GetMsgAttachmentElement();
   let attachmentsBox = document.getElementById("attachments-box");
-  let emptyBucket = (bucket.itemCount == 0);
   let bucketHasFocus = (document.activeElement == bucket);
+  let cmdToggleAttachmentPane = document.getElementById("cmd_toggleAttachmentPane");
+  let eventSource = cmdToggleAttachmentPane.getAttribute("eventsource");
+  cmdToggleAttachmentPane.removeAttribute("eventsource"); // reset eventsource
   let attachmentBucketSizer = document.getElementById("attachmentbucket-sizer");
 
   if (aAction == "toggle") {
-    if (!attachmentsBox.collapsed && bucket.itemCount == 0) {
-      // Menu click (View > Attachment Pane) with empty, shown bucket: Hide it.
-      aAction = "hide"
+    if (!attachmentsBox.collapsed) {
+      // If attachment pane is currently shown:
+      if (!bucketHasFocus && eventSource == "key") {
+        // If we get here via key_toggleAttachmentPane, here's where we mimick
+        // access key functionality: First focus the pane if it isn't focused yet.
+        bucket.focus();
+      } else {
+        // If bucket has focus, or if we get here via menu-click or header-click,
+        // just toggle.
+        aAction = "hide"
+      }
     } else {
-      // Menu click with hidden bucket (empty or full)
-      // or cmd_toggleAttachmentPane via shortcut key;
-      // we disable the menu to prevent hiding full and shown bucket.
+      // If attachment pane is currently hidden, show it.
       aAction = "show";
     }
   }
@@ -5221,6 +5250,7 @@ function toggleAttachmentPane(aAction = "toggle") {
     case "show":
       attachmentsBox.collapsed = false;
       attachmentBucketSizer.collapsed = false;
+      attachmentBucketSizer.setAttribute("state", "");
       if (!bucketHasFocus)
         bucket.focus();
       break;
@@ -5229,11 +5259,8 @@ function toggleAttachmentPane(aAction = "toggle") {
       if (bucketHasFocus)
         SetMsgBodyFrameFocus();
       attachmentsBox.collapsed = true;
-      attachmentBucketSizer.collapsed = true;
+      attachmentBucketSizer.setAttribute("state", "collapsed");
       break;
-
-    case "focus":
-      bucket.focus();
   }
 
   goUpdateCommand("cmd_toggleAttachmentPane");
@@ -5402,9 +5429,31 @@ function attachmentBucketOnKeyPress(aEvent) {
     goDoCommand("cmd_attachFile");
   }
 
-  if (aEvent.key == "m" && aEvent.altKey) {
-    toggleAttachmentPane();
+  // For user's convenience, we want the access key combo for attachments pane
+  // (e.g. Alt+M) to also work as a shortcut key to toggle the attachment pane.
+  // Hence localizations have been advised to define the access key combo as a
+  // shortcut key in <key_toggleAttachmentPane/>. This is important especially
+  // for Mac which does not have access keys for UI elements, but it should work
+  // if defined as a shortcut key.
+  // On Windows (and Linux?), unfortunately access key intercepts the identical
+  // shortcut key, so we have to trigger the shortcut key action here.
+  // This means that if the shortcut key is identical with the access key on
+  // Windows/Linux, the shortcut never triggers and we always end up here.
+  // We still want the shortcut key on those OS because localizations might
+  // ignore our advice and define a shortcut key which is different from the
+  // access key. And we can't use the shortcut key only because removing the
+  // control attribute of the access key breaks screen readers. Sigh.
+  let attachmentsAccessKey = document.getElementById("attachmentBucketCount")
+                                     .accessKey;
+  // We can get away with hardcoding the access key modifier key as aEvent.altKey
+  // because it's ALT for Windows and Linux, and Mac doesn't have XUL access keys.
+  if (aEvent.key == attachmentsAccessKey && aEvent.altKey) {
+    goDoCommand('cmd_toggleAttachmentPane');
   }
+}
+
+function attachmentBucketOnDragStart(aEvent) {
+  nsDragAndDrop.startDrag(aEvent, attachmentBucketDNDObserver);
 }
 
 function attachmentBucketOnClick(aEvent)
@@ -5424,7 +5473,6 @@ function attachmentBucketOnSelect() {
   updateAttachmentItems();
 }
 
-
 function attachmentBucketUpdateTooltips() {
   let bucket = GetMsgAttachmentElement();
   let bucketHeader = document.getElementById("attachments-header-box");
@@ -5439,8 +5487,15 @@ function attachmentBucketUpdateTooltips() {
   }
 }
 
-function attachmentBucketHeaderOnClick() {
-  toggleAttachmentPane("focus");
+function attachmentBucketHeaderOnClick(aEvent) {
+  if (aEvent.button == 0) {
+    // Left click
+    goDoCommand("cmd_toggleAttachmentPane");
+  }
+}
+
+function attachmentBucketCloseButtonOnCommand() {
+  toggleAttachmentPane("hide");
 }
 
 function attachmentBucketSizerOnMouseUp() {
@@ -5459,11 +5514,11 @@ function AttachmentElementHasItems()
 
 function attachmentBucketMarkEmptyBucket() {
   let attachmentBucket = GetMsgAttachmentElement();
-  let bucketSizer = document.getElementById("attachmentbucket-sizer");
+  let attachmentsBox = document.getElementById("attachments-box");
   if (attachmentBucket.itemCount > 0) {
-    attachmentBucket.removeAttribute("empty");
+    attachmentsBox.removeAttribute("empty");
   } else {
-    attachmentBucket.setAttribute("empty", "true");
+    attachmentsBox.setAttribute("empty", "true");
   }
 }
 
@@ -5510,14 +5565,8 @@ function nsAttachmentOpener()
 
 nsAttachmentOpener.prototype =
 {
-  QueryInterface: function(iid)
-  {
-    if (iid.equals(Ci.nsIURIContentListener) ||
-        iid.equals(Ci.nsIInterfaceRequestor) ||
-        iid.equals(Ci.nsISupports))
-        return this;
-    throw Cr.NS_NOINTERFACE;
-  },
+  QueryInterface: ChromeUtils.generateQI(["nsIURIContentListener",
+                                          "nsIInterfaceRequestor"]),
 
   onStartURIOpen: function(uri)
   {
@@ -6045,13 +6094,22 @@ var envelopeDragObserver = {
       {
         // Process attachments.
         case "application/x-moz-file": {
-          isValidAttachment = true;
           let fileHandler = Services.io
                                     .getProtocolHandler("file")
                                     .QueryInterface(Ci.nsIFileProtocolHandler);
+          if (!rawData.exists() || !rawData.isReadable()) {
+            // For some reason we couldn't read the file just dragged. Permission problem?
+            Cu.reportError("Couldn't access the dragged file " + rawData.leafName);
+            break;
+          }
 
-          size = rawData.fileSize;
-          rawData = fileHandler.getURLSpecFromFile(rawData);
+          try {
+            size = rawData.fileSize;
+            rawData = fileHandler.getURLSpecFromFile(rawData);
+            isValidAttachment = true;
+          } catch (e) {
+            Cu.reportError("Couldn't process the dragged file " + rawData.leafName + ":" + e);
+          }
           break;
         }
 
@@ -6143,7 +6201,7 @@ var envelopeDragObserver = {
 
     if (aFlavour.contentType != "text/x-moz-address") {
       // Make sure the attachment pane is visible during drag over.
-      updateAttachmentPane("show");
+      toggleAttachmentPane("show");
     } else {
       DragAddressOverTargetControl(aEvent);
     }
@@ -6435,6 +6493,10 @@ function SwitchElementFocus(event)
         break;
     }
   }
+}
+
+function sidebarCloseButtonOnCommand() {
+  toggleAddressPicker();
 }
 
 function toggleAddressPicker()

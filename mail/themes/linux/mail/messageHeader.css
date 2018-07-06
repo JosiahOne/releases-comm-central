@@ -43,21 +43,6 @@
   padding-inline-end: 2px;
 }
 
-.inline-toolbar {
-  -moz-appearance: none;
-  -moz-box-pack: end;
-  min-height: 0;
-  padding: 0;
-}
-
-.inline-toolbar toolbarseparator {
-  height: 28px;
-}
-
-.inline-toolbar toolbarspacer {
-  height: 23px;
-}
-
 /* ::::: attachment view ::::: */
 
 #attachmentList {
@@ -329,12 +314,6 @@ toolbar[mode="icons"] > #otherActionsButton > .toolbarbutton-menu-dropmarker {
   max-height: 7px; /* the height of the image */
   margin: 0.2em 2px 0px; /* 0.2em just to move it off the top of the text */
   list-style-image: url("chrome://messenger/skin/icons/arrow-dn-grey.png");
-}
-
-/* ::::: view expand twisty  ::::: */
-
-.expandHeaderViewButton {
-  list-style-image: url("chrome://global/skin/tree/twisty-open.png");
 }
 
 window[inlinetoolbox] #smallicons,

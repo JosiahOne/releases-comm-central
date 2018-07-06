@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Deprecated.jsm");
 ChromeUtils.import("resource:///modules/jsmime.jsm");
 ChromeUtils.import("resource:///modules/mimeParser.jsm");
 ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -18,7 +17,7 @@ function StringEnumerator(iterator) {
   this._next = undefined;
 }
 StringEnumerator.prototype = {
-  QueryInterface: XPCOMUtils.generateQI([
+  QueryInterface: ChromeUtils.generateQI([
     Ci.nsIUTF8StringEnumerator]),
   _setNext: function () {
     if (this._next !== undefined)
@@ -133,7 +132,7 @@ MimeHeaders.prototype = {
   classDescription: "Mime headers implementation",
   classID: Components.ID("d1258011-f391-44fd-992e-c6f4b461a42f"),
   contractID: "@mozilla.org/messenger/mimeheaders;1",
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIMimeHeaders,
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIMimeHeaders,
     Ci.msgIStructuredHeaders]),
 
   initialize: function MimeHeaders_initialize(allHeaders) {
@@ -165,7 +164,7 @@ function MimeWritableStructuredHeaders() {
 MimeWritableStructuredHeaders.prototype = {
   __proto__: MimeStructuredHeaders.prototype,
   classID: Components.ID("c560806a-425f-4f0f-bf69-397c58c599a7"),
-  QueryInterface: XPCOMUtils.generateQI([
+  QueryInterface: ChromeUtils.generateQI([
     Ci.msgIStructuredHeaders,
     Ci.msgIWritableStructuredHeaders]),
 
@@ -261,7 +260,7 @@ function MimeAddressParser() {
 }
 MimeAddressParser.prototype = {
   classID: Components.ID("96bd8769-2d0e-4440-963d-22b97fb3ba77"),
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIMsgHeaderParser]),
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIMsgHeaderParser]),
 
   parseEncodedHeader: function (aHeader, aCharset, aPreserveGroups, count) {
     aHeader = aHeader || "";
@@ -438,17 +437,10 @@ function MimeConverter() {
 }
 MimeConverter.prototype = {
   classID: Components.ID("93f8c049-80ed-4dda-9000-94ad8daba44c"),
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIMimeConverter]),
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIMimeConverter]),
 
-  encodeMimePartIIStr_UTF8: function (aHeader, aStructured, aCharset,
+  encodeMimePartIIStr_UTF8: function (aHeader, aStructured,
       aFieldNameLen, aLineLength) {
-    // The JSMime encoder only works in UTF-8, so if someone requests to not do
-    // it, they need to change their code.
-    if (aCharset.toLowerCase() != "utf-8") {
-      Deprecated.warning("Encoding to non-UTF-8 values is obsolete",
-        "http://bugzilla.mozilla.org/show_bug.cgi?id=790855");
-    }
-
     // Compute the encoding options. The way our API is structured in this
     // method is really horrendous and does not align with the way that JSMime
     // handles it. Instead, we'll need to create a fake header to take into

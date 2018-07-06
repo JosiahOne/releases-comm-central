@@ -1593,8 +1593,7 @@ function EditorDblClick(event)
     // Only bring up properties if clicked on an element or selected link
     var element;
     try {
-      element = event.explicitOriginalTarget.QueryInterface(
-                    Ci.nsIDOMElement);
+      element = event.explicitOriginalTarget;
     } catch (e) {}
 
      //  We use "href" instead of "a" to not be fooled by named anchor
@@ -1627,8 +1626,7 @@ function EditorClick(event)
     {
       // We check event.explicitOriginalTarget here because .target will never
       // be a textnode (bug 193689)
-      var element = event.explicitOriginalTarget.QueryInterface(
-                        Ci.nsIDOMElement);
+      var element = event.explicitOriginalTarget;
       var name = element.localName;
       if (!["body", "caption", "table", "td", "th", "tr"].includes(name))
       {
@@ -2006,7 +2004,7 @@ function SaveRecentFilesPrefs(aTitle, aFileType)
 
   for (let i = 0; i < historyCount && urlArray.length < historyCount; i++)
   {
-    let url = GetStringPref("editor.history_url_" + i);
+    let url = Services.prefs.getStringPref("editor.history_url_" + i, "");
 
     // Continue if URL pref is missing because
     //  a URL not found during loading may have been removed
@@ -2014,8 +2012,8 @@ function SaveRecentFilesPrefs(aTitle, aFileType)
     // Skip over current an "data" URLs
     if (url && url != curUrl && GetScheme(url) != "data")
     {
-      let title = GetStringPref("editor.history_title_" + i);
-      let fileType = GetStringPref("editor.history_type_" + i);
+      let title = Services.prefs.getStringPref("editor.history_title_" + i, "");
+      let fileType = Services.prefs.getStringPref("editor.history_type_" + i, "");
       titleArray.push(title);
       urlArray.push(url);
       typeArray.push(fileType);

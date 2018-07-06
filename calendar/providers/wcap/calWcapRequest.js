@@ -207,7 +207,7 @@ calWcapNetworkRequest.prototype = {
     m_bLogging: false,
 
     classID: calWcapNetworkRequestClassID,
-    QueryInterface: XPCOMUtils.generateQI(calWcapNetworkRequestInterfaces),
+    QueryInterface: cal.generateQI(calWcapNetworkRequestInterfaces),
     classInfo: XPCOMUtils.generateCI({
         classID: calWcapNetworkRequestClassID,
         contractID: "@mozilla.org/calendar/wcap/network-request;1",
@@ -219,7 +219,7 @@ calWcapNetworkRequest.prototype = {
      * @see nsIInterfaceRequestor
      * @see calProviderUtils.jsm
      */
-    getInterface: cal.InterfaceRequestor_getInterface,
+    getInterface: cal.provider.InterfaceRequestor_getInterface,
 
     /**
      * prepareChannel

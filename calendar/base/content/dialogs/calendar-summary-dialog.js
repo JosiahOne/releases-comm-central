@@ -7,7 +7,6 @@
  */
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
 ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
 
 /**
@@ -121,14 +120,22 @@ function onLoad() {
         let partstat = organizer.participationStatus || "NEEDS-ACTION";
         let orgName = (organizer.commonName && organizer.commonName.length)
                        ? organizer.commonName : organizer.toString();
-        let userTypeString = cal.calGetString("calendar", "dialog.tooltip.attendeeUserType2." + userType,
-                                              [organizer.toString()]);
-        let roleString = cal.calGetString("calendar", "dialog.tooltip.attendeeRole2." + role,
-                                          [userTypeString]);
-        let partstatString = cal.calGetString("calendar", "dialog.tooltip.attendeePartStat2." + partstat,
-                                             [orgName]);
-        let tooltip = cal.calGetString("calendar", "dialog.tooltip.attendee.combined",
-                                       [roleString, partstatString]);
+        let userTypeString = cal.l10n.getCalString(
+            "dialog.tooltip.attendeeUserType2." + userType,
+            [organizer.toString()]
+        );
+        let roleString = cal.l10n.getCalString(
+            "dialog.tooltip.attendeeRole2." + role,
+            [userTypeString]
+        );
+        let partstatString = cal.l10n.getCalString(
+            "dialog.tooltip.attendeePartStat2." + partstat,
+            [orgName]
+        );
+        let tooltip = cal.l10n.getCalString(
+            "dialog.tooltip.attendee.combined",
+            [roleString, partstatString]
+        );
 
         text.setAttribute("value", orgName);
         cell.setAttribute("tooltiptext", tooltip);
@@ -331,7 +338,7 @@ function updateToolbar() {
         msgStr["NEEDS-ACTION"] = type + "NeedsAction";
         msgStr["IN-PROGRESS"] = "taskInProgress";
 
-        let msg = cal.calGetString("calendar-event-dialog", msgStr[partStat]);
+        let msg = cal.l10n.getString("calendar-event-dialog", msgStr[partStat]);
 
         notificationBox.appendNotification(msg,
                                            "statusNotification",
@@ -381,7 +388,7 @@ function updateRepeatDetails() {
                                               endDate, startDate.isDate);
 
     if (!detailsString) {
-        detailsString = cal.calGetString("calendar-event-dialog", "ruleTooComplexSummary");
+        detailsString = cal.l10n.getString("calendar-event-dialog", "ruleTooComplexSummary");
     }
 
     // Now display the string...
@@ -442,7 +449,7 @@ function sendMailToOrganizer() {
     let item = args.calendarEvent;
     let organizer = item.organizer;
     let email = cal.email.getAttendeeEmail(organizer, true);
-    let emailSubject = cal.calGetString("calendar-event-dialog", "emailSubjectReply", [item.title]);
+    let emailSubject = cal.l10n.getString("calendar-event-dialog", "emailSubjectReply", [item.title]);
     let identity = item.calendar.getProperty("imip.identity");
     cal.email.sendTo(email, emailSubject, null, identity);
 }

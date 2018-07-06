@@ -7,15 +7,15 @@
 #include "prmem.h"
 #include "nsMsgImapCID.h"
 #include "nsImapMailFolder.h"
+#include "nsIImapService.h"
 #include "nsIFile.h"
-#include "nsIFolderListener.h"
+#include "nsIUrlListener.h"
 #include "nsCOMPtr.h"
 #include "nsAutoPtr.h"
 #include "nsIRDFService.h"
 #include "nsRDFCID.h"
 #include "nsMsgDBCID.h"
 #include "nsMsgFolderFlags.h"
-#include "nsImapFlagAndUidState.h"
 #include "nsISeekableStream.h"
 #include "nsThreadUtils.h"
 #include "nsIImapUrl.h"
@@ -25,6 +25,7 @@
 #include "nsMsgKeyArray.h"
 #include "nsMsgBaseCID.h"
 #include "nsMsgLocalCID.h"
+#include "nsITransactionManager.h"
 #include "nsImapUndoTxn.h"
 #include "nsIIMAPHostSessionList.h"
 #include "nsIMsgCopyService.h"
@@ -35,18 +36,13 @@
 #include "nsIPrefBranch.h"
 #include "nsIPrefService.h"
 #include "nsMsgI18N.h"
-#include "nsICacheSession.h"
-#include "nsIDOMWindow.h"
 #include "nsIMsgFilter.h"
 #include "nsIMsgFilterService.h"
 #include "nsIMsgSearchCustomTerm.h"
 #include "nsIMsgSearchTerm.h"
 #include "nsImapMoveCoalescer.h"
 #include "nsIPrompt.h"
-#include "nsIPromptService.h"
 #include "nsIDocShell.h"
-#include "nsIInterfaceRequestor.h"
-#include "nsIInterfaceRequestorUtils.h"
 #include "nsUnicharUtils.h"
 #include "nsIImapFlagAndUidState.h"
 #include "nsIImapHeaderXferInfo.h"
@@ -56,25 +52,24 @@
 #include "nsIProgressEventSink.h"
 #include "nsIMsgWindow.h"
 #include "nsIMsgFolder.h" // TO include biffState enum. Change to bool later...
+#include "nsIMsgLocalMailFolder.h"
 #include "nsIMsgOfflineImapOperation.h"
 #include "nsImapOfflineSync.h"
+#include "nsIImapMailFolderSink.h"
+#include "nsIImapServerSink.h"
 #include "nsIMsgAccountManager.h"
 #include "nsQuickSort.h"
 #include "nsIImapMockChannel.h"
-#include "nsIWebNavigation.h"
 #include "nsNetUtil.h"
 #include "nsIMAPNamespace.h"
 #include "nsIMsgFolderCompactor.h"
 #include "nsMsgMessageFlags.h"
-#include "nsIMimeHeaders.h"
-#include "nsIMsgMdnGenerator.h"
 #include "nsISpamSettings.h"
 #include <time.h>
 #include "nsIMsgMailNewsUrl.h"
 #include "nsEmbedCID.h"
 #include "nsIMsgComposeService.h"
 #include "nsMsgCompCID.h"
-#include "nsICacheEntry.h"
 #include "nsDirectoryServiceDefs.h"
 #include "nsIMsgIdentity.h"
 #include "nsIMsgFolderNotificationService.h"
@@ -5163,7 +5158,7 @@ nsImapMailFolder::GetCurMoveCopyMessageInfo(nsIImapUrl *runningUrl,
 NS_IMETHODIMP
 nsImapMailFolder::OnStartRunningUrl(nsIURI *aUrl)
 {
-  NS_PRECONDITION(aUrl, "sanity check - need to be be running non-null url");
+  NS_ASSERTION(aUrl, "sanity check - need to be be running non-null url");
   nsCOMPtr<nsIMsgMailNewsUrl> mailUrl = do_QueryInterface(aUrl);
   if (mailUrl)
   {
@@ -7793,7 +7788,7 @@ nsresult nsImapFolderCopyState::AdvanceToNextFolder(nsresult aStatus)
 NS_IMETHODIMP
 nsImapFolderCopyState::OnStartRunningUrl(nsIURI *aUrl)
 {
-  NS_PRECONDITION(aUrl, "sanity check - need to be be running non-null url");
+  NS_ASSERTION(aUrl, "sanity check - need to be be running non-null url");
   return NS_OK;
 }
 

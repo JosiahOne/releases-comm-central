@@ -3,34 +3,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-
 /*
+ * Windows Live Mail (Win32) import mail and addressbook interfaces
+ */
 
-  Windows Live Mail (Win32) import mail and addressbook interfaces
-
-*/
 #include "nscore.h"
 #include "nsString.h"
 #include "nsMsgUtils.h"
-#include "nsIServiceManager.h"
-#include "nsIImportService.h"
 #include "nsWMImport.h"
-#include "nsIMemory.h"
-#include "nsIImportService.h"
 #include "nsIImportMail.h"
 #include "nsIImportMailboxDescriptor.h"
-#include "nsIImportGeneric.h"
-#include "nsIImportAddressBooks.h"
-#include "nsIImportABDescriptor.h"
-#include "nsIImportFieldMap.h"
 #include "nsXPCOM.h"
-#include "nsISupportsPrimitives.h"
-#include "nsIOutputStream.h"
-#include "nsIAddrDatabase.h"
 #include "nsWMSettings.h"
 #include "nsTextFormatter.h"
 #include "nsWMStringBundle.h"
-#include "nsIStringBundle.h"
 #include "nsUnicharUtils.h"
 
 #include "ImportDebug.h"
@@ -109,7 +95,7 @@ NS_IMETHODIMP nsWMImport::GetDescription(char16_t **name)
 
 NS_IMETHODIMP nsWMImport::GetSupports(char **supports)
 {
-  NS_PRECONDITION(supports != nullptr, "null ptr");
+  NS_ASSERTION(supports != nullptr, "null ptr");
   if (! supports)
       return NS_ERROR_NULL_POINTER;
 
@@ -119,7 +105,7 @@ NS_IMETHODIMP nsWMImport::GetSupports(char **supports)
 
 NS_IMETHODIMP nsWMImport::GetSupportsUpgrade(bool *pUpgrade)
 {
-  NS_PRECONDITION(pUpgrade != nullptr, "null ptr");
+  NS_ASSERTION(pUpgrade != nullptr, "null ptr");
   if (! pUpgrade)
     return NS_ERROR_NULL_POINTER;
 

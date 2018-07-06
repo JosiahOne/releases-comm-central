@@ -95,10 +95,10 @@ pref("app.update.url", "https://aus5.mozilla.org/update/6/%PRODUCT%/%VERSION%/%B
 
 // URL user can browse to manually if for some reason all update installation
 // attempts fail.
-pref("app.update.url.manual", "http://www.getthunderbird.com");
+pref("app.update.url.manual", "https://www.thunderbird.net");
 // A default value for the "More information about this update" link
 // supplied in the "An update is available" page of the update wizard.
-pref("app.update.url.details", "https://www.mozilla.org/%LOCALE%/%APP%/releases/");
+pref("app.update.url.details", "https://www.thunderbird.net/%LOCALE%/%APP%/releases/");
 
 // app.update.promptWaitTime is in branding section
 
@@ -111,14 +111,14 @@ pref("app.update.service.enabled", true);
 #endif
 
 // Release notes URL
-pref("app.releaseNotesURL", "https://live.mozillamessaging.com/%APP%/releasenotes?locale=%LOCALE%&version=%VERSION%&os=%OS%&buildid=%APPBUILDID%");
+pref("app.releaseNotesURL", "https://live.thunderbird.net/%APP%/releasenotes?locale=%LOCALE%&version=%VERSION%&os=%OS%&buildid=%APPBUILDID%");
 
 // URL for "Learn More" for Crash Reporter.
 pref("toolkit.crashreporter.infoURL",
      "https://www.mozilla.org/thunderbird/legal/privacy/#crash-reporter");
 
 // Base URL for web-based support pages.
-pref("app.support.baseURL", "https://support.live.mozillamessaging.com/%LOCALE%/%APP%/%APPBUILDID%/");
+pref("app.support.baseURL", "https://support.thunderbird.net/%LOCALE%/%APP%/%APPBUILDID%/");
 
 // Show error messages in error console.
 pref("javascript.options.showInConsole", true);
@@ -133,11 +133,9 @@ pref("extensions.strictCompatibility", false);
 pref("extensions.strictCompatibility", true);
 #endif
 
-// Specifies a minimum maxVersion an addon needs to say it's compatible with
-// for it to be compatible by default.
-pref("extensions.minCompatibleAppVersion", "5.0");
-
 pref("extensions.update.autoUpdateDefault", true);
+
+pref("extensions.systemAddon.update.enabled", true);  // See bug 1462160.
 
 pref("extensions.hotfix.id", "thunderbird-hotfix@mozilla.org");
 pref("extensions.hotfix.cert.checkAttributes", true);
@@ -163,8 +161,8 @@ pref("extensions.legacy.enabled", true);
 // Preferences for AMO integration
 pref("extensions.getAddons.cache.enabled", true);
 pref("extensions.getAddons.maxResults", 15);
-pref("extensions.getAddons.get.url", "https://services.addons.mozilla.org/api/v3/addons/search/?guid=%IDS%&lang=%LOCALE%");
-pref("extensions.getAddons.compatOverides.url", "https://services.addons.mozilla.org/api/v3/addons/compat-override/?guid=%IDS%&lang=%LOCALE%");
+pref("extensions.getAddons.get.url", "https://live.thunderbird.net/services.addons/api/v3/addons/search/?guid=%IDS%&lang=%LOCALE%");
+pref("extensions.getAddons.compatOverides.url", "https://live.thunderbird.net/services.addons/api/v3/addons/compat-override/?guid=%IDS%&lang=%LOCALE%");
 pref("extensions.getAddons.link.url", "https://addons.mozilla.org/%LOCALE%/%APP%/");
 pref("extensions.getAddons.recommended.url", "https://services.addons.mozilla.org/%LOCALE%/%APP%/api/%API_VERSION%/list/recommended/all/%MAX_RESULTS%/%OS%/%VERSION%?src=thunderbird");
 pref("extensions.getAddons.search.browseURL", "https://addons.mozilla.org/%LOCALE%/%APP%/search/?q=%TERMS%");
@@ -173,31 +171,9 @@ pref("extensions.webservice.discoverURL", "https://services.addons.mozilla.org/%
 pref("extensions.getAddons.themes.browseURL", "https://addons.mozilla.org/%LOCALE%/thunderbird/themes/?src=thunderbird");
 
 // Blocklist preferences
-pref("extensions.blocklist.enabled", true);
-pref("extensions.blocklist.interval", 86400);
-pref("extensions.blocklist.url", "https://blocklist.addons.mozilla.org/blocklist/3/%APP_ID%/%APP_VERSION%/%PRODUCT%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/%PING_COUNT%/%TOTAL_PING_COUNT%/%DAYS_SINCE_LAST_PING%/");
-pref("extensions.blocklist.detailsURL", "https://addons.mozilla.org/%LOCALE%/%APP%/blocked/");
-pref("extensions.blocklist.itemURL", "https://blocklist.addons.mozilla.org/%LOCALE%/%APP%/blocked/%blockID%");
-
-// Kinto blocklist preferences
-pref("services.kinto.base", "https://firefox.settings.services.mozilla.com/v1");
-pref("services.kinto.changes.path", "/buckets/monitor/collections/changes/records");
-pref("services.kinto.bucket", "blocklists");
-pref("services.kinto.onecrl.collection", "certificates");
-pref("services.kinto.onecrl.checked", 0);
-pref("services.kinto.addons.collection", "addons");
-pref("services.kinto.addons.checked", 0);
-pref("services.kinto.plugins.collection", "plugins");
-pref("services.kinto.plugins.checked", 0);
-pref("services.kinto.gfx.collection", "gfx");
-pref("services.kinto.gfx.checked", 0);
-
-// For now, let's keep kinto update out of the release channel.
-#ifdef RELEASE_OR_BETA
-pref("services.kinto.update_enabled", false);
-#else
-pref("services.kinto.update_enabled", true);
-#endif
+pref("extensions.blocklist.url", "https://live.thunderbird.net/blocklists.settings/v1/blocklist/3/%APP_ID%/%APP_VERSION%/%PRODUCT%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/%PING_COUNT%/%TOTAL_PING_COUNT%/%DAYS_SINCE_LAST_PING%/");
+pref("extensions.blocklist.detailsURL", "https://live.thunderbird.net/blocked.cdn/");
+pref("extensions.blocklist.itemURL", "https://live.thunderbird.net/blocked.cdn/%blockID%.html");
 
 // 1 = allow "Man In The Middle" (local proxy, web filter, etc.) for certificate
 //     pinning checks.
@@ -220,11 +196,10 @@ pref("extensions.update.interval", 86400);  // Check for updates to Extensions a
 
 pref("extensions.dss.switchPending", false);    // Non-dynamic switch pending after next
 
-pref("extensions.{972ce4c6-7e08-4474-a285-3208198ce6fd}.name", "chrome://messenger/locale/messenger.properties");
-pref("extensions.{972ce4c6-7e08-4474-a285-3208198ce6fd}.description", "chrome://messenger/locale/messenger.properties");
-
 pref("extensions.webextensions.themes.icons.buttons", "getmsg,newmsg,address,reply,replyall,replylist,forwarding,delete,junk,print,stop,file,nextUnread,prevUnread,mark,tag,back,forward,compact,archive,chat,nextMsg,prevMsg,QFB,conversation,app_menu,newcard,newlist,editcard,newim,send,spelling,attach,security,save,quote,cut,copy,paste,buddy,join_chat,chat_accounts,calendar,tasks,synchronize,newevent,newtask,editevent,today,find,category,complete,priority,saveandclose,attendees,privacy,status,freebusy,timezones");
 pref("extensions.webextensions.themes.enabled", true);
+
+pref("lightweightThemes.selectedThemeID", "default-theme@mozilla.org", sticky);
 
 pref("lightweightThemes.update.enabled", true);
 
@@ -268,9 +243,6 @@ pref("browser.preferences.animateFadeIn", true);
 #else
 pref("browser.preferences.animateFadeIn", false);
 #endif
-
-// load the Preferences in a tab
-pref("mail.preferences.inContent", false);
 
 pref("browser.download.show_plugins_in_list", false);
 pref("browser.download.hide_plugins_without_extensions", true);
@@ -462,6 +434,7 @@ pref("mail.phishing.detection.enabled", true);
 // of the local, static tests
 pref("mail.phishing.detection.ipaddresses", true);
 pref("mail.phishing.detection.mismatched_hosts", true);
+pref("mail.phishing.detection.disallow_form_actions", true);
 
 pref("browser.safebrowsing.reportPhishURL", "https://%LOCALE%.phish-report.mozilla.com/?hl=%LOCALE%");
 
@@ -722,8 +695,6 @@ pref("places.frecency.defaultVisitBonus", 0);
 pref("places.frecency.unvisitedBookmarkBonus", 140);
 pref("places.frecency.unvisitedTypedBonus", 200);
 
-pref("browser.urlbar.restrict.openpage", "%");
-
 // The default for this pref reflects whether the build is capable of IPC.
 // (Turning it on in a no-IPC build will have no effect.)
 #ifdef XP_MACOSX
@@ -765,7 +736,7 @@ pref("plugins.hide_infobar_for_carbon_failure_plugin", false);
 
 pref("plugins.update.url", "https://www.mozilla.org/%LOCALE%/plugincheck/");
 pref("plugins.update.notifyUser", false);
-pref("plugins.crash.supportUrl", "https://live.mozillamessaging.com/%APP%/plugin-crashed?locale=%LOCALE%&version=%VERSION%&os=%OS%&buildid=%APPBUILDID%");
+pref("plugins.crash.supportUrl", "https://live.thunderbird.net/%APP%/plugin-crashed?locale=%LOCALE%&version=%VERSION%&os=%OS%&buildid=%APPBUILDID%");
 
 // Click-to-play has not been ported for TB yet, see bug 814168.
 // The default plugin state should be changed to "ask to activate" when this
@@ -795,22 +766,9 @@ pref("gfx.direct2d.disabled", true);
 #endif
 
 // Account provisioner.
-pref("mail.provider.providerList", "https://broker-live.mozillamessaging.com/provider/list");
-pref("mail.provider.suggestFromName", "https://broker-live.mozillamessaging.com/provider/suggest");
+pref("mail.provider.providerList", "https://broker.thunderbird.net/provider/list");
+pref("mail.provider.suggestFromName", "https://broker.thunderbird.net/provider/suggest");
 pref("mail.provider.enabled", true);
-
-// Pointer to the default engine name.
-pref("browser.search.defaultenginename", "chrome://messenger-region/locale/region.properties");
-
-// Ordering of search engines in the engine list.
-pref("browser.search.order.1", "chrome://messenger-region/locale/region.properties");
-pref("browser.search.order.2", "chrome://messenger-region/locale/region.properties");
-pref("browser.search.order.3", "chrome://messenger-region/locale/region.properties");
-
-pref("browser.search.defaultenginename.US", "data:text/plain,browser.search.defaultenginename.US=Bing");
-pref("browser.search.order.US.1", "data:text/plain,browser.search.defaultenginename.US=Bing");
-pref("browser.search.order.US.2", "data:text/plain,browser.search.defaultenginename.US=Yahoo");
-pref("browser.search.order.US.3", "data:text/plain,browser.search.defaultenginename.US=");
 
 // Developer Tools related preferences
 pref("devtools.debugger.log", false);
@@ -834,11 +792,11 @@ pref("mail.chat.play_sound.url", "");
 
 // BigFiles
 pref("mail.cloud_files.enabled", true);
-pref("mail.cloud_files.inserted_urls.footer.link", "http://www.getthunderbird.com");
-pref("mail.cloud_files.learn_more_url", "https://support.mozillamessaging.com/kb/filelink-large-attachments");
+pref("mail.cloud_files.inserted_urls.footer.link", "https://www.thunderbird.net");
+pref("mail.cloud_files.learn_more_url", "https://support.thunderbird.net/kb/filelink-large-attachments");
 
 // Ignore threads
-pref("mail.ignore_thread.learn_more_url", "https://support.mozillamessaging.com/kb/ignore-threads");
+pref("mail.ignore_thread.learn_more_url", "https://support.thunderbird.net/kb/ignore-threads");
 
 // Sanitize dialog window
 pref("privacy.cpd.history", true);

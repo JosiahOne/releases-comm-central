@@ -16,17 +16,9 @@ function calItipEmailTransport() {
     this.wrappedJSObject = this;
     this._initEmailTransport();
 }
-var calItipEmailTransportClassID = Components.ID("{d4d7b59e-c9e0-4a7a-b5e8-5958f85515f0}");
-var calItipEmailTransportInterfaces = [Ci.calIItipTransport];
 calItipEmailTransport.prototype = {
-    classID: calItipEmailTransportClassID,
-    QueryInterface: XPCOMUtils.generateQI(calItipEmailTransportInterfaces),
-    classInfo: XPCOMUtils.generateCI({
-        classID: calItipEmailTransportClassID,
-        contractID: "@mozilla.org/calendar/itip-transport;1?type=email",
-        classDescription: "Calendar iTIP Email Transport",
-        interfaces: calItipEmailTransportInterfaces,
-    }),
+    QueryInterface: ChromeUtils.generateQI([Ci.calIItipTransport]),
+    classID: Components.ID("{d4d7b59e-c9e0-4a7a-b5e8-5958f85515f0}"),
 
     mHasXpcomMail: false,
     mDefaultAccount: null,
@@ -80,50 +72,29 @@ calItipEmailTransport.prototype = {
                     let subjectKey = seq && seq > 0
                         ? "itipRequestUpdatedSubject"
                         : "itipRequestSubject";
-                    subject = cal.calGetString(
-                        "lightning",
-                        subjectKey,
-                        [summary],
-                        "lightning"
-                    );
+                    subject = cal.l10n.getLtnString(subjectKey, [summary]);
                 } else {
                     subject = summary;
                 }
-                body = cal.calGetString(
-                    "lightning",
+                body = cal.l10n.getLtnString(
                     "itipRequestBody",
-                    [item.organizer ? item.organizer.toString() : "", summary],
-                    "lightning"
+                    [item.organizer ? item.organizer.toString() : "", summary]
                 );
                 break;
             }
             case "CANCEL": {
-                subject = cal.calGetString(
-                    "lightning",
-                    "itipCancelSubject",
-                    [summary],
-                    "lightning"
-                );
-                body = cal.calGetString(
-                    "lightning",
+                subject = cal.l10n.getLtnString("itipCancelSubject", [summary]);
+                body = cal.l10n.getLtnString(
                     "itipCancelBody",
-                    [item.organizer ? item.organizer.toString() : "", summary],
-                    "lightning"
+                    [item.organizer ? item.organizer.toString() : "", summary]
                 );
                 break;
             }
             case "DECLINECOUNTER": {
-                subject = cal.calGetString(
-                    "lightning",
-                    "itipDeclineCounterSubject",
-                    [summary],
-                    "lightning"
-                );
-                body = cal.calGetString(
-                    "lightning",
+                subject = cal.l10n.getLtnString("itipDeclineCounterSubject", [summary]);
+                body = cal.l10n.getLtnString(
                     "itipDeclineCounterBody",
-                    [item.organizer ? item.organizer.toString() : "", summary],
-                    "lightning"
+                    [item.organizer ? item.organizer.toString() : "", summary]
                 );
                 break;
             }
@@ -162,18 +133,8 @@ calItipEmailTransport.prototype = {
                         bodyKey = "itipReplyBodyAccept";
                         break;
                 }
-                subject = cal.calGetString(
-                    "lightning",
-                    subjectKey,
-                    [summary],
-                    "lightning"
-                );
-                body = cal.calGetString(
-                    "lightning",
-                    bodyKey,
-                    [name],
-                    "lightning"
-                );
+                subject = cal.l10n.getLtnString(subjectKey, [summary]);
+                body = cal.l10n.getLtnString(bodyKey, [name]);
                 break;
             }
         }
@@ -243,8 +204,8 @@ calItipEmailTransport.prototype = {
                 }
                 let cancelled = Services.prompt.confirmEx(
                     parent,
-                    cal.calGetString("lightning", "imipSendMail.title", null, "lightning"),
-                    cal.calGetString("lightning", "imipSendMail.text", null, "lightning"),
+                    cal.l10n.getLtnString("imipSendMail.title"),
+                    cal.l10n.getLtnString("imipSendMail.text"),
                     Services.prompt.STD_YES_NO_BUTTONS,
                     null,
                     null,

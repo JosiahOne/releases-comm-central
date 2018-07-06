@@ -7,6 +7,7 @@ ChromeUtils.import("resource://gre/modules/InlineSpellChecker.jsm");
 ChromeUtils.import("resource://gre/modules/PlacesUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource:///modules/MailUtils.js");
 
 XPCOMUtils.defineLazyGetter(this, "PageMenuParent", function() {
@@ -490,7 +491,7 @@ nsContextMenu.prototype = {
       } else if (editFlags & (SpellCheckHelper.INPUT | SpellCheckHelper.TEXTAREA)) {
         if (!this.target.readOnly) {
           this.onEditableArea = true;
-          gSpellChecker.init(this.target.QueryInterface(Ci.nsIDOMNSEditableElement).editor);
+          gSpellChecker.init(this.target.editor);
           gSpellChecker.initFromEvent(document.popupRangeParent, document.popupRangeOffset);
         }
       } else if (editFlags & (SpellCheckHelper.CONTENTEDITABLE)) {
@@ -953,28 +954,25 @@ nsContextMenu.prototype = {
   },
 
   openInBrowser: function CM_openInBrowser() {
-    let uri = Services.io.newURI(this.target.ownerDocument.defaultView.
-                                 top.location.href);
-    PlacesUtils.asyncHistory.updatePlaces({
-      uri: uri,
-      visits:  [{
-        visitDate: Date.now() * 1000,
-        transitionType: Ci.nsINavHistoryService.TRANSITION_LINK
+    let url = this.target.ownerDocument.defaultView.top.location.href;
+    PlacesUtils.history.insert({
+      url,
+      visits: [{
+        date: new Date()
       }]
-    });
+    }).catch(Cu.reportError);
     Cc["@mozilla.org/uriloader/external-protocol-service;1"]
       .getService(Ci.nsIExternalProtocolService)
-      .loadURI(uri);
+      .loadURI(Services.io.newURI(url));
   },
 
   openLinkInBrowser: function CM_openLinkInBrowser() {
-    PlacesUtils.asyncHistory.updatePlaces({
-      uri: this.linkURI,
-      visits:  [{
-        visitDate: Date.now() * 1000,
-        transitionType: Ci.nsINavHistoryService.TRANSITION_LINK
+    PlacesUtils.history.insert({
+      url: this.linkURL,
+      visits: [{
+        date: new Date()
       }]
-    });
+    }).catch(Cu.reportError);
     Cc["@mozilla.org/uriloader/external-protocol-service;1"]
       .getService(Ci.nsIExternalProtocolService)
       .loadURI(this.linkURI);

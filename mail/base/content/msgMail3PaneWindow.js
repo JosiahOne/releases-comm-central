@@ -20,6 +20,10 @@ ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 ChromeUtils.import("resource://gre/modules/Color.jsm");
 
+XPCOMUtils.defineLazyModuleGetters(this, {
+  LightweightThemeManager: "resource://gre/modules/LightweightThemeManager.jsm",
+});
+
 /* This is where functions related to the 3 pane window are kept */
 
 // from MailNewsTypes.h
@@ -68,7 +72,7 @@ var folderListener = {
 
     OnItemIntPropertyChanged: function(item, property, oldValue, newValue) {
       if (item == gFolderDisplay.displayedFolder) {
-        if(property == "TotalMessages" || property == "TotalUnreadMessages") {
+        if (property == "TotalMessages" || property == "TotalUnreadMessages") {
           UpdateStatusMessageCounts(gFolderDisplay.displayedFolder);
         }
       }
@@ -339,6 +343,7 @@ function OnLoadMessenger()
   // update the pane config before we exit onload otherwise the user may see a flicker if we poke the document
   // in delayedOnLoadMessenger...
   UpdateMailPaneConfig(false);
+  CompactTheme.init();
 
   if (AppConstants.platform == "win") {
     // On Win8 set an attribute when the window frame color is too dark for black text.
@@ -631,6 +636,8 @@ function OnUnloadMessenger()
 
   ToolbarIconColor.uninit();
 
+  CompactTheme.uninit();
+
   let tabmail = document.getElementById("tabmail");
   tabmail._teardown();
 
@@ -715,7 +722,10 @@ function loadExtraTabs()
   if ((!tab) || (typeof tab != "object"))
     return;
 
-  let tabmail =  document.getElementById("tabmail");
+  if ("wrappedJSObject" in tab)
+    tab = tab.wrappedJSObject;
+
+  let tabmail = document.getElementById("tabmail");
 
   // we got no action, so suppose its "legacy" code
   if (!("action" in tab)) {
@@ -743,10 +753,9 @@ function loadExtraTabs()
   }
 
   if (tab.action == "open") {
-
     for (let i = 0; i < tab.tabs.length; i++)
-      if("tabType" in tabs.tab[i])
-        tabmail.openTab(tabs.tab[i].tabType,tabs.tab[i].tabParams);
+      if ("tabType" in tab.tabs[i])
+        tabmail.openTab(tab.tabs[i].tabType, tab.tabs[i].tabParams);
 
     return;
   }
@@ -782,9 +791,10 @@ function loadStartFolder(initialUri)
     //First get default account
     try
     {
-
-        if(initialUri)
+        if (initialUri)
+        {
             startFolder = MailUtils.getFolderForURI(initialUri);
+        }
         else
         {
             try {
@@ -1359,8 +1369,7 @@ function messageFlavorDataProvider() {
 }
 
 messageFlavorDataProvider.prototype = {
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIFlavorDataProvider,
-                       Ci.nsISupports]),
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIFlavorDataProvider]),
 
   getFlavorData : function(aTransferable, aFlavor, aData, aDataLen) {
     if (aFlavor !== "application/x-moz-file-promise") {
@@ -1528,9 +1537,18 @@ var LightWeightThemeWebInstaller = {
     notificationBar.persistence = 1;
   },
 
-  _install: function (newTheme) {
+  _executeSoon: function (callback) {
+    Services.tm.dispatchToMainThread(callback);
+  },
+
+  _setTheme: function (theme) {
+    this._manager.currentTheme = theme;
+    return new Promise(this._executeSoon);
+  },
+
+  _install: async function (newTheme) {
     let previousTheme = this._manager.currentTheme;
-    this._manager.currentTheme = newTheme;
+    await this._setTheme(newTheme);
     if (this._manager.currentTheme &&
         this._manager.currentTheme.id == newTheme.id)
       this._postInstallNotification(newTheme, previousTheme);
@@ -1788,6 +1806,12 @@ var TabsInTitlebar = {
 
     let allowed = this.systemSupported &&
                   (Object.keys(this._disallowed)).length == 0;
+
+    if (document.documentElement.getAttribute("chromehidden").includes("toolbar")) {
+      // Don't draw in titlebar in case of a popup window
+      allowed = false;
+    }
+
     if (allowed) {
       document.documentElement.setAttribute("tabsintitlebar", "true");
       if (AppConstants.platform == "macosx") {

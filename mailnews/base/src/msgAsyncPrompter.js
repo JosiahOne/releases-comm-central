@@ -16,8 +16,8 @@ runnablePrompter.prototype = {
   _asyncPrompter: null,
   _hashKey: null,
 
-  run: Task.async(function *() {
-    yield Services.logins.initializationPromise;
+  async run() {
+    await Services.logins.initializationPromise;
     this._asyncPrompter._log.debug("Running prompt for " + this._hashKey);
     let prompter = this._asyncPrompter._pendingPrompts[this._hashKey];
     let ok = false;
@@ -46,7 +46,7 @@ runnablePrompter.prototype = {
 
     this._asyncPrompter._log.debug("Finished running prompter for " + this._hashKey);
     this._asyncPrompter._doAsyncAuthPrompt();
-  })
+  }
 };
 
 function msgAsyncPrompter() {
@@ -64,7 +64,7 @@ function msgAsyncPrompter() {
 
 msgAsyncPrompter.prototype = {
   classID: Components.ID("{49b04761-23dd-45d7-903d-619418a4d319}"),
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIMsgAsyncPrompter]),
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIMsgAsyncPrompter]),
 
   _pendingPrompts: null,
   _asyncPromptInProgress: 0,

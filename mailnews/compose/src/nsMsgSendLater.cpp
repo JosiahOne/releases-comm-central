@@ -156,7 +156,7 @@ nsMsgSendLater::Observe(nsISupports *aSubject, const char* aTopic,
 
     mTimerSet = false;
   }
-  else if (!strcmp(aTopic, "xpcom-shutdown"))
+  else if (!strcmp(aTopic, NS_XPCOM_SHUTDOWN_OBSERVER_ID))
   {
     // We're shutting down. Unsubscribe from the unsentFolder notifications
     // they aren't any use to us now, we don't want to start sending more
@@ -479,14 +479,14 @@ SendOperationListener::OnProgress(uint32_t aProgress, uint32_t aProgressMax)
 NS_IMETHODIMP
 SendOperationListener::SetMessageKey(nsMsgKey aKey)
 {
-  NS_NOTREACHED("SendOperationListener::SetMessageKey()");
+  MOZ_ASSERT_UNREACHABLE("SendOperationListener::SetMessageKey()");
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 NS_IMETHODIMP
 SendOperationListener::GetMessageId(nsACString& messageId)
 {
-  NS_NOTREACHED("SendOperationListener::GetMessageId()\n");
+  MOZ_ASSERT_UNREACHABLE("SendOperationListener::GetMessageId()\n");
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 

@@ -23,9 +23,11 @@ only-for-build-platforms:
 
 job-template:
     description: Localization
-    locales-file: comm/mail/locales/all-locales
+    locales-file: comm/mail/locales/l10n-changesets.json
     locales-per-chunk: 5
     run-on-projects: ['release']
+    attributes:
+        shipping_phase: promote
     ignore-locales:
         by-build-platform:
             # OSX has a special locale for japanese
@@ -127,5 +129,5 @@ job-template:
         options:
             - revision=$GECKO_HEAD_REV
         actions: ['clone-locales', 'list-locales', 'setup', 'repack',
-                  'submit-to-balrog', 'summary']
+                  'summary']
         script: mozharness/scripts/desktop_l10n.py

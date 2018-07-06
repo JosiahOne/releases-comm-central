@@ -169,8 +169,9 @@
 @RESPATH@/components/mozIntl.js
 @RESPATH@/components/satchel.manifest
 @RESPATH@/components/SuiteBrowser.manifest
-@RESPATH@/components/SuiteCommon.manifest
+@RESPATH@/components/SuiteComponents.manifest
 @RESPATH@/components/SuiteFeeds.manifest
+@RESPATH@/components/SuiteSidebar.manifest
 @RESPATH@/components/toolkitplaces.manifest
 @RESPATH@/components/toolkitsearch.manifest
 ; Security Reports
@@ -227,7 +228,6 @@
 @RESPATH@/components/nsAbout.js
 @RESPATH@/components/nsAsyncShutdown.manifest
 @RESPATH@/components/nsAsyncShutdown.js
-@RESPATH@/components/nsBlocklistService.js
 @RESPATH@/components/nsBrowserContentHandler.js
 @RESPATH@/components/nsComposerCmdLineHandler.js
 @RESPATH@/components/nsComposerCmdLineHandler.manifest
@@ -263,9 +263,9 @@
 @RESPATH@/components/nsSearchService.js
 @RESPATH@/components/nsSearchSuggestions.js
 @RESPATH@/components/nsSessionStartup.js
+@RESPATH@/components/nsSessionStartup.manifest
 @RESPATH@/components/nsSessionStore.js
 @RESPATH@/components/nsSidebar.js
-@RESPATH@/components/nsSuiteDownloadManagerUI.js
 @RESPATH@/components/nsSuiteGlue.js
 @RESPATH@/components/nsSetDefault.js
 @RESPATH@/components/nsSetDefault.manifest
@@ -305,10 +305,13 @@
 @RESPATH@/components/recording-cmdline.js
 @RESPATH@/components/recording-cmdline.manifest
 @RESPATH@/components/servicesComponents.manifest
+@RESPATH@/components/servicesSettings.manifest
 @RESPATH@/components/ProcessSelector.js
 @RESPATH@/components/ProcessSelector.manifest
 @RESPATH@/components/SlowScriptDebug.js
 @RESPATH@/components/SlowScriptDebug.manifest
+@RESPATH@/components/ClearDataService.manifest
+@RESPATH@/components/ClearDataService.js
 @RESPATH@/components/storage-json.js
 @RESPATH@/components/SuiteProfileMigrator.js
 @RESPATH@/components/SuiteProfileMigrator.manifest
@@ -390,6 +393,8 @@
 @RESPATH@/chrome/icons/default/default.png
 @RESPATH@/chrome/icons/default/default16.png
 @RESPATH@/chrome/icons/default/default48.png
+@RESPATH@/chrome/icons/default/default64.png
+@RESPATH@/chrome/icons/default/default128.png
 @RESPATH@/chrome/icons/default/downloadManager.png
 @RESPATH@/chrome/icons/default/downloadManager16.png
 @RESPATH@/chrome/icons/default/downloadManager48.png
@@ -414,7 +419,6 @@
 @RESPATH@/chrome/icons/default/places.png
 @RESPATH@/chrome/icons/default/places16.png
 @RESPATH@/chrome/icons/default/places48.png
-@RESPATH@/chrome/icons/default/seamonkey.png
 #ifdef MOZ_UPDATER
 @RESPATH@/icons/updater.png
 #endif
@@ -431,7 +435,6 @@
 @RESPATH@/chrome/icons/default/jpeg-file.ico
 @RESPATH@/chrome/icons/default/JSConsoleWindow.ico
 @RESPATH@/chrome/icons/default/main-window.ico
-@RESPATH@/chrome/icons/default/misc-file.ico
 @RESPATH@/chrome/icons/default/places.ico
 @RESPATH@/chrome/icons/default/script-file.ico
 @RESPATH@/chrome/icons/default/xml-file.ico
@@ -445,8 +448,9 @@
 @RESPATH@/greprefs.js
 @RESPATH@/defaults/autoconfig/prefcalls.js
 @RESPATH@/defaults/permissions
-@RESPATH@/defaults/blocklists
-@RESPATH@/defaults/pinning
+@RESPATH@/defaults/settings/blocklists
+@RESPATH@/defaults/settings/pinning
+@RESPATH@/defaults/settings/main
 ; Warning: changing the path to channel-prefs.js can cause bugs. (Bug 756325)
 @RESPATH@/defaults/pref/channel-prefs.js
 
@@ -654,15 +658,7 @@ man/*
 @BINPATH@/mozMapi32.dll
 #endif
 
-#ifdef MOZ_MOVEMAIL
-@RESPATH@/isp/movemail.rdf
-#endif
-@RESPATH@/isp/rss.rdf
-@RESPATH@/isp/Bogofilter.sfd
-@RESPATH@/isp/DSPAM.sfd
-@RESPATH@/isp/POPFile.sfd
-@RESPATH@/isp/SpamAssassin.sfd
-@RESPATH@/isp/SpamPal.sfd
+@RESPATH@/isp/*
 
 ; Gloda
 @RESPATH@/chrome/gloda@JAREXT@

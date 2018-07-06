@@ -72,6 +72,11 @@
   --toolbarbutton-icon-fill-opacity: 1;
 }
 
+:root[lwt-popup-brighttext] {
+  --arrowpanel-dimmed: rgba(249, 249, 250, .1);
+  --arrowpanel-dimmed-further: rgba(249, 249, 250, .15);
+}
+
 toolbar[brighttext] {
   --toolbarbutton-icon-fill-attention: var(--lwt-toolbarbutton-icon-fill-attention, #45a1ff);
 }
@@ -93,6 +98,7 @@ toolbar[brighttext] {
   --toolbarbutton-checkedhover-backgroundcolor: rgba(255, 255, 255, .5);
 }
 
+#FindToolbar:-moz-lwtheme,
 #ab-toolbox > toolbar:-moz-lwtheme,
 .mail-toolbox > toolbar:-moz-lwtheme,
 #compose-toolbox > toolbar:-moz-lwtheme,
@@ -115,6 +121,19 @@ toolbar[brighttext] {
 
 #tabbar-toolbar[customizing="true"] {
   min-width: 24px;
+}
+
+.inline-toolbar {
+  -moz-appearance: none;
+}
+
+.inline-toolbar toolbarpaletteitem toolbarseparator,
+.inline-toolbar toolbarseparator {
+  height: 24px;
+}
+
+.inline-toolbar toolbarspacer {
+  height: 20px;
 }
 
 /* ::::: menubar ::::: */
@@ -376,6 +395,7 @@ button[type="menu-button"] > button {
 
 .findbar-button {
   padding: 2px 6px;
+  color: inherit;
 }
 
 .toolbarbutton-1[disabled=true] .toolbarbutton-icon,
@@ -501,6 +521,7 @@ toolbar[mode="icons"] .toolbarbutton-1:not([type="menu-button"]) {
   transition-duration: 10ms;
 }
 
+.findbar-button[checked=true]:not(:active):hover,
 .toolbarbutton-1[checked=true]:not(:active):hover {
   background-color: var(--toolbarbutton-checkedhover-backgroundcolor);
   transition: background-color .4s;

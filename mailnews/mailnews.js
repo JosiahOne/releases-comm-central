@@ -149,6 +149,8 @@ pref("mail.strictly_mime.parm_folding",     1);
 pref("mail.label_ascii_only_mail_as_us_ascii", false);
 pref("mail.file_attach_binary",             false);
 pref("mail.show_headers",                   1); // some
+pref("mailnews.p7m_external", false);          // S/MIME parts are not external (but inline decrypted).
+pref("mailnews.p7m_subparts_external", true);  // S/MIME child parts are external. Protect against efail.
 pref("mail.pane_config.dynamic",            0);
 pref("mail.addr_book.mapit_url.format", "chrome://messenger-region/locale/region.properties");
 pref("mail.addr_book.mapit_url.1.name", "chrome://messenger-region/locale/region.properties");
@@ -613,7 +615,6 @@ pref("mailnews.display.date_senders_timezone", false);
 pref("mailnews.display.prefer_plaintext", false);  // Ignore HTML parts in multipart/alternative
 pref("mailnews.display.html_as", 0);  // How to display HTML/MIME parts. 0 = Render the sender's HTML; 1 = HTML->TXT->HTML; 2 = Show HTML source; 3 = Sanitize HTML; 4 = Show all body parts
 pref("mailnews.display.show_all_body_parts_menu", false); // Whether the View > Message body as > All body parts menu item is available
-pref("mailnews.display.html_sanitizer.allowed_tags.migrated", false); // whether legacy mailnews.display.html_sanitizer.allowed_tags pref has been migrated to values of the two prefs below
 pref("mailnews.display.html_sanitizer.drop_non_css_presentation", true); // whether to drop <font>, <center>, align='...', etc.
 pref("mailnews.display.html_sanitizer.drop_media", false); // whether to drop <img>, <video> and <audio>
 pref("mailnews.display.disallow_mime_handlers", 0);  /* Let only a few classes process incoming data. This protects from bugs (e.g. buffer overflows) and from security loopholes (e.g. allowing unchecked HTML in some obscure classes, although the user has html_as > 0).
@@ -732,7 +733,7 @@ pref("mail.biff.show_balloon", false);
 #elifdef XP_MACOSX
 pref("mail.biff.animate_dock_icon", false);
 #elifdef XP_UNIX
-pref("mail.biff.use_system_alert", false);
+pref("mail.biff.use_system_alert", true);
 #endif
 
 // add jitter to biff interval
@@ -881,9 +882,9 @@ pref("mailnews.emptyJunk.dontAskAgain", false);
 pref("mailnews.emptyTrash.dontAskAgain", false);
 
 // where to fetch auto config information from.
-pref("mailnews.auto_config_url", "https://live.mozillamessaging.com/autoconfig/v1.1/");
+pref("mailnews.auto_config_url", "https://live.thunderbird.net/autoconfig/v1.1/");
 // Added in bug 551519. Remove when bug 545866 is fixed.
-pref("mailnews.mx_service_url", "https://live.mozillamessaging.com/dns/mx/");
+pref("mailnews.mx_service_url", "https://live.thunderbird.net/dns/mx/");
 // Allow to contact ISP (email address domain)
 // This happens via insecure means (HTTP), so the config cannot be trusted,
 // and also contains the email address

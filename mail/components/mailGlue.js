@@ -3,6 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Services.jsm");
 ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
@@ -11,6 +13,20 @@ ChromeUtils.import("resource:///modules/distribution.js");
 ChromeUtils.import("resource:///modules/mailMigrator.js");
 ChromeUtils.import("resource:///modules/extensionSupport.jsm");
 const { L10nRegistry, FileSource } = ChromeUtils.import("resource://gre/modules/L10nRegistry.jsm", {});
+
+// lazy module getters
+
+XPCOMUtils.defineLazyModuleGetters(this, {
+  LightweightThemeManager: "resource://gre/modules/LightweightThemeManager.jsm",
+});
+
+XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
+  return Services.strings.createBundle("chrome://branding/locale/brand.properties");
+});
+
+XPCOMUtils.defineLazyGetter(this, "gMailBundle", function() {
+  return Services.strings.createBundle("chrome://messenger/locale/messenger.properties");
+});
 
 /**
  * Glue code that should be executed before any windows are opened. Any
@@ -38,6 +54,32 @@ MailGlue.prototype = {
     Services.obs.addObserver(this, "handle-xul-text-link");
     Services.obs.addObserver(this, "profile-after-change");
     Services.obs.addObserver(this, "chrome-document-global-created");
+
+    // Inject scripts into some devtools windows.
+    function _setupBrowserConsole(domWindow) {
+      domWindow.document.documentElement.setAttribute("title", gMailBundle.GetStringFromName("errorConsoleTitle"));
+      Services.scriptloader.loadSubScript("chrome://global/content/viewSourceUtils.js", domWindow);
+    }
+
+    ExtensionSupport.registerWindowListener(
+      "Thunderbird-internal-BrowserConsole",
+      {
+        chromeURLs: [ "chrome://devtools/content/webconsole/browserconsole.xul" ],
+        onLoadWindow: _setupBrowserConsole
+      });
+
+    function _setupToolbox(domWindow) {
+      // Defines openUILinkIn and openWebLinkIn
+      Services.scriptloader.loadSubScript("chrome://communicator/content/contentAreaClick.js", domWindow);
+    }
+
+    ExtensionSupport.registerWindowListener(
+      "Thunderbird-internal-Toolbox",
+      {
+        chromeURLs: [ "chrome://devtools/content/framework/toolbox-process-window.xul" ],
+        onLoadWindow: _setupToolbox
+      });
+
   },
 
   // cleanup (called at shutdown)
@@ -48,6 +90,9 @@ MailGlue.prototype = {
     Services.obs.removeObserver(this, "handle-xul-text-link");
     Services.obs.removeObserver(this, "profile-after-change");
     Services.obs.removeObserver(this, "chrome-document-global-created");
+
+    ExtensionSupport.unregisterWindowListener("Thunderbird-internal-Toolbox");
+    ExtensionSupport.unregisterWindowListener("Thunderbird-internal-BrowserConsole");
   },
 
   // nsIObserver implementation
@@ -89,7 +134,7 @@ MailGlue.prototype = {
     TBDistCustomizer.applyPrefDefaults();
 
     let locales = Services.locale.getPackagedLocales();
-    const appSource = new FileSource("app", locales, "resource:///chrome/{locale}/locale/{locale}/");
+    const appSource = new FileSource("app", locales, "resource:///localization/{locale}/");
     L10nRegistry.registerSource(appSource);
 
     // handle any migration work that has to happen at profile startup
@@ -100,6 +145,57 @@ MailGlue.prototype = {
       Services.ww.openWindow(null, "chrome://messenger/content/safeMode.xul",
                              "_blank", "chrome,centerscreen,modal,resizable=no", null);
     }
+
+    let vendorShortName = gBrandBundle.GetStringFromName("vendorShortName");
+
+    LightweightThemeManager.addBuiltInTheme({
+      id: "thunderbird-compact-light@mozilla.org",
+      name: gMailBundle.GetStringFromName("lightTheme.name"),
+      description: gMailBundle.GetStringFromName("lightTheme.description"),
+      iconURL: "resource:///chrome/messenger/content/messenger/light.icon.svg",
+      textcolor: "black",
+      accentcolor: "white",
+      popup: "#fff",
+      popup_text: "#0c0c0d",
+      popup_border: "#ccc",
+      author: vendorShortName,
+    });
+    LightweightThemeManager.addBuiltInTheme({
+      id: "thunderbird-compact-dark@mozilla.org",
+      name: gMailBundle.GetStringFromName("darkTheme.name"),
+      description: gMailBundle.GetStringFromName("darkTheme.description"),
+      iconURL: "resource:///chrome/messenger/content/messenger/dark.icon.svg",
+      textcolor: "white",
+      accentcolor: "black",
+      popup: "#4a4a4f",
+      popup_text: "rgb(249, 249, 250)",
+      popup_border: "#27272b",
+      toolbar_field_text: "rgb(249, 249, 250)",
+      toolbar_field_border: "rgba(249, 249, 250, 0.2)",
+      author: vendorShortName,
+    }, {
+      useInDarkMode: true
+    });
+  },
+
+ _offertToEnableAddons(aAddons) {
+    let win = Services.wm.getMostRecentWindow("mail:3pane");
+    let tabmail = win.document.getElementById("tabmail");
+
+    aAddons.forEach(function(aAddon) {
+    // If the add-on isn't user disabled or can't be enabled, then skip it.
+    if (!aAddon.userDisabled || !(aAddon.permissions & AddonManager.PERM_CAN_ENABLE))
+      return;
+
+    tabmail.openTab("contentTab",
+                    { contentPage: "about:newaddon?id=" + aAddon.id,
+                      clickHandler: null });
+    });
+  },
+
+  _detectNewSideloadedAddons: async function () {
+    let newSideloadedAddons = await AddonManagerPrivate.getNewSideloads();
+    this._offertToEnableAddons(newSideloadedAddons);
   },
 
   _onMailStartupDone: function MailGlue__onMailStartupDone() {
@@ -113,20 +209,10 @@ MailGlue.prototype = {
 
     // For any add-ons that were installed disabled and can be enabled, offer
     // them to the user.
-    var win = Services.wm.getMostRecentWindow("mail:3pane");
-    var tabmail = win.document.getElementById("tabmail");
     var changedIDs = AddonManager.getStartupChanges(AddonManager.STARTUP_CHANGE_INSTALLED);
-    AddonManager.getAddonsByIDs(changedIDs, function (aAddons) {
-      aAddons.forEach(function(aAddon) {
-        // If the add-on isn't user disabled or can't be enabled then skip it.
-        if (!aAddon.userDisabled || !(aAddon.permissions & AddonManager.PERM_CAN_ENABLE))
-          return;
+    AddonManager.getAddonsByIDs(changedIDs, this._offertToEnableAddons.bind(this));
 
-        tabmail.openTab("contentTab",
-                        { contentPage: "about:newaddon?id=" + aAddon.id,
-                          clickHandler: null });
-      });
-    });
+    this._detectNewSideloadedAddons();
   },
 
   _handleLink: function MailGlue__handleLink(aSubject, aData) {
@@ -156,8 +242,8 @@ MailGlue.prototype = {
 
   // for XPCOM
   classID: Components.ID("{eb239c82-fac9-431e-98d7-11cacd0f71b8}"),
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
-                                         Ci.nsIMailGlue]),
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIObserver,
+                                          Ci.nsIMailGlue]),
 };
 
 var components = [MailGlue];

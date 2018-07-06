@@ -3,7 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
 ChromeUtils.import("resource://calendar/modules/ltnInvitationUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -222,10 +221,10 @@ var ltnImipBar = {
         // anymore, we also clear the buttons if any to avoid e.g. accept/decline buttons
         if (isOutgoing(gMessageDisplay.displayedMessage)) {
             if (ltnImipBar.foundItems && ltnImipBar.foundItems[0]) {
-                data.label = ltn.getString("lightning", "imipBarSentText");
+                data.label = cal.l10n.getLtnString("imipBarSentText");
             } else {
                 data = {
-                    label: ltn.getString("lightning", "imipBarSentButRemovedText"),
+                    label: cal.l10n.getLtnString("imipBarSentButRemovedText"),
                     buttons: [],
                     hideMenuItems: []
                 };
@@ -315,7 +314,7 @@ var ltnImipBar = {
                 }
 
                 let opListener = {
-                    QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+                    QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
                     onOperationComplete: function(aCalendar, aStatus, aOperationType, aId, aDetail) {
                         if (Components.isSuccessCode(aStatus) && isDeclineCounter) {
                             // TODO: move the DECLINECOUNTER stuff to actionFunc
@@ -418,7 +417,7 @@ var ltnImipBar = {
                             onReschedule: () => {
                                 imipBar.setAttribute(
                                     "label",
-                                    ltn.getString("lightning", "imipBarCounterPreviousVersionText")
+                                    cal.l10n.getLtnString("imipBarCounterPreviousVersionText")
                                 );
                                 // TODO: should we hide the buttons in this case, too?
                             }
@@ -426,7 +425,7 @@ var ltnImipBar = {
                     } else {
                         imipBar.setAttribute(
                             "label",
-                            ltn.getString("lightning", "imipBarCounterErrorText")
+                            cal.l10n.getLtnString("imipBarCounterErrorText")
                         );
                         ltnImipBar.resetButtons();
                         if (proposingAttendee) {
@@ -464,8 +463,8 @@ var ltnImipBar = {
             let items = ltnImipBar.itipItem.getItemList({});
             if (items && items.length) {
                 let delTime = delmgr.getDeletedDate(items[0].id);
-                let dialogText = ltnGetString("lightning", "confirmProcessInvitation");
-                let dialogTitle = ltnGetString("lightning", "confirmProcessInvitationTitle");
+                let dialogText = cal.l10n.getLtnString("confirmProcessInvitation");
+                let dialogTitle = cal.l10n.getLtnString("confirmProcessInvitationTitle");
                 if (delTime && !Services.prompt.confirm(window, dialogTitle, dialogText)) {
                     return false;
                 }

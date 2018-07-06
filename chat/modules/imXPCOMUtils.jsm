@@ -108,8 +108,8 @@ XPCOMUtils.defineLazyGetter(Cu.getGlobalForObject({}), "gLogLevels", function() 
       else
         delete gLogLevels[module];
     },
-    QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
-                                           Ci.nsISupportsWeakReference]),
+    QueryInterface: ChromeUtils.generateQI(["nsIObserver",
+                                            "nsISupportsWeakReference"]),
   };
 
   // Add weak pref observer to see log level pref changes.
@@ -236,11 +236,11 @@ nsSimpleEnumerator.prototype = {
 
     return this._items[this._nextIndex++];
   },
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsISimpleEnumerator])
+  QueryInterface: ChromeUtils.generateQI([Ci.nsISimpleEnumerator])
 };
 
 var EmptyEnumerator = {
   hasMoreElements: () => false,
   getNext: function() { throw Cr.NS_ERROR_NOT_AVAILABLE; },
-  QueryInterface: XPCOMUtils.generateQI([Ci.nsISimpleEnumerator])
+  QueryInterface: ChromeUtils.generateQI([Ci.nsISimpleEnumerator])
 };

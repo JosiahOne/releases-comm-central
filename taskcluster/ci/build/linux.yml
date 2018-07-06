@@ -31,6 +31,8 @@ linux64-nightly/opt:
     description: "Linux64 Nightly"
     attributes:
         nightly: true
+    shipping-phase: build
+    shipping-product: thunderbird
     index:
         product: thunderbird
         job-name: linux64-opt
@@ -51,7 +53,6 @@ linux64-nightly/opt:
         config:
             - builds/taskcluster_base_thunderbird.py
             - builds/releng_base_linux_64_builds.py
-            - disable_signing.py
             - taskcluster_nightly.py
         script: "mozharness/scripts/fx_desktop_build.py"
         need-xvfb: true
@@ -123,6 +124,8 @@ linux-nightly/opt:
     description: "Linux32 Nightly"
     attributes:
         nightly: true
+    shipping-phase: build
+    shipping-product: thunderbird
     index:
         product: thunderbird
         job-name: linux32-opt
@@ -143,7 +146,6 @@ linux-nightly/opt:
         config:
             - builds/taskcluster_base_thunderbird.py
             - builds/releng_base_linux_32_builds.py
-            - disable_signing.py
             - taskcluster_nightly.py
         script: "mozharness/scripts/fx_desktop_build.py"
         need-xvfb: true

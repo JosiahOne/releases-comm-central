@@ -74,7 +74,7 @@ function getPrintSettings(receiverFunc) {
     let tempTitle = document.getElementById("title-field").value;
     let settings = {};
     let requiresFetch = true;
-    settings.title = tempTitle || cal.calGetString("calendar", "Untitled");
+    settings.title = tempTitle || cal.l10n.getCalString("Untitled");
     settings.layoutCId = document.getElementById("layout-field").value;
     settings.start = null;
     settings.end = null;
@@ -142,7 +142,7 @@ function getPrintSettings(receiverFunc) {
     // then fetch the items here.
     if (requiresFetch) {
         let listener = {
-            QueryInterface: XPCOMUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
             onOperationComplete: function(aCalendar, aStatus, aOperationType, aId, aDateTime) {
                 receiverFunc(settings);
             },
@@ -202,7 +202,7 @@ function getFilter(settings) {
  */
 function refreshHtml(finishFunc) {
     getPrintSettings((settings) => {
-        document.title = cal.calGetString("calendar", "PrintPreviewWindowTitle", [settings.title]);
+        document.title = cal.l10n.getCalString("PrintPreviewWindowTitle", [settings.title]);
 
         let printformatter = Components.classes[settings.layoutCId]
                                        .createInstance(Components.interfaces.calIPrintFormatter);
@@ -304,8 +304,20 @@ function printAndClose() {
  * Called when once a date has been selected in the datepicker.
  */
 function onDatePick() {
-    cal.view.radioGroupSelectItem("view-field", "custom-range");
-    setTimeout(refreshHtml, 0);
+    let radioGroup = document.getElementById("view-field");
+    let items = radioGroup.getElementsByTagName("radio");
+    let index;
+    for (let i in items) {
+        if (items[i].getAttribute("id") == "custom-range") {
+            index = i;
+            break;
+        }
+    }
+
+    if (index && index != 0) {
+        radioGroup.selectedIndex = index;
+        setTimeout(refreshHtml, 0);
+    }
 }
 
 function eventsAndTasksOptions(targetId) {

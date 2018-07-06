@@ -2,17 +2,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+// make SOLO_TEST=content-tabs/test-addons-mgr.js mozmill-one
+
 var MODULE_NAME = "test-addons-mgr";
 
-var RELATIVE_ROOT = '../shared-modules';
-var MODULE_REQUIRES = ['folder-display-helpers', 'content-tab-helpers'];
+var RELATIVE_ROOT = "../shared-modules";
+var MODULE_REQUIRES = ["folder-display-helpers", "content-tab-helpers",
+                       "window-helpers"];
 
-var setupModule = function (module) {
-  let fdh = collector.getModule('folder-display-helpers');
-  fdh.installInto(module);
-  let cth = collector.getModule('content-tab-helpers');
-  cth.installInto(module);
-};
+var elib = {};
+ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+
+function setupModule(module) {
+  for (let lib of MODULE_REQUIRES) {
+    collector.getModule(lib).installInto(module);
+  }
+}
 
 function test_open_addons_with_url() {
   mc.window.openAddonsMgr('addons://list/theme');
@@ -32,4 +37,40 @@ function test_open_addons_with_url() {
   wait_for_content_tab_load(tab, 'about:addons', 10000);
   assert_true(content_tab_e(tab, 'category-plugin').selected,
               "Plugins category should be selected!");
+
+  mc.tabmail.closeTab(tab);
 }
+
+/**
+ * Bug 1462923
+ * Check if the "Tools->Add-on Options" menu item works and shows our add-on.
+ * This relies on the MozMill extension having optionsURL defined in install.rdf,
+ * however simplistic the preferences XUL document may be.
+ */
+function test_addon_prefs() {
+  // Open Add-on Options.
+  mc.click(mc.eid("tasksMenu"));
+  let popups = mc.click_menus_in_sequence(mc.e("taskPopup"), [ { id: "addonsManager_prefs" } ], true);
+  let foundAddon = false;
+  plan_for_modal_dialog("mozmill-prefs", function (controller) {
+     // Add |mc.sleep(1000);| here to see the popup dialog.
+    controller.window.close();
+  });
+
+  // MozMill add-on should be somewhere in the list. When found, click it.
+  for (let item of popups[popups.length-1].children) {
+    if (item.tagName == "menuitem" && item.getAttribute("collapsed") != "true" &&
+        item.label == "MozMill") {
+      foundAddon = true;
+      mc.click(new elib.Elem(item));
+      break;
+    }
+  }
+  assert_true(foundAddon);
+
+  // Wait for the options dialog to open and close.
+  wait_for_modal_dialog();
+  wait_for_window_close();
+}
+// The test operates the main menu which is not accessible from MozMill on Mac.
+test_addon_prefs.EXCLUDED_PLATFORMS = ["darwin"];

@@ -188,7 +188,7 @@ nsMsgPrintEngine::OnLocationChange(nsIWebProgress* aWebProgress,
                       nsIURI *location,
                       uint32_t aFlags)
 {
-    NS_NOTREACHED("notification excluded in AddProgressListener(...)");
+    MOZ_ASSERT_UNREACHABLE("notification excluded in AddProgressListener(...)");
     return NS_OK;
 }
 
@@ -208,7 +208,7 @@ nsMsgPrintEngine::OnSecurityChange(nsIWebProgress *aWebProgress,
                       nsIRequest *aRequest,
                       uint32_t state)
 {
-    NS_NOTREACHED("notification excluded in AddProgressListener(...)");
+    MOZ_ASSERT_UNREACHABLE("notification excluded in AddProgressListener(...)");
     return NS_OK;
 }
 
@@ -238,8 +238,8 @@ nsMsgPrintEngine::SetWindow(mozIDOMWindowProxy *aWin)
 
   nsCOMPtr<nsIDocShellTreeItem> childItem;
   rootAsItem->FindChildWithName(NS_LITERAL_STRING("content"), true,
-				false, nullptr, nullptr,
-				getter_AddRefs(childItem));
+        false, nullptr, nullptr,
+        getter_AddRefs(childItem));
 
   mDocShell = do_QueryInterface(childItem);
 
@@ -427,8 +427,8 @@ nsMsgPrintEngine::StartNextPrintOperation()
 NS_IMETHODIMP
 nsMsgPrintEngine::SetStatusFeedback(nsIMsgStatusFeedback *aFeedback)
 {
-	mFeedback = aFeedback;
-	return NS_OK;
+  mFeedback = aFeedback;
+  return NS_OK;
 }
 
 #define DATA_URL_PREFIX     "data:"

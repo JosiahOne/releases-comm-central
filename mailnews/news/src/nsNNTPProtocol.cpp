@@ -91,7 +91,7 @@
 #define READ_NEWS_LIST_COUNT_MAX 500 /* number of groups to process at a time when reading the list from the server */
 #define READ_NEWS_LIST_TIMEOUT 50  /* uSec to wait until doing more */
 #define RATE_STR_BUF_LEN 32
-#define UPDATE_THRESHHOLD 25600 /* only update every 25 KB */
+#define UPDATE_THRESHOLD 25600 /* only update every 25 KB */
 
 using namespace mozilla::mailnews;
 using namespace mozilla;
@@ -350,7 +350,7 @@ NS_IMETHODIMP nsNNTPProtocol::Initialize(nsIURI *aURL, nsIMsgWindow *aMsgWindow)
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
-  NS_PRECONDITION(m_url, "invalid URL passed into NNTP Protocol");
+  NS_ASSERTION(m_url, "invalid URL passed into NNTP Protocol");
 
   m_runningURL = do_QueryInterface(m_url, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -780,7 +780,7 @@ nsNNTPProtocol::OnCacheEntryAvailable(nsICacheEntry *entry, bool aNew, nsIApplic
       NS_ENSURE_SUCCESS(rv, rv);
 
       nsCOMPtr<nsIOutputStream> outStream;
-      rv = entry->OpenOutputStream(0, getter_AddRefs(outStream));
+      rv = entry->OpenOutputStream(0, -1, getter_AddRefs(outStream));
       NS_ENSURE_SUCCESS(rv, rv);
 
       rv = tee->Init(m_channelListener, outStream, nullptr);
@@ -1069,7 +1069,7 @@ nsresult nsNNTPProtocol::LoadUrl(nsIURI * aURL, nsISupports * aConsumer)
     m_typeWanted = ARTICLE_WANTED;
   else
   {
-    NS_NOTREACHED("Unknown news action");
+    MOZ_ASSERT_UNREACHABLE("Unknown news action");
     rv = NS_ERROR_FAILURE;
   }
 
@@ -1340,7 +1340,7 @@ nsresult nsNNTPProtocol::NewsResponse(nsIInputStream *inputStream, uint32_t leng
 {
   uint32_t status = 0;
 
-  NS_PRECONDITION(nullptr != inputStream, "invalid input stream");
+  NS_ASSERTION(nullptr != inputStream, "invalid input stream");
 
   bool pauseForMoreData = false;
   char *line = m_lineStreamBuffer->ReadNextLine(inputStream, status, pauseForMoreData);
@@ -1536,7 +1536,7 @@ nsresult nsNNTPProtocol::SendListSearchesResponse(nsIInputStream * inputStream, 
   uint32_t status = 0;
   nsresult rv = NS_OK;
 
-  NS_PRECONDITION(inputStream, "invalid input stream");
+  NS_ASSERTION(inputStream, "invalid input stream");
 
   bool pauseForMoreData = false;
   char *line = m_lineStreamBuffer->ReadNextLine(inputStream, status, pauseForMoreData, &rv);
@@ -2771,7 +2771,7 @@ nsresult nsNNTPProtocol::ReadNewsList(nsIInputStream * inputStream, uint32_t len
     mBytesReceived += status;
     mBytesReceivedSinceLastStatusUpdate += status;
 
-    if ((mBytesReceivedSinceLastStatusUpdate > UPDATE_THRESHHOLD) && m_msgWindow) {
+    if ((mBytesReceivedSinceLastStatusUpdate > UPDATE_THRESHOLD) && m_msgWindow) {
       mBytesReceivedSinceLastStatusUpdate = 0;
 
       nsCOMPtr <nsIMsgStatusFeedback> msgStatusFeedback;
@@ -3680,7 +3680,7 @@ nsresult nsNNTPProtocol::DoCancel()
     rv = dialog->ConfirmEx(nullptr, confirmText.get(), nsIPrompt::STD_YES_NO_BUTTONS,
                            nullptr, nullptr, nullptr, nullptr, &dummyValue, &confirmCancelResult);
     if (NS_FAILED(rv))
-    	confirmCancelResult = 1; // Default to No.
+      confirmCancelResult = 1; // Default to No.
   }
   else
     confirmCancelResult = 0; // Default to Yes.
@@ -3710,6 +3710,10 @@ nsresult nsNNTPProtocol::DoCancel()
     otherHeaders += distribution;
     otherHeaders.AppendLiteral(CRLF);
   }
+  otherHeaders.AppendLiteral("MIME-Version: 1.0");
+  otherHeaders.AppendLiteral(CRLF);
+  otherHeaders.AppendLiteral("Content-Type: text/plain");
+  otherHeaders.AppendLiteral(CRLF);
 
   PL_strcpy (body, "This message was cancelled from within ");
   PL_strcat (body, appName.get());

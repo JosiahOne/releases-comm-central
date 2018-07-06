@@ -185,13 +185,11 @@ nsLDAPConnection::Close()
       // still be synchronous
       //
       rc = ldap_unbind(mConnectionHandle);
-#ifdef PR_LOGGING
       if (rc != LDAP_SUCCESS) {
           MOZ_LOG(gLDAPLogModule, mozilla::LogLevel::Warning,
                  ("nsLDAPConnection::Close(): %s\n",
                   ldap_err2string(rc)));
       }
-#endif
       mConnectionHandle = nullptr;
   }
 
@@ -234,7 +232,7 @@ nsLDAPConnection::Observe(nsISupports *aSubject, const char *aTopic,
     }
     Close();
   } else {
-    NS_NOTREACHED("unexpected topic");
+    MOZ_ASSERT_UNREACHABLE("unexpected topic");
     return NS_ERROR_UNEXPECTED;
   }
   return NS_OK;
@@ -557,7 +555,7 @@ nsLDAPConnection::OnLookupComplete(nsICancelable *aRequest,
                 version = LDAP_VERSION3;
                 ldap_set_option(mConnectionHandle, LDAP_OPT_PROTOCOL_VERSION,
                                 &version);
-		break;
+                break;
             default:
                 NS_ERROR("nsLDAPConnection::OnLookupComplete(): mVersion"
                          " invalid");

@@ -8,6 +8,7 @@
 <?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/attachmentList.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/smime/msgCompSMIMEOverlay.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/compacttheme.css" type="text/css" alternate="yes" title="Light/Dark"?>
 
 <!DOCTYPE window [
   <!ENTITY % messengercomposeDTD SYSTEM "chrome://messenger/locale/messengercompose/messengercompose.dtd" >
@@ -59,6 +60,7 @@
 <script type="application/javascript" src="chrome://global/content/printUtils.js"/>
 <script type="application/javascript" src="chrome://messenger/content/accountUtils.js"/>
 <script type="application/javascript" src="chrome://messenger/content/mailCore.js"/>
+<script type="application/javascript" src="chrome://messenger/content/mail-compacttheme.js"/>
 <script type="application/javascript" src="chrome://communicator/content/contentAreaClick.js"/>
 <script type="application/javascript" src="chrome://editor/content/editor.js"/>
 <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
@@ -441,7 +443,7 @@
        command="cmd_reorderAttachments"/>
   <key id="key_toggleAttachmentPane"
        key="&toggleAttachmentPaneCmd.key;" modifiers="control"
-       command="cmd_toggleAttachmentPane"/>
+       command="keyToggleAttachmentPaneOnCommand();"/>
 #else
   <key id="key_delete" keycode="VK_DELETE" command="cmd_delete"/>
   <key id="key_renameAttachment" keycode="VK_F2"
@@ -451,7 +453,7 @@
        command="cmd_reorderAttachments"/>
   <key id="key_toggleAttachmentPane"
        key="&toggleAttachmentPaneCmd.key;" modifiers="alt"
-       command="cmd_toggleAttachmentPane"/>
+       oncommand="keyToggleAttachmentPaneOnCommand();"/>
 #endif
   <key id="key_selectAll" key="&selectAllCmd.key;" modifiers="accel"/>
   <key id="key_find" key="&findBarCmd.key;" command="cmd_find" modifiers="accel"/>
@@ -568,7 +570,6 @@
 
 <!-- Reorder Attachments Panel -->
 <panel id="reorderAttachmentsPanel"
-       backdrag="true"
        orient="vertical"
        type="arrow"
        flip="slide"
@@ -1884,11 +1885,10 @@
            fullscreentoolbar="true" mode="full"
 #ifdef XP_MACOSX
            iconsize="small"
-           defaultset="button-send,separator,button-address,spellingButton,button-attach,button-security,button-save,spring"
-#else
-           defaultset="button-send,separator,button-address,spellingButton,button-attach,button-security,button-save"
 #endif
-           customizable="true" context="toolbar-context-menu">
+           defaultset="button-send,separator,button-address,spellingButton,button-security,button-save,spring,button-attach"
+           customizable="true"
+           context="toolbar-context-menu">
   </toolbar>
 
   <toolbarset id="customToolbars" context="toolbar-context-menu"/>
@@ -1899,7 +1899,9 @@
       <sidebarheader id="sidebarHeader" align="center">
         <label id="sidebar-title" value="&addressesSidebarTitle.label;"/>
         <spacer flex="1"/>
-        <toolbarbutton class="ab-closebutton close-icon" oncommand="toggleAddressPicker();"/>
+        <toolbarbutton id="sidebarCloseButton"
+                       class="ab-closebutton close-icon"
+                       oncommand="sidebarCloseButtonOnCommand();"/>
       </sidebarheader>
       <browser id="sidebar" flex="1" src="" disablehistory="true"
                style="min-width: 150px; width: 200px; max-width: 400px;"/>
@@ -1988,23 +1990,29 @@
                   onmouseup="attachmentBucketSizerOnMouseUp();"/>
         <vbox id="attachments-box" collapsed="true" persist="width">
           <hbox id="attachments-header-box"
-                align="center"
-                tooltiptext="&attachmentBucketHeader.tooltip;"
-                onclick="attachmentBucketHeaderOnClick();"
+                align="stretch"
+                tooltiptext="&attachmentBucketCloseButton.tooltip;"
+                onclick="attachmentBucketHeaderOnClick(event);"
                 context="attachmentHeaderContext">
-            <label id="attachmentBucketCount"
-                   accesskey="&attachments.accesskey;"
-                   flex="1" crop="end"
-                   context=""
-                   control="attachmentBucket"/>
+            <hbox id="attachmentBucketCountBox"
+                  align="center"
+                  context="msgComposeAttachmentListContext">
+              <label id="attachmentBucketCount"
+                     accesskey="&attachments.accesskey;"
+                     control="attachmentBucket"
+                     flex="1" crop="end"/>
+            </hbox>
             <toolbarspring/>
-            <label id="attachmentBucketSize"
-                   context=""/>
+            <hbox id="attachmentBucketSizeBox"
+                  align="center"
+                  context="msgComposeAttachmentListContext">
+              <label id="attachmentBucketSize"/>
+            </hbox>
             <toolbarbutton id="attachmentBucketCloseButton"
                            class="ab-closebutton close-icon"
                            tooltiptext="&attachmentBucketCloseButton.tooltip;"
                            context=""
-                           oncommand="toggleAttachmentPane('hide');"/>
+                           oncommand="attachmentBucketCloseButtonOnCommand();"/>
           </hbox>
           <attachmentlist id="attachmentBucket"
                           tooltiptext=""
@@ -2013,14 +2021,19 @@
                           orient="vertical"
                           flex="1"
                           height="0"
+                          role="listbox"
                           context="msgComposeAttachmentListContext"
                           itemcontext="msgComposeAttachmentItemContext"
                           onclick="attachmentBucketOnClick(event);"
                           onkeypress="attachmentBucketOnKeyPress(event);"
                           onselect="attachmentBucketOnSelect();"
-                          ondragstart="nsDragAndDrop.startDrag(event, attachmentBucketDNDObserver);"
+                          ondragstart="attachmentBucketOnDragStart(event);"
                           onblur="attachmentBucketOnBlur();"/>
         </vbox>
+        <vbox id="attachments-placeholder-box"
+              hidden="true"
+              tooltiptext=""
+              onclick="goDoCommand('cmd_toggleAttachmentPane')"/>
       </hbox>
     </toolbar>
 

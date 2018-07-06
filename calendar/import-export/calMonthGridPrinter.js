@@ -2,12 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calXMLUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calPrintUtils.jsm");
 ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Prints a rough month-grid of events/tasks
@@ -16,20 +12,11 @@ function calMonthPrinter() {
     this.wrappedJSObject = this;
 }
 
-var calMonthPrinterClassID = Components.ID("{f42d5132-92c4-487b-b5c8-38bf292d74c1}");
-var calMonthPrinterInterfaces = [Components.interfaces.calIPrintFormatter];
 calMonthPrinter.prototype = {
-    classID: calMonthPrinterClassID,
-    QueryInterface: XPCOMUtils.generateQI(calMonthPrinterInterfaces),
+    QueryInterface: ChromeUtils.generateQI([Ci.calIPrintFormatter]),
+    classID: Components.ID("{f42d5132-92c4-487b-b5c8-38bf292d74c1}"),
 
-    classInfo: XPCOMUtils.generateCI({
-        classID: calMonthPrinterClassID,
-        contractID: "@mozilla.org/calendar/printformatter;1?type=monthgrid",
-        classDescription: "Calendar Month Grid Print Formatter",
-        interfaces: calMonthPrinterInterfaces
-    }),
-
-    get name() { return cal.calGetString("calendar", "monthPrinterName"); },
+    get name() { return cal.l10n.getCalString("monthPrinterName"); },
 
     formatToHtml: function(aStream, aStart, aEnd, aCount, aItems, aTitle) {
         let document = cal.xml.parseFile("chrome://calendar-common/skin/printing/calMonthGridPrinter.html");
@@ -154,16 +141,16 @@ calMonthPrinter.prototype = {
         currentMonth.item = startOfMonth.clone();
 
         // Set up the month title
-        let monthName = cal.formatMonth(startOfMonth.month + 1, "calendar", "monthInYear");
-        let monthTitle = cal.calGetString("calendar", "monthInYear", [monthName, startOfMonth.year]);
+        let monthName = cal.l10n.formatMonth(startOfMonth.month + 1, "calendar", "monthInYear");
+        let monthTitle = cal.l10n.getCalString("monthInYear", [monthName, startOfMonth.year]);
         currentMonth.querySelector(".month-name").textContent = monthTitle;
 
         // Set up the weekday titles
         let wkst = Preferences.get("calendar.week.start", 0);
         for (let i = 1; i <= 7; i++) {
             let dayNumber = ((i + wkst - 1) % 7) + 1;
-            let dayTitle = currentMonth.querySelector(".day" + i + "-title");
-            dayTitle.textContent = cal.calGetString("dateFormat", "day." + dayNumber + ".Mmm");
+            let dayTitle = currentMonth.querySelector(`.day${i}-title`);
+            dayTitle.textContent = cal.l10n.getDateFmtString(`day.${dayNumber}.Mmm`);
         }
 
         // Set up each week

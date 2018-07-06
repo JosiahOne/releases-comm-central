@@ -79,12 +79,16 @@ nsMsgDBService::~nsMsgDBService()
   // If you hit this warning, it means that some code is holding onto
   // a db at shutdown.
   NS_WARNING_ASSERTION(!m_dbCache.Length(), "some msg dbs left open");
+#ifndef MOZILLA_OFFICIAL
+  // Only print this on local builds since it causes crashes,
+  // see bug 1468691, bug 1377692 and bug 1342858.
   for (uint32_t i = 0; i < m_dbCache.Length(); i++)
   {
     nsMsgDatabase* pMessageDB = m_dbCache.ElementAt(i);
     if (pMessageDB)
       printf("db left open %s\n", pMessageDB->m_dbFile->HumanReadablePath().get());
   }
+#endif
 #endif
 }
 
@@ -4358,8 +4362,8 @@ nsIMsgThread *nsMsgDatabase::GetThreadForReference(nsCString &msgID, nsIMsgDBHdr
   // Referenced message not found, check if there are messages that reference same message
   else if (UseCorrectThreading())
   {
-	if (NS_SUCCEEDED(GetRefFromHash(msgID, &threadId)))
-	  thread = GetThreadForThreadId(threadId);
+    if (NS_SUCCEEDED(GetRefFromHash(msgID, &threadId)))
+      thread = GetThreadForThreadId(threadId);
   }
 
   return thread;

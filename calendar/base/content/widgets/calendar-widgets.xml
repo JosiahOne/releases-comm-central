@@ -132,11 +132,15 @@
         <parameter name="compare" />
         <body><![CDATA[
             let newIndex = cal.data.binaryInsert(categories, category, compare, true);
-            let item = categoryListbox.childNodes[Math.min(newIndex, categoryListbox.childNodes.length - 1)];
+            let item = categoryListbox.getItemAtIndex(Math.min(newIndex, categoryListbox.itemCount - 1));
 
             if (!item || item.getAttribute("value") != category) {
                 // The item doesn't exist, insert it at the correct spot.
-                item = categoryListbox.insertItemAt(newIndex, category, category);
+                item = document.createElementNS("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul", "listitem");
+                item.setAttribute("label", category);
+                item.setAttribute("value", category);
+                let beforeItem = categoryListbox.getItemAtIndex(newIndex);
+                categoryListbox.insertBefore(item, beforeItem);  // Will append if 'beforeItem' is null.
 
                 if (this.maxCount != 1) {
                     item.setAttribute("type", "checkbox");
@@ -158,7 +162,7 @@
                 return;
             }
 
-            let localeCollator = cal.createLocaleCollator();
+            let localeCollator = cal.l10n.createLocaleCollator();
             let compare = localeCollator.compareString.bind(localeCollator, 0);
 
             let children = categoryListbox.childNodes;
@@ -186,7 +190,7 @@
             let categoryListbox = document.getAnonymousElementByAttribute(this, "anonid", "categories-listbox");
             let categoryList = cal.category.fromPrefs();
 
-            cal.sortArrayByLocaleCollator(categoryList);
+            cal.l10n.sortArrayByLocaleCollator(categoryList);
 
             removeChildren(categoryListbox);
 
@@ -197,7 +201,7 @@
             }
 
             if (aItem) {
-                let localeCollator = cal.createLocaleCollator();
+                let localeCollator = cal.l10n.createLocaleCollator();
                 let compare = localeCollator.compareString.bind(localeCollator, 0);
 
                 // Ensure the item's categories are in the list and they are checked.
@@ -244,7 +248,7 @@
 
       <method name="setUpTodayDate">
         <body><![CDATA[
-            let dayNumber = cal.calGetString("dateFormat", "day." + cal.dtz.now().day + ".number");
+            let dayNumber = cal.l10n.getDateFmtString(`day.${cal.dtz.now().day}.number`);
             document.getAnonymousElementByAttribute(this, "anonid", "day-label").value = dayNumber;
         ]]></body>
       </method>

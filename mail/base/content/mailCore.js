@@ -19,8 +19,48 @@ ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource://gre/modules/CharsetMenu.jsm");
 ChromeUtils.import("resource:///modules/mailServices.js");
 
-XPCOMUtils.defineLazyScriptGetter(this, "gViewSourceUtils",
-                                  "chrome://global/content/viewSourceUtils.js");
+XPCOMUtils.defineLazyGetter(this, "gViewSourceUtils", function() {
+  let scope = {};
+  Services.scriptloader.loadSubScript("chrome://global/content/viewSourceUtils.js", scope);
+  scope.gViewSourceUtils.viewSource = async function (aArgs) {
+    // Check if external view source is enabled. If so, try it. If it fails,
+    // fallback to internal view source.
+    if (Services.prefs.getBoolPref("view_source.editor.external")) {
+      try {
+        await this.openInExternalEditor(aArgs);
+        return;
+      } catch (ex) {}
+    }
+
+    window.openDialog("chrome://messenger/content/viewSource.xul", "_blank", "all,dialog=no", aArgs);
+  };
+  return scope.gViewSourceUtils;
+});
+
+Services.obs.addObserver({
+  observe(win) {
+    win.addEventListener("load", function() {
+      if (this.location.href != "chrome://devtools/content/webconsole/browserconsole.xul") {
+        return;
+      }
+
+      this.setTimeout(() => {
+        this.gViewSourceUtils.viewSource = async function (aArgs) {
+          // Check if external view source is enabled. If so, try it. If it fails,
+          // fallback to internal view source.
+          if (Services.prefs.getBoolPref("view_source.editor.external")) {
+            try {
+              await this.openInExternalEditor(aArgs);
+              return;
+            } catch (ex) {}
+          }
+
+          window.openDialog("chrome://messenger/content/viewSource.xul", "_blank", "all,dialog=no", aArgs);
+        };
+      }, 0);
+    }, { capture: false, once: true });
+  },
+}, "chrome-document-global-created");
 
 var gCustomizeSheet = false;
 
@@ -407,32 +447,7 @@ function toSanitize()
  */
 function openOptionsDialog(aPaneID, aTabID, aOtherArgs)
 {
-  let loadInContent = Services.prefs.getBoolPref("mail.preferences.inContent");
-  // Load the prefs in a tab?
-  if (loadInContent) {
-    // Yes, load the prefs in a tab
-    openPreferencesTab(aPaneID, aTabID, aOtherArgs);
-  } else {
-    // No, load the prefs in a dialog
-    let win = Services.wm.getMostRecentWindow("Mail:Preferences");
-    if (win) {
-      // the dialog is already open
-      win.focus();
-      if (aPaneID) {
-        let prefWindow = win.document.getElementById("MailPreferences");
-        win.selectPaneAndTab(prefWindow, aPaneID, aTabID);
-      }
-    } else {
-      // the dialog must be created
-      let instantApply = Services.prefs
-                                 .getBoolPref("browser.preferences.instantApply");
-      let features = "chrome,titlebar,toolbar,centerscreen" +
-                     (instantApply ? ",dialog=no" : ",modal");
-
-      window.openDialog("chrome://messenger/content/preferences/preferences.xul",
-                        "Preferences", features, aPaneID, aTabID, aOtherArgs);
-    }
-  }
+  openPreferencesTab(aPaneID, aTabID, aOtherArgs);
 }
 
 function openAddonsMgr(aView)
@@ -750,13 +765,7 @@ function nsFlavorDataProvider()
 
 nsFlavorDataProvider.prototype =
 {
-  QueryInterface : function(iid)
-  {
-      if (iid.equals(Ci.nsIFlavorDataProvider) ||
-          iid.equals(Ci.nsISupports))
-        return this;
-      throw Cr.NS_NOINTERFACE;
-  },
+  QueryInterface: ChromeUtils.generateQI(["nsIFlavorDataProvider"]),
 
   getFlavorData : function(aTransferable, aFlavor, aData, aDataLen)
   {

@@ -27,10 +27,6 @@
   margin-bottom: 0;
 }
 
-.tabmail-tab {
-  list-style-image: url("chrome://messenger/skin/icons/item.png");
-}
-
 :root[tabsintitlebar]:not([sizemode=fullscreen]) .tabmail-tab:first-child::before {
   content: '';
   display: -moz-box;
@@ -67,7 +63,7 @@
   text-shadow: 0 1px rgba(255, 255, 255, 0.4);
 }
 
-.tabmail-tab[selected="true"] {
+.tabmail-tab[selected="true"]:not(:-moz-lwtheme) {
   -moz-font-smoothing-background-color: var(--toolbar-bgcolor);
 }
 
@@ -180,10 +176,6 @@ tabmail > tabbox > tabpanels {
 /**
  * All Tabs Menupopup
  */
-
-.alltabs-item {
-  list-style-image: url("chrome://messenger/skin/icons/item.png");
-}
 
 @media (min-resolution: 1.1dppx) {
   alltabs-item[busy] {

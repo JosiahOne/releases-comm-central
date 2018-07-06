@@ -10,8 +10,6 @@ nsIMAPGenericParser is the base parser class used by the server parser and body 
 #ifndef nsIMAPGenericParser_H
 #define nsIMAPGenericParser_H
 
-#include "nsImapCore.h"
-
 #define WHITESPACE " \015\012"     // token delimiter
 
 
@@ -19,8 +17,8 @@ class nsIMAPGenericParser
 {
 
 public:
-	nsIMAPGenericParser();
-	virtual ~nsIMAPGenericParser();
+  nsIMAPGenericParser();
+  virtual ~nsIMAPGenericParser();
 
   // Add any specific stuff in the derived class
   virtual bool       LastCommandSuccessful();
@@ -32,15 +30,15 @@ public:
 
 protected:
 
-	// This is a pure virtual member which must be overridden in the derived class
-	// for each different implementation of a nsIMAPGenericParser.
-	// For instance, one implementation (the nsIMAPServerState) might get the next line
-	// from an open socket, whereas another implementation might just get it from a buffer somewhere.
-	// This fills in nextLine with the buffer, and returns true if everything is OK.
-	// Returns false if there was some error encountered.  In that case, we reset the parser.
-	virtual bool	GetNextLineForParser(char **nextLine) = 0;	
+  // This is a pure virtual member which must be overridden in the derived class
+  // for each different implementation of a nsIMAPGenericParser.
+  // For instance, one implementation (the nsIMAPServerState) might get the next line
+  // from an open socket, whereas another implementation might just get it from a buffer somewhere.
+  // This fills in nextLine with the buffer, and returns true if everything is OK.
+  // Returns false if there was some error encountered.  In that case, we reset the parser.
+  virtual bool GetNextLineForParser(char **nextLine) = 0;
 
-  virtual void	HandleMemoryFailure();
+  virtual void HandleMemoryFailure();
   void skip_to_CRLF();
   void skip_to_close_paren();
   char *CreateString();
@@ -58,10 +56,10 @@ protected:
   void ResetLexAnalyzer();
 
 protected:
-	// use with care
+  // use with care
   const char     *fNextToken;
   char           *fCurrentLine;
-	char					 *fLineOfTokens;
+  char           *fLineOfTokens;
   char           *fStartOfLineOfTokens;
   char           *fCurrentTokenPlaceHolder;
   bool            fAtEndOfLine;
