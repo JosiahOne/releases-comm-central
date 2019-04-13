@@ -11,7 +11,7 @@
 #include "nsIAddrDatabase.h" // For SetFieldValue() arguments
 #include "nsTArray.h"
 #include "nsString.h"
-
+#include "nsIStringBundle.h"
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +24,7 @@ public:
 
   NS_DECL_NSIIMPORTFIELDMAP
 
-  nsImportFieldMap(nsIStringBundle *aBundle);
+  explicit nsImportFieldMap(nsIStringBundle *aBundle);
 
   static nsresult Create(nsIStringBundle *aBundle, nsISupports *aOuter, REFNSIID aIID, void **aResult);
 

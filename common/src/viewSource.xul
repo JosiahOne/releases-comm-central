@@ -23,7 +23,7 @@
 ]>
 
 <window id="viewSource"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         contenttitlesetting="true"
         title="&mainWindow.title;"
         titlemodifier="&mainWindow.titlemodifier;"
@@ -42,6 +42,7 @@
   <script type="application/javascript" src="chrome://messenger/content/viewSource.js"/>
   <script type="application/javascript" src="chrome://global/content/viewZoomOverlay.js"/>
   <script type="application/javascript" src="chrome://global/content/contentAreaUtils.js"/>
+  <script type="application/javascript" src="chrome://global/content/editMenuOverlay.js"/>
 
   <stringbundle id="viewSourceBundle" src="chrome://messenger/locale/viewSource.properties"/>
 
@@ -50,7 +51,6 @@
   <command id="cmd_printpreview" oncommand="PrintUtils.printPreview(PrintPreviewListener);"/>
   <command id="cmd_pagesetup" oncommand="PrintUtils.showPageSetup();"/>
   <command id="cmd_close" oncommand="window.close();"/>
-#includesubst @TOOLKIT_DIR@/content/editMenuCommands.inc.xul
   <command id="cmd_find"
            oncommand="document.getElementById('FindToolbar').onFindCommand();"/>
   <command id="cmd_findAgain"
@@ -66,15 +66,12 @@
 #ifdef MOZ_SUITE
   <command id="cmd_highlightSyntax" oncommand="viewSourceChrome.toggleSyntaxHighlighting();"/>
   <command id="cmd_wrapLongLines" oncommand="viewSourceChrome.toggleWrapping();"/>
+  <command id="Browser:Back" oncommand="viewSourceChrome.goBack()" class="viewSourceNavigation"/>
+  <command id="Browser:Forward" oncommand="viewSourceChrome.goForward()" class="viewSourceNavigation"/>
 #endif
   <command id="cmd_textZoomReduce" oncommand="ZoomManager.reduce();"/>
   <command id="cmd_textZoomEnlarge" oncommand="ZoomManager.enlarge();"/>
   <command id="cmd_textZoomReset" oncommand="ZoomManager.reset();"/>
-
-  <command id="Browser:Back" oncommand="viewSourceChrome.goBack()" observes="viewSourceNavigation"/>
-  <command id="Browser:Forward" oncommand="viewSourceChrome.goForward()" observes="viewSourceNavigation"/>
-
-  <broadcaster id="viewSourceNavigation"/>
 
 #includesubst @TOOLKIT_DIR@/content/editMenuKeys.inc.xul
   <keyset id="viewSourceKeys">
@@ -133,6 +130,7 @@
   <tooltip id="aHTMLTooltip" page="true"/>
 
   <menupopup id="viewSourceContextMenu">
+#ifdef MOZ_SUITE
     <menuitem id="context-back"
               label="&backCmd.label;"
               accesskey="&backCmd.accesskey;"
@@ -144,6 +142,7 @@
               command="Browser:Forward"
               observes="viewSourceNavigation"/>
     <menuseparator observes="viewSourceNavigation"/>
+#endif
     <menuitem id="cMenu_findAgain"
               label="&findAgainCmd.label;"
               accesskey="&findAgainCmd.accesskey;"

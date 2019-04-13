@@ -14,13 +14,12 @@
 #include "MailNewsTypes.h"
 #include "nsIDBChangeListener.h"
 #include "nsITreeView.h"
-#include "nsITreeBoxObject.h"
+#include "mozilla/dom/XULTreeElement.h"
 #include "nsITreeSelection.h"
 #include "nsIMsgFolder.h"
 #include "nsIMsgThread.h"
 #include "DateTimeFormat.h"
 #include "nsIImapIncomingServer.h"
-#include "nsIWeakReference.h"
 #include "nsIMsgFilterPlugin.h"
 #include "nsIStringBundle.h"
 #include "nsMsgTagService.h"
@@ -31,6 +30,7 @@
 #include "nsIMsgCustomColumnHandler.h"
 #include "nsAutoPtr.h"
 #include "nsIWeakReferenceUtils.h"
+#include "nsSimpleEnumerator.h"
 #define MESSENGER_STRING_URL       "chrome://messenger/locale/messenger.properties"
 
 typedef AutoTArray<nsMsgViewIndex, 1> nsMsgViewIndexArray;
@@ -68,9 +68,6 @@ public:
 #define PREF_LABELS_MAX 5
 #define PREF_LABELS_DESCRIPTION  "mailnews.labels.description."
 #define PREF_LABELS_COLOR  "mailnews.labels.color."
-
-#define LABEL_COLOR_STRING " lc-"
-#define LABEL_COLOR_WHITE_STRING "#FFFFFF"
 
 struct IdUint32
 {
@@ -134,7 +131,7 @@ protected:
   static char16_t* kForwardedString;
   static char16_t* kNewString;
 
-  nsCOMPtr<nsITreeBoxObject> mTree;
+  RefPtr<mozilla::dom::XULTreeElement> mTree;
   nsCOMPtr<nsITreeSelection> mTreeSelection;
   // We cache this to determine when to push command status notifications.
   uint32_t mNumSelectedRows;
@@ -407,8 +404,7 @@ protected:
   char16_t * GetString(const char16_t *aStringName);
   nsresult GetPrefLocalizedString(const char *aPrefName, nsString& aResult);
   nsresult AppendKeywordProperties(const nsACString& keywords,
-                                   nsAString& properties,
-                                   bool addSelectedTextProperty);
+                                   nsAString& properties);
   nsresult InitLabelStrings(void);
   nsresult CopyDBView(nsMsgDBView *aNewMsgDBView,
                       nsIMessenger *aMessengerInstance,
@@ -434,7 +430,7 @@ protected:
   nsCOMPtr <nsIMsgDBHdr>  m_cachedHdr;
   nsMsgKey                m_cachedMsgKey;
 
-  // We need to store the message key for the message we are currenty
+  // We need to store the message key for the message we are currently
   // displaying to ensure we don't try to redisplay the same message just
   // because the selection changed (i.e. after a sort).
   nsMsgKey                m_currentlyDisplayedMsgKey;
@@ -541,22 +537,25 @@ private:
                                          bool &changeReadState,
                                          nsIMsgFolder** targetFolder);
 
-  class nsMsgViewHdrEnumerator final : public nsISimpleEnumerator
+  class nsMsgViewHdrEnumerator final : public nsSimpleEnumerator
   {
   public:
-    NS_DECL_ISUPPORTS
+    const nsID& DefaultInterface() override
+    {
+      return NS_GET_IID(nsIMsgDBHdr);
+    }
 
     // nsISimpleEnumerator methods:
     NS_DECL_NSISIMPLEENUMERATOR
 
     // nsMsgThreadEnumerator methods:
-    nsMsgViewHdrEnumerator(nsMsgDBView *view);
+    explicit nsMsgViewHdrEnumerator(nsMsgDBView *view);
 
     RefPtr<nsMsgDBView> m_view;
     nsMsgViewIndex m_curHdrIndex;
 
   private:
-    ~nsMsgViewHdrEnumerator();
+    ~nsMsgViewHdrEnumerator() override;
   };
 };
 

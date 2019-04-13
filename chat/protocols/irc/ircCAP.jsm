@@ -19,8 +19,7 @@
 
 this.EXPORTED_SYMBOLS = ["ircCAP"];
 
-ChromeUtils.import("resource:///modules/ircHandlers.jsm");
-ChromeUtils.import("resource:///modules/ircUtils.jsm");
+const {ircHandlers} = ChromeUtils.import("resource:///modules/ircHandlers.jsm");
 
 /*
  * Parses a CAP message of the form:
@@ -35,7 +34,7 @@ function capMessage(aMessage) {
   // The subcommand is the second parameter...although sometimes it's the first
   // parameter.
   aMessage.cap = {
-    subcommand: aMessage.params[aMessage.params.length == 3 ? 1 : 0]
+    subcommand: aMessage.params[aMessage.params.length == 3 ? 1 : 0],
   };
 
   return parameters.map(function(aParameter) {
@@ -45,7 +44,7 @@ function capMessage(aMessage) {
 
     // If there's a modifier...pull it off. (This is pretty much unused, but we
     // have to pull it off for backward compatibility.)
-    if ('-=~'.includes(aParameter[0])) {
+    if ("-=~".includes(aParameter[0])) {
       message.cap.modifier = aParameter[0];
       aParameter = aParameter.substr(1);
     } else
@@ -92,6 +91,6 @@ var ircCAP = {
       // <unrecognized subcommand> :Invalid CAP subcommand
       this.WARN("Invalid subcommand: " + aMessage.params[1]);
       return true;
-    }
-  }
+    },
+  },
 };

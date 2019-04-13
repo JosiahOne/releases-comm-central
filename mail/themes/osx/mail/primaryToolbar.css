@@ -26,13 +26,22 @@
   color: var(--toolbar-color, inherit);
 }
 
+/*
+  This is a workaround for Bug 1482157
+  -moz-appearance: toolbox; makes the macOS sheets attached to the element's
+  bottom border. We cannot put this property on the toolbox itself as it
+  cancels all backgrounds that are there, so we set it on the toolbox bottom
+  border.
+*/
 .mail-toolbox::after,
 .contentTabToolbox::after {
+  -moz-appearance: toolbox;
   content: "";
   display: -moz-box;
   margin-top: -1px;
   height: 1px;
-  border-bottom: 1px solid var(--toolbox-border-bottom-color);
+  /* use inset box-shadow instead of border because -moz-appearance hides the border */
+  box-shadow: inset 0 -1px var(--chrome-content-separator-color);
 }
 
 .mail-bar3 {
@@ -48,6 +57,10 @@
   -moz-appearance: none;
   /* force iconsize="small" on these toolbars */
   counter-reset: smallicons;
+}
+
+#folderPane-toolbox {
+  -moz-appearance: none;
 }
 
 /* remove the small icons checkbox in Customize window */
@@ -155,6 +168,10 @@
 
 #button-showconversation {
   list-style-image: url("chrome://messenger/skin/icons/conversation.svg");
+}
+
+#button-addons {
+  list-style-image: url("chrome://mozapps/skin/extensions/extensionGeneric-16.svg");
 }
 
 .button-appmenu {

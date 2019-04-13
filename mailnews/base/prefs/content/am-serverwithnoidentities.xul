@@ -11,14 +11,16 @@
 <!ENTITY % accountServerTopDTD SYSTEM "chrome://messenger/locale/am-server-top.dtd">%accountServerTopDTD;
 ]>
 
-<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
       title="&accountTitle.label;"
       onload="parent.onPanelLoaded('am-serverwithnoidentities.xul');">
 
   <script type="application/javascript" src="chrome://messenger/content/am-serverwithnoidentities.js"/>
   <script type="application/javascript" src="chrome://messenger/content/amUtils.js"/>
 
-  <dialogheader title="&accountTitle.label;"/>
+  <hbox class="dialogheader">
+    <label class="dialogheader-title" value="&accountTitle.label;"/>
+  </hbox>
 
   <label hidden="true"
          wsm_persist="true"
@@ -33,13 +35,14 @@
     <label value="&accountName.label;" control="server.prettyName"
            accesskey="&accountName.accesskey;"/>
     <textbox wsm_persist="true" size="30" id="server.prettyName"
+             onblur="parent.setAccountLabel(gAccount.key, null, this.value);"
              prefstring="mail.server.%serverkey%.name"/>
   </hbox>
 
   <separator class="thin"/>
 
   <groupbox>
-    <caption label="&messageStorage.label;"/>
+    <label class="header">&messageStorage.label;</label>
 
     <vbox align="start">
       <checkbox wsm_persist="true" id="server.emptyTrashOnExit"

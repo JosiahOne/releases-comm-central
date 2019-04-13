@@ -38,8 +38,8 @@ function unique_string() {
   return s;
 }
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/gloda/msg_search.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {GlodaMsgSearcher} = ChromeUtils.import("resource:///modules/gloda/msg_search.js");
 
 /**
  * Wrap the construction of a GlodaMsgSearcher with a limit of 1 and feed it to

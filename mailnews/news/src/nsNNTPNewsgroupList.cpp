@@ -50,7 +50,6 @@
 
 #include "nsXPCOM.h"
 #include "nsISupportsPrimitives.h"
-#include "nsIInterfaceRequestor.h"
 #include "nsIInterfaceRequestorUtils.h"
 #include "nsIMsgWindow.h"
 #include "nsIDocShell.h"
@@ -228,8 +227,6 @@ openWindow(nsIMsgWindow *aMsgWindow, const char *chromeURL,
   nsCOMPtr<mozIDOMWindowProxy> domWindow(do_GetInterface(docShell));
   NS_ENSURE_TRUE(domWindow, NS_ERROR_FAILURE);
   nsCOMPtr<nsPIDOMWindowOuter> parentWindow = nsPIDOMWindowOuter::From(domWindow);
-  parentWindow = parentWindow->GetOuterWindow();
-  NS_ENSURE_ARG_POINTER(parentWindow);
 
   nsCOMPtr<nsISupportsInterfacePointer> ifptr = do_CreateInstance(NS_SUPPORTS_INTERFACE_POINTER_CONTRACTID, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -536,14 +533,15 @@ nsNNTPNewsgroupList::ParseLine(char *line, uint32_t * message_number)
     // ### should call IsHeaderRead here...
     /* strip "Re: " */
     nsCString modifiedSubject;
-    if (NS_MsgStripRE(nsDependentCString(subject), modifiedSubject))
+    bool strippedRE = NS_MsgStripRE(nsDependentCString(subject), modifiedSubject);
+    if (strippedRE)
       (void) newMsgHdr->OrFlags(nsMsgMessageFlags::HasRe, &flags);
 
     // this will make sure read flags agree with newsrc
     if (! (flags & nsMsgMessageFlags::Read))
       rv = newMsgHdr->OrFlags(nsMsgMessageFlags::New, &flags);
 
-    rv = newMsgHdr->SetSubject(modifiedSubject.IsEmpty() ? subject : modifiedSubject.get());
+    rv = newMsgHdr->SetSubject(strippedRE ? modifiedSubject.get() : subject);
 
     if (NS_FAILED(rv))
       return rv;
@@ -1055,15 +1053,15 @@ nsNNTPNewsgroupList::AddHeader(const char *header, const char *value)
     // ### should call IsHeaderRead here...
     /* strip "Re: " */
     nsCString modifiedSubject;
-    if (NS_MsgStripRE(nsDependentCString(subject), modifiedSubject))
+    bool strippedRE = NS_MsgStripRE(nsDependentCString(subject), modifiedSubject);
+    if (strippedRE)
       // this will make sure read flags agree with newsrc
      (void) m_newMsgHdr->OrFlags(nsMsgMessageFlags::HasRe, &flags);
 
     if (! (flags & nsMsgMessageFlags::Read))
       rv = m_newMsgHdr->OrFlags(nsMsgMessageFlags::New, &flags);
 
-    rv = m_newMsgHdr->SetSubject(modifiedSubject.IsEmpty() ? subject :
-      modifiedSubject.get());
+    rv = m_newMsgHdr->SetSubject(strippedRE ? modifiedSubject.get() : subject);
   }
   else if (PL_strcmp(header, "message-id") == 0)
   {
@@ -1177,14 +1175,12 @@ nsNNTPNewsgroupList::CallFilters()
     if (filterCount)
     {
       rv = m_filterList->ApplyFiltersToHdr(nsMsgFilterType::NewsRule,
-          m_newMsgHdr, folder, m_newsDB, fullHeaders.get(),
-          fullHeaders.Length(), this, m_msgWindow);
+          m_newMsgHdr, folder, m_newsDB, fullHeaders, this, m_msgWindow);
     }
     if (serverFilterCount)
     {
       rv = m_serverFilterList->ApplyFiltersToHdr(nsMsgFilterType::NewsRule,
-          m_newMsgHdr, folder, m_newsDB, fullHeaders.get(),
-          fullHeaders.Length(), this, m_msgWindow);
+          m_newMsgHdr, folder, m_newsDB, fullHeaders, this, m_msgWindow);
     }
 
     NS_ENSURE_SUCCESS(rv,rv);

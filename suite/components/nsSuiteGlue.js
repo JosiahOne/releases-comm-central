@@ -4,44 +4,31 @@
 
 const XULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/osfile.jsm");
-ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
-ChromeUtils.import("resource://gre/modules/LoginManagerParent.jsm");
-ChromeUtils.import("resource:///modules/Sanitizer.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.import("resource:///modules/mailnewsMigrator.js");
 ChromeUtils.import("resource:///modules/extensionSupport.jsm");
 
-ChromeUtils.defineModuleGetter(this, "NetUtil",
-                               "resource://gre/modules/NetUtil.jsm");
-
-ChromeUtils.defineModuleGetter(this, "FileUtils",
-                               "resource://gre/modules/FileUtils.jsm");
-
-ChromeUtils.defineModuleGetter(this, "PlacesUtils",
-                               "resource://gre/modules/PlacesUtils.jsm");
-
-ChromeUtils.defineModuleGetter(this, "PlacesBackups",
-                               "resource://gre/modules/PlacesBackups.jsm");
-
-ChromeUtils.defineModuleGetter(this, "AsyncShutdown",
-                               "resource://gre/modules/AsyncShutdown.jsm");
-
-ChromeUtils.defineModuleGetter(this, "AutoCompletePopup",
-                               "resource://gre/modules/AutoCompletePopup.jsm");
-
-ChromeUtils.defineModuleGetter(this, "BookmarkHTMLUtils",
-                               "resource://gre/modules/BookmarkHTMLUtils.jsm");
-
-ChromeUtils.defineModuleGetter(this, "BookmarkJSONUtils",
-                               "resource://gre/modules/BookmarkJSONUtils.jsm");
-
-ChromeUtils.defineModuleGetter(this, "RecentWindow",
-                               "resource:///modules/RecentWindow.jsm");
-
-ChromeUtils.defineModuleGetter(this, "DownloadsCommon",
-                               "resource:///modules/DownloadsCommon.jsm");
+XPCOMUtils.defineLazyModuleGetters(this, {
+  AddonManager: "resource://gre/modules/AddonManager.jsm",
+  LoginManagerParent: "resource://gre/modules/LoginManagerParent.jsm",
+  NetUtil: "resource://gre/modules/NetUtil.jsm",
+  FileUtils: "resource://gre/modules/FileUtils.jsm",
+  OS: "resource://gre/modules/osfile.jsm",
+  PlacesUtils: "resource://gre/modules/PlacesUtils.jsm",
+  PlacesBackups: "resource://gre/modules/PlacesBackups.jsm",
+  AsyncShutdown: "resource://gre/modules/AsyncShutdown.jsm",
+  AutoCompletePopup: "resource://gre/modules/AutoCompletePopup.jsm",
+  BookmarkHTMLUtils: "resource://gre/modules/BookmarkHTMLUtils.jsm",
+  BookmarkJSONUtils: "resource://gre/modules/BookmarkJSONUtils.jsm",
+  RecentWindow: "resource:///modules/RecentWindow.jsm",
+  Sanitizer: "resource:///modules/Sanitizer.jsm",
+  ShellService: "resource:///modules/ShellService.jsm",
+  DownloadsCommon: "resource:///modules/DownloadsCommon.jsm",
+  PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.jsm",
+  Integration: "resource://gre/modules/Integration.jsm",
+  PermissionUI: "resource:///modules/PermissionUI.jsm",
+});
 
 XPCOMUtils.defineLazyGetter(this, "DebuggerServer", () => {
   var tmp = {};
@@ -96,7 +83,6 @@ const DEBUGGER_REMOTE_PORT = "devtools.debugger.remote-port";
 const DEBUGGER_FORCE_LOCAL = "devtools.debugger.force-local";
 const DEBUGGER_WIFI_VISIBLE = "devtools.remote.wifi.visible";
 const DOWNLOAD_MANAGER_URL = "chrome://communicator/content/downloads/downloadmanager.xul";
-const PROGRESS_DIALOG_URL = "chrome://communicator/content/downloads/progressDialog.xul";
 const PREF_FOCUS_WHEN_STARTING = "browser.download.manager.focusWhenStarting";
 const PREF_FLASH_COUNT = "browser.download.manager.flashCount";
 
@@ -114,7 +100,6 @@ function SuiteGlue() {
 
 SuiteGlue.prototype = {
   _saveSession: false,
-  _sound: null,
   _isIdleObserver: false,
   _isPlacesDatabaseLocked: false,
   _migrationImportsDefaultBookmarks: false,
@@ -164,7 +149,7 @@ SuiteGlue.prototype = {
     }
     delay = delay <= MAX_DELAY ? delay : MAX_DELAY;
 
-    ChromeUtils.import("resource://services-sync/main.js");
+    const {Weave} = ChromeUtils.import("resource://services-sync/main.js");
     Weave.Service.scheduler.delayedAutoConnect(delay);
   },
 
@@ -255,9 +240,6 @@ SuiteGlue.prototype = {
         this._setPrefToSaveSession();
         subject.QueryInterface(Ci.nsISupportsPRBool);
         subject.data = true;
-        break;
-      case "dl-done":
-        this._playDownloadSound();
         break;
       case "places-init-complete":
         if (!this._migrationImportsDefaultBookmarks)
@@ -358,7 +340,6 @@ SuiteGlue.prototype = {
     Services.obs.addObserver(this, "weave:service:ready", true);
     Services.obs.addObserver(this, "weave:engine:clients:display-uri", true);
     Services.obs.addObserver(this, "session-save", true);
-    Services.obs.addObserver(this, "dl-done", true);
     Services.obs.addObserver(this, "places-init-complete", true);
     Services.obs.addObserver(this, "places-shutdown", true);
     Services.obs.addObserver(this, "browser-search-engine-modified", true);
@@ -412,7 +393,7 @@ SuiteGlue.prototype = {
 
   _migrateUI: function()
   {
-    const UI_VERSION = 3;
+    const UI_VERSION = 6;
 
     // If the pref is not set this is a new or pre SeaMonkey 2.49 profile.
     // We can't tell so we just run migration with version 0.
@@ -487,14 +468,54 @@ SuiteGlue.prototype = {
       } catch (ex) {}
     }
 
-    // The XUL directory viewer is no longer provided.
-    if (currentUIVersion < 3) {
+    // Pretend currentUIVersion 3 never happend (used in 2.57 for a time and became 6).
+
+    // Remove obsolete download preferences set by user.
+    if (currentUIVersion < 4) {
+      try {
+        if (Services.prefs.prefHasUserValue("browser.download.manager.showAlertOnComplete")) {
+          Services.prefs.clearUserPref("browser.download.manager.showAlertOnComplete");
+        }
+        if (Services.prefs.prefHasUserValue("browser.download.manager.showAlertInterval")) {
+          Services.prefs.clearUserPref("browser.download.manager.showAlertInterval");
+        }
+        if (Services.prefs.prefHasUserValue("browser.download.manager.retention")) {
+          Services.prefs.clearUserPref("browser.download.manager.retention");
+        }
+        if (Services.prefs.prefHasUserValue("browser.download.manager.quitBehavior")) {
+          Services.prefs.clearUserPref("browser.download.manager.quitBehavior");
+        }
+        if (Services.prefs.prefHasUserValue("browser.download.manager.scanWhenDone")) {
+          Services.prefs.clearUserPref("browser.download.manager.scanWhenDone");
+        }
+        if (Services.prefs.prefHasUserValue("browser.download.manager.showWhenStarting")) {
+          Services.prefs.clearUserPref("browser.download.manager.showWhenStarting");
+        }
+        if (Services.prefs.prefHasUserValue("browser.download.manager.closeWhenDone")) {
+          Services.prefs.clearUserPref("browser.download.manager.closeWhenDone");
+        }
+      } catch (ex) {}
+    }
+
+    if (currentUIVersion < 6) {
+      // Delete obsolete ssl and strict transport security permissions.
+      let perms = Services.perms.enumerator;
+      while (perms.hasMoreElements()) {
+        let perm = perms.getNext();
+        if (perm.type == "falsestart-rc4" ||
+            perm.type == "falsestart-rsa" ||
+            perm.type == "sts/use" ||
+            perm.type == "sts/subd") {
+          Services.perms.removePermission(perm);
+        }
+      }
+
+      // The XUL directory viewer is no longer provided.
       try {
         if (Services.prefs.getIntPref("network.dir.format") == 3) {
           Services.prefs.setIntPref("network.dir.format", 2);
         }
       } catch (ex) {}
-
     }
 
     // Update the migration version.
@@ -623,7 +644,7 @@ SuiteGlue.prototype = {
     })().catch(ex => {
       Cu.reportError(ex);
     }).then(() => {
-      Cu.import("resource:///modules/DownloadsTaskbar.jsm", {})
+      ChromeUtils.import("resource:///modules/DownloadsTaskbar.jsm", {})
         .DownloadsTaskbar.registerIndicator(aWindow);
     });
   },
@@ -795,22 +816,6 @@ SuiteGlue.prototype = {
     }
   },
 
-  _playDownloadSound: function()
-  {
-    if (Services.prefs.getBoolPref("browser.download.finished_download_sound")) {
-      if (!this._sound)
-        this._sound = Cc["@mozilla.org/sound;1"]
-                        .createInstance(Ci.nsISound);
-      try {
-        var url = Services.prefs.getComplexValue("browser.download.finished_sound_url",
-                                                 Ci.nsISupportsString);
-        this._sound.play(Services.io.newURI(url.data));
-      } catch (e) {
-        this._sound.beep();
-      }
-    }
-  },
-
   _showPluginUpdatePage: function(aWindow) {
     Services.prefs.setBoolPref("plugins.update.notifyUser", false);
 
@@ -893,19 +898,14 @@ SuiteGlue.prototype = {
   // This will do nothing on platforms without a shell service.
   _checkForDefaultClient: function checkForDefaultClient(aWindow)
   {
-    const NS_SHELLSERVICE_CID = "@mozilla.org/suite/shell-service;1";
-    if (NS_SHELLSERVICE_CID in Cc) try {
-      var nsIShellService = Ci.nsIShellService;
-
-      var shellService = Cc[NS_SHELLSERVICE_CID]
-                           .getService(nsIShellService);
-      var appTypes = shellService.shouldBeDefaultClientFor;
+    if (ShellService) try {
+      var appTypes = ShellService.shouldBeDefaultClientFor;
 
       // Show the default client dialog only if we should check for the default
       // client and we aren't already the default for the stored app types in
       // shell.checkDefaultApps.
-      if (appTypes && shellService.shouldCheckDefaultClient &&
-          !shellService.isDefaultClient(true, appTypes)) {
+      if (appTypes && ShellService.shouldCheckDefaultClient &&
+          !ShellService.isDefaultClient(true, appTypes)) {
         aWindow.openDialog("chrome://communicator/content/defaultClientDialog.xul",
                            "DefaultClient",
                            "modal,centerscreen,chrome,resizable=no");
@@ -1250,21 +1250,26 @@ SuiteGlue.prototype = {
   // public nsISuiteGlue members
   // ------------------------------
 
-  showDownloadManager: function(aDownload)
+  showDownloadManager: function(newDownload)
   {
     if (!gDownloadManager) {
+      // Use an empty arguments string or the download manager window
+      // will miss the toolbar and other features.
+      var argString = Cc["@mozilla.org/supports-string;1"]
+                        .createInstance(Ci.nsISupportsString);
+      argString.data = "";
       gDownloadManager = Services.ww.openWindow(null, DOWNLOAD_MANAGER_URL,
                                                 null, "all,dialog=no",
-                                                { wrappedJSObject: aDownload });
+                                                argString);
       gDownloadManager.addEventListener("load", function() {
         gDownloadManager.addEventListener("unload", function() {
           gDownloadManager = null;
         });
         // Attach the taskbar progress meter to the download manager window.
-        Components.utils.import("resource:///modules/DownloadsTaskbar.jsm", {})
-                  .DownloadsTaskbar.attachIndicator(gDownloadManager);
+        ChromeUtils.import("resource:///modules/DownloadsTaskbar.jsm", {})
+                   .DownloadsTaskbar.attachIndicator(gDownloadManager);
       });
-    } else if (!aDownload ||
+    } else if (!newDownload ||
                Services.prefs.getBoolPref(PREF_FOCUS_WHEN_STARTING)) {
         gDownloadManager.focus();
     } else {
@@ -1454,6 +1459,54 @@ SuiteGlue.prototype = {
 
 }
 
+/**
+ * ContentPermissionIntegration is responsible for showing the user
+ * simple permission prompts when content requests additional
+ * capabilities.
+ *
+ * While there are some built-in permission prompts, createPermissionPrompt
+ * can also be overridden by system add-ons or tests to provide new ones.
+ *
+ * This override ability is provided by Integration.jsm. See
+ * PermissionUI.jsm for an example of how to provide a new prompt
+ * from an add-on.
+ */
+const ContentPermissionIntegration = {
+  /**
+   * Creates a PermissionPrompt for a given permission type and
+   * nsIContentPermissionRequest.
+   *
+   * @param {string} type
+   *        The type of the permission request from content. This normally
+   *        matches the "type" field of an nsIContentPermissionType, but it
+   *        can be something else if the permission does not use the
+   *        nsIContentPermissionRequest model. Note that this type might also
+   *        be different from the permission key used in the permissions
+   *        database.
+   *        Example: "geolocation"
+   * @param {nsIContentPermissionRequest} request
+   *        The request for a permission from content.
+   * @return {PermissionPrompt} (see PermissionUI.jsm),
+   *         or undefined if the type cannot be handled.
+   */
+  createPermissionPrompt(type, request) {
+    switch (type) {
+      case "geolocation": {
+        return new PermissionUI.GeolocationPermissionPrompt(request);
+      }
+      case "desktop-notification": {
+        return new PermissionUI.DesktopNotificationPermissionPrompt(request);
+      }
+      case "persistent-storage": {
+        if (Services.prefs.getBoolPref("browser.storageManager.enabled")) {
+          return new PermissionUI.PersistentStoragePermissionPrompt(request);
+        }
+      }
+    }
+    return undefined;
+  },
+};
+
 function ContentPermissionPrompt() {}
 
 ContentPermissionPrompt.prototype = {
@@ -1461,74 +1514,48 @@ ContentPermissionPrompt.prototype = {
 
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIContentPermissionPrompt]),
 
-  prompt: function(aRequest)
-  {
-    // Only allow exactly one permission type here.
-    if (aRequest.types.length != 1)
-      return;
+  /**
+   * This implementation of nsIContentPermissionPrompt.prompt ensures
+   * that there's only one nsIContentPermissionType in the request,
+   * and that it's of type nsIContentPermissionType. Failing to
+   * satisfy either of these conditions will result in this method
+   * throwing NS_ERRORs. If the combined ContentPermissionIntegration
+   * cannot construct a prompt for this particular request, an
+   * NS_ERROR_FAILURE will be thrown.
+   *
+   * Any time an error is thrown, the nsIContentPermissionRequest is
+   * cancelled automatically.
+   *
+   * @param {nsIContentPermissionRequest} request
+   *        The request that we're to show a prompt for.
+   */
+  prompt(request) {
+    try {
+      // Only allow exactly one permission request here.
+      let types = request.types.QueryInterface(Ci.nsIArray);
+      if (types.length != 1) {
+        throw Components.Exception(
+          "Expected an nsIContentPermissionRequest with only 1 type.",
+          Cr.NS_ERROR_UNEXPECTED);
+      }
 
-    const kFeatureKeys = { "geolocation" : "geo",
-                           "desktop-notification" : "desktop-notification",
-                         };
+      let type = types.queryElementAt(0, Ci.nsIContentPermissionType).type;
+      let combinedIntegration =
+        Integration.contentPermission.getCombined(ContentPermissionIntegration);
 
-    // Make sure that we support the request.
-    var type = aRequest.types.queryElementAt(0, Ci.nsIContentPermissionType).type;
-    if (!(type in kFeatureKeys))
-      return;
+      let permissionPrompt =
+        combinedIntegration.createPermissionPrompt(type, request);
+      if (!permissionPrompt) {
+        throw Components.Exception(
+          "Failed to handle permission of type ${type}",
+          Cr.NS_ERROR_FAILURE);
+      }
 
-    var path, host;
-    var requestingPrincipal = aRequest.principal;
-    var requestingURI = requestingPrincipal.URI;
-
-    if (requestingURI instanceof Ci.nsIFileURL)
-      path = requestingURI.file.path;
-    else if (requestingURI instanceof Ci.nsIStandardURL)
-      host = requestingURI.host;
-    // Ignore requests from non-nsIStandardURLs
-    else
-      return;
-
-    var perm = kFeatureKeys[type];
-    switch (Services.perms.testExactPermissionFromPrincipal(requestingPrincipal, perm)) {
-      case Services.perms.ALLOW_ACTION:
-        aRequest.allow();
-        return;
-      case Services.perms.DENY_ACTION:
-        aRequest.cancel();
-        return;
-    }
-
-    function allowCallback(remember, expireType) {
-      if (remember)
-        Services.perms.addFromPrincipal(requestingPrincipal, perm,
-                                        Services.perms.ALLOW_ACTION,
-                                        expireType);
-      aRequest.allow();
-    }
-
-    function cancelCallback(remember, expireType) {
-      if (remember)
-        Services.perms.addFromPrincipal(requestingPrincipal, perm,
-                                        Services.perms.DENY_ACTION,
-                                        expireType);
-      aRequest.cancel();
-    }
-
-    var nb = aRequest.window
-                     .QueryInterface(Ci.nsIInterfaceRequestor)
-                     .getInterface(Ci.nsIWebNavigation)
-                     .QueryInterface(Ci.nsIDocShell)
-                     .chromeEventHandler.parentNode;
-
-    // Show the prompt.
-    switch (type) {
-      case "geolocation":
-        nb.showGeolocationPrompt(path, host, allowCallback, cancelCallback);
-        break;
-      case "desktop-notification":
-        if (host)
-          nb.showWebNotificationPrompt(host, allowCallback, cancelCallback);
-        break;
+      permissionPrompt.prompt();
+    } catch (ex) {
+      Cu.reportError(ex);
+      request.cancel();
+      throw ex;
     }
   },
 };

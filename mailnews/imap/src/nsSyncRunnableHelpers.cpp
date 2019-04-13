@@ -359,14 +359,12 @@ NS_IMETHODIMP iface##Proxy::Set##attribute(type a1) {                     \
 #define NS_NOTIMPLEMENTED \
   { NS_RUNTIMEABORT("Not implemented"); return NS_ERROR_UNEXPECTED; }
 
-NS_SYNCRUNNABLEMETHOD5(StreamListener, OnDataAvailable,
-                       nsIRequest *, nsISupports *, nsIInputStream *, uint64_t, uint32_t)
+NS_SYNCRUNNABLEMETHOD4(StreamListener, OnDataAvailable,
+                       nsIRequest *, nsIInputStream *, uint64_t, uint32_t)
 
-NS_SYNCRUNNABLEMETHOD2(StreamListener, OnStartRequest,
-                       nsIRequest *, nsISupports *)
+NS_SYNCRUNNABLEMETHOD1(StreamListener, OnStartRequest, nsIRequest *)
 
-NS_SYNCRUNNABLEMETHOD3(StreamListener, OnStopRequest,
-                       nsIRequest *, nsISupports *, nsresult)
+NS_SYNCRUNNABLEMETHOD2(StreamListener, OnStopRequest, nsIRequest *, nsresult)
 
 NS_SYNCRUNNABLEMETHOD2(ImapProtocolSink, GetUrlWindow, nsIMsgMailNewsUrl *,
                        nsIMsgWindow **)
@@ -578,13 +576,13 @@ void OAuth2ThreadHelper::Connect()
   }
 }
 
-nsresult OAuth2ThreadHelper::OnSuccess(const nsACString &aAccessToken)
+nsresult OAuth2ThreadHelper::OnSuccess(const nsACString &aOAuth2String)
 {
   MOZ_ASSERT(NS_IsMainThread(), "Can't touch JS off-main-thread");
   MonitorAutoLock lockGuard(mMonitor);
 
   MOZ_ASSERT(mOAuth2Support, "Should not be here if no OAuth2 support");
-  mOAuth2Support->BuildXOAuth2String(mOAuth2String);
+  mOAuth2String = aOAuth2String;
   mMonitor.Notify();
   return NS_OK;
 }

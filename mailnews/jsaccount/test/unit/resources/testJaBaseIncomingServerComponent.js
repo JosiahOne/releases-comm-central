@@ -6,9 +6,12 @@
 // This file is the component definition for a demo base implementation of a
 // javascript IncomingServer.
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/jsaccount/JSAccountUtils.jsm");
-ChromeUtils.import("resource://testing-common/mailnews/testJaBaseIncomingServer.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {JSAccountUtils} = ChromeUtils.import("resource:///modules/jsaccount/JSAccountUtils.jsm");
+var {
+  JaBaseIncomingServerProperties,
+  JaBaseIncomingServer,
+} = ChromeUtils.import("resource://testing-common/mailnews/testJaBaseIncomingServer.jsm");
 dump("\n\ntestJaBaseIncomingServerComponent.js\n\n");
 
 // Constructor

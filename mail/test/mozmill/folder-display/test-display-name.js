@@ -6,6 +6,9 @@
  * Test that the display names in email addresses are correctly shown in the
  * thread pane.
  */
+
+"use strict";
+
 var MODULE_NAME = "test-display-name";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -91,7 +94,7 @@ var messages = [
   { name: "from_display_name_multiple",
     headers: { From: "Carter Burke <cburke@wyutani.invalid>, " +
                      "Dwayne Hicks <dhicks@uscmc.invalid>" },
-    expected: { column: "from", value: "Carter Burke" },
+    expected: { column: "from", value: "Carter Burke et al." },
   },
   { name: "from_missing",
     headers: { From: null },

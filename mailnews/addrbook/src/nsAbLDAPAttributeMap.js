@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 var NS_ABLDAPATTRIBUTEMAP_CID = Components.ID(
   "{127b341a-bdda-4270-85e1-edff569a9b85}");
@@ -18,8 +18,7 @@ function nsAbLDAPAttributeMap() {
 nsAbLDAPAttributeMap.prototype = {
   classID: NS_ABLDAPATTRIBUTEMAP_CID,
 
-  getAttributeList: function getAttributeList(aProperty) {
-
+  getAttributeList(aProperty) {
     if (!(aProperty in this.mPropertyMap)) {
       return null;
     }
@@ -28,8 +27,7 @@ nsAbLDAPAttributeMap.prototype = {
     return this.mPropertyMap[aProperty].join(",");
   },
 
-  getAttributes: function getAttributes(aProperty, aCount, aAttrs) {
-
+  getAttributes(aProperty, aCount, aAttrs) {
     // fail if no entry for this
     if (!(aProperty in this.mPropertyMap)) {
       throw Cr.NS_ERROR_FAILURE;
@@ -40,8 +38,7 @@ nsAbLDAPAttributeMap.prototype = {
     return aAttrs;
   },
 
-  getFirstAttribute: function getFirstAttribute(aProperty) {
-
+  getFirstAttribute(aProperty) {
     // fail if no entry for this
     if (!(aProperty in this.mPropertyMap)) {
       return null;
@@ -50,9 +47,7 @@ nsAbLDAPAttributeMap.prototype = {
     return this.mPropertyMap[aProperty][0];
   },
 
-  setAttributeList: function setAttributeList(aProperty, aAttributeList,
-                                              aAllowInconsistencies) {
-
+  setAttributeList(aProperty, aAttributeList, aAllowInconsistencies) {
     var attrs = aAttributeList.split(",");
 
     // check to make sure this call won't allow multiple mappings to be
@@ -81,8 +76,7 @@ nsAbLDAPAttributeMap.prototype = {
     this.mPropertyMap[aProperty] = attrs;
   },
 
-  getProperty: function getProperty(aAttribute) {
-
+  getProperty(aAttribute) {
     if (!(aAttribute in this.mAttrMap)) {
       return null;
     }
@@ -90,7 +84,7 @@ nsAbLDAPAttributeMap.prototype = {
     return this.mAttrMap[aAttribute];
   },
 
-  getAllCardAttributes: function getAllCardAttributes() {
+  getAllCardAttributes() {
     var attrs = [];
     for (var prop in this.mPropertyMap) {
       let attrArray = this.mPropertyMap[prop];
@@ -104,8 +98,7 @@ nsAbLDAPAttributeMap.prototype = {
     return attrs.join(",");
   },
 
-  getAllCardProperties: function getAllCardProperties(aCount) {
-
+  getAllCardProperties(aCount) {
     var props = [];
     for (var prop in this.mPropertyMap) {
       props.push(prop);
@@ -115,7 +108,7 @@ nsAbLDAPAttributeMap.prototype = {
     return props;
   },
 
-  setFromPrefs: function setFromPrefs(aPrefBranchName) {
+  setFromPrefs(aPrefBranchName) {
     // get the right pref branch
     let branch = Services.prefs.getBranch(aPrefBranchName + ".");
 
@@ -132,9 +125,7 @@ nsAbLDAPAttributeMap.prototype = {
     this.checkState();
   },
 
-  setCardPropertiesFromLDAPMessage: function
-    setCardPropertiesFromLDAPMessage(aMessage, aCard) {
-
+  setCardPropertiesFromLDAPMessage(aMessage, aCard) {
     var cardValueWasSet = false;
 
     var msgAttrCount = {};
@@ -146,15 +137,12 @@ nsAbLDAPAttributeMap.prototype = {
 
     // deal with each addressbook property
     for (var prop in this.mPropertyMap) {
-
       // go through the list of possible attrs in precedence order
       for (var attr of this.mPropertyMap[prop]) {
-
         attr = attr.toLowerCase();
 
         // find the first attr that exists in this message
-        if (msgAttrs.indexOf(attr) != -1) {
-
+        if (msgAttrs.includes(attr)) {
           try {
             var values = aMessage.getValues(attr, {});
             // strip out the optional label from the labeledURI
@@ -177,25 +165,21 @@ nsAbLDAPAttributeMap.prototype = {
     if (!cardValueWasSet) {
       throw Cr.NS_ERROR_FAILURE;
     }
-
-    return;
   },
 
-  checkState: function checkState() {
-
+  checkState() {
     var attrsSeen = [];
 
     for (var prop in this.mPropertyMap) {
       let attrArray = this.mPropertyMap[prop];
       for (var attr of attrArray) {
-
         // multiple attributes that mapped to the empty string are permitted
         if (!attr.length) {
           continue;
         }
 
         // if we've seen this before, there's a problem
-        if (attrsSeen.indexOf(attr) != -1) {
+        if (attrsSeen.includes(attr)) {
           throw Cr.NS_ERROR_FAILURE;
         }
 
@@ -203,13 +187,10 @@ nsAbLDAPAttributeMap.prototype = {
         attrsSeen.push(attr);
       }
     }
-
-    return;
   },
 
-  QueryInterface: XPCOMUtils
-    .generateQI([Ci.nsIAbLDAPAttributeMap])
-}
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIAbLDAPAttributeMap]),
+};
 
 function nsAbLDAPAttributeMapService() {
 }
@@ -220,8 +201,7 @@ nsAbLDAPAttributeMapService.prototype = {
 
   mAttrMaps: {},
 
-  getMapForPrefBranch: function getMapForPrefBranch(aPrefBranchName) {
-
+  getMapForPrefBranch(aPrefBranchName) {
     // if we've already got this map, return it
     if (aPrefBranchName in this.mAttrMaps) {
       return this.mAttrMaps[aPrefBranchName];
@@ -239,9 +219,8 @@ nsAbLDAPAttributeMapService.prototype = {
     return attrMap;
   },
 
-  QueryInterface: XPCOMUtils
-    .generateQI([Ci.nsIAbLDAPAttributeMapService])
-}
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIAbLDAPAttributeMapService]),
+};
 
 var NSGetFactory = XPCOMUtils.generateNSGetFactory([nsAbLDAPAttributeMap, nsAbLDAPAttributeMapService]);
 

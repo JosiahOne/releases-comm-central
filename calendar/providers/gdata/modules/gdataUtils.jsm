@@ -2,19 +2,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gdata-provider/modules/gdataLogging.jsm");
-ChromeUtils.import("resource://gdata-provider/modules/gdataRequest.jsm");
-ChromeUtils.import("resource://gdata-provider/modules/timezoneMap.jsm");
+// Backwards compatibility with Thunderbird <60.
+if (!("Cc" in this)) {
+    // eslint-disable-next-line mozilla/no-define-cc-etc, no-unused-vars
+    const { classes: Cc, interfaces: Ci, results: Cr, utils: Cu } = Components;
+}
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/PromiseUtils.jsm");
+var {
+    LOGitem,
+    LOGverbose,
+    stringException
+} = ChromeUtils.import("resource://gdata-provider/modules/gdataLogging.jsm");
+var { calGoogleRequest } = ChromeUtils.import("resource://gdata-provider/modules/gdataRequest.jsm");
+var { windowsTimezoneMap } = ChromeUtils.import("resource://gdata-provider/modules/timezoneMap.jsm");
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { PromiseUtils } = ChromeUtils.import("resource://gre/modules/PromiseUtils.jsm");
 
-ChromeUtils.import("resource://gdata-provider/modules/calUtilsShim.jsm");
-
-var cIE = Components.interfaces.calIErrors;
+var { cal } = ChromeUtils.import("resource://gdata-provider/modules/calUtilsShim.jsm");
 
 var FOUR_WEEKS_IN_MINUTES = 40320;
 
@@ -28,7 +33,7 @@ var EXPORTED_SYMBOLS = [
 ];
 
 /**
- * Retrives the Google ID associated with this event. This is either a simple
+ * Retrieves the Google ID associated with this event. This is either a simple
  * id or the id in combination with the recurrence id.
  *
  * @param aItem             The Item to get the id for.
@@ -327,7 +332,7 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
         // user didn't choose to delete the event, we will protect him and not
         // allow this status to be set
         throw new Components.Exception("The status CANCELLED is reserved, delete the event instead!",
-                                       Components.results.NS_ERROR_LOSS_OF_SIGNIFICANT_DATA);
+                                       Cr.NS_ERROR_LOSS_OF_SIGNIFICANT_DATA);
     } else if (status == "none") {
         status = null;
     }
@@ -339,7 +344,7 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
     addExtendedProperty("X-MOZ-CATEGORIES", categories);
 
     // Only parse attendees if they are enabled, due to bug 407961
-    if (Preferences.get("calendar.google.enableAttendees", false)) {
+    if (Services.prefs.getBoolPref("calendar.google.enableAttendees", false)) {
         let createAttendee = function(attendee) {
             const statusMap = {
                 "NEEDS-ACTION": "needsAction",
@@ -440,7 +445,7 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
     let itemSnoozeTime = aItem.getProperty("X-MOZ-SNOOZE-TIME");
     let icalSnoozeTime = null;
     if (itemSnoozeTime) {
-        // The propery is saved as a string, translate back to calIDateTime.
+        // The property is saved as a string, translate back to calIDateTime.
         icalSnoozeTime = cal.createDateTime();
         icalSnoozeTime.icalString = itemSnoozeTime;
     }
@@ -454,12 +459,10 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
         // from the event. This should change when we have multiple alarms
         // support.
         let snoozeObj = {};
-        let enumerator = aItem.propertyEnumerator;
-        while (enumerator.hasMoreElements()) {
-            let prop = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-            if (prop.name.substr(0, 18) == "X-MOZ-SNOOZE-TIME-") {
+        for (let [name, value] of aItem.properties) {
+            if (name.substr(0, 18) == "X-MOZ-SNOOZE-TIME-") {
                 // We have a snooze time for a recurring event, add it to our object
-                snoozeObj[prop.name.substr(18)] = prop.value;
+                snoozeObj[name.substr(18)] = value;
             }
         }
         if (Object.keys(snoozeObj).length > 0) {
@@ -476,7 +479,7 @@ function EventToJSON(aItem, aOfflineStorage, aIsImport) {
         let recurrenceItems = aItem.recurrenceInfo.getRecurrenceItems({});
         for (let ritem of recurrenceItems) {
             let prop = ritem.icalProperty;
-            if (ritem instanceof Components.interfaces.calIRecurrenceDate) {
+            if (ritem instanceof Ci.calIRecurrenceDate) {
                 // EXDATES require special casing, since they might contain
                 // a TZID. To avoid the need for conversion of TZID strings,
                 // convert to UTC before serialization.
@@ -580,8 +583,8 @@ function setupRecurrence(aItem, aRecurrence, aTimezone) {
     }
 
     let rootComp;
+    let vevent = "BEGIN:VEVENT\r\n" + aRecurrence.join("\r\n") + "\r\nEND:VEVENT";
     try {
-        let vevent = "BEGIN:VEVENT\r\n" + aRecurrence.join("\r\n") + "\r\nEND:VEVENT";
         rootComp = cal.getIcsService().parseICS(vevent, null);
     } catch (e) {
         cal.ERROR("[calGoogleCalendar] Unable to parse recurrence item: " + vevent);
@@ -594,8 +597,8 @@ function setupRecurrence(aItem, aRecurrence, aTimezone) {
         switch (prop.propertyName) {
             case "RDATE":
             case "EXDATE": {
-                let recItem = Components.classes["@mozilla.org/calendar/recurrence-date;1"]
-                                        .createInstance(Components.interfaces.calIRecurrenceDate);
+                let recItem = Cc["@mozilla.org/calendar/recurrence-date;1"]
+                                .createInstance(Ci.calIRecurrenceDate);
                 try {
                     recItem.icalProperty = prop;
                     aItem.recurrenceInfo.appendRecurrenceItem(recItem);
@@ -645,7 +648,7 @@ function JSONToAlarm(aEntry, aDefault) {
     let alarm = cal.createAlarm();
     let alarmOffset = cal.createDuration();
     alarm.action = alarmActionMap[aEntry.method] || "DISPLAY";
-    alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_START;
+    alarm.related = Ci.calIAlarm.ALARM_RELATED_START;
     alarmOffset.inSeconds = -aEntry.minutes * 60;
     alarmOffset.normalize();
     alarm.offset = alarmOffset;
@@ -977,7 +980,7 @@ ItemSaver.prototype = {
             return this.parseTaskStream(aData);
         } else {
             let message = "Invalid Stream type: " + (aData ? aData.kind || aData.toSource() : null);
-            throw new Components.Exception(message, Components.results.NS_ERROR_FAILURE);
+            throw new Components.Exception(message, Cr.NS_ERROR_FAILURE);
         }
     },
 
@@ -1197,8 +1200,8 @@ ItemSaver.prototype = {
                     parent.id = meta.path + "@google.com";
                 }
                 parent.recurrenceInfo = cal.createRecurrenceInfo(parent);
-                let rdate = Components.classes["@mozilla.org/calendar/recurrence-date;1"]
-                    .createInstance(Components.interfaces.calIRecurrenceDate);
+                let rdate = Cc["@mozilla.org/calendar/recurrence-date;1"]
+                              .createInstance(Ci.calIRecurrenceDate);
                 rdate.date = exc.recurrenceId;
                 parent.recurrenceInfo.appendRecurrenceItem(rdate);
                 await this.commitItem(parent);
@@ -1215,7 +1218,7 @@ ItemSaver.prototype = {
 function ActivityShell(aCalendar) {
     this.calendar = aCalendar;
 
-    if ("@mozilla.org/activity-process;1" in Components.classes) {
+    if ("@mozilla.org/activity-process;1" in Cc) {
         this.init();
     }
 }
@@ -1227,16 +1230,14 @@ ActivityShell.prototype = {
     type: null,
 
     init: function() {
-        this.actMgr = Components.classes["@mozilla.org/activity-manager;1"]
-                                .getService(Components.interfaces.nsIActivityManager);
-        this.act = Components.classes["@mozilla.org/activity-process;1"]
-                             .createInstance(Components.interfaces.nsIActivityProcess);
+        this.actMgr = Cc["@mozilla.org/activity-manager;1"].getService(Ci.nsIActivityManager);
+        this.act = Cc["@mozilla.org/activity-process;1"].createInstance(Ci.nsIActivityProcess);
         this.act.init(getProviderString("syncStatus", this.calendar.name), this);
         this.act.iconClass = "syncMail";
         this.act.contextType = "gdata-calendar";
         this.act.contextObj = this.calendar;
         this.act.contextDisplayText = this.calendar.name;
-        this.act.state = Components.interfaces.nsIActivityProcess.STATE_INPROGRESS;
+        this.act.state = Ci.nsIActivityProcess.STATE_INPROGRESS;
 
         this.actMgr.addActivity(this.act);
     },
@@ -1269,7 +1270,7 @@ ActivityShell.prototype = {
         }
         let total = this.act.totalWorkUnits;
         this.act.setProgress("", total, total);
-        this.act.state = Components.interfaces.nsIActivityProcess.STATE_COMPLETED;
+        this.act.state = Ci.nsIActivityProcess.STATE_COMPLETED;
         this.actMgr.removeActivity(this.act.id);
     }
 };
@@ -1311,7 +1312,7 @@ async function checkResolveConflict(aOperation, aCalendar, aItem) {
         // means to update the item locally.
         cal.LOG("[calGoogleCalendar] Reload requested, cancelling change of " + aItem.title);
         aCalendar.superCalendar.refresh();
-        throw Components.Exception(null, cIE.OPERATION_CANCELLED);
+        throw Components.Exception(null, Ci.calIErrors.OPERATION_CANCELLED);
     }
 }
 
@@ -1344,7 +1345,7 @@ function monkeyPatch(obj, x, func) {
         try {
             return func.apply(obj, args);
         } catch (e) {
-            Components.utils.reportError(e);
+            Cu.reportError(e);
             throw e;
         }
     };
@@ -1355,7 +1356,7 @@ function monkeyPatch(obj, x, func) {
  */
 function spinEventLoop() {
     let diff = new Date() - spinEventLoop.lastSpin;
-    if (diff < Preferences.get("calendar.threading.latency", 250)) {
+    if (diff < Services.prefs.getIntPref("calendar.threading.latency", 250)) {
         return Promise.resolve(false);
     }
     spinEventLoop.lastSpin = new Date();

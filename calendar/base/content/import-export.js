@@ -2,8 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from calendar-item-editing.js */
+
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /* exported loadEventsFromFile, exportEntireCalendar */
 
@@ -20,30 +22,21 @@ var MODE_TRUNCATE = 0x20;
  *                              into the calendar
  */
 function loadEventsFromFile(aCalendar) {
-    const nsIFilePicker = Components.interfaces.nsIFilePicker;
-
-    let picker = Components.classes["@mozilla.org/filepicker;1"]
-                           .createInstance(nsIFilePicker);
+    let picker = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
     picker.init(window,
                 cal.l10n.getCalString("filepickerTitleImport"),
-                nsIFilePicker.modeOpen);
+                Ci.nsIFilePicker.modeOpen);
     picker.defaultExtension = "ics";
 
     // Get a list of importers
     let contractids = [];
-    let catman = Components.classes["@mozilla.org/categorymanager;1"]
-                           .getService(Components.interfaces.nsICategoryManager);
-    let catenum = catman.enumerateCategory("cal-importers");
     let currentListLength = 0;
     let defaultCIDIndex = 0;
-    while (catenum.hasMoreElements()) {
-        let entry = catenum.getNext();
-        entry = entry.QueryInterface(Components.interfaces.nsISupportsCString);
-        let contractid = catman.getCategoryEntry("cal-importers", entry);
+    for (let { data } of Services.catMan.enumerateCategory("cal-importers")) {
+        let contractid = Services.catMan.getCategoryEntry("cal-importers", data);
         let importer;
         try {
-            importer = Components.classes[contractid]
-                                 .getService(Components.interfaces.calIImporter);
+            importer = Cc[contractid].getService(Ci.calIImporter);
         } catch (e) {
             cal.WARN("Could not initialize importer: " + contractid + "\nError: " + e);
             continue;
@@ -61,7 +54,7 @@ function loadEventsFromFile(aCalendar) {
     }
 
     picker.open(rv => {
-        if (rv != nsIFilePicker.returnOK || !picker.file || !picker.file.path) {
+        if (rv != Ci.nsIFilePicker.returnOK || !picker.file || !picker.file.path) {
             return;
         }
 
@@ -72,13 +65,10 @@ function loadEventsFromFile(aCalendar) {
         }
 
         let filePath = picker.file.path;
-        let importer = Components.classes[contractids[filterIndex]]
-                                 .getService(Components.interfaces.calIImporter);
+        let importer = Cc[contractids[filterIndex]].getService(Ci.calIImporter);
 
-        const nsIFileInputStream = Components.interfaces.nsIFileInputStream;
-
-        let inputStream = Components.classes["@mozilla.org/network/file-input-stream;1"]
-                                    .createInstance(nsIFileInputStream);
+        let inputStream = Cc["@mozilla.org/network/file-input-stream;1"]
+                            .createInstance(Ci.nsIFileInputStream);
         let items = [];
         let exception;
 
@@ -88,7 +78,7 @@ function loadEventsFromFile(aCalendar) {
         } catch (ex) {
             exception = ex;
             switch (ex.result) {
-                case Components.interfaces.calIErrors.INVALID_TIMEZONE:
+                case Ci.calIErrors.INVALID_TIMEZONE:
                     cal.showError(cal.l10n.getCalString("timezoneError", [filePath]), window);
                     break;
                 default:
@@ -152,7 +142,7 @@ function putItemsIntoCal(destCal, aItems, aFilePath) {
     let failedCount = 0;
     let duplicateCount = 0;
     // Used to store the last error. Only the last error, because we don't
-    // wan't to bomb the user with thousands of error messages in case
+    // want to bomb the user with thousands of error messages in case
     // something went really wrong.
     // (example of something very wrong: importing the same file twice.
     //  quite easy to trigger, so we really should do this)
@@ -162,7 +152,7 @@ function putItemsIntoCal(destCal, aItems, aFilePath) {
         onOperationComplete: function(aCalendar, aStatus, aOperationType, aId, aDetail) {
             count++;
             if (!Components.isSuccessCode(aStatus)) {
-                if (aStatus == Components.interfaces.calIErrors.DUPLICATE_ID) {
+                if (aStatus == Ci.calIErrors.DUPLICATE_ID) {
                     duplicateCount++;
                 } else {
                     failedCount++;
@@ -199,7 +189,7 @@ function putItemsIntoCal(destCal, aItems, aFilePath) {
             // counter and not miss failed items. Otherwise, endBatch might
             // never be called.
             listener.onOperationComplete(null, null, null, null, null);
-            Components.utils.reportError("Import error: " + e);
+            Cu.reportError("Import error: " + e);
         }
     }
 
@@ -220,14 +210,11 @@ function saveEventsToFile(calendarEventArray, aDefaultFileName) {
     }
 
     // Show the 'Save As' dialog and ask for a filename to save to
-    const nsIFilePicker = Components.interfaces.nsIFilePicker;
-
-    let picker = Components.classes["@mozilla.org/filepicker;1"]
-                       .createInstance(nsIFilePicker);
+    let picker = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
 
     picker.init(window,
                 cal.l10n.getCalString("filepickerTitleExport"),
-                nsIFilePicker.modeSave);
+                Ci.nsIFilePicker.modeSave);
 
     if (aDefaultFileName && aDefaultFileName.length && aDefaultFileName.length > 0) {
         picker.defaultString = aDefaultFileName;
@@ -241,19 +228,13 @@ function saveEventsToFile(calendarEventArray, aDefaultFileName) {
 
     // Get a list of exporters
     let contractids = [];
-    let catman = Components.classes["@mozilla.org/categorymanager;1"]
-                           .getService(Components.interfaces.nsICategoryManager);
-    let catenum = catman.enumerateCategory("cal-exporters");
     let currentListLength = 0;
     let defaultCIDIndex = 0;
-    while (catenum.hasMoreElements()) {
-        let entry = catenum.getNext();
-        entry = entry.QueryInterface(Components.interfaces.nsISupportsCString);
-        let contractid = catman.getCategoryEntry("cal-exporters", entry);
+    for (let { data } of Services.catMan.enumerateCategory("cal-exporters")) {
+        let contractid = Services.catMan.getCategoryEntry("cal-exporters", data);
         let exporter;
         try {
-            exporter = Components.classes[contractid]
-                                 .getService(Components.interfaces.calIExporter);
+            exporter = Cc[contractid].getService(Ci.calIExporter);
         } catch (e) {
             cal.WARN("Could not initialize exporter: " + contractid + "\nError: " + e);
             continue;
@@ -272,7 +253,7 @@ function saveEventsToFile(calendarEventArray, aDefaultFileName) {
 
     // Now find out as what to save, convert the events and save to file.
     picker.open(rv => {
-        if (rv == nsIFilePicker.returnCancel || !picker.file || !picker.file.path) {
+        if (rv == Ci.nsIFilePicker.returnCancel || !picker.file || !picker.file.path) {
             return;
         }
 
@@ -282,24 +263,22 @@ function saveEventsToFile(calendarEventArray, aDefaultFileName) {
             filterIndex = defaultCIDIndex;
         }
 
-        let exporter = Components.classes[contractids[filterIndex]]
-                                 .getService(Components.interfaces.calIExporter);
+        let exporter = Cc[contractids[filterIndex]].getService(Ci.calIExporter);
 
         let filePath = picker.file.path;
         if (!filePath.includes(".")) {
             filePath += "." + exporter.getFileTypes({})[0].defaultExtension;
         }
 
-        const nsIFile = Components.interfaces.nsIFile;
-        const nsIFileOutputStream = Components.interfaces.nsIFileOutputStream;
+        const nsIFile = Ci.nsIFile;
+        const nsIFileOutputStream = Ci.nsIFileOutputStream;
 
         let outputStream;
-        let localFileInstance = Components.classes["@mozilla.org/file/local;1"]
-                                          .createInstance(nsIFile);
+        let localFileInstance = Cc["@mozilla.org/file/local;1"].createInstance(nsIFile);
         localFileInstance.initWithPath(filePath);
 
-        outputStream = Components.classes["@mozilla.org/network/file-output-stream;1"]
-                                 .createInstance(nsIFileOutputStream);
+        outputStream = Cc["@mozilla.org/network/file-output-stream;1"]
+                         .createInstance(nsIFileOutputStream);
         try {
             outputStream.init(localFileInstance,
                               MODE_WRONLY | MODE_CREATE | MODE_TRUNCATE,
@@ -340,7 +319,7 @@ function exportEntireCalendar(aCalendar) {
     };
 
     let getItemsFromCal = function(aCal) {
-        aCal.getItems(Components.interfaces.calICalendar.ITEM_FILTER_ALL_ITEMS,
+        aCal.getItems(Ci.calICalendar.ITEM_FILTER_ALL_ITEMS,
                       0, null, null, getListener);
     };
 

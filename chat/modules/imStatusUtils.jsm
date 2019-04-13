@@ -4,8 +4,10 @@
 
 this.EXPORTED_SYMBOLS = ["Status"];
 
-ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm");
+var {
+  XPCOMUtils,
+  l10nHelper,
+} = ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "_", () =>
   l10nHelper("chrome://chat/locale/status.properties")
@@ -27,7 +29,7 @@ var Status = {
     aStatusType in statusAttributes ? statusAttributes[aStatusType] : "unknown",
 
   _labels: {},
-  toLabel: function(aStatusType, aStatusText) {
+  toLabel(aStatusType, aStatusText) {
     // aStatusType may be either one of the (integral) imIStatusInfo status
     // constants, or one of the statusAttributes.
     if (!(typeof aStatusType == "string"))
@@ -43,10 +45,10 @@ var Status = {
     return label;
   },
 
-  toFlag: function(aAttribute) {
+  toFlag(aAttribute) {
     for (let flag in statusAttributes)
       if (statusAttributes[flag] == aAttribute)
         return flag;
     return imIStatusInfo.STATUS_UNKNOWN;
-  }
+  },
 };

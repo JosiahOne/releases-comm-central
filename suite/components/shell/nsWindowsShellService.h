@@ -6,7 +6,7 @@
 #include "nscore.h"
 #include "nsShellService.h"
 #include "nsString.h"
-#include "nsIWindowsShellService.h"
+#include "nsIShellService.h"
 #include "mozilla/Attributes.h"
 #include "nsSuiteCID.h"
 
@@ -20,15 +20,14 @@ typedef struct {
   int32_t flags;
 } SETTING;
 
-class nsWindowsShellService final : public nsIWindowsShellService
+class nsWindowsShellService final : public nsIShellService
 {
 public:
-  nsWindowsShellService() : mCheckedThisSessionClient(false) {};
+  nsWindowsShellService() {};
   nsresult Init();
 
   NS_DECL_ISUPPORTS
   NS_DECL_NSISHELLSERVICE
-  NS_DECL_NSIWINDOWSSHELLSERVICE
 
 protected:
   ~nsWindowsShellService() {}
@@ -36,7 +35,6 @@ protected:
   bool TestForDefault(SETTING aSettings[], int32_t aSize);
 
 private:
-  bool mCheckedThisSessionClient;
   nsString mAppLongPath;
   nsString mAppShortPath;
 };

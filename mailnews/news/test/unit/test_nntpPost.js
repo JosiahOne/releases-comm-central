@@ -1,16 +1,16 @@
 /* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 // Tests that the news can correctly post messages
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 function run_test() {
   var daemon = setupNNTPDaemon();
   var server = makeServer(NNTP_RFC977_handler, daemon);
   server.start();
   var localserver = setupLocalServer(server.port);
-  var listener = { OnStopRunningUrl: function () {
-    localserver.closeCachedConnections();
-  }};
+  var listener = {
+    OnStopRunningUrl() { localserver.closeCachedConnections(); },
+  };
 
   // Tests bug 484656.
   localserver.realHostName = localserver.hostName;

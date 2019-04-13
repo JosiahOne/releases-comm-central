@@ -13,7 +13,7 @@
   When all searches are finished, close the dialog.
 */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var nsIX509CertDB = Ci.nsIX509CertDB;
 var nsX509CertDB = "@mozilla.org/security/x509certdb;1";
@@ -26,6 +26,8 @@ var gLdapConnection;
 var gCertDB;
 var gLdapOperation;
 var gLogin;
+
+document.addEventListener("dialogcancel", stopFetching);
 
 function onLoad()
 {
@@ -78,7 +80,6 @@ function stopFetching()
     catch (e) {
     }
   }
-  return true;
 }
 
 function importCert(ber_value)

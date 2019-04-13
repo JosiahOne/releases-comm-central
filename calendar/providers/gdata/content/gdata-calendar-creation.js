@@ -2,8 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gdata-provider/modules/gdataSession.jsm");
-ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
+/* import-globals-from ../../../lightning/content/lightning-calendar-creation.js */
+
+// Backwards compatibility with Thunderbird <60.
+if (!("Cc" in this)) {
+    // eslint-disable-next-line mozilla/no-define-cc-etc, no-unused-vars
+    const { utils: Cu } = Components;
+}
+
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://gdata-provider/modules/calUtilsShim.jsm");
+var { getGoogleSessionManager } = ChromeUtils.import("resource://gdata-provider/modules/gdataSession.jsm");
+var { monkeyPatch } = ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
 
 (function() {
     function pageorder(anchor, ...pages) {
@@ -20,7 +30,7 @@ ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
             try {
                 return func.apply(this, arguments);
             } catch (e) {
-                Components.utils.reportError(e);
+                Cu.reportError(e);
                 throw e;
             }
         };
@@ -34,7 +44,7 @@ ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
         curi.parentNode.style.visibility = (isGdata ? "hidden" : "visible");
         document.getElementById("cache").parentNode.style.visibility = (isGdata ? "hidden" : "visible");
 
-        // Move the next step descrition to the right place
+        // Move the next step description to the right place
         let locationRows = document.querySelector("#calendar-wizard > [pageid='locationPage'] > grid > rows");
         let nextStepDescr = document.getElementById("gdata-nextstep-description");
         locationRows.appendChild(nextStepDescr);
@@ -68,6 +78,8 @@ ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
         // handler, which causes our provider to fail. Given the exchange
         // provider is currently not maintained and we want them to work
         // together, here is a workaround.
+
+        // eslint-disable-next-line no-undef
         monkeyPatch(tmpCalendarCreation, "doRadioExchangeCalendar", (protofunc, target) => {
             // We need to run our function first, otherwise resetting the
             // pageorder will overwrite what the exchange provider does.
@@ -203,7 +215,7 @@ ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
 
             calendarListWidget.calendars = calendars;
         }, (e) => {
-            Components.utils.reportError(e);
+            Cu.reportError(e);
         });
     });
 
@@ -212,7 +224,6 @@ ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
         let calendars = calendarList.selectedCalendars.filter(calendar => !calendar.getProperty("disabled") && !calendar.readOnly);
         let calMgr = cal.getCalendarManager();
         calendars.forEach(calMgr.registerCalendar, calMgr);
-        return true;
     });
 
     this.gdataFocusNewSession = trycatch(() => {
@@ -230,5 +241,22 @@ ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
         if (!("updateStyleSheetForViews" in window)) {
             window.updateStyleSheetForViews = function() {};
         }
+
+        if (document.getElementById("gdata-session").pageIndex == -1) {
+            let wizard = document.documentElement;
+            wizard._initPages();
+        }
     });
+
+    let gdataSessionPage = document.getElementById("gdata-session");
+    gdataSessionPage.addEventListener("pageshow", () => {
+        this.gdataSessionShow();
+        checkRequired();
+    });
+    let gdataCalendarsPage = document.getElementById("gdata-calendars");
+    gdataCalendarsPage.addEventListener("pageshow", () => {
+        this.gdataCalendarsShow();
+        checkRequired();
+    });
+    gdataCalendarsPage.addEventListener("pageadvanced", this.gdataCalendarsAdvance);
 }).call(window);

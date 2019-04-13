@@ -6,6 +6,8 @@
  * This test checks proper operation of the account tree in the Account manager.
  */
 
+"use strict";
+
 var MODULE_NAME = "test-account-tree";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -172,7 +174,7 @@ function subtest_check_selection_after_account_deletion(amc)
 
   // See if the currently selected account is the one next in the account list.
   let accountTree = amc.e("accounttree");
-  accountRow = accountTree.view.selection.currentIndex;
+  let accountRow = accountTree.view.selection.currentIndex;
   assert_equals(accountTree.view.getItemAtIndex(accountRow)._account,
                 accountList[accountIndex + 1]);
 }

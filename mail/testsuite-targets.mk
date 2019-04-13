@@ -2,11 +2,11 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-MOZMILLDIR=$(DEPTH)/_tests/mozmill
+MOZMILLDIR=$(topobjdir)/_tests/mozmill
 ifeq ($(OS_ARCH),WINNT)
-VIRTUALENV_BIN = $(MOZMILLDIR)/../mozmill-virtualenv/Scripts
+VIRTUALENV_BIN = $(topobjdir)/_virtualenvs/init/Scripts
 else
-VIRTUALENV_BIN = $(MOZMILLDIR)/../mozmill-virtualenv/bin
+VIRTUALENV_BIN = $(topobjdir)/_virtualenvs/init/bin
 endif
 MOZMILLPYTHON = $(abspath $(VIRTUALENV_BIN)/python$(BIN_SUFFIX))
 
@@ -17,9 +17,11 @@ ifdef MOZ_DEBUG
 APP_NAME := $(APP_NAME)Debug
 endif
 BINARY = $(DIST)/$(APP_NAME).app/
+ABS_BINARY = $(abspath $(DIST))/$(APP_NAME).app/
 else
 # Non-mac options
 BINARY = $(DIST)/bin/thunderbird$(BIN_SUFFIX)
+ABS_BINARY = $(abspath $(BINARY))
 endif
 
 check-no-solo = $(foreach solo,SOLO_TEST SOLO_FILE,$(if $($(solo)),$(error $(subst SOLOVAR,$(solo),$(1)))))
@@ -30,10 +32,9 @@ mozmill:
 	$(call check-no-solo,SOLOVAR is specified. Perhaps you meant mozmill-one.)
 	unset PYTHONHOME && cd $(MOZMILLDIR) && MACOSX_DEPLOYMENT_TARGET= \
 	$(MOZMILLPYTHON) runtestlist.py --list=mozmilltests.list \
-	--binary=$(abspath $(BINARY)) \
+	--binary="$(ABS_BINARY)" \
 	--dir=$(commtopsrcdir)/mail/test/mozmill \
 	--symbols-path=$(ABS_DIST)/crashreporter-symbols \
-	--plugins-path=$(ABS_DIST)/plugins \
 	--testing-modules-dir=$(topobjdir)/_tests/modules \
 	$(MOZMILL_EXTRA)
 
@@ -42,16 +43,15 @@ mozmill-one:
 	unset PYTHONHOME && cd $(MOZMILLDIR) && MACOSX_DEPLOYMENT_TARGET= \
 	$(MOZMILLPYTHON) runtest.py \
 	--test=$(commtopsrcdir)/mail/test/mozmill/$(solo-test) \
-	--binary=$(abspath $(BINARY)) \
+	--binary="$(ABS_BINARY)" \
 	--symbols-path=$(ABS_DIST)/crashreporter-symbols \
-	--plugins-path=$(ABS_DIST)/plugins \
 	--testing-modules-dir=$(topobjdir)/_tests/modules \
 	$(MOZMILL_EXTRA)
 
 # We need to add the mozmill tests to the package for tests.
 # If Lightning is enabled, also stage the lightning extension
 ifdef MOZ_CALENDAR
-package-tests: stage-mozmill stage-calendar
+package-tests: stage-calendar
 else
 package-tests: stage-mozmill
 endif
@@ -59,7 +59,8 @@ endif
 stage-mozmill: make-stage-dir
 	$(MAKE) -C $(commtopobjdir)/mail/test/mozmill stage-package
 
-stage-calendar: make-stage-dir
+stage-calendar: stage-mozmill
 	$(MAKE) -C $(commtopobjdir)/calendar/lightning stage-package
+	$(MAKE) -C $(commtopobjdir)/calendar/providers/gdata stage-package
 
 .PHONY: stage-mozmill stage-calendar

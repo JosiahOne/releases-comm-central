@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "content-tab-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -10,12 +12,9 @@ var MODULE_REQUIRES = ["folder-display-helpers",
                          "window-helpers",
                          "mock-object-helpers"];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-var utils = {};
-ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import('resource://gre/modules/XPCOMUtils.jsm');
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var utils = ChromeUtils.import("chrome://mozmill/content/modules/utils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var NORMAL_TIMEOUT = 6000;
 var FAST_TIMEOUT = 1000;
@@ -30,7 +29,7 @@ var _originalBlocklistURL = null;
 
 // logHelper (and therefore folderDisplayHelper) exports
 var mark_failure;
-var gMockExtProtocolSvcReg;
+var gMockExtProtSvcReg;
 
 function setupModule() {
   folderDisplayHelper = collector.getModule('folder-display-helpers');
@@ -467,14 +466,12 @@ function plugins_run_in_separate_processes(aController) {
 }
 
 function updateBlocklist(aController, aCallback) {
-  let blocklistNotifier = Cc["@mozilla.org/extensions/blocklist;1"]
-                            .getService(Ci.nsITimerCallback);
   let observer = function() {
     Services.obs.removeObserver(observer, "blocklist-updated");
     aController.window.setTimeout(aCallback, 0);
   };
   Services.obs.addObserver(observer, "blocklist-updated");
-  blocklistNotifier.notify(null);
+  Services.blocklist.QueryInterface(Ci.nsITimerCallback).notify(null);
 }
 
 function setAndUpdateBlocklist(aController, aURL, aCallback) {

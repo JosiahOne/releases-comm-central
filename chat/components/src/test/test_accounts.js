@@ -2,15 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm");
-ChromeUtils.import("resource://testing-common/AppInfo.jsm");
+var {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
+const {updateAppInfo} = ChromeUtils.import("resource://testing-common/AppInfo.jsm");
 
 function run_test() {
   do_get_profile();
 
   // Test the handling of accounts for unknown protocols.
-  const kAccountName = "Unknown"
+  const kAccountName = "Unknown";
   const kPrplId = "prpl-unknown";
 
   let prefs = Services.prefs;

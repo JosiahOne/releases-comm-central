@@ -2,8 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from calWcapCalendarModule.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 calWcapCalendar.prototype.encodeAttendee = function(att) {
     if (LOG_LEVEL > 2) {
@@ -41,8 +42,8 @@ calWcapCalendar.prototype.getRecurrenceParams = function(item, out_rrules, out_r
         let rItems = item.recurrenceInfo.getRecurrenceItems({});
         for (let rItem of rItems) {
             let isNeg = rItem.isNegative;
-            let rRuleInstance = cal.wrapInstance(rItem, Components.interfaces.calIRecurrenceRule);
-            let rDateInstance = cal.wrapInstance(rItem, Components.interfaces.calIRecurrenceDate);
+            let rRuleInstance = cal.wrapInstance(rItem, Ci.calIRecurrenceRule);
+            let rDateInstance = cal.wrapInstance(rItem, Ci.calIRecurrenceDate);
             if (rRuleInstance) {
                 let rule = "\"" + encodeURIComponent(rRuleInstance.icalProperty.valueAsIcalString) + "\"";
                 if (isNeg) {
@@ -302,7 +303,7 @@ calWcapCalendar.prototype.storeItem = function(bAddItem, item, oldItem, request)
         if (attachments) {
             let strings = [];
             for (let att of attachments) {
-                let wrappedAtt = cal.wrapInstance(att, Components.interfaces.calIAttachment);
+                let wrappedAtt = cal.wrapInstance(att, Ci.calIAttachment);
                 if (typeof att == "string") {
                     strings.push(encodeURIComponent(att));
                 } else if (wrappedAtt && wrappedAtt.uri) {
@@ -596,11 +597,8 @@ calWcapCalendar.prototype.tunnelXProps = function(destItem, srcItem) {
     // tunnel alarm X-MOZ-SNOOZE only if alarm is still set:
     // TODO ALARMSUPPORT still needed when showing alarms as EMAIL for wcap?
     let hasAlarms = destItem.getAlarms({}).length;
-    let enumerator = srcItem.propertyEnumerator;
-    while (enumerator.hasMoreElements()) {
+    for (let [name, value] of srcItem.properties) {
         try {
-            let prop = enumerator.getNext().QueryInterface(Components.interfaces.nsIProperty);
-            let name = prop.name;
             if (name.startsWith("X-MOZ-")) {
                 switch (name) {
                     // keep snooze stamps for occurrences only and if alarm is still set:
@@ -611,9 +609,9 @@ calWcapCalendar.prototype.tunnelXProps = function(destItem, srcItem) {
                         // falls through
                     default:
                         if (LOG_LEVEL > 1) {
-                            log("tunneling " + name + "=" + prop.value, this);
+                            log("tunneling " + name + "=" + value, this);
                         }
-                        destItem.setProperty(name, prop.value);
+                        destItem.setProperty(name, value);
                         break;
                 }
             }
@@ -925,8 +923,8 @@ calWcapCalendar.prototype.parseItems = function(
             items.push(parent);
         }
         if (item.id in fakedParents) {
-            let rdate = Components.classes["@mozilla.org/calendar/recurrence-date;1"]
-                                  .createInstance(Components.interfaces.calIRecurrenceDate);
+            let rdate = Cc["@mozilla.org/calendar/recurrence-date;1"]
+                          .createInstance(Ci.calIRecurrenceDate);
             rdate.date = item.recurrenceId;
             parent.recurrenceInfo.appendRecurrenceItem(rdate);
         }
@@ -956,8 +954,8 @@ calWcapCalendar.prototype.parseItems = function(
             let recItems = item.recurrenceInfo.getRecurrenceItems({});
             for (let recItem of recItems) {
                 // cs bug: workaround missing COUNT
-                let rRuleInstance = cal.wrapInstance(recItem, Components.interfaces.calIRecurrenceRule);
-                let rDateInstance = cal.wrapInstance(recItem, Components.interfaces.calIRecurrenceDate);
+                let rRuleInstance = cal.wrapInstance(recItem, Ci.calIRecurrenceRule);
+                let rDateInstance = cal.wrapInstance(recItem, Ci.calIRecurrenceDate);
                 if (rRuleInstance) {
                     recItem = rRuleInstance;
                     if (!recItem.isFinite && !recItem.isNegative) {
@@ -1147,7 +1145,7 @@ calWcapCalendar.prototype.getItems = function(itemFilter, maxResults, rangeStart
         return request;
     }
 
-    // m_cachedResults holds the last data revtrieval. This is expecially useful when
+    // m_cachedResults holds the last data retrieval. This is especially useful when
     // switching on multiple subcriptions: the composite calendar multiplexes getItems()
     // calls to all composited calendars over and over again, most often on the same
     // date range (as the user usually looks at the same view).
@@ -1251,10 +1249,9 @@ calWcapCalendar.prototype.getItems = function(itemFilter, maxResults, rangeStart
                             let freq = Math.min(20, // default: 20secs
                                                 Math.max(1, CACHE_LAST_RESULTS_INVALIDATE));
                             log("cached results sort out timer freq: " + freq, this);
-                            this.m_cachedResultsTimer = Components.classes["@mozilla.org/timer;1"]
-                                                                  .createInstance(Components.interfaces.nsITimer);
+                            this.m_cachedResultsTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
                             this.m_cachedResultsTimer.initWithCallback(callback, freq * 1000,
-                                                                       Components.interfaces.nsITimer.TYPE_REPEATING_SLACK);
+                                                                       Ci.nsITimer.TYPE_REPEATING_SLACK);
                         }
                         if (!this.m_cachedResults) {
                             this.m_cachedResults = [];

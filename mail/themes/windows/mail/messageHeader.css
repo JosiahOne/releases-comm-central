@@ -13,7 +13,7 @@
   color: WindowText;
   background-color: ButtonFace;
   padding: 0.4ex;
-  border-bottom: 1px solid #a9b7c9; /* The same color as the splitters */
+  border-bottom: 1px solid var(--splitter-color); /* The same color as the splitters */
 }
 
 /* ::::: msg header toolbars ::::: */
@@ -51,14 +51,14 @@
   border: 0;
   background-color: transparent;
   -moz-user-focus: normal;
-  list-style-image: url("chrome://global/skin/tree/twisty-collapsed.svg");
+  list-style-image: url("chrome://global/skin/icons/twisty-collapsed.svg");
   -moz-context-properties: fill, fill-opacity;
   fill: currentColor;
   fill-opacity: 1;
 }
 
 #attachmentToggle[checked="true"] {
-  list-style-image: url("chrome://global/skin/tree/twisty-expanded.svg");
+  list-style-image: url("chrome://global/skin/icons/twisty-expanded.svg");
 }
 
 #attachmentToggle:hover {
@@ -66,7 +66,7 @@
 }
 
 #attachmentToggle:-moz-locale-dir(rtl) {
-  list-style-image: url("chrome://global/skin/tree/twisty-collapsed-rtl.svg");
+  list-style-image: url("chrome://global/skin/icons/twisty-collapsed-rtl.svg");
 }
 
 #attachmentName:hover,
@@ -138,12 +138,6 @@ window[inlinetoolbox] #newtoolbar {
   margin-inline-end: 3px;
 }
 
-.headerValueBox {
-  overflow:visible;
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
 .headerValue {
   min-width: 50px;
   white-space: normal;
@@ -166,6 +160,10 @@ window[inlinetoolbox] #newtoolbar {
 
 .headerValueUrl:hover {
   color: -moz-activehyperlinktext;
+}
+
+mail-headerfield.headerValue:focus {
+  outline-color: Highlight;
 }
 
 .moreIndicator {

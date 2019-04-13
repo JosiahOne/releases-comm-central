@@ -6,18 +6,20 @@
  * Tests Filelink URL insertion behaviours in compose windows.
  */
 
-var MODULE_NAME = 'test-cloudfile-attachment-urls';
+"use strict";
 
-var RELATIVE_ROOT = '../shared-modules';
-var MODULE_REQUIRES = ['folder-display-helpers',
-                       'compose-helpers',
-                       'cloudfile-helpers',
-                       'attachment-helpers',
-                       'dom-helpers',
-                       'window-helpers'];
+var MODULE_NAME = "test-cloudfile-attachment-urls";
 
-ChromeUtils.import('resource://gre/modules/Services.jsm');
-ChromeUtils.import('resource:///modules/mailServices.js');
+var RELATIVE_ROOT = "../shared-modules";
+var MODULE_REQUIRES = ["folder-display-helpers",
+                       "compose-helpers",
+                       "cloudfile-helpers",
+                       "attachment-helpers",
+                       "dom-helpers",
+                       "window-helpers"];
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var kUploadedFile = "attachment-uploaded";
 var kHtmlPrefKey = "mail.identity.default.compose_html";
@@ -30,7 +32,7 @@ var kSigOnReplyKey = "mail.identity.default.sig_on_reply";
 var kSigOnForwardKey = "mail.identity.default.sig_on_fwd";
 var kDefaultSigKey = "mail.identity.id1.htmlSigText";
 var kDefaultSig = "This is my signature.\n\nCheck out my website sometime!";
-var kFiles = ['./data/testFile1', './data/testFile2'];
+var kFiles = ["./data/testFile1", "./data/testFile2"];
 var kLines = ["This is a line of text", "and here's another!"];
 
 var gInbox, gOldHtmlPref, gOldSigPref;
@@ -131,7 +133,7 @@ function prepare_some_attachments_and_reply(aText, aFiles) {
 
   // If we have any typing to do, let's do it.
   type_in_composer(cw, aText);
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
   return cw;
 }
 
@@ -166,7 +168,7 @@ function prepare_some_attachments_and_forward(aText, aFiles) {
 
   // Do any necessary typing...
   type_in_composer(cw, aText);
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
   return cw;
 }
 
@@ -240,7 +242,7 @@ function subtest_inserts_linebreak_on_empty_compose() {
   let provider = new MockCloudfileAccount();
   provider.init("someKey");
   let cw = open_compose_new_mail();
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
 
   let [root, list, urls] = wait_for_attachment_urls(cw, kFiles.length);
 
@@ -269,7 +271,7 @@ function test_inserts_linebreak_on_empty_compose_with_signature() {
   let provider = new MockCloudfileAccount();
   provider.init("someKey");
   let cw = open_compose_new_mail();
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
   // wait_for_attachment_urls ensures that the attachment URL containment
   // node is an immediate child of the body of the message, so if this
   // succeeds, then we were not in the signature node.
@@ -297,7 +299,7 @@ function test_inserts_linebreak_on_empty_compose_with_signature() {
 
   // Now let's try with plaintext mail.
   cw = open_compose_new_mail();
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
   [root, list, urls] = wait_for_attachment_urls(cw, kFiles.length);
 
   br = assert_previous_nodes("br", root, 1);
@@ -371,7 +373,7 @@ function subtest_adding_filelinks_to_written_message() {
   let cw = open_compose_new_mail();
 
   type_in_composer(cw, kLines);
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
 
   let [root, list, urls] = wait_for_attachment_urls(cw, kFiles.length);
 
@@ -543,8 +545,7 @@ function subtest_adding_filelinks_to_reply_below(aText, aWithSig) {
     br = assert_previous_nodes("br", root, 2);
     let textNode = assert_previous_text(br.previousSibling, aText);
     blockquote = textNode.previousSibling;
-  }
-  else {
+  } else {
     // If no text was inserted, check for 1 previous br node, and then the
     // blockquote.
     br = assert_previous_nodes("br", root, 1);
@@ -580,8 +581,7 @@ function subtest_adding_filelinks_to_plaintext_reply_below(aText, aWithSig) {
     let textNode = assert_previous_text(br.previousSibling, aText);
     // And then grab the span, which should be before the final text node.
     span = textNode.previousSibling;
-  }
-  else {
+  } else {
     br = assert_previous_nodes("br", root, 1);
     // If no text was entered, just grab the last br's previous sibling - that
     // will be the span.
@@ -683,7 +683,7 @@ function subtest_converting_filelink_updates_urls() {
   providerB.init("providerB");
 
   let cw = open_compose_new_mail();
-  cw.window.attachToCloud(providerA);
+  add_cloud_attachments(cw, providerA);
 
   let [root, list, urls] = wait_for_attachment_urls(cw, kFiles.length);
 
@@ -724,7 +724,7 @@ function subtest_converting_filelink_to_normal_removes_url() {
   provider.init("someKey");
 
   let cw = open_compose_new_mail();
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
 
   let [root, list, urls] = wait_for_attachment_urls(cw, kFiles.length);
 
@@ -765,7 +765,7 @@ function subtest_filelinks_work_after_manual_removal() {
   let provider = new MockCloudfileAccount();
   provider.init("someKey");
   let cw = open_compose_new_mail();
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
 
   let [root, list, urls] = wait_for_attachment_urls(cw, kFiles.length);
 
@@ -773,7 +773,7 @@ function subtest_filelinks_work_after_manual_removal() {
   root.remove();
 
   gMockFilePicker.returnFiles = collectFiles(["./data/testFile3"], __file__);
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
   [root, list, urls] = wait_for_attachment_urls(cw, 1);
 
   close_window(cw);
@@ -809,7 +809,7 @@ function subtest_insertion_restores_caret_point() {
   type_in_composer(cw, ["Line 1", "Line 2", "", ""]);
 
   // Attach some Filelinks.
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider);
   let [root, list, urls] = wait_for_attachment_urls(cw, kFiles.length);
 
   // Type some text.

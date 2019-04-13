@@ -25,8 +25,7 @@
 // Forward declares
 class QuotingOutputStreamListener;
 class nsMsgComposeSendListener;
-class nsIEditorMailSupport;
-class nsIRDFService;
+class nsIEditor;
 class nsIArray;
 struct nsMsgMailList;
 
@@ -58,7 +57,7 @@ protected:
                                                      const char * originalPath,
                                                      mozilla::dom::Element * element);
   nsresult                      ResetUrisForEmbeddedObjects();
-  nsresult                      TagEmbeddedObjects(nsIEditorMailSupport *aMailEditor);
+  nsresult                      TagEmbeddedObjects(nsIEditor *aEditor);
 
   nsCString                     mQuoteCharset;
   nsCString                     mOriginalMsgURI; // used so we can mark message disposition flags after we send the message
@@ -92,7 +91,7 @@ protected:
   nsresult MoveToAboveQuote(void);
   nsresult MoveToBeginningOfDocument(void);
   nsresult MoveToEndOfDocument(void);
-  nsresult ReplaceFileURLs(nsAutoString &sigData);
+  nsresult ReplaceFileURLs(nsString &sigData);
   nsresult DataURLForFileURL(const nsAString &aFileURL, nsAString &aDataURL);
 
 // 3 = To, Cc, Bcc
@@ -167,13 +166,13 @@ public:
     NS_DECL_NSISTREAMLISTENER
     NS_DECL_NSIMSGQUOTINGOUTPUTSTREAMLISTENER
 
-    NS_IMETHOD SetComposeObj(nsIMsgCompose *obj);
-    NS_IMETHOD ConvertToPlainText(bool formatflowed,
-                                  bool delsp,
-                                  bool formatted,
-                                  bool disallowBreaks);
-    NS_IMETHOD InsertToCompose(nsIEditor *aEditor, bool aHTMLEditor);
-    NS_IMETHOD AppendToMsgBody(const nsCString &inStr);
+    nsresult SetComposeObj(nsIMsgCompose *obj);
+    nsresult ConvertToPlainText(bool formatflowed,
+                                bool delsp,
+                                bool formatted,
+                                bool disallowBreaks);
+    nsresult InsertToCompose(nsIEditor *aEditor, bool aHTMLEditor);
+    nsresult AppendToMsgBody(const nsCString &inStr);
 
 private:
     virtual ~QuotingOutputStreamListener();
@@ -219,7 +218,8 @@ public:
   // nsIWebProgressListener interface
   NS_DECL_NSIWEBPROGRESSLISTENER
 
-  nsresult    RemoveCurrentDraftMessage(nsIMsgCompose *compObj, bool calledByCopy);
+  nsresult    RemoveDraftOrTemplate(nsIMsgCompose *compObj, nsCString msgURI, bool isSaveTemplate);
+  nsresult    RemoveCurrentDraftMessage(nsIMsgCompose *compObj, bool calledByCopy, bool isSaveTemplate);
   nsresult    GetMsgFolder(nsIMsgCompose *compObj, nsIMsgFolder **msgFolder);
 
 private:

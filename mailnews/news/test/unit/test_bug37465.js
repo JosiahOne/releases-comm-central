@@ -1,7 +1,6 @@
 // Bug 37465 -- assertions with no accounts
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 function run_test() {
   var daemon = setupNNTPDaemon();
@@ -19,12 +18,12 @@ function run_test() {
   Assert.equal(newsUri.folder, null);
 
   // Run the URI and make sure we get the message
-  let channel = Services.io.newChannelFromURI2(uri,
-                                               null,
-                                               Services.scriptSecurityManager.getSystemPrincipal(),
-                                               null,
-                                               Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                               Ci.nsIContentPolicy.TYPE_OTHER);
+  let channel = Services.io.newChannelFromURI(uri,
+                                              null,
+                                              Services.scriptSecurityManager.getSystemPrincipal(),
+                                              null,
+                                              Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                              Ci.nsIContentPolicy.TYPE_OTHER);
   channel.asyncOpen(articleTextListener, null);
 
   // Run the server

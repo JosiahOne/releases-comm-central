@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+// toolkit/content/treeUtils.js
+/* globals gTreeUtils */
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 var nsIPermissionManager = Ci.nsIPermissionManager;
 var nsICookiePermission = Ci.nsICookiePermission;
@@ -16,8 +19,7 @@ var NOTIFICATION_FLUSH_PERMISSIONS = "flush-pending-permissions";
  */
 var MAILURI_BASE = "chrome://messenger/content/email=";
 
-function Permission(principal, type, capability)
-{
+function Permission(principal, type, capability) {
   this.principal = principal;
   this.origin = principal.origin;
   this.type = type;
@@ -25,22 +27,20 @@ function Permission(principal, type, capability)
 }
 
 var gPermissionManager = {
-  _type                 : "",
-  _permissions          : [],
-  _permissionsToAdd     : new Map(),
-  _permissionsToDelete  : new Map(),
-  _bundle               : null,
-  _tree                 : null,
-  _observerRemoved      : false,
+  _type: "",
+  _permissions: [],
+  _permissionsToAdd: new Map(),
+  _permissionsToDelete: new Map(),
+  _bundle: null,
+  _tree: null,
+  _observerRemoved: false,
 
   _view: {
     _rowCount: 0,
-    get rowCount()
-    {
+    get rowCount() {
       return this._rowCount;
     },
-    getCellText: function (aRow, aColumn)
-    {
+    getCellText(aRow, aColumn) {
       if (aColumn.id == "siteCol")
         return gPermissionManager._permissions[aRow].origin
           .replace(MAILURI_BASE, "");
@@ -49,25 +49,24 @@ var gPermissionManager = {
       return "";
     },
 
-    isSeparator: function(aIndex) { return false; },
-    isSorted: function() { return false; },
-    isContainer: function(aIndex) { return false; },
-    setTree: function(aTree){},
-    getImageSrc: function(aRow, aColumn) {},
-    getProgressMode: function(aRow, aColumn) {},
-    getCellValue: function(aRow, aColumn) {},
-    cycleHeader: function(column) {},
-    getRowProperties: function(row){ return ""; },
-    getColumnProperties: function(column){ return ""; },
-    getCellProperties: function(row,column){
+    isSeparator(aIndex) { return false; },
+    isSorted() { return false; },
+    isContainer(aIndex) { return false; },
+    setTree(aTree) {},
+    getImageSrc(aRow, aColumn) {},
+    getProgressMode(aRow, aColumn) {},
+    getCellValue(aRow, aColumn) {},
+    cycleHeader(column) {},
+    getRowProperties(row) { return ""; },
+    getColumnProperties(column) { return ""; },
+    getCellProperties(row, column) {
       if (column.element.getAttribute("id") == "siteCol")
         return "ltr";
       return "";
-    }
+    },
   },
 
-  _getCapabilityString: function (aCapability)
-  {
+  _getCapabilityString(aCapability) {
     var stringKey = null;
     switch (aCapability) {
     case nsIPermissionManager.ALLOW_ACTION:
@@ -86,8 +85,7 @@ var gPermissionManager = {
     return this._bundle.getString(stringKey);
   },
 
-  addPermission: function (aCapability)
-  {
+  addPermission(aCapability) {
     var textbox = document.getElementById("url");
     var input_url = textbox.value.trim();
     let principal;
@@ -105,7 +103,7 @@ var gPermissionManager = {
         principal = Services.scriptSecurityManager.createCodebasePrincipal(uri, {});
         // If we have ended up with an unknown scheme, the following will throw.
         principal.origin;
-      } catch(ex) {
+      } catch (ex) {
         let scheme = (this._type != "image" || !input_url.includes("@")) ?
           "http://" : MAILURI_BASE;
         uri = Services.io.newURI(scheme + input_url);
@@ -113,7 +111,7 @@ var gPermissionManager = {
         // If we have ended up with an unknown scheme, the following will throw.
         principal.origin;
       }
-    } catch(ex) {
+    } catch (ex) {
       var message = this._bundle.getString("invalidURI");
       var title = this._bundle.getString("invalidURITitle");
       Services.prompt.alert(window, title, message);
@@ -137,12 +135,11 @@ var gPermissionManager = {
       }
     }
 
-    let permissionParams = {principal: principal, type: this._type, capability: aCapability};
+    let permissionParams = {principal, type: this._type, capability: aCapability};
     if (!permissionExists) {
       this._permissionsToAdd.set(principal.origin, permissionParams);
       this._addPermission(permissionParams);
-    }
-    else if (!capabilityExists) {
+    } else if (!capabilityExists) {
       this._permissionsToAdd.set(principal.origin, permissionParams);
       this._handleCapabilityChange();
     }
@@ -157,8 +154,7 @@ var gPermissionManager = {
     document.getElementById("removeAllPermissions").disabled = this._permissions.length == 0;
   },
 
-  _removePermission: function(aPermission)
-  {
+  _removePermission(aPermission) {
     this._removePermissionFromList(aPermission.principal);
 
     // If this permission was added during this session, let's remove
@@ -169,31 +165,27 @@ var gPermissionManager = {
     if (!isNewPermission) {
       this._permissionsToDelete.set(aPermission.principal.origin, aPermission);
     }
-
   },
 
-  _handleCapabilityChange: function ()
-  {
+  _handleCapabilityChange() {
     // Re-do the sort, if the status changed from Block to Allow
     // or vice versa, since if we're sorted on status, we may no
     // longer be in order.
     if (this._lastPermissionSortColumn == "statusCol") {
       this._resortPermissions();
     }
-    this._tree.treeBoxObject.invalidate();
+    this._tree.invalidate();
   },
 
-  _addPermission: function(aPermission)
-  {
+  _addPermission(aPermission) {
     this._addPermissionToList(aPermission);
     ++this._view._rowCount;
-    this._tree.treeBoxObject.rowCountChanged(this._view.rowCount - 1, 1);
+    this._tree.rowCountChanged(this._view.rowCount - 1, 1);
     // Re-do the sort, since we inserted this new item at the end.
     this._resortPermissions();
   },
 
-  _resortPermissions: function()
-  {
+  _resortPermissions() {
     gTreeUtils.sort(this._tree, this._view, this._permissions,
                     this._lastPermissionSortColumn,
                     this._permissionsComparator,
@@ -201,34 +193,29 @@ var gPermissionManager = {
                     !this._lastPermissionSortAscending); // keep sort direction
   },
 
-  onHostInput: function (aSiteField)
-  {
+  onHostInput(aSiteField) {
     document.getElementById("btnSession").disabled = !aSiteField.value;
     document.getElementById("btnBlock").disabled = !aSiteField.value;
     document.getElementById("btnAllow").disabled = !aSiteField.value;
   },
 
-  onWindowKeyPress: function (aEvent)
-  {
+  onWindowKeyPress(aEvent) {
     if (aEvent.keyCode == KeyEvent.DOM_VK_ESCAPE)
       window.close();
   },
 
-  onHostKeyPress: function (aEvent)
-  {
+  onHostKeyPress(aEvent) {
     if (aEvent.keyCode == KeyEvent.DOM_VK_RETURN)
       document.getElementById("btnAllow").click();
   },
 
-  onLoad: function ()
-  {
+  onLoad() {
     this._bundle = document.getElementById("bundlePreferences");
     var params = window.arguments[0];
     this.init(params);
   },
 
-  init: function (aParams)
-  {
+  init(aParams) {
     if (this._type) {
       // reusing an open dialog, clear the old observer
       this.uninit();
@@ -239,7 +226,7 @@ var gPermissionManager = {
 
     var permissionsText = document.getElementById("permissionsText");
     while (permissionsText.hasChildNodes())
-      permissionsText.removeChild(permissionsText.firstChild);
+      permissionsText.firstChild.remove();
     permissionsText.appendChild(document.createTextNode(aParams.introText));
 
     document.title = aParams.windowTitle;
@@ -281,8 +268,7 @@ var gPermissionManager = {
     urlField.focus();
   },
 
-  uninit: function ()
-  {
+  uninit() {
     if (!this._observerRemoved) {
       Services.obs.removeObserver(this, "perm-changed");
 
@@ -290,8 +276,7 @@ var gPermissionManager = {
     }
   },
 
-  observe: function (aSubject, aTopic, aData)
-  {
+  observe(aSubject, aTopic, aData) {
     if (aTopic == "perm-changed") {
       var permission = aSubject.QueryInterface(Ci.nsIPermission);
 
@@ -301,8 +286,7 @@ var gPermissionManager = {
 
       if (aData == "added") {
         this._addPermission(permission);
-      }
-      else if (aData == "changed") {
+      } else if (aData == "changed") {
         for (var i = 0; i < this._permissions.length; ++i) {
           if (permission.matches(this._permissions[i].principal, true)) {
             this._permissions[i].capability = this._getCapabilityString(permission.capability);
@@ -310,23 +294,20 @@ var gPermissionManager = {
           }
         }
         this._handleCapabilityChange();
-      }
-      else if (aData == "deleted") {
+      } else if (aData == "deleted") {
         this._removePermissionFromList(permission);
       }
     }
   },
 
-  onPermissionSelected: function ()
-  {
+  onPermissionSelected() {
     var hasSelection = this._tree.view.selection.count > 0;
     var hasRows = this._tree.view.rowCount > 0;
     document.getElementById("removePermission").disabled = !hasRows || !hasSelection;
     document.getElementById("removeAllPermissions").disabled = !hasRows;
   },
 
-  onPermissionDeleted: function ()
-  {
+  onPermissionDeleted() {
     if (!this._view.rowCount)
       return;
     var removedPermissions = [];
@@ -339,8 +320,7 @@ var gPermissionManager = {
     document.getElementById("removeAllPermissions").disabled = !this._permissions.length;
   },
 
-  onAllPermissionsDeleted: function ()
-  {
+  onAllPermissionsDeleted() {
     if (!this._view.rowCount)
       return;
     var removedPermissions = [];
@@ -353,8 +333,7 @@ var gPermissionManager = {
     document.getElementById("removeAllPermissions").disabled = true;
   },
 
-  onPermissionKeyPress: function (aEvent)
-  {
+  onPermissionKeyPress(aEvent) {
     if (aEvent.keyCode == KeyEvent.DOM_VK_DELETE ||
         ((AppConstants.platform == "macosx") &&
          aEvent.keyCode == KeyEvent.DOM_VK_BACK_SPACE))
@@ -363,14 +342,12 @@ var gPermissionManager = {
 
   _lastPermissionSortColumn: "",
   _lastPermissionSortAscending: false,
-  _permissionsComparator : function (a, b)
-  {
+  _permissionsComparator(a, b) {
     return a.toLowerCase().localeCompare(b.toLowerCase());
   },
 
 
-  onPermissionSort: function (aColumn)
-  {
+  onPermissionSort(aColumn) {
     this._lastPermissionSortAscending = gTreeUtils.sort(this._tree,
                                                         this._view,
                                                         this._permissions,
@@ -381,8 +358,7 @@ var gPermissionManager = {
     this._lastPermissionSortColumn = aColumn;
   },
 
-  onApplyChanges: function()
-  {
+  onApplyChanges() {
     // Stop observing permission changes since we are about
     // to write out the pending adds/deletes and don't need
     // to update the UI
@@ -399,13 +375,11 @@ var gPermissionManager = {
     window.close();
   },
 
-  _loadPermissions: function ()
-  {
+  _loadPermissions() {
     this._tree = document.getElementById("permissionsTree");
     this._permissions = [];
 
     // load permissions into a table
-    var count = 0;
     var enumerator = Services.perms.enumerator;
     while (enumerator.hasMoreElements()) {
       var nextPermission = enumerator.getNext().QueryInterface(Ci.nsIPermission);
@@ -422,13 +396,10 @@ var gPermissionManager = {
     document.getElementById("removeAllPermissions").disabled = this._permissions.length == 0;
   },
 
-  _addPermissionToList: function (aPermission)
-  {
-
+  _addPermissionToList(aPermission) {
     if (aPermission.type == this._type &&
         (!this._manageCapability ||
          (aPermission.capability == this._manageCapability))) {
-
       var principal = aPermission.principal;
       var capabilityString = this._getCapabilityString(aPermission.capability);
       var p = new Permission(principal,
@@ -438,32 +409,28 @@ var gPermissionManager = {
     }
   },
 
-  _removePermissionFromList: function (aPrincipal)
-  {
+  _removePermissionFromList(aPrincipal) {
     for (let i = 0; i < this._permissions.length; ++i) {
       // Thunderbird compares origins, not principals here.
       if (this._permissions[i].principal.origin == aPrincipal.origin) {
         this._permissions.splice(i, 1);
         this._view._rowCount--;
-        this._tree.treeBoxObject.rowCountChanged(this._view.rowCount - 1, -1);
-        this._tree.treeBoxObject.invalidate();
+        this._tree.rowCountChanged(this._view.rowCount - 1, -1);
+        this._tree.invalidate();
         break;
       }
     }
   },
 
-  setOrigin: function (aOrigin)
-  {
+  setOrigin(aOrigin) {
     document.getElementById("url").value = aOrigin;
-  }
+  },
 };
 
-function setOrigin(aOrigin)
-{
+function setOrigin(aOrigin) {
   gPermissionManager.setOrigin(aOrigin);
 }
 
-function initWithParams(aParams)
-{
+function initWithParams(aParams) {
   gPermissionManager.init(aParams);
 }

@@ -6,7 +6,7 @@
  * Test that temporary files for draft are surely removed.
  */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gMsgCompose;
 var gExpectedFiles;
@@ -21,6 +21,7 @@ var progressListener = {
   onLocationChange: function(aWebProgress, aRequest, aLocation, aFlags) {},
   onStatusChange: function(aWebProgress, aRequest, aStatus, aMessage) {},
   onSecurityChange: function(aWebProgress, aRequest, state) {},
+  onContentBlockingEvent: function(aWebProgress, aRequest, aEvent) {},
 
   QueryInterface: ChromeUtils.generateQI(["nsIWebProgressListener",
                                           "nsISupportsWeakReference"]),

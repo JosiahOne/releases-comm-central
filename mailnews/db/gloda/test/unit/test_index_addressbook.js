@@ -4,7 +4,7 @@
 
 load("resources/glodaTestHelper.js");
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gInbox;
 

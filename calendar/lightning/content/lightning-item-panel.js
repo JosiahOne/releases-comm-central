@@ -3,30 +3,22 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* exported onLoadLightningItemPanel, onAccept, onCancel, onCommandSave,
- *          onCommandDeleteItem, editAttendees, rotatePrivacy, editPrivacy,
- *          rotatePriority, editPriority, rotateStatus, editStatus,
- *          rotateShowTimeAs, editShowTimeAs, updateShowTimeAs, editToDoStatus,
+ *          onCommandDeleteItem, editAttendees, editPrivacy, editPriority,
+ *          editStatus, editShowTimeAs, updateShowTimeAs, editToDoStatus,
  *          postponeTask, toggleTimezoneLinks, toggleLink, attachURL,
  *          onCommandViewToolbar, onCommandCustomize, attachFileByAccountKey,
  *          onUnloadLightningItemPanel, openNewEvent, openNewTask,
  *          openNewMessage, openNewCardDialog
  */
 
-// XXX Need to determine which of these we really need here.
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from ../../../../toolkit/content/globalOverlay.js */
+/* import-globals-from ../../base/content/dialogs/calendar-dialog-utils.js */
+/* import-globals-from ../../base/content/calendar-ui-utils.js */
 
-try {
-    ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
-} catch (e) {
-    // This will fail on Seamonkey, but thats ok since the pref for cloudfiles
-    // is false, which means the UI will not be shown
-}
+// XXX Need to determine which of these we really need here.
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 // gTabmail is null if we are in a dialog window and not in a tab.
 var gTabmail = document.getElementById("tabmail") || null;
@@ -69,6 +61,9 @@ if (!gTabmail) {
         goUpdateCommand("cmd_paste");
     };
 }
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
 
 // Stores the ids of the iframes of currently open event/task tabs, used
 // when window is closed to prompt for saving changes.
@@ -243,11 +238,10 @@ function onLoadLightningItemPanel(aIframeId, aUrl) {
         iframe.setAttribute("id", "lightning-item-panel-iframe");
         iframe.setAttribute("flex", "1");
 
-        let dialog = document.getElementById("calendar-event-dialog");
         let statusbar = document.getElementById("status-bar");
 
         // Note: iframe.contentWindow is undefined before the iframe is inserted here.
-        dialog.insertBefore(iframe, statusbar);
+        document.documentElement.insertBefore(iframe, statusbar);
 
         // Move the args so they are positioned relative to the iframe,
         // for the window dialog just as they are for the tab.
@@ -263,9 +257,43 @@ function onLoadLightningItemPanel(aIframeId, aUrl) {
         cancel.parentNode.setAttribute("collapsed", "true");
 
         // set toolbar icon color for light or dark themes
-        if (typeof ToolbarIconColor !== "undefined") {
-            ToolbarIconColor.init();
+        if (typeof window.ToolbarIconColor !== "undefined") {
+            window.ToolbarIconColor.init();
         }
+
+        // Enlarge the dialog window so the iframe content fits, and prevent it
+        // getting smaller. We don't know the minimum size of the content unless
+        // it's overflowing, so don't attempt to enforce what we don't know.
+        let docEl = document.documentElement;
+        let overflowListener = () => {
+            let { scrollWidth, scrollHeight } = iframe.contentDocument.documentElement;
+            let { clientWidth, clientHeight } = iframe;
+
+            let diffX = scrollWidth - clientWidth;
+            let diffY = scrollHeight - clientHeight;
+            // If using a scaled screen resolution, rounding might cause
+            // scrollWidth/scrollHeight to be 1px larger than
+            // clientWidth/clientHeight, so we check for a difference
+            // greater than 1 here, not 0.
+            if (diffX > 1) {
+                window.resizeBy(diffX, 0);
+                docEl.setAttribute("minwidth", docEl.getAttribute("width"));
+            }
+            if (diffY > 1) {
+                window.resizeBy(0, diffY);
+                docEl.setAttribute("minheight", docEl.getAttribute("height"));
+            }
+            if (docEl.hasAttribute("minwidth") && docEl.hasAttribute("minheight")) {
+                iframe.contentWindow.removeEventListener("resize", overflowListener);
+            }
+        };
+        iframe.contentWindow.addEventListener("load", () => {
+            // This is the first listener added, but it should run after all the others,
+            // so that they can properly set up the layout they might need.
+            // Push to the end of the event queue.
+            setTimeout(overflowListener, 0);
+        }, { once: true });
+        iframe.contentWindow.addEventListener("resize", overflowListener);
     }
 
     // event or task
@@ -273,8 +301,12 @@ function onLoadLightningItemPanel(aIframeId, aUrl) {
     gConfig.isEvent = cal.item.isEvent(calendarItem);
 
     // for tasks in a window dialog, set the dialog id for CSS selection, etc.
-    if (!gTabmail && !gConfig.isEvent) {
-        setDialogId(document.documentElement, "calendar-task-dialog");
+    if (!gTabmail) {
+        if (gConfig.isEvent) {
+            setDialogId(document.documentElement, "calendar-event-dialog");
+        } else {
+            setDialogId(document.documentElement, "calendar-task-dialog");
+        }
     }
 
     // timezones enabled
@@ -297,8 +329,8 @@ function onLoadLightningItemPanel(aIframeId, aUrl) {
 function onUnloadLightningItemPanel() {
     if (!gTabmail) {
         // window dialog case
-        if (typeof ToolbarIconColor !== "undefined") {
-            ToolbarIconColor.uninit();
+        if (typeof window.ToolbarIconColor !== "undefined") {
+            window.ToolbarIconColor.uninit();
         }
     }
 }
@@ -436,8 +468,8 @@ function openNewMessage() {
         null,
         null,
         null,
-        Components.interfaces.nsIMsgCompType.New,
-        Components.interfaces.nsIMsgCompFormat.Default,
+        Ci.nsIMsgCompType.New,
+        Ci.nsIMsgCompFormat.Default,
         null,
         null
     );
@@ -472,17 +504,6 @@ function editAttendees() {
  */
 function editConfigState(aArg) {
     sendMessage({ command: "editConfigState", argument: aArg });
-}
-
-/**
- * Rotates the Privacy of an item to the next value
- * following the sequence  -> PUBLIC -> CONFIDENTIAL -> PRIVATE ->.
- */
-function rotatePrivacy() {
-    const states = ["PUBLIC", "CONFIDENTIAL", "PRIVATE"];
-    let oldPrivacy = gConfig.privacy;
-    let newPrivacy = states[(states.indexOf(oldPrivacy) + 1) % states.length];
-    editConfigState({ privacy: newPrivacy });
 }
 
 /**
@@ -613,25 +634,6 @@ function updatePrivacy(aArg) {
 }
 
 /**
- * Rotates the Priority of an item to the next value
- * following the sequence -> Not specified -> Low -> Normal -> High ->.
- */
-function rotatePriority() {
-    let now = gConfig.priority;
-    let next;
-    if (now <= 0 || now > 9) {         // not specified -> low
-        next = 9;
-    } else if (now >= 1 && now <= 4) { // high -> not specified
-        next = 0;
-    } else if (now == 5) {             // normal -> high
-        next = 1;
-    } else if (now >= 6 && now <= 9) { // low -> normal
-        next = 5;
-    }
-    editConfigState({ priority: next });
-}
-
-/**
  * Handler to change the priority.
  *
  * @param {Node} aTarget  Has the new priority in its "value" attribute
@@ -705,26 +707,6 @@ function updatePriority(aArg) {
 }
 
 /**
- * Rotate the Status of an item to the next value following
- * the sequence -> NONE -> TENTATIVE -> CONFIRMED -> CANCELLED ->.
- */
-function rotateStatus() {
-    let oldStatus = gConfig.status;
-    let noneCommand = document.getElementById("cmd_status_none");
-    let noneCommandIsVisible = !noneCommand.hasAttribute("hidden");
-    let states = ["TENTATIVE", "CONFIRMED", "CANCELLED"];
-
-    // If control for status "NONE" ("cmd_status_none") is visible,
-    // allow rotating to it.
-    if (gConfig.isEvent && noneCommandIsVisible) {
-        states.unshift("NONE");
-    }
-
-    let newStatus = states[(states.indexOf(oldStatus) + 1) % states.length];
-    editConfigState({ status: newStatus });
-}
-
-/**
  * Handler for changing the status.
  *
  * @param {Node} aTarget  Has the new status in its "value" attribute
@@ -773,17 +755,6 @@ function updateStatus(aArg) {
         // "not specified" and update the status again.
         sendMessage({ command: "editStatus", value: "NONE" });
     }
-}
-
-/**
- * Toggles the transparency ("Show Time As" property) of an item
- * from BUSY (Opaque) to FREE (Transparent).
- */
-function rotateShowTimeAs() {
-    const states = ["OPAQUE", "TRANSPARENT"];
-    let oldValue = gConfig.showTimeAs;
-    let newValue = states[(states.indexOf(oldValue) + 1) % states.length];
-    editConfigState({ showTimeAs: newValue });
 }
 
 /**
@@ -976,8 +947,8 @@ function onCommandViewToolbar(aToolbarId, aMenuItemId) {
     // toggle visibility of the toolbar
     toolbar.collapsed = !toolbarCollapsed;
 
-    document.persist(aToolbarId, "collapsed");
-    document.persist(aMenuItemId, "checked");
+    Services.xulStore.persist(toolbar, "collapsed");
+    Services.xulStore.persist(menuItem, "checked");
 }
 
 /**
@@ -1074,7 +1045,7 @@ function loadCloudProviders(aItemObjects) {
 
     for (let itemObject of aItemObjects) {
         // Create a menu item.
-        let item = createXULElement("menuitem");
+        let item = document.createXULElement("menuitem");
         item.setAttribute("label", itemObject.label);
         item.setAttribute("observes", "cmd_attach_cloud");
         item.setAttribute("oncommand", "attachFileByAccountKey(event.target.cloudProviderAccountKey); event.stopPropagation();");

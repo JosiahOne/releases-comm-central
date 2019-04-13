@@ -5,55 +5,30 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
-<!DOCTYPE prefwindow SYSTEM "chrome://messenger/locale/preferences/connection.dtd">
+<!DOCTYPE dialog SYSTEM "chrome://messenger/locale/preferences/connection.dtd">
 
 <?xml-stylesheet href="chrome://global/skin/"?>
 <?xml-stylesheet href="chrome://messenger/skin/preferences/preferences.css"?>
 
-<prefwindow id="ConnectionsDialog" type="child"
-            xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-            title="&connectionsDialog.title;"
-            dlgbuttons="accept,cancel"
-            onbeforeaccept="return gConnectionsDialog.beforeAccept();"
-            onload="gConnectionsDialog.checkForSystemProxy();"
+<dialog id="ConnectionsDialog" type="child"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
+        title="&connectionsDialog.title;"
+        dlgbuttons="accept,cancel"
+        onbeforeaccept="return gConnectionsDialog.beforeAccept();"
+        onload="gConnectionsDialog.checkForSystemProxy(); gConnectionsDialog.initDnsOverHttpsUI();"
 #ifdef XP_MACOSX
-            style="width: &window.macWidth; !important;">
+        style="width: &window.macWidth; !important;">
 #else
-            style="width: &window.width; !important;">
+        style="width: &window.width; !important;">
 #endif
 
   <prefpane id="ConnectionsDialogPane">
-    <preferences id="ConnectionPreferences">
-      <preference id="network.proxy.type"         name="network.proxy.type"         type="int" onchange="gConnectionsDialog.proxyTypeChanged();"/>
-      <preference id="network.proxy.http"         name="network.proxy.http"         type="string"/>
-      <preference id="network.proxy.http_port"    name="network.proxy.http_port"    type="int"/>
-      <preference id="network.proxy.ssl"          name="network.proxy.ssl"          type="string"/>
-      <preference id="network.proxy.ssl_port"     name="network.proxy.ssl_port"     type="int"/>
-      <preference id="network.proxy.socks"        name="network.proxy.socks"        type="string"/>
-      <preference id="network.proxy.socks_port"   name="network.proxy.socks_port"   type="int"/>
-      <preference id="network.proxy.socks_version"  name="network.proxy.socks_version"  type="int"/>
-      <preference id="network.proxy.no_proxies_on"  name="network.proxy.no_proxies_on"  type="string"/>
-      <preference id="network.proxy.autoconfig_url" name="network.proxy.autoconfig_url" type="string"/>
-      <preference id="network.proxy.share_proxy_settings"
-                  name="network.proxy.share_proxy_settings"
-                  type="bool"/>
-
-      <preference id="pref.advanced.proxies.disable_button.reload"
-                  name="pref.advanced.proxies.disable_button.reload"
-                  type="bool"/>
-
-      <preference id="network.proxy.backup.ssl"          name="network.proxy.backup.ssl"          type="string"/>
-      <preference id="network.proxy.backup.ssl_port"     name="network.proxy.backup.ssl_port"     type="int"/>
-      <preference id="network.proxy.backup.socks"        name="network.proxy.backup.socks"        type="string"/>
-      <preference id="network.proxy.backup.socks_port"   name="network.proxy.backup.socks_port"   type="int"/>
-      <preference id="network.proxy.socks_remote_dns"    name="network.proxy.socks_remote_dns"    type="bool"/>
-      <preference id="signon.autologin.proxy"            name="signon.autologin.proxy"            type="bool"/>
-    </preferences>
-
+    <script type="application/javascript" src="chrome://global/content/preferencesBindings.js"/>
     <script type="application/javascript" src="chrome://messenger/content/preferences/connection.js"/>
 
     <groupbox>
-      <caption label="&proxyTitle.label;"/>
+      <label><html:h2>&proxyTitle.label;</html:h2></label>
 
       <radiogroup id="networkProxyType" preference="network.proxy.type"
                   onsyncfrompreference="return gConnectionsDialog.readProxyType();">
@@ -120,22 +95,11 @@
             <row>
               <spacer/>
               <radiogroup id="networkProxySOCKSVersion" orient="horizontal"
-                          preference="network.proxy.socks_version">
+                          preference="network.proxy.socks_version"
+                          onsyncfrompreference="return gConnectionsDialog.updateDNSPref();">
                 <radio id="networkProxySOCKSVersion4" value="4" label="&socks4.label;" accesskey="&socks4.accesskey;" />
                 <radio id="networkProxySOCKSVersion5" value="5" label="&socks5.label;" accesskey="&socks5.accesskey;" />
               </radiogroup>
-            </row>
-
-            <row align="center">
-              <hbox align="center" pack="end">
-                <label value="&noproxy.label;" accesskey="&noproxy.accesskey;" control="networkProxyNone"/>
-              </hbox>
-              <textbox id="networkProxyNone" class="uri-element"
-                       preference="network.proxy.no_proxies_on"/>
-            </row>
-            <row>
-              <spacer/>
-              <label value="&noproxyExplain.label;" control="networkProxyNone"/>
             </row>
           </rows>
         </grid>
@@ -151,6 +115,11 @@
       </radiogroup>
     </groupbox>
     <separator class="thin"/>
+    <label value="&noproxy.label;"
+           accesskey="&noproxy.accesskey;"
+           control="networkProxyNone"/>
+    <html:textarea id="networkProxyNone" rows="2" preference="network.proxy.no_proxies_on"/>
+    <label value="&noproxyExplain.label;" control="networkProxyNone"/>
     <checkbox id="autologinProxy"
               label="&autologinproxy.label;"
               accesskey="&autologinproxy.accesskey;"
@@ -159,7 +128,37 @@
     <checkbox id="networkProxySOCKSRemoteDNS"
               preference="network.proxy.socks_remote_dns"
               label="&socksRemoteDNS.label;"
-              accesskey="&socksRemoteDNS.accesskey;" />
+              accesskey="&socksRemoteDNS.accesskey;"/>
+    <checkbox id="networkDnsOverHttps"
+              label="&dnsOverHttps.label;"
+              accesskey="&dnsOverHttps.accesskey;"
+              preference="network.trr.mode"
+              onsyncfrompreference="return gConnectionsDialog.readDnsOverHttpsMode();"
+              onsynctopreference="return gConnectionsDialog.writeDnsOverHttpsMode();"
+              oncommand="gConnectionsDialog.updateDnsOverHttpsUI();"/>
+    <vbox class="indent" flex="1">
+      <radiogroup id="DnsOverHttpsUrlRadioGroup" orient="vertical">
+        <hbox>
+          <radio id="defaultDnsOverHttpsUrlRadio"
+                 label="&dnsOverHttpsUrlDefault.label;"
+                 accesskey="&dnsOverHttpsUrlDefault.accesskey;"
+                 tooltiptext="&dnsOverHttpsUrlDefault.tooltip;"
+                 preference="network.trr.uri"
+                 oncommand="gConnectionsDialog.updateDnsOverHttpsUI();"/>
+          <label id="defaultDnsOverHttpsUrlLabel"/>
+        </hbox>
+        <hbox>
+          <radio id="customDnsOverHttpsUrlRadio"
+                 label="&dnsOverHttpsUrlCustom.label;"
+                 accesskey="&dnsOverHttpsUrlCustom.accesskey;"
+                 tooltiptext="&dnsOverHttpsUrlCustom.tooltip;"
+                 oncommand="gConnectionsDialog.updateDnsOverHttpsUI();"/>
+          <textbox id="customDnsOverHttpsInput"
+                   flex="1"
+                   preference="network.trr.custom_uri"/>
+        </hbox>
+      </radiogroup>
+    </vbox>
     <separator/>
   </prefpane>
-</prefwindow>
+</dialog>

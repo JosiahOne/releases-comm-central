@@ -261,14 +261,8 @@ nsNNTPProtocol::nsNNTPProtocol(nsINntpIncomingServer *aServer, nsIURI *aURL,
   m_nntpServer(aServer)
 {
   m_ProxyServer = nullptr;
-  m_lineStreamBuffer = nullptr;
   m_responseText = nullptr;
   m_dataBuf = nullptr;
-
-  m_cancelFromHdr = nullptr;
-  m_cancelNewsgroups = nullptr;
-  m_cancelDistribution = nullptr;
-  m_cancelID = nullptr;
 
   m_key = nsMsgKey_None;
 
@@ -295,9 +289,6 @@ nsNNTPProtocol::~nsNNTPProtocol()
     m_nntpServer->WriteNewsrcFile();
     m_nntpServer->RemoveConnection(this);
   }
-  if (m_lineStreamBuffer) {
-     delete m_lineStreamBuffer;
-  }
   if (mUpdateTimer) {
     mUpdateTimer->Cancel();
     mUpdateTimer = nullptr;
@@ -309,10 +300,6 @@ void nsNNTPProtocol::Cleanup()  //free char* member variables
 {
   PR_FREEIF(m_responseText);
   PR_FREEIF(m_dataBuf);
-  PR_FREEIF(m_cancelFromHdr);
-  PR_FREEIF(m_cancelNewsgroups);
-  PR_FREEIF(m_cancelDistribution);
-  PR_FREEIF(m_cancelID);
 }
 
 NS_IMETHODIMP nsNNTPProtocol::Initialize(nsIURI *aURL, nsIMsgWindow *aMsgWindow)
@@ -433,10 +420,10 @@ NS_IMETHODIMP nsNNTPProtocol::Initialize(nsIURI *aURL, nsIMsgWindow *aMsgWindow)
 
   m_articleNumber = 0;
   m_originalContentLength = 0;
-  m_cancelID = nullptr;
-  m_cancelFromHdr = nullptr;
-  m_cancelNewsgroups = nullptr;
-  m_cancelDistribution = nullptr;
+  m_cancelID.Truncate();
+  m_cancelFromHdr.Truncate();
+  m_cancelNewsgroups.Truncate();
+  m_cancelDistribution.Truncate();
   return NS_OK;
 }
 
@@ -543,33 +530,31 @@ nsresult nsNntpCacheStreamListener::Init(nsIStreamListener * aStreamListener, ns
 }
 
 NS_IMETHODIMP
-nsNntpCacheStreamListener::OnStartRequest(nsIRequest *request, nsISupports * aCtxt)
+nsNntpCacheStreamListener::OnStartRequest(nsIRequest *request)
 {
   nsCOMPtr <nsILoadGroup> loadGroup;
-  nsCOMPtr <nsIRequest> ourRequest = do_QueryInterface(mChannelToUse);
 
   NS_ASSERTION(mChannelToUse, "null channel in OnStartRequest");
   if (mChannelToUse)
     mChannelToUse->GetLoadGroup(getter_AddRefs(loadGroup));
   if (loadGroup)
-    loadGroup->AddRequest(ourRequest, nullptr /* context isupports */);
-  return (mListener) ? mListener->OnStartRequest(ourRequest, aCtxt) : NS_OK;
+    loadGroup->AddRequest(mChannelToUse, nullptr /* context isupports */);
+  return (mListener) ? mListener->OnStartRequest(mChannelToUse) : NS_OK;
 }
 
 NS_IMETHODIMP
-nsNntpCacheStreamListener::OnStopRequest(nsIRequest *request, nsISupports * aCtxt, nsresult aStatus)
+nsNntpCacheStreamListener::OnStopRequest(nsIRequest *request, nsresult aStatus)
 {
-  nsCOMPtr <nsIRequest> ourRequest = do_QueryInterface(mChannelToUse);
   nsresult rv = NS_OK;
   NS_ASSERTION(mListener, "this assertion is for Bug 531794 comment 7");
   if (mListener)
-    mListener->OnStopRequest(ourRequest, aCtxt, aStatus);
+    mListener->OnStopRequest(mChannelToUse, aStatus);
   nsCOMPtr <nsILoadGroup> loadGroup;
   NS_ASSERTION(mChannelToUse, "null channel in OnStopRequest");
   if (mChannelToUse)
     mChannelToUse->GetLoadGroup(getter_AddRefs(loadGroup));
   if (loadGroup)
-    loadGroup->RemoveRequest(ourRequest, nullptr, aStatus);
+    loadGroup->RemoveRequest(mChannelToUse, nullptr, aStatus);
 
   // clear out mem cache entry so we're not holding onto it.
   if (mRunningUrl)
@@ -586,11 +571,10 @@ nsNntpCacheStreamListener::OnStopRequest(nsIRequest *request, nsISupports * aCtx
 }
 
 NS_IMETHODIMP
-nsNntpCacheStreamListener::OnDataAvailable(nsIRequest *request, nsISupports * aCtxt, nsIInputStream * aInStream, uint64_t aSourceOffset, uint32_t aCount)
+nsNntpCacheStreamListener::OnDataAvailable(nsIRequest *request, nsIInputStream * aInStream, uint64_t aSourceOffset, uint32_t aCount)
 {
     NS_ENSURE_STATE(mListener);
-    nsCOMPtr <nsIRequest> ourRequest = do_QueryInterface(mChannelToUse);
-    return mListener->OnDataAvailable(ourRequest, aCtxt, aInStream, aSourceOffset, aCount);
+    return mListener->OnDataAvailable(mChannelToUse, aInStream, aSourceOffset, aCount);
 }
 
 NS_IMETHODIMP nsNNTPProtocol::GetOriginalURI(nsIURI* *aURI)
@@ -698,7 +682,9 @@ nsresult nsNNTPProtocol::ReadFromNewsConnection()
     nsresult rv = Initialize(m_url, m_msgWindow);
     NS_ENSURE_SUCCESS(rv, rv);
   }
-  return nsMsgProtocol::AsyncOpen(m_channelListener, m_channelContext);
+
+  // XXX TODO: m_channelContext should be passes as URI on the channel. Previously passed as context.
+  return nsMsgProtocol::AsyncOpen(m_channelListener);
 }
 
 // for messages stored in our offline cache, we have special code to handle that...
@@ -784,8 +770,8 @@ nsNNTPProtocol::OnCacheEntryAvailable(nsICacheEntry *entry, bool aNew, nsIApplic
       NS_ENSURE_SUCCESS(rv, rv);
 
       rv = tee->Init(m_channelListener, outStream, nullptr);
-      m_channelListener = do_QueryInterface(tee);
       NS_ENSURE_SUCCESS(rv, rv);
+      m_channelListener = tee;
     }
     else
     {
@@ -841,9 +827,12 @@ nsresult nsNNTPProtocol::OpenCacheEntry()
                                     nsICacheStorage::OPEN_NORMALLY, this);
 }
 
-NS_IMETHODIMP nsNNTPProtocol::AsyncOpen(nsIStreamListener *listener, nsISupports *ctxt)
+NS_IMETHODIMP nsNNTPProtocol::AsyncOpen(nsIStreamListener *aListener)
 {
-  nsresult rv;
+  nsCOMPtr<nsIStreamListener> listener = aListener;
+  nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
+  NS_ENSURE_SUCCESS(rv, rv);
+
   nsCOMPtr<nsIMsgMailNewsUrl> mailnewsUrl = do_QueryInterface(m_runningURL, &rv);
   NS_ENSURE_SUCCESS(rv,rv);
 
@@ -856,7 +845,9 @@ NS_IMETHODIMP nsNNTPProtocol::AsyncOpen(nsIStreamListener *listener, nsISupports
   if (NS_FAILED(rv))
       return rv;
 
-  m_channelContext = ctxt;
+  nsCOMPtr <nsIURI> uri;
+  GetURI(getter_AddRefs(uri));
+  m_channelContext = uri;
   m_channelListener = listener;
   m_runningURL->GetNewsAction(&m_newsAction);
 
@@ -886,15 +877,8 @@ NS_IMETHODIMP nsNNTPProtocol::AsyncOpen(nsIStreamListener *listener, nsISupports
     if (NS_SUCCEEDED(OpenCacheEntry()))
       return NS_OK;
   }
-  return nsMsgProtocol::AsyncOpen(listener, ctxt);
-}
 
-NS_IMETHODIMP nsNNTPProtocol::AsyncOpen2(nsIStreamListener *aListener)
-{
-    nsCOMPtr<nsIStreamListener> listener = aListener;
-    nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
-    NS_ENSURE_SUCCESS(rv, rv);
-    return AsyncOpen(listener, nullptr);
+  return nsMsgProtocol::AsyncOpen(listener);  // Context already attached to the channel.
 }
 
 void nsNNTPProtocol::PostLoadAssertions()
@@ -1077,7 +1061,7 @@ nsresult nsNNTPProtocol::LoadUrl(nsIURI * aURL, nsISupports * aConsumer)
     // load group here, by generating the start request notification. nsMsgProtocol::OnStartRequest
     // ignores the first parameter (which is supposed to be the channel) so we'll pass in null.
     if (m_fromCache)
-      nsMsgProtocol::OnStartRequest(nullptr, aURL);
+      nsMsgProtocol::OnStartRequest(nullptr);
 
       /* At this point, we're all done parsing the URL, and know exactly
       what we want to do with it.
@@ -1141,12 +1125,15 @@ nsNNTPProtocol::LoadUrlInternal(nsIProxyInfo* aProxyInfo)
 {
   m_proxyRequest = nullptr;
 
-  nsCOMPtr<nsIMsgIncomingServer> server = do_QueryInterface(m_nntpServer);
+  nsresult rv;
+  nsCOMPtr<nsIMsgIncomingServer> server = do_QueryInterface(m_nntpServer, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+
   nsCString hostName;
   int32_t port = 0;
   int32_t socketType;
 
-  nsresult rv = server->GetRealHostName(hostName);
+  rv = server->GetRealHostName(hostName);
   NS_ENSURE_SUCCESS(rv, rv);
 
   rv = m_url->GetPort(&port);
@@ -1192,14 +1179,14 @@ void nsNNTPProtocol::FinishMemCacheEntry(bool valid)
 }
 
 // stop binding is a "notification" informing us that the stream associated with aURL is going away.
-NS_IMETHODIMP nsNNTPProtocol::OnStopRequest(nsIRequest *request, nsISupports * aContext, nsresult aStatus)
+NS_IMETHODIMP nsNNTPProtocol::OnStopRequest(nsIRequest *request, nsresult aStatus)
 {
     // either remove mem cache entry, or mark it valid if url successful and
     // command succeeded
     FinishMemCacheEntry(NS_SUCCEEDED(aStatus)
       && MK_NNTP_RESPONSE_TYPE(m_responseCode) == MK_NNTP_RESPONSE_TYPE_OK);
 
-    nsMsgProtocol::OnStopRequest(request, aContext, aStatus);
+    nsMsgProtocol::OnStopRequest(request, aStatus);
 
     // nsMsgProtocol::OnStopRequest() has called m_channelListener. There is
     // no need to be called again in CloseSocket(). Let's clear it here.
@@ -1655,7 +1642,7 @@ nsresult nsNNTPProtocol::GetPropertiesResponse(nsIInputStream * inputStream, uin
 
   if ('.' != line[0])
   {
-    char *propertyName = NS_strdup(line);
+    char *propertyName = NS_xstrdup(line);
     if (propertyName)
     {
       char *space = PL_strchr(propertyName, ' ');
@@ -2007,7 +1994,7 @@ nsresult nsNNTPProtocol::SendFirstNNTPCommandResponse()
       // call nsDocShell::Stop(STOP_NETWORK), which will eventually
       // call nsNNTPProtocol::Cancel(), which will close the socket.
       // we need to fix this, since the connection is still valid.
-      rv = m_msgWindow->DisplayURIInMessagePane(NS_ConvertASCIItoUTF16(uri).get(), true,
+      rv = m_msgWindow->DisplayURIInMessagePane(NS_ConvertASCIItoUTF16(uri), true,
                                                 nsContentUtils::GetSystemPrincipal());
       NS_ENSURE_SUCCESS(rv,rv);
     }
@@ -2136,7 +2123,7 @@ nsresult nsNNTPProtocol::DisplayArticle(nsIInputStream * inputStream, uint32_t l
       uint64_t inlength = 0;
       mDisplayInputStream->Available(&inlength);
       if (inlength > 0) // broadcast our batched up ODA changes
-        m_channelListener->OnDataAvailable(this, m_channelContext, mDisplayInputStream, 0, std::min(inlength, uint64_t(PR_UINT32_MAX)));
+        m_channelListener->OnDataAvailable(this, mDisplayInputStream, 0, std::min(inlength, uint64_t(PR_UINT32_MAX)));
       SetFlag(NNTP_PAUSE_FOR_READ);
       PR_Free(line);
       return rv;
@@ -2155,7 +2142,7 @@ nsresult nsNNTPProtocol::DisplayArticle(nsIInputStream * inputStream, uint32_t l
       uint64_t inlength = 0;
       mDisplayInputStream->Available(&inlength);
       if (inlength > 0) // broadcast our batched up ODA changes
-        m_channelListener->OnDataAvailable(this, m_channelContext, mDisplayInputStream, 0, std::min(inlength, uint64_t(PR_UINT32_MAX)));
+        m_channelListener->OnDataAvailable(this, mDisplayInputStream, 0, std::min(inlength, uint64_t(PR_UINT32_MAX)));
       PR_Free(line);
       return rv;
     }
@@ -2217,8 +2204,6 @@ nsresult nsNNTPProtocol::ReadArticle(nsIInputStream * inputStream, uint32_t leng
   if(!line)
     return rv;  /* no line yet or error */
 
-  nsCOMPtr<nsISupports> ctxt = do_QueryInterface(m_runningURL);
-
   if (m_typeWanted == CANCEL_WANTED && m_responseCode != MK_NNTP_RESPONSE_ARTICLE_HEAD)
   {
     /* HEAD command failed. */
@@ -2263,7 +2248,30 @@ nsresult nsNNTPProtocol::ReadArticle(nsIInputStream * inputStream, uint32_t leng
 
 void nsNNTPProtocol::ParseHeaderForCancel(char *buf)
 {
+    static int lastHeader = 0;
     nsAutoCString header(buf);
+    if (header.First() == ' ' || header.First() == '\t') {
+        header.StripWhitespace();
+        // Add folded line to header if needed.
+        switch (lastHeader) {
+        case 1:
+            m_cancelFromHdr += header;
+            break;
+        case 2:
+            m_cancelID += header;
+            break;
+        case 3:
+            m_cancelNewsgroups += header;
+            break;
+        case 4:
+            m_cancelDistribution += header;
+            break;
+        }
+        // Other folded lines are of no interest.
+        return;
+    }
+
+    lastHeader = 0;
     int32_t colon = header.FindChar(':');
     if (!colon)
     return;
@@ -2274,26 +2282,26 @@ void nsNNTPProtocol::ParseHeaderForCancel(char *buf)
     switch (header.First()) {
     case 'F': case 'f':
         if (header.Find("From", /* ignoreCase = */ true) == 0) {
-            PR_FREEIF(m_cancelFromHdr);
-      m_cancelFromHdr = ToNewCString(value);
+            m_cancelFromHdr = value;
+            lastHeader = 1;
         }
         break;
     case 'M': case 'm':
         if (header.Find("Message-ID", /* ignoreCase = */ true) == 0) {
-            PR_FREEIF(m_cancelID);
-      m_cancelID = ToNewCString(value);
+            m_cancelID = value;
+            lastHeader = 2;
         }
         break;
     case 'N': case 'n':
         if (header.Find("Newsgroups", /* ignoreCase = */ true) == 0) {
-            PR_FREEIF(m_cancelNewsgroups);
-      m_cancelNewsgroups = ToNewCString(value);
+            m_cancelNewsgroups = value;
+            lastHeader = 3;
         }
         break;
      case 'D': case 'd':
         if (header.Find("Distributions", /* ignoreCase = */ true) == 0) {
-            PR_FREEIF(m_cancelDistribution);
-      m_cancelDistribution = ToNewCString(value);
+            m_cancelDistribution = value;
+            lastHeader = 4;
         }
         break;
     }
@@ -2494,6 +2502,13 @@ nsresult nsNNTPProtocol::PasswordResponse()
 
   NS_ERROR("should never get here");
   return NS_ERROR_FAILURE;
+}
+
+NS_IMETHODIMP nsNNTPProtocol::OnPromptStartAsync(nsIMsgAsyncPromptCallback *aCallback)
+{
+  bool result = false;
+  OnPromptStart(&result);
+  return aCallback->OnAuthResult(result);
 }
 
 NS_IMETHODIMP nsNNTPProtocol::OnPromptStart(bool *authAvailable)
@@ -3000,7 +3015,6 @@ nsresult nsNNTPProtocol::FigureNextChunk()
     nsresult rv = NS_OK;
   int32_t status = 0;
 
-  nsCOMPtr<nsIMsgMailNewsUrl> mailnewsurl = do_QueryInterface(m_runningURL);
   if (m_firstArticle > 0)
   {
       MOZ_LOG(NNTP, LogLevel::Info,("(%p) add to known articles:  %d - %d", this, m_firstArticle, m_lastArticle));
@@ -3539,15 +3553,8 @@ nsresult nsNNTPProtocol::DoCancel()
     int32_t status = 0;
     bool failure = false;
     nsresult rv = NS_OK;
-    char *id = nullptr;
-    char *subject = nullptr;
-    char *newsgroups = nullptr;
-    char *distribution = nullptr;
-    char *body = nullptr;
     bool requireConfirmationForCancel = true;
     bool showAlertAfterCancel = true;
-
-    int L;
 
   /* #### Should we do a more real check than this?  If the POST command
      didn't respond with "MK_NNTP_RESPONSE_POST_SEND_NOW Ok", then it's not ready for us to throw a
@@ -3555,13 +3562,6 @@ nsresult nsNNTPProtocol::DoCancel()
      Why?
    */
   NS_ASSERTION (m_responseCode == MK_NNTP_RESPONSE_POST_SEND_NOW, "code != POST_SEND_NOW");
-
-  // These shouldn't be set yet, since the headers haven't been "flushed"
-  // "Distribution: " doesn't appear to be required, so
-  // don't assert on m_cancelDistribution
-  NS_ASSERTION (m_cancelID &&
-   m_cancelFromHdr &&
-   m_cancelNewsgroups, "null ptr");
 
   nsCOMPtr<nsIStringBundleService> bundleService =
     mozilla::services::GetStringBundleService();
@@ -3577,9 +3577,9 @@ nsresult nsNNTPProtocol::DoCancel()
   NS_ENSURE_SUCCESS(rv,rv);
   NS_ConvertUTF16toUTF8 appName(brandFullName);
 
-  newsgroups = m_cancelNewsgroups;
-  distribution = m_cancelDistribution;
-  id = m_cancelID;
+  nsCString newsgroups(m_cancelNewsgroups);
+  nsCString distribution (m_cancelDistribution);
+  nsCString id (m_cancelID);
   nsCString oldFrom(m_cancelFromHdr);
 
   nsCOMPtr<nsIPrefBranch> prefBranch = do_GetService(NS_PREFSERVICE_CONTRACTID, &rv);
@@ -3593,18 +3593,13 @@ nsresult nsNNTPProtocol::DoCancel()
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
-  NS_ASSERTION (id && newsgroups, "null ptr");
-  if (!id || !newsgroups) return NS_ERROR_FAILURE;
+  if (id.IsEmpty() || newsgroups.IsEmpty())
+    return NS_ERROR_FAILURE;
 
-  m_cancelNewsgroups = nullptr;
-  m_cancelDistribution = nullptr;
-  m_cancelFromHdr = nullptr;
-  m_cancelID = nullptr;
-
-  L = PL_strlen (id);
-
-  subject = (char *) PR_Malloc (L + 20);
-  body = (char *) PR_Malloc (PL_strlen (appName.get()) + 100);
+  m_cancelNewsgroups.Truncate();
+  m_cancelDistribution.Truncate();
+  m_cancelFromHdr.Truncate();
+  m_cancelID.Truncate();
 
   nsString alertText;
   nsString confirmText;
@@ -3692,20 +3687,10 @@ nsresult nsNNTPProtocol::DoCancel()
       goto FAIL;
   }
 
-  if (!subject || !body)
-  {
-    status = MK_OUT_OF_MEMORY;
-    failure = true;
-    goto FAIL;
-  }
-
-  PL_strcpy (subject, "cancel ");
-  PL_strcat (subject, id);
-
   otherHeaders.AppendLiteral("Control: cancel ");
   otherHeaders += id;
   otherHeaders.AppendLiteral(CRLF);
-  if (distribution) {
+  if (!distribution.IsEmpty()) {
     otherHeaders.AppendLiteral("Distribution: ");
     otherHeaders += distribution;
     otherHeaders.AppendLiteral(CRLF);
@@ -3715,10 +3700,6 @@ nsresult nsNNTPProtocol::DoCancel()
   otherHeaders.AppendLiteral("Content-Type: text/plain");
   otherHeaders.AppendLiteral(CRLF);
 
-  PL_strcpy (body, "This message was cancelled from within ");
-  PL_strcat (body, appName.get());
-  PL_strcat (body, "." CRLF);
-
   m_cancelStatus = 0;
 
   {
@@ -3727,14 +3708,14 @@ nsresult nsNNTPProtocol::DoCancel()
     char *data;
     data = PR_smprintf("From: %s" CRLF
                        "Newsgroups: %s" CRLF
-                       "Subject: %s" CRLF
+                       "Subject: cancel %s" CRLF
                        "References: %s" CRLF
                        "%s" /* otherHeaders, already with CRLF */
                        CRLF /* body separator */
-                       "%s" /* body, already with CRLF */
+                       "This message was cancelled from within %s." CRLF /* body */
                        "." CRLF, /* trailing message terminator "." */
-                       from.get(), newsgroups, subject, id,
-                       otherHeaders.get(), body);
+                       from.get(), newsgroups.get(), id.get(), id.get(),
+                       otherHeaders.get(), appName.get());
 
     rv = SendData(data);
     PR_Free (data);
@@ -3772,12 +3753,6 @@ FAIL:
   if (m_newsFolder)
     rv = ( failure ) ? m_newsFolder->CancelFailed()
                      : m_newsFolder->CancelComplete();
-
-  PR_Free (id);
-  PR_Free (subject);
-  PR_Free (newsgroups);
-  PR_Free (distribution);
-  PR_Free (body);
 
   return rv;
 }
@@ -4686,7 +4661,7 @@ nsresult nsNNTPProtocol::CleanupAfterRunningUrl()
   // because it can synchronously causes a new url to get run in the
   // protocol - truly evil, but we're stuck at the moment.
   if (m_channelListener)
-    (void) m_channelListener->OnStopRequest(this, m_channelContext, NS_OK);
+    (void) m_channelListener->OnStopRequest(this, NS_OK);
 
   if (m_loadGroup)
     (void) m_loadGroup->RemoveRequest(static_cast<nsIRequest *>(this), nullptr, NS_OK);

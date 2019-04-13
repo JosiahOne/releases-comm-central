@@ -32,7 +32,9 @@
   }
 }
 
-#navigation-toolbox {
+#navigation-toolbox,
+#folderPane-toolbox,
+#mail-toolbar-menubar2 {
   -moz-appearance: none;
 }
 
@@ -42,13 +44,18 @@
     border-style: none;
   }
 
-  #menubar-items > #mail-menubar > menu[_moz-menuactive="true"] {
+  #menubar-items > #mail-menubar > menu[disabled="true"] {
+    background-color: transparent;
+  }
+
+  #menubar-items > #mail-menubar >
+    menu:not([disabled="true"])[_moz-menuactive="true"] {
     background-color: hsla(0, 0%, 0%, .12);
   }
 
   #menubar-items > #mail-menubar >
-    menu:-moz-lwtheme-brighttext[_moz-menuactive="true"] {
-    background-color: hsla(0, 0%, 100%, .12);
+    menu:not([disabled="true"])[_moz-menuactive="true"]:-moz-lwtheme-brighttext {
+    background-color: hsla(0, 0%, 100%, .2);
   }
 }
 
@@ -158,7 +165,7 @@
   content: "";
   display: -moz-box;
   height: 1px;
-  border-bottom: 1px solid var(--toolbox-border-bottom-color);
+  border-bottom: 1px solid var(--chrome-content-separator-color);
 }
 
 .mail-toolbox > toolbar:-moz-lwtheme,
@@ -290,7 +297,6 @@ toolbar[mode="text"] .button-appmenu .toolbarbutton-icon {
     padding-inline-end: 2px;
     padding-top: 2px;
     padding-bottom: 2px;
-    font-family: "Segoe UI Semibold", "Segoe UI", sans-serif;
   }
   #appmenuSecondaryPane:-moz-locale-dir(rtl) {
     box-shadow: -1px 0 2px var(--appMenu-bg-box-shadow) inset;
@@ -372,7 +378,6 @@ toolbar[mode="text"] .button-appmenu .toolbarbutton-icon {
 }
 
 .mail-toolbox > toolbar {
-  margin-inline-start: 0;
   /* force iconsize="small" on these toolbars */
   counter-reset: smallicons;
 }
@@ -381,15 +386,10 @@ toolbar[mode="text"] .button-appmenu .toolbarbutton-icon {
   padding: 1px;
 }
 
-.chromeclass-toolbar {
-  /* Toolbar buttons have a margin of 3px; adjust the toolbar so the leftmost
-     button lines up with the rest of the window. */
-  margin-inline-start: -3px;
-}
-
 /* ::::: toolbar buttons on tabbar toolbar ::::: */
 
 #alltabs-button,
+#tabbar-toolbar menulist,
 #tabbar-toolbar .toolbarbutton-1,
 #tabbar-toolbar .toolbarbutton-1[type="menu-button"] {
   margin-top: 2px;
@@ -550,6 +550,10 @@ toolbar[mode="text"] .button-appmenu .toolbarbutton-icon {
 
 #button-showconversation {
   list-style-image: url("chrome://messenger/skin/icons/conversation.svg");
+}
+
+#button-addons {
+  list-style-image: url("chrome://mozapps/skin/extensions/extensionGeneric-16.svg");
 }
 
 .button-appmenu {
@@ -824,7 +828,7 @@ toolbar:not([mode="text"]) > toolbarpaletteitem > #button-chat > stack {
 @media (-moz-windows-glass) {
   .mail-toolbox:not(:-moz-lwtheme)::after,
   .contentTabToolbox:not(:-moz-lwtheme)::after {
-    --toolbox-border-bottom-color: #aabccf;
+    --chrome-content-separator-color: #aabccf;
   }
 
   #tabs-toolbar {
@@ -856,15 +860,12 @@ toolbar:not([mode="text"]) > toolbarpaletteitem > #button-chat > stack {
     position: relative;
   }
 
-  #tabs-toolbar:not(:-moz-lwtheme)::before {
-    box-shadow: 0 0 30px 30px rgba(174, 189, 204, 0.85);
+  #navigation-toolbox:not(:-moz-lwtheme)::before {
+    box-shadow: 0 30px 30px 30px rgba(174, 189, 204, 0.85);
     content: "";
     display: -moz-box;
-    height: 0;
     margin: 0 60px; /* (30px + 30px) from box-shadow */
-    position: absolute;
     pointer-events: none;
-    top: 50%;
     width: -moz-available;
     z-index: -1;
   }
@@ -903,7 +904,8 @@ toolbar:not([mode="text"]) > toolbarpaletteitem > #button-chat > stack {
   }
 
   .mail-toolbox,
-  .contentTabToolbox {
+  .contentTabToolbox,
+  #folderPane-toolbox {
     box-shadow: none;
   }
 
@@ -933,6 +935,6 @@ toolbar:not([mode="text"]) > toolbarpaletteitem > #button-chat > stack {
 
   .mail-toolbox:not(:-moz-lwtheme)::after,
   .contentTabToolbox:not(:-moz-lwtheme)::after {
-    --toolbox-border-bottom-color: #c2c2c2;
+    --chrome-content-separator-color: #c2c2c2;
   }
 }

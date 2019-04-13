@@ -2,6 +2,10 @@
 <!-- This Source Code Form is subject to the terms of the Mozilla Public
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!-- import-globals-from ../calendar-ui-utils.js -->
+<!-- import-globals-from ../calendar-views.js -->
+
 <!DOCTYPE dialog [
   <!ENTITY % dtd1 SYSTEM "chrome://global/locale/global.dtd" > %dtd1;
   <!ENTITY % dtd2 SYSTEM "chrome://calendar/locale/calendar-event-dialog.dtd"> %dtd2;
@@ -12,213 +16,7 @@
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
           xmlns:xbl="http://www.mozilla.org/xbl">
 
-  <!-- Unfortunately, the normal menulist binding doesn't allow a panel child
-       This binding replaces the usual menulist to allow a panel -->
-  <binding id="panel-menulist" extends="chrome://global/content/bindings/menulist.xml#menulist">
-    <content sizetopopup="pref">
-      <xul:hbox class="menulist-label-box" flex="1">
-        <xul:image class="menulist-icon" xbl:inherits="src=image,src"/>
-        <xul:label class="menulist-label" xbl:inherits="value=label,crop,accesskey" crop="right" flex="1"/>
-      </xul:hbox>
-      <xul:dropmarker class="menulist-dropmarker" type="menu" xbl:inherits="disabled,open"/>
-      <children includes="menupopup|panel"/>
-    </content>
-  </binding>
-
-  <binding id="category-panel" extends="chrome://global/content/bindings/popup.xml#panel">
-    <resources>
-      <stylesheet src="chrome://calendar/skin/widgets/calendar-widgets.css"/>
-    </resources>
-    <content>
-        <xul:textbox  anonid="category-textbox"
-                      class="categories-textbox"
-                      type="search"
-                      searchbutton="true"
-                      placeholder="&event.categories.textbox.label;"
-                      oncommand="document.getBindingParent(this).addNewCategory();"
-                      flex="1"/>
-        <xul:listbox anonid="categories-listbox"
-                   class="categories-listbox"
-                   onselect="document.getBindingParent(this).selectCategory()"
-                   selType="multiple"
-                   >
-        <children/>
-      </xul:listbox>
-    </content>
-    <implementation>
-      <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-      ]]></constructor>
-
-      <field name="_maxCount">0</field>
-
-      <property name="categories" readonly="true">
-        <getter><![CDATA[
-            let categoryListbox = document.getAnonymousElementByAttribute(this, "anonid", "categories-listbox");
-            if (this.maxCount == 1) {
-                let selectedItem = categoryListbox.selectedItem;
-                return selectedItem ? [selectedItem.getAttribute("value")] : [];
-            } else {
-                let checkedNodes = categoryListbox.getElementsByAttribute("checked", "true");
-                let sliceEnd = this.maxCount > 0 ? this.maxCount : checkedNodes.length;
-                return Array.from(checkedNodes).slice(0, sliceEnd)
-                                               .map(x => x.getAttribute("value"));
-            }
-        ]]></getter>
-      </property>
-
-      <property name="maxCount">
-        <getter><![CDATA[
-            return this._maxCount;
-        ]]></getter>
-        <setter><![CDATA[
-            if (this._maxCount != val) {
-                this._maxCount = val;
-                this.setupSelection();
-            }
-        ]]></setter>
-      </property>
-
-      <method name="selectCategory">
-        <body><![CDATA[
-            this.setupSelection();
-            if (this.maxCount == 1) {
-                this.hidePopup();
-            }
-        ]]></body>
-      </method>
-
-      <method name="setupSelection">
-        <body><![CDATA[
-            let categoryListbox = document.getAnonymousElementByAttribute(this, "anonid", "categories-listbox");
-            categoryListbox.setAttribute("seltype", this.maxCount == 1 ? "single" : "multiple");
-
-            if (this.maxCount == 1) {
-                for (let node of categoryListbox.childNodes) {
-                    // Single selection doesn't have checkboxes
-                    node.removeAttribute("type");
-
-                    // Even though we have single select, these may be checked
-                    // in case the user switches between calendars that support
-                    // one vs multiple categories. Uncheck the other nodes to
-                    // make sure the UX is not weird.
-                    setBooleanAttribute(node, "checked", node == categoryListbox.selectedItem);
-                }
-            } else {
-                let categoryTextbox = document.getAnonymousElementByAttribute(this, "anonid", "category-textbox");
-                let maxCountReached = this.maxCount > 0 && this.categories.length == this.maxCount;
-                setBooleanAttribute(categoryTextbox, "disabled", maxCountReached);
-
-                for (let node of categoryListbox.childNodes) {
-                    // Multiselect has checkboxes
-                    node.setAttribute("type", "checkbox");
-
-                    if (maxCountReached && node.getAttribute("checked") != "true") {
-                        // If the maxcount is reached, disable all unchecked items
-                        node.setAttribute("disabled", "true");
-                    } else if (!maxCountReached) {
-                        // If its not reached, remove the disabled attribute
-                        node.removeAttribute("disabled");
-                    }
-                }
-            }
-        ]]></body>
-      </method>
-
-      <method name="insertCategory">
-        <parameter name="category" />
-        <parameter name="categories" />
-        <parameter name="categoryListbox" />
-        <parameter name="compare" />
-        <body><![CDATA[
-            let newIndex = cal.data.binaryInsert(categories, category, compare, true);
-            let item = categoryListbox.getItemAtIndex(Math.min(newIndex, categoryListbox.itemCount - 1));
-
-            if (!item || item.getAttribute("value") != category) {
-                // The item doesn't exist, insert it at the correct spot.
-                item = document.createElementNS("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul", "listitem");
-                item.setAttribute("label", category);
-                item.setAttribute("value", category);
-                let beforeItem = categoryListbox.getItemAtIndex(newIndex);
-                categoryListbox.insertBefore(item, beforeItem);  // Will append if 'beforeItem' is null.
-
-                if (this.maxCount != 1) {
-                    item.setAttribute("type", "checkbox");
-                }
-            }
-
-            item.setAttribute("checked", "true");
-            return item;
-        ]]></body>
-      </method>
-
-      <method name="addNewCategory">
-        <body><![CDATA[
-            let categoryListbox = document.getAnonymousElementByAttribute(this, "anonid", "categories-listbox");
-            let categoryTextbox = document.getAnonymousElementByAttribute(this, "anonid", "category-textbox");
-            let category = categoryTextbox.value;
-
-            if (!category) {
-                return;
-            }
-
-            let localeCollator = cal.l10n.createLocaleCollator();
-            let compare = localeCollator.compareString.bind(localeCollator, 0);
-
-            let children = categoryListbox.childNodes;
-            let categories = [];
-            for (let i = 0; i < children.length; i++) {
-                categories.push(children[i].label);
-            }
-
-            let item = this.insertCategory(category, categories, categoryListbox, compare);
-            categoryTextbox.value = "";
-
-            if (this.maxCount == 1) {
-                categoryListbox.selectedItem = item;
-            } else {
-                this.selectCategory();
-            }
-
-            categoryListbox.ensureElementIsVisible(item);
-        ]]></body>
-      </method>
-
-      <method name="loadItem">
-        <parameter name="aItem"/>
-        <body><![CDATA[
-            let categoryListbox = document.getAnonymousElementByAttribute(this, "anonid", "categories-listbox");
-            let categoryList = cal.category.fromPrefs();
-
-            cal.l10n.sortArrayByLocaleCollator(categoryList);
-
-            removeChildren(categoryListbox);
-
-            for (let cat of categoryList) {
-                // First insert all categories from the prefs
-                let item = categoryListbox.appendItem(cat, cat);
-                item.setAttribute("type", "checkbox");
-            }
-
-            if (aItem) {
-                let localeCollator = cal.l10n.createLocaleCollator();
-                let compare = localeCollator.compareString.bind(localeCollator, 0);
-
-                // Ensure the item's categories are in the list and they are checked.
-                for (let cat of aItem.getCategories({})) {
-                    this.insertCategory(cat, categoryList, categoryListbox, compare);
-                }
-            }
-        ]]></body>
-      </method>
-    </implementation>
-  </binding>
-
   <binding id="doubleimage-toolbarbutton" extends="chrome://global/content/bindings/toolbarbutton.xml#toolbarbutton">
-    <resources>
-      <stylesheet src="chrome://calendar/skin/widgets/calendar-widgets.css"/>
-    </resources>
-
     <content>
       <children includes="observes|template|menupopup|tooltip"/>
       <xul:image class="toolbarbutton-icon-begin" xbl:inherits="validate,src-begin=image,toolbarmode,buttonstyle"/>
@@ -242,7 +40,6 @@
 
     <implementation>
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
           this.setUpTodayDate();
       ]]></constructor>
 
@@ -252,41 +49,6 @@
             document.getAnonymousElementByAttribute(this, "anonid", "day-label").value = dayNumber;
         ]]></body>
       </method>
-    </implementation>
-   </binding>
-
-  <!-- this binding directly extends to a checkbox but is visualized as
-       a treenode in a treecontrol-->
-  <binding id="treenode-checkbox" extends="chrome://global/content/bindings/checkbox.xml#checkbox">
-    <resources>
-      <stylesheet src="chrome://calendar/skin/widgets/calendar-widgets.css"/>
-    </resources>
-  </binding>
-
-  <!-- this binding directly extends to a xul:box element and automatically
-       sets the "orient" attribute to "vertical" thus behaving like a vbox-->
-  <binding id="modevbox" extends="chrome://calendar/content/widgets/calendar-widgets.xml#modebox">
-    <resources>
-      <stylesheet src="chrome://calendar/skin/widgets/calendar-widgets.css"/>
-    </resources>
-
-    <implementation>
-      <constructor><![CDATA[
-          this.setAttribute("orient", "vertical");
-      ]]></constructor>
-    </implementation>
-  </binding>
-
-  <!-- this binding directly extends to a xul:box element and automatically
-       sets the "orient" attribute to "horizontal" thus behaving like a vbox-->
-  <binding id="modehbox" extends="chrome://calendar/content/widgets/calendar-widgets.xml#modebox">
-    <resources>
-      <stylesheet src="chrome://calendar/skin/widgets/calendar-widgets.css"/>
-    </resources>
-    <implementation>
-      <constructor><![CDATA[
-          this.setAttribute("orient", "horizontal");
-      ]]></constructor>
     </implementation>
   </binding>
 
@@ -298,7 +60,7 @@
     - The attribute "broadcaster" points to the id of a broadcaster that is supposed to be notified (by the application)
       as soon as the mode changes. When this happens the modebox" will be notified and will check if it should
       collapse itself or not.
-    - The attribute "refcontrol" points to a control either a "command", "checkbox" or a "treenode-checkbox" or other
+    - The attribute "refcontrol" points to a control either a "command", "checkbox" or other
       elements that support a "checked" attribute that is often used to denote whether a modebox is supposed to be
       displayed or not. If "refcontrol" is set to the id of a command you can there set the oncommend attribute like:
       "oncommand='document.getElementById('my-mode-pane').togglePane(event)'. In case it is a checkbox element or derived
@@ -307,10 +69,7 @@
       additionally verified if the xul-element denoted by "refcontrol" is checked or not. During runtime an attribute named
       "collapsedinmodes" with the collpsed modes comma-separated e.g. "mail,calendar,task. This attribute is also made
       persistent-->
-  <binding id="modebox" extends="xul:box">
-    <resources>
-      <stylesheet src="chrome://calendar/skin/widgets/calendar-widgets.css"/>
-    </resources>
+  <binding id="modebox">
     <implementation>
       <field name="mBroadcaster">null</field>;
       <field name="mModHandler">null</field>;
@@ -323,8 +82,7 @@
           }
           if (this.hasAttribute("refcontrol")) {
               this.mRefControl = document.getElementById(this.getAttribute("refcontrol"));
-              if (this.mRefControl && ((this.mRefControl.localName == "treenode-checkbox") ||
-                                    (this.mRefControl.localName == "checkbox"))) {
+              if (this.mRefControl && (this.mRefControl.localName == "checkbox")) {
                   this.mControlHandler = {
                       binding: this,
                       handleEvent: function(aEvent, aHandled) {
@@ -334,6 +92,8 @@
                   this.mRefControl.addEventListener("CheckboxStateChange", this.mControlHandler, true);
               }
           }
+
+          this.dispatchEvent(new CustomEvent("bindingattached", { bubbles: false }));
       ]]></constructor>
 
       <destructor><![CDATA[
@@ -435,10 +195,10 @@
                     }
                 }
                 this.setAttribute("collapsedinmodes", collapsedModes.join(","));
-                let id = this.getAttribute("id");
-                if (id) {
-                    document.persist(id, "collapsedinmodes");
-                }
+
+                // This binding is used all over the place. We can't guarantee that Services is available.
+                var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+                Services.xulStore.persist(this, "collapsedinmodes");
             }
             if (notifyRefControl === true) {
                 if (this.hasAttribute("refcontrol")) {
@@ -529,10 +289,6 @@
       <field name="mDropShadows">[]</field>
       <field name="mCalendarView">null</field>
 
-      <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-      ]]></constructor>
-
       <!-- The ViewController that supports the interface 'calICalendarView'-->
       <property name="calendarView"
                 onget="return this.mCalendarView;"
@@ -570,7 +326,7 @@
                             shadowStartDate.day += 1;
                             continue;
                         }
-                        let dropshadow = createXULElement("box");
+                        let dropshadow = document.createXULElement("box");
                         dropshadow.setAttribute("class", "dropshadow");
                         if (box.hasChildNodes()) {
                             box.insertBefore(dropshadow, box.firstChild);
@@ -632,8 +388,8 @@
           }
           let item = draggedDOMNode.occurrence.clone();
           let beginMoveDate = draggedDOMNode.mParentBox.date;
-          let itemStartDate = (item.startDate || item.entryDate || item.dueDate).getInTimezone(calendarView.mTimezone);
-          let itemEndDate = (item.endDate || item.dueDate || item.entryDate).getInTimezone(calendarView.mTimezone);
+          let itemStartDate = (item.startDate || item.entryDate || item.dueDate).getInTimezone(this.calendarView.mTimezone);
+          let itemEndDate = (item.endDate || item.dueDate || item.entryDate).getInTimezone(this.calendarView.mTimezone);
           let oneMoreDay = (itemEndDate.hour > 0 || itemEndDate.minute > 0);
           itemStartDate.isDate = true;
           itemEndDate.isDate = true;
@@ -691,8 +447,8 @@
           }
           let item = session.sourceNode.sourceObject.clone();
           this.setAttribute("dropbox", "false");
-          let transfer = Components.classes["@mozilla.org/widget/transferable;1"]
-                                   .createInstance(Components.interfaces.nsITransferable);
+          let transfer = Cc["@mozilla.org/widget/transferable;1"]
+                           .createInstance(Ci.nsITransferable);
           transfer.init(null);
 
           if (cal.item.isEvent(item)) {
@@ -722,11 +478,7 @@
     </handlers>
   </binding>
 
-  <binding id="view-tab" extends="chrome://global/content/bindings/tabbox.xml#tab">
-    <resources>
-      <stylesheet src="chrome://calendar/skin/widgets/calendar-widgets.css"/>
-    </resources>
-
+  <binding id="view-tab">
     <content>
       <xul:hbox class="tab-middle box-inherit" xbl:inherits="align,dir,pack,orient,selected" flex="1">
         <xul:image class="tab-icon" xbl:inherits="validate,src=image"/>

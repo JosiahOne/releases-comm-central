@@ -8,7 +8,10 @@
  *          tasksToMail, tasksToEvents, toggleCompleted,
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from calendar-common-sets.js */
+/* import-globals-from calendar-dnd-listener.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Add registered calendars to the given menupopup. Removes all previous
@@ -168,7 +171,7 @@ function contextChangeTaskProgress(aEvent, aProgress) {
         startBatchTransaction();
         let tasks = getSelectedTasks(aEvent);
         for (let task of tasks) {
-            let newTask = task.clone().QueryInterface(Components.interfaces.calITodo);
+            let newTask = task.clone().QueryInterface(Ci.calITodo);
             newTask.percentComplete = aProgress;
             switch (aProgress) {
                 case 0:
@@ -220,7 +223,7 @@ function contextChangeTaskPriority(aEvent, aPriority) {
         startBatchTransaction();
         let tasks = getSelectedTasks(aEvent);
         for (let task of tasks) {
-            let newTask = task.clone().QueryInterface(Components.interfaces.calITodo);
+            let newTask = task.clone().QueryInterface(Ci.calITodo);
             newTask.priority = aPriority;
             doTransaction("modify", newTask, newTask.calendar, task, null);
         }

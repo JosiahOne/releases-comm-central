@@ -8,6 +8,8 @@
 
 // make SOLO_TEST=folder-display/test-watch-ignore-thread.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-watch-ignore-thread";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -64,7 +66,7 @@ function test_ignore_thread() {
   // The ignored thread should still be visible (with an ignored icon).
   assert_visible(t1root);
 
-  // Go to another folde then back. Ignored messages should now be hidden.
+  // Go to another folder then back. Ignored messages should now be hidden.
   be_in_folder(inboxFolder);
   be_in_folder(folder);
   select_click_row(0);

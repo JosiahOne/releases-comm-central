@@ -50,6 +50,7 @@ static HeaderInfo kHeaders[] = {
   { "Message-Id", true },
   { "X-Template", true },
   { nullptr, false }, // DRAFT_ID
+  { nullptr, false }, // TEMPLATE_ID
   { "Content-Language", true },
   { nullptr, false } // CREATOR IDENTITY KEY
 };
@@ -360,6 +361,17 @@ NS_IMETHODIMP nsMsgCompFields::GetDraftId(char **_retval)
   return *_retval ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
 }
 
+NS_IMETHODIMP nsMsgCompFields::SetTemplateId(const char *value)
+{
+  return SetAsciiHeader(MSG_TEMPLATE_ID_HEADER_ID, value);
+}
+
+NS_IMETHODIMP nsMsgCompFields::GetTemplateId(char **_retval)
+{
+  *_retval = strdup(GetAsciiHeader(MSG_TEMPLATE_ID_HEADER_ID));
+  return *_retval ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
+}
+
 NS_IMETHODIMP nsMsgCompFields::SetReturnReceipt(bool value)
 {
   m_returnReceipt = value;
@@ -536,7 +548,7 @@ const char* nsMsgCompFields::GetBody()
 /* readonly attribute nsISimpleEnumerator attachmentsArray; */
 NS_IMETHODIMP nsMsgCompFields::GetAttachments(nsISimpleEnumerator * *aAttachmentsEnum)
 {
-  return aAttachmentsEnum ? NS_NewArrayEnumerator(aAttachmentsEnum, m_attachments) : NS_ERROR_NULL_POINTER;
+  return aAttachmentsEnum ? NS_NewArrayEnumerator(aAttachmentsEnum, m_attachments, NS_GET_IID(nsIMsgAttachment)) : NS_ERROR_NULL_POINTER;
 }
 
 /* void addAttachment (in nsIMsgAttachment attachment); */
@@ -600,7 +612,7 @@ nsMsgCompFields::SplitRecipients(const nsAString &aRecipients,
   *aLength = 0;
   *aResult = nullptr;
 
-  nsCOMArray<msgIAddressObject> header(EncodedHeader(NS_ConvertUTF16toUTF8(aRecipients)));
+  nsCOMArray<msgIAddressObject> header(EncodedHeaderW(aRecipients));
   nsTArray<nsString> results;
   if (aEmailAddressOnly)
     ExtractEmails(header, results);
@@ -623,8 +635,7 @@ nsresult nsMsgCompFields::SplitRecipientsEx(const nsAString &recipients,
                                             nsTArray<nsMsgRecipient> &aResult)
 {
   nsTArray<nsString> names, addresses;
-  ExtractAllAddresses(EncodedHeader(NS_ConvertUTF16toUTF8(recipients)), names,
-    addresses);
+  ExtractAllAddresses(EncodedHeaderW(recipients), names, addresses);
 
   uint32_t numAddresses = names.Length();
   for (uint32_t i = 0; i < numAddresses; ++i)
@@ -658,16 +669,16 @@ NS_IMETHODIMP nsMsgCompFields::ConvertBodyToPlainText()
   return rv;
 }
 
-NS_IMETHODIMP nsMsgCompFields::GetSecurityInfo(nsISupports ** aSecurityInfo)
+NS_IMETHODIMP nsMsgCompFields::GetComposeSecure(nsIMsgComposeSecure ** aComposeSecure)
 {
-  NS_ENSURE_ARG_POINTER(aSecurityInfo);
-  NS_IF_ADDREF(*aSecurityInfo = mSecureCompFields);
+  NS_ENSURE_ARG_POINTER(aComposeSecure);
+  NS_IF_ADDREF(*aComposeSecure = mSecureCompFields);
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMsgCompFields::SetSecurityInfo(nsISupports * aSecurityInfo)
+NS_IMETHODIMP nsMsgCompFields::SetComposeSecure(nsIMsgComposeSecure * aComposeSecure)
 {
-  mSecureCompFields = aSecurityInfo;
+  mSecureCompFields = aComposeSecure;
   return NS_OK;
 }
 

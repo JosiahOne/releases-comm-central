@@ -10,6 +10,7 @@
 #include "nsIMsgImapMailFolder.h"
 #include "nsIMsgMessageService.h"
 #include "nsMsgUtils.h"
+#include "nsIChannel.h"
 #include "netCore.h"
 
 NS_IMPL_ISUPPORTS(nsCopyMessageStreamListener, nsIStreamListener,
@@ -80,21 +81,25 @@ NS_IMETHODIMP nsCopyMessageStreamListener::EndMessage(nsMsgKey key)
 }
 
 
-NS_IMETHODIMP nsCopyMessageStreamListener::OnDataAvailable(nsIRequest * /* request */, nsISupports *ctxt, nsIInputStream *aIStream, uint64_t sourceOffset, uint32_t aLength)
+NS_IMETHODIMP nsCopyMessageStreamListener::OnDataAvailable(nsIRequest * /* request */, nsIInputStream *aIStream, uint64_t sourceOffset, uint32_t aLength)
 {
   nsresult rv;
   rv = mDestination->CopyData(aIStream, aLength);
   return rv;
 }
 
-NS_IMETHODIMP nsCopyMessageStreamListener::OnStartRequest(nsIRequest * request, nsISupports *ctxt)
+NS_IMETHODIMP nsCopyMessageStreamListener::OnStartRequest(nsIRequest * request)
 {
   nsCOMPtr<nsIMsgDBHdr> message;
   nsresult rv = NS_OK;
-  nsCOMPtr<nsIURI> uri = do_QueryInterface(ctxt, &rv);
+  nsCOMPtr<nsIURI> uri;
 
-  NS_ASSERTION(NS_SUCCEEDED(rv), "ahah...someone didn't pass in the expected context!!!");
-
+  // We know the request is an nsIChannel we can get a URI from, but this is
+  // probably bad form. See Bug 1528662.
+  nsCOMPtr<nsIChannel> channel = do_QueryInterface(request, &rv);
+  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "error QI nsIRequest to nsIChannel failed");
+  if (NS_SUCCEEDED(rv))
+    rv = channel->GetURI(getter_AddRefs(uri));
   if (NS_SUCCEEDED(rv))
     rv = GetMessage(uri, getter_AddRefs(message));
   if(NS_SUCCEEDED(rv))
@@ -138,8 +143,17 @@ NS_IMETHODIMP nsCopyMessageStreamListener::EndCopy(nsISupports *url, nsresult aS
   return NS_OK;
 }
 
-NS_IMETHODIMP nsCopyMessageStreamListener::OnStopRequest(nsIRequest* request, nsISupports *ctxt, nsresult aStatus)
+NS_IMETHODIMP nsCopyMessageStreamListener::OnStopRequest(nsIRequest* request, nsresult aStatus)
 {
-  return EndCopy(ctxt, aStatus);
+  nsresult rv;
+  // We know the request is an nsIChannel we can get a URI from, but this is
+  // probably bad form. See Bug 1528662.
+  nsCOMPtr<nsIChannel> channel = do_QueryInterface(request, &rv);
+  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "error QI nsIRequest to nsIChannel failed");
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIURI> uri;
+  rv = channel->GetURI(getter_AddRefs(uri));
+  NS_ENSURE_SUCCESS(rv, rv);
+  return EndCopy(uri, aStatus);
 }
 

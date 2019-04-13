@@ -2,14 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var imServices = {};
-ChromeUtils.import("resource:///modules/chatNotifications.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm", imServices);
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+// This file is loaded in messenger.xul.
+/* globals fixIterator, MailToolboxCustomizeDone, Notifications, openIMAccountMgr,
+   PROTO_TREE_VIEW, Services, Status, statusSelector, ZoomManager */
+
+var {Notifications} = ChromeUtils.import("resource:///modules/chatNotifications.jsm");
+var { Services: imServices } = ChromeUtils.import("resource:///modules/imServices.jsm");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 ChromeUtils.defineModuleGetter(this, "OS", "resource://gre/modules/osfile.jsm");
-
-imServices = imServices.Services;
 
 var gBuddyListContextMenu = null;
 
@@ -17,7 +18,9 @@ function buddyListContextMenu(aXulMenu) {
   this.target = aXulMenu.triggerNode;
   this.menu = aXulMenu;
   let localName = this.target.localName;
-  this.onContact = localName == "imcontact";
+  document.getElementById("contactlistbox").selectedItem = this.target;
+  this.onContact = (localName == "richlistitem" &&
+    this.target.getAttribute("is") == "chat-contact");
   this.onConv = localName == "imconv";
   this.shouldDisplay = this.onContact || this.onConv;
 
@@ -32,19 +35,19 @@ function buddyListContextMenu(aXulMenu) {
     !hide && !this.target.canOpenConversation();
 }
 buddyListContextMenu.prototype = {
-  openConversation: function blcm_openConversation() {
+  openConversation() {
     if (this.onContact || this.onConv)
       this.target.openConversation();
   },
-  closeConversation: function blcm_closeConversation() {
+  closeConversation() {
     if (this.onConv)
       this.target.closeConversation();
   },
-  alias: function blcm_alias() {
+  alias() {
     if (this.onContact)
       this.target.startAliasing();
   },
-  delete: function blcm_delete() {
+  delete() {
     if (!this.onContact)
       return;
 
@@ -71,7 +74,7 @@ buddyListContextMenu.prototype = {
       return;
 
     this.target.deleteContact();
-  }
+  },
 };
 
 var gChatTab = null;
@@ -82,28 +85,30 @@ var chatTabType = {
   hasBeenOpened: false,
   modes: {
     chat: {
-      type: "chat"
-    }
+      type: "chat",
+    },
   },
 
   tabMonitor: {
     monitorName: "chattab",
 
     // Unused, but needed functions
-    onTabTitleChanged: function() {},
-    onTabOpened: function(aTab) {},
-    onTabClosing: function() {},
-    onTabPersist: function() {},
-    onTabRestored: function() {},
+    onTabTitleChanged() {},
+    onTabOpened(aTab) {},
+    onTabPersist() {},
+    onTabRestored() {},
 
+    onTabClosing() {
+      chatHandler._onTabDeactivated(true);
+    },
     onTabSwitched(aNewTab, aOldTab) {
       // aNewTab == chat is handled earlier by showTab() below.
       if (aOldTab.mode.name == "chat")
-        chatHandler._onTabDeactivated();
-    }
+        chatHandler._onTabDeactivated(true);
+    },
   },
 
-  _handleArgs: function(aArgs) {
+  _handleArgs(aArgs) {
     if (!aArgs || !("convType" in aArgs) ||
         (aArgs.convType != "log" && aArgs.convType != "focus"))
       return;
@@ -133,9 +138,9 @@ var chatTabType = {
   _onWindowDeactivated() {
     let tabmail = document.getElementById("tabmail");
     if (tabmail.currentTabInfo.mode.name == "chat")
-      chatHandler._onTabDeactivated();
+      chatHandler._onTabDeactivated(false);
   },
-  openTab: function(aTab, aArgs) {
+  openTab(aTab, aArgs) {
     if (!this.hasBeenOpened) {
       if (chatHandler.ChatCore && chatHandler.ChatCore.initialized) {
         let convs = imServices.conversations.getUIConversations();
@@ -146,28 +151,28 @@ var chatTabType = {
             chatHandler._addConversation(conv);
         }
       }
-
-      // The tab monitor will inform us when a different tab is selected.
-      let tabmail = document.getElementById("tabmail");
-      tabmail.registerTabMonitor(this.tabMonitor);
-      window.addEventListener("deactivate", chatTabType._onWindowDeactivated);
-      window.addEventListener("activate", chatTabType._onWindowActivated);
+      this.hasBeenOpened = true;
     }
+
+    // The tab monitor will inform us when a different tab is selected.
+    let tabmail = document.getElementById("tabmail");
+    tabmail.registerTabMonitor(this.tabMonitor);
+    window.addEventListener("deactivate", chatTabType._onWindowDeactivated);
+    window.addEventListener("activate", chatTabType._onWindowActivated);
 
     gChatTab = aTab;
     aTab.tabNode.setAttribute("type", "chat");
     this._handleArgs(aArgs);
     this.showTab(aTab);
     chatHandler.updateTitle();
-    this.hasBeenOpened = true;
   },
-  shouldSwitchTo: function(aArgs) {
+  shouldSwitchTo(aArgs) {
     if (!gChatTab)
       return -1;
     this._handleArgs(aArgs);
     return document.getElementById("tabmail").tabInfo.indexOf(gChatTab);
   },
-  showTab: function(aTab) {
+  showTab(aTab) {
     gChatTab = aTab;
     chatHandler._onTabActivated();
     // The next call may change the selected conversation, but that
@@ -175,21 +180,21 @@ var chatTabType = {
     chatHandler._updateSelectedConversation();
     chatHandler._updateFocus();
   },
-  closeTab: function(aTab) {
+  closeTab(aTab) {
     gChatTab = null;
     let tabmail = document.getElementById("tabmail");
     tabmail.unregisterTabMonitor(this.tabMonitor);
     window.removeEventListener("deactivate", chatTabType._onWindowDeactivated);
     window.removeEventListener("activate", chatTabType._onWindowActivated);
   },
-  persistTab: function(aTab) {
+  persistTab(aTab) {
     return {};
   },
-  restoreTab: function(aTabmail, aPersistedState) {
+  restoreTab(aTabmail, aPersistedState) {
     aTabmail.openTab("chat", {});
   },
 
-  supportsCommand: function ct_supportsCommand(aCommand, aTab) {
+  supportsCommand(aCommand, aTab) {
     switch (aCommand) {
       case "cmd_fullZoomReduce":
       case "cmd_fullZoomEnlarge":
@@ -203,7 +208,7 @@ var chatTabType = {
         return false;
     }
   },
-  isCommandEnabled: function ct_isCommandEnabled(aCommand, aTab) {
+  isCommandEnabled(aCommand, aTab) {
     switch (aCommand) {
       case "cmd_fullZoomReduce":
       case "cmd_fullZoomEnlarge":
@@ -218,7 +223,7 @@ var chatTabType = {
         return false;
     }
   },
-  doCommand: function ct_doCommand(aCommand, aTab) {
+  doCommand(aCommand, aTab) {
     switch (aCommand) {
       case "cmd_fullZoomReduce":
         ZoomManager.reduce();
@@ -243,37 +248,35 @@ var chatTabType = {
         break;
     }
   },
-  onEvent: function(aEvent, aTab) { },
-  getBrowser: function ct_getBrowser(aTab) {
+  onEvent(aEvent, aTab) {},
+  getBrowser(aTab) {
     let panel = document.getElementById("conversationsDeck").selectedPanel;
     if (panel == document.getElementById("logDisplay")) {
       if (document.getElementById("logDisplayDeck").selectedPanel ==
           document.getElementById("logDisplayBrowserBox"))
         return document.getElementById("conv-log-browser");
-    }
-    else if (panel && panel.localName == "imconversation") {
+    } else if (panel && panel.localName == "imconversation") {
       return panel.browser;
     }
     return null;
   },
-  getFindbar: function ct_getFindbar(aTab) {
+  getFindbar(aTab) {
     let panel = document.getElementById("conversationsDeck").selectedPanel;
     if (panel == document.getElementById("logDisplay")) {
       if (document.getElementById("logDisplayDeck").selectedPanel ==
           document.getElementById("logDisplayBrowserBox"))
         return document.getElementById("log-findbar");
-    }
-    else if (panel && panel.localName == "imconversation") {
+    } else if (panel && panel.localName == "imconversation") {
       return panel.findbar;
     }
     return null;
   },
 
-  saveTabState: function(aTab) { }
+  saveTabState(aTab) {},
 };
 
 var chatHandler = {
-  _addConversation: function(aConv) {
+  _addConversation(aConv) {
     let list = document.getElementById("contactlistbox");
     let convs = document.getElementById("conversationsGroup");
     let selectedItem = list.selectedItem;
@@ -282,8 +285,9 @@ var chatHandler = {
       (!selectedItem || (selectedItem == convs &&
                         convs.nextSibling.localName != "imconv"));
     let elt = convs.addContact(aConv, "imconv");
-    if (shouldSelect)
+    if (shouldSelect) {
       list.selectedItem = elt;
+    }
 
     if (aConv.isChat || !aConv.buddy)
       return;
@@ -292,11 +296,12 @@ var chatHandler = {
     elt.imContact = contact;
     let groupName = (contact.online ? "on" : "off") + "linecontactsGroup";
     let item = document.getElementById(groupName).removeContact(contact);
-    if (list.selectedItem == item)
+    if (list.selectedItem == item) {
       list.selectedItem = elt;
+    }
   },
 
-  _hasConversationForContact: function(aContact) {
+  _hasConversationForContact(aContact) {
     let convs = document.getElementById("conversationsGroup").contacts;
     return convs.some(aConversation =>
       aConversation.hasOwnProperty("imContact") &&
@@ -304,7 +309,7 @@ var chatHandler = {
   },
 
   _chatButtonUpdatePending: false,
-  updateChatButtonState: function() {
+  updateChatButtonState() {
     if (this._chatButtonUpdatePending)
       return;
     this._chatButtonUpdatePending = true;
@@ -314,7 +319,7 @@ var chatHandler = {
   // This is the unread count that was part of the latest
   // unread-im-count-changed notification.
   _notifiedUnreadCount: 0,
-  _updateChatButtonState: function() {
+  _updateChatButtonState() {
     delete this._chatButtonUpdatePending;
     let chatButton = document.getElementById("button-chat");
     if (!chatButton)
@@ -337,7 +342,7 @@ var chatHandler = {
     }
   },
 
-  countUnreadMessages: function() {
+  countUnreadMessages() {
     let convs = imServices.conversations.getUIConversations();
     let unreadTargettedCount = 0;
     let unreadTotalCount = 0;
@@ -348,7 +353,7 @@ var chatHandler = {
     return [unreadTargettedCount, unreadTotalCount];
   },
 
-  updateTitle: function() {
+  updateTitle() {
     if (!gChatTab)
       return;
 
@@ -367,14 +372,14 @@ var chatHandler = {
     document.getElementById("tabmail").setTabTitle(gChatTab);
   },
 
-  onConvResize: function() {
+  onConvResize() {
     let convDeck = document.getElementById("conversationsDeck");
     let panel = convDeck.selectedPanel;
     if (panel && panel.localName == "imconversation")
       panel.onConvResize();
   },
 
-  setStatusMenupopupCommand: function(aEvent) {
+  setStatusMenupopupCommand(aEvent) {
     let target = aEvent.originalTarget;
     if (target.getAttribute("id") == "imStatusShowAccounts" ||
         target.getAttribute("id") == "appmenu_imStatusShowAccounts") {
@@ -391,18 +396,18 @@ var chatHandler = {
   },
 
   _pendingLogBrowserLoad: false,
-  _showLogPanel: function() {
+  _showLogPanel() {
     document.getElementById("conversationsDeck").selectedPanel =
       document.getElementById("logDisplay");
     document.getElementById("logDisplayDeck").selectedPanel =
       document.getElementById("logDisplayBrowserBox");
   },
-  _showLog: function(aConversation, aSearchTerm) {
+  _showLog(aConversation, aSearchTerm) {
     if (!aConversation)
       return;
     this._showLogPanel();
     let browser = document.getElementById("conv-log-browser");
-    browser._autoScrollEnabled = false;
+    browser._convScrollEnabled = false;
     if (this._pendingLogBrowserLoad) {
       browser._conv = aConversation;
       return;
@@ -459,7 +464,7 @@ var chatHandler = {
    * item that needs to be selected.
    * @returns true if there's at least one log in the list, false if empty.
    */
-  _showLogList: function(aLogs, aShouldSelect) {
+  _showLogList(aLogs, aShouldSelect) {
     let logTree = document.getElementById("logTree");
     let treeView = this._treeView = new chatLogTreeView(logTree, aLogs);
     if (!treeView._rowMap.length)
@@ -483,7 +488,7 @@ var chatHandler = {
       if (!treeView.isContainer(index) &&
           treeView._rowMap[index].log.time == logTime) {
         logTree.view.selection.select(index);
-        logTree.treeBoxObject.ensureRowIsVisible(index);
+        logTree.ensureRowIsVisible(index);
         return true;
       }
       if (!treeView._rowMap[index].children.some(i => i.log.time == logTime))
@@ -495,14 +500,14 @@ var chatHandler = {
         ++index;
       if (treeView._rowMap[index].log.time == logTime) {
         logTree.view.selection.select(index);
-        logTree.treeBoxObject.ensureRowIsVisible(index);
+        logTree.ensureRowIsVisible(index);
       }
       return true;
     }
-    throw("Couldn't find the log to select among the set of logs passed.");
+    throw new Error("Couldn't find the log to select among the set of logs passed.");
   },
 
-  onLogSelect: function() {
+  onLogSelect() {
     let selection = this._treeView.selection;
     let currentIndex = selection.currentIndex;
     // The current (focused) row may not be actually selected...
@@ -522,12 +527,12 @@ var chatHandler = {
   },
 
   _contactObserver: {
-    observe: function(aSubject, aTopic, aData) {
+    observe(aSubject, aTopic, aData) {
       if (aTopic == "contact-status-changed" ||
           aTopic == "contact-display-name-changed" ||
           aTopic == "contact-icon-changed")
         chatHandler.showContactInfo(aSubject);
-    }
+    },
   },
   _observedContact: null,
   get observedContact() { return this._observedContact; },
@@ -543,7 +548,7 @@ var chatHandler = {
       aContact.addObserver(this._contactObserver);
     return aContact;
   },
-  showCurrentConversation: function() {
+  showCurrentConversation() {
     let item = document.getElementById("contactlistbox").selectedItem;
     if (!item)
       return;
@@ -551,18 +556,18 @@ var chatHandler = {
       document.getElementById("conversationsDeck").selectedPanel = item.convView;
       document.getElementById("logTree").view.selection.clearSelection();
       item.convView.focus();
-    }
-    else if (item.localName == "imcontact")
+    } else if (item.localName == "richlistitem" && item.getAttribute("is") == "chat-contact") {
       item.openConversation();
+    }
   },
-  focusConversation: function(aUIConv) {
+  focusConversation(aUIConv) {
     let conv =
       document.getElementById("conversationsGroup").contactsById[aUIConv.id];
     document.getElementById("contactlistbox").selectedItem = conv;
     if (conv.convView)
       conv.convView.focus();
   },
-  showContactInfo: function(aContact) {
+  showContactInfo(aContact) {
     let cti = document.getElementById("conv-top-info");
     cti.setAttribute("userIcon", aContact.buddyIconFilename);
     cti.setAttribute("displayName", aContact.displayName);
@@ -579,7 +584,6 @@ var chatHandler = {
     cti.setAttribute("statusTypeTooltiptext", statusString);
     cti.setAttribute("statusTooltiptext", statusString + statusText);
     cti.removeAttribute("typing");
-    cti.removeAttribute("typed");
     cti.removeAttribute("topicEditable");
     cti.removeAttribute("noTopic");
 
@@ -589,11 +593,11 @@ var chatHandler = {
                                              [aContact.displayName]);
     button.disabled = !aContact.canSendMessage;
   },
-  _hideContextPane: function(aHide) {
+  _hideContextPane(aHide) {
     document.getElementById("contextSplitter").hidden = aHide;
     document.getElementById("contextPane").hidden = aHide;
   },
-  onListItemClick: function(aEvent) {
+  onListItemClick(aEvent) {
     // We only care about single clicks of the left button.
     if (aEvent.button != 0 || aEvent.detail != 1)
       return;
@@ -601,7 +605,7 @@ var chatHandler = {
     if (item.localName == "imconv" && item.convView)
       item.convView.focus();
   },
-  onListItemSelected: function() {
+  onListItemSelected() {
     let contactlistbox = document.getElementById("contactlistbox");
     let item = contactlistbox.selectedItem;
     if (!item || item.hidden || item.localName == "imgroup") {
@@ -640,8 +644,7 @@ var chatHandler = {
           this._showLogList(aSimilarLogs, aLog);
         });
       });
-    }
-    else if (item.localName == "imconv") {
+    } else if (item.localName == "imconv") {
       let convDeck = document.getElementById("conversationsDeck");
       if (!item.convView) {
         // Create new conversation binding.
@@ -654,9 +657,9 @@ var chatHandler = {
         item.convView = conv;
         document.getElementById("contextSplitter").hidden = false;
         document.getElementById("contextPane").hidden = false;
-      }
-      else
+      } else {
         item.convView.onConvResize();
+      }
 
       convDeck.selectedPanel = item.convView;
       item.convView.updateConvStatus();
@@ -672,23 +675,23 @@ var chatHandler = {
       if (item.conv.isChat) {
         contextPane.setAttribute("chat", "true");
         item.convView.showParticipants();
-      }
-      else
+      } else {
         contextPane.removeAttribute("chat");
+      }
 
       let button = document.getElementById("goToConversation");
       let bundle = document.getElementById("chatBundle");
       button.label = bundle.getString("goBackToCurrentConversation.button");
       button.disabled = false;
       this.observedContact = null;
-    }
-    else if (item.localName == "imcontact") {
+    } else if (item.localName == "richlistitem" && item.getAttribute("is") == "chat-contact") {
       let contact = item.contact;
       if (this.observedContact && contact &&
-          this.observedContact.id == contact.id)
+          this.observedContact.id == contact.id) {
         return; // onselect has just been fired again because a status
-                // change caused the imcontact to move.
+                // change caused the chat-contact to move.
                 // Return early to avoid flickering and changing the selected log.
+      }
 
       this.showContactInfo(contact);
       this.observedContact = contact;
@@ -709,7 +712,7 @@ var chatHandler = {
     this.updateTitle();
   },
 
-  onNickClick: function(aEvent) {
+  onNickClick(aEvent) {
     // Open a private conversation only for a middle or double click.
     if (aEvent.button != 1 && (aEvent.button != 0 || aEvent.detail != 2))
       return;
@@ -723,7 +726,7 @@ var chatHandler = {
     } catch (e) {}
   },
 
-  onNicklistKeyPress: function(aEvent) {
+  onNicklistKeyPress(aEvent) {
     if (aEvent.keyCode != aEvent.DOM_VK_RETURN)
       return;
 
@@ -745,21 +748,21 @@ var chatHandler = {
       this.focusConversation(newconv);
   },
 
-  _openDialog: function(aType) {
+  _openDialog(aType) {
     let features = "chrome,modal,titlebar,centerscreen";
     window.openDialog("chrome://messenger/content/chat/" + aType + ".xul", "",
                       features);
   },
-  addBuddy: function() {
+  addBuddy() {
      this._openDialog("addbuddy");
   },
-  joinChat: function() {
+  joinChat() {
     this._openDialog("joinchat");
   },
 
   _colorCache: {},
   // Duplicated code from imconversation.xml :-(
-  _computeColor: function(aName) {
+  _computeColor(aName) {
     if (Object.prototype.hasOwnProperty.call(this._colorCache, aName))
       return this._colorCache[aName];
 
@@ -787,7 +790,7 @@ var chatHandler = {
   },
 
   _placeHolderButtonId: "",
-  _updateNoConvPlaceHolder: function() {
+  _updateNoConvPlaceHolder() {
     let connected = false;
     let hasAccount = false;
     let canJoinChat = false;
@@ -807,8 +810,7 @@ var chatHandler = {
       connected || !hasAccount;
     if (connected) {
       delete this._placeHolderButtonId;
-    }
-    else {
+    } else {
       this._placeHolderButtonId =
         hasAccount ? "openIMAccountManagerButton" : "openIMAccountWizardButton";
     }
@@ -834,13 +836,12 @@ var chatHandler = {
     if (!hasAccount || !connected && groupIds.every(id =>
         document.getElementById(id + "Group").contacts.length)) {
       contactlist.disabled = true;
-    }
-    else {
+    } else {
       contactlist.disabled = false;
       this._updateSelectedConversation();
     }
   },
-  _updateSelectedConversation: function() {
+  _updateSelectedConversation() {
     let list = document.getElementById("contactlistbox");
     // We can't select anything if there's no account.
     if (list.disabled)
@@ -890,7 +891,7 @@ var chatHandler = {
       return;
     }
   },
-  _updateFocus: function() {
+  _updateFocus() {
     let focusId = this._placeHolderButtonId || "contactlistbox";
     document.getElementById(focusId).focus();
   },
@@ -911,12 +912,12 @@ var chatHandler = {
     if (convView)
       convView.switchingToPanel();
   },
-  _onTabDeactivated() {
+  _onTabDeactivated(aHidden) {
     let convView = chatHandler._getActiveConvView();
     if (convView)
-      convView.switchingAwayFromPanel();
+      convView.switchingAwayFromPanel(aHidden);
   },
-  observe: function(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     if (aTopic == "chat-core-initialized") {
       this.initAfterChatCore();
       return;
@@ -1024,14 +1025,14 @@ var chatHandler = {
       let acceptButton = {
         accessKey: bundle.getString("buddy.authRequest.allow.accesskey"),
         label: bundle.getString("buddy.authRequest.allow.label"),
-        callback: function() { aSubject.grant(); }
+        callback() { aSubject.grant(); },
       };
       let denyButton = {
         accessKey: bundle.getString("buddy.authRequest.deny.accesskey"),
         label: bundle.getString("buddy.authRequest.deny.label"),
-        callback: function() { aSubject.deny(); }
+        callback() { aSubject.deny(); },
       };
-      let box = document.getElementById("chatTabPanel");
+      let box = document.getElementById("chatNotificationBox");
       box.appendNotification(label, value, null, box.PRIORITY_INFO_HIGH,
                             [acceptButton, denyButton]);
       if (!gChatTab) {
@@ -1044,15 +1045,13 @@ var chatHandler = {
       aSubject.QueryInterface(Ci.prplIBuddyRequest);
       let value =
         "buddy-auth-request-" + aSubject.account.id + aSubject.userName;
-      let notification =
-        document.getElementById("chatTabPanel")
-                .getNotificationWithValue(value);
+      let box = document.getElementById("chatNotificationBox");
+      let notification = box.getNotificationWithValue(value);
       if (notification)
         notification.close();
-      return;
     }
   },
-  initAfterChatCore: function() {
+  initAfterChatCore() {
     let onGroup = document.getElementById("onlinecontactsGroup");
     let offGroup = document.getElementById("offlinecontactsGroup");
 
@@ -1069,18 +1068,18 @@ var chatHandler = {
      "contact-signed-on", "contact-signed-off",
      "contact-added", "contact-removed", "contact-no-longer-dummy",
      "account-connected", "account-disconnected",
-     "account-added","account-removed"
+     "account-added", "account-removed",
     ].forEach(chatHandler._addObserver);
 
     chatHandler._updateNoConvPlaceHolder();
     statusSelector.init();
   },
   _observedTopics: [],
-  _addObserver: function(aTopic) {
+  _addObserver(aTopic) {
     imServices.obs.addObserver(chatHandler, aTopic);
     chatHandler._observedTopics.push(aTopic);
   },
-  _removeObservers: function() {
+  _removeObservers() {
     for (let topic of this._observedTopics)
       imServices.obs.removeObserver(this, topic);
   },
@@ -1088,7 +1087,7 @@ var chatHandler = {
   _getNextUnreadConversation(aConversations, aCurrent, aReverse) {
     let convCount = aConversations.length;
     if (!convCount)
-      return;
+      return -1;
 
     let direction = aReverse ? -1 : 1;
     let next = (i) => {
@@ -1130,7 +1129,7 @@ var chatHandler = {
     if (newIndex !== -1)
       aList.selectedItem = conversations[newIndex];
   },
-  init: function() {
+  init() {
     Notifications.init();
     if (!Services.prefs.getBoolPref("mail.chat.enabled")) {
       ["button-chat", "menu_goChat", "goChatSeparator",
@@ -1190,13 +1189,13 @@ var chatHandler = {
       (a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase());
 
     ChromeUtils.import("resource:///modules/chatHandler.jsm", this);
-    if (this.ChatCore.initialized)
+    if (this.ChatCore.initialized) {
       this.initAfterChatCore();
-    else {
+    } else {
       this.ChatCore.init();
       this._addObserver("chat-core-initialized");
     }
-  }
+  },
 };
 
 function chatLogTreeGroupItem(aTitle, aLogItems) {
@@ -1207,13 +1206,13 @@ function chatLogTreeGroupItem(aTitle, aLogItems) {
   this._open = false;
 }
 chatLogTreeGroupItem.prototype = {
-  getText: function() { return this._title; },
+  getText() { return this._title; },
   get id() { return this._title; },
   get open() { return this._open; },
   get level() { return 0; },
   get _parent() { return null; },
   get children() { return this._children; },
-  getProperties: function() { return ""; }
+  getProperties() { return ""; },
 };
 
 function chatLogTreeLogItem(aLog, aText, aLevel) {
@@ -1222,12 +1221,12 @@ function chatLogTreeLogItem(aLog, aText, aLevel) {
   this._level = aLevel;
 }
 chatLogTreeLogItem.prototype = {
-  getText: function() { return this._text; },
+  getText() { return this._text; },
   get id() { return this.log.title; },
   get open() { return false; },
   get level() { return this._level; },
   get children() { return []; },
-  getProperties: function() { return ""; }
+  getProperties() { return ""; },
 };
 
 function chatLogTreeView(aTree, aLogs) {
@@ -1239,7 +1238,7 @@ function chatLogTreeView(aTree, aLogs) {
 chatLogTreeView.prototype = {
   __proto__: new PROTO_TREE_VIEW(),
 
-  _rebuild: function cLTV__rebuild() {
+  _rebuild() {
     // Some date helpers...
     const kDayInMsecs = 24 * 60 * 60 * 1000;
     const kWeekInMsecs = 7 * kDayInMsecs;
@@ -1254,16 +1253,16 @@ chatLogTreeView.prototype = {
     let chatBundle = document.getElementById("chatBundle");
     let dateFormatBundle = document.getElementById("bundle_dateformat");
     let placesBundle = document.getElementById("bundle_places");
+    const dateFormatter = new Services.intl.DateTimeFormat(undefined, {
+      dateStyle: "short",
+    });
     let formatDate = function(aDate) {
-      const dateFormatter = new Services.intl.DateTimeFormat(undefined, {
-        dateStyle: "short"
-      });
       return dateFormatter.format(aDate);
     };
+    const dateTimeFormatter = new Services.intl.DateTimeFormat(undefined, {
+      dateStyle: "short", timeStyle: "short",
+    });
     let formatDateTime = function(aDate) {
-      const dateTimeFormatter = new Services.intl.DateTimeFormat(undefined, {
-        dateStyle: "short", timeStyle: "short"
-      });
       return dateTimeFormatter.format(aDate);
     };
     let formatMonthYear = function(aDate) {
@@ -1287,7 +1286,7 @@ chatLogTreeView.prototype = {
       previousWeek: [],
       currentWeek: [],
       yesterday: [],
-      today: []
+      today: [],
     };
 
     // today and yesterday are treated differently, because for JSON logs they
@@ -1310,23 +1309,20 @@ chatLogTreeView.prototype = {
           continue;
         }
         group = firstgroups.today;
-      }
-      else if (timeFromToday <= kDayInMsecs) {
+      } else if (timeFromToday <= kDayInMsecs) {
         if (isJSON) {
           yesterday = new chatLogTreeLogItem(log, chatBundle.getString("log.yesterday"), 0);
           continue;
         }
         group = firstgroups.yesterday;
-      }
-      // Note that the 7 days of the current week include today.
-      else if (timeFromToday <= kWeekInMsecs - kDayInMsecs) {
+      } else if (timeFromToday <= kWeekInMsecs - kDayInMsecs) {
+        // Note that the 7 days of the current week include today.
         group = firstgroups.currentWeek;
         if (isJSON)
           title = formatWeekday(logDate);
-      }
-      else if (timeFromToday <= kTwoWeeksInMsecs - kDayInMsecs)
+      } else if (timeFromToday <= kTwoWeeksInMsecs - kDayInMsecs) {
         group = firstgroups.previousWeek;
-      else {
+      } else {
         logDate.setHours(0);
         logDate.setMinutes(0);
         logDate.setSeconds(0);
@@ -1339,12 +1335,12 @@ chatLogTreeView.prototype = {
               groupname = placesBundle.getString("finduri-AgeInMonths-is-0");
             else
               groupname = formatMonth(logDate);
-          }
-          else
+          } else {
             groupname = formatMonthYear(logDate);
+          }
           groups[groupID] = {
             entries: [],
-            name: groupname
+            name: groupname,
           };
         }
         group = groups[groupID].entries;
@@ -1362,7 +1358,7 @@ chatLogTreeView.prototype = {
       groupIDs.unshift(groupID);
       groups[groupID] = {
         entries: firstgroups[groupID],
-        name: chatBundle.getString("log." + groupID)
+        name: chatBundle.getString("log." + groupID),
       };
     }
 
@@ -1371,7 +1367,7 @@ chatLogTreeView.prototype = {
       this._rowMap.push(today);
     if (yesterday)
       this._rowMap.push(yesterday);
-    groupIDs.forEach(function (aGroupID) {
+    groupIDs.forEach(function(aGroupID) {
       let group = groups[aGroupID];
       group.entries.sort((l1, l2) => l2.log.time - l1.log.time);
       this._rowMap.push(new chatLogTreeGroupItem(group.name, group.entries));
@@ -1380,7 +1376,7 @@ chatLogTreeView.prototype = {
     // Finally, notify the tree.
     if (this._tree)
       this._tree.rowCountChanged(0, this._rowMap.length);
-  }
+  },
 };
 
 window.addEventListener("load", chatHandler.init.bind(chatHandler));

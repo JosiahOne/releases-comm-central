@@ -9,13 +9,10 @@
 #include "nsCOMPtr.h"
 #include "nsString.h"
 #include "nsIMsgIncomingServer.h"
-#include "nsITreeBoxObject.h"
+#include "mozilla/dom/XULTreeElement.h"
 #include "nsITreeSelection.h"
 #include "nsITreeView.h"
 #include "nsISubscribableServer.h"
-#include "nsIRDFService.h"
-#include "nsSubscribeDataSource.h"
-#include "nsIRDFResource.h"
 #include "nsTArray.h"
 
 /**
@@ -62,34 +59,20 @@ private:
   nsresult ConvertNameToUnichar(const char *inStr, char16_t **outStr);
   nsCOMPtr <nsISubscribeListener> mSubscribeListener;
   nsCString mIncomingServerUri;
-  nsCOMPtr <nsISubscribeDataSource> mSubscribeDS;
   char mDelimiter;
   bool mShowFullName;
   bool mStopped;
   nsCString mServerType;
 
-  nsCOMPtr <nsIRDFResource>      kNC_Child;
-  nsCOMPtr <nsIRDFResource>      kNC_Subscribed;
-  nsCOMPtr <nsIRDFLiteral>       kTrueLiteral;
-  nsCOMPtr <nsIRDFLiteral>       kFalseLiteral;
-
-  nsCOMPtr <nsIRDFService>       mRDFService;
-
   SubscribeTreeNode *mTreeRoot;          // root of the folder tree while items are discovered on the server
   nsTArray<SubscribeTreeNode*> mRowMap;  // array of nodes representing the rows for the tree element
   nsCOMPtr<nsITreeSelection> mSelection;
-  nsCOMPtr<nsITreeBoxObject> mTree;
+  RefPtr<mozilla::dom::XULTreeElement> mTree;
   nsresult FreeSubtree(SubscribeTreeNode *node);
   nsresult FreeRows();
   nsresult CreateNode(SubscribeTreeNode *parent, const char *name, const nsACString &aPath, SubscribeTreeNode **result);
   nsresult AddChildNode(SubscribeTreeNode *parent, const char *name, const nsACString &aPath, SubscribeTreeNode **child);
   nsresult FindAndCreateNode(const nsACString &aPath, SubscribeTreeNode **aResult);
-  nsresult NotifyAssert(SubscribeTreeNode *subjectNode, nsIRDFResource *property, SubscribeTreeNode *objectNode);
-  nsresult NotifyChange(SubscribeTreeNode *subjectNode, nsIRDFResource *property, bool value);
-  nsresult Notify(nsIRDFResource *subject, nsIRDFResource *property, nsIRDFNode *object, bool isAssert, bool isChange);
-  void BuildURIFromNode(SubscribeTreeNode *node, nsACString &uri);
-  nsresult EnsureSubscribeDS();
-  nsresult EnsureRDFService();
 
   int32_t GetRow(SubscribeTreeNode *node, bool *open);
   int32_t AddSubtree(SubscribeTreeNode *node, int32_t index);

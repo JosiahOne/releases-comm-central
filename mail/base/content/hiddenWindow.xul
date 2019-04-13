@@ -28,16 +28,16 @@
 %quickFilterBarDTD;
 <!ENTITY % msgViewPickerDTD SYSTEM "chrome://messenger/locale/msgViewPickerOverlay.dtd" >
 %msgViewPickerDTD;
+<!ENTITY % msgHdrViewOverlayDTD SYSTEM "chrome://messenger/locale/msgHdrViewOverlay.dtd">
+%msgHdrViewOverlayDTD;
 ]>
 
 <window id="hidden-window"
-     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-     xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-     onload="hiddenWindowStartup();">
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
+        onload="hiddenWindowStartup();">
 
 <script type="application/javascript" src="chrome://global/content/globalOverlay.js"/>
 <script type="application/javascript" src="chrome://messenger/content/commandglue.js"/>
-<script type="application/javascript" src="chrome://messenger/content/shareglue.js"/>
 <script type="application/javascript" src="chrome://messenger/content/mailWindow.js"/>
 <script type="application/javascript" src="chrome://messenger/content/msgMail3PaneWindow.js"/>
 <script type="application/javascript" src="chrome://messenger/content/mail3PaneWindowCommands.js"/>
@@ -53,7 +53,6 @@
 <script type="application/javascript" src="chrome://messenger/content/mail-offline.js"/>
 <script type="application/javascript" src="chrome://global/content/printUtils.js"/>
 <script type="application/javascript" src="chrome://messenger/content/msgViewPickerOverlay.js"/>
-<script type="application/javascript" src="chrome://messenger/content/plugins.js"/>
 <script type="application/javascript" src="chrome://global/content/viewZoomOverlay.js"/>
 <script type="application/javascript" src="chrome://communicator/content/utilityOverlay.js"/>
 <script type="application/javascript" src="chrome://messenger/content/mailCore.js"/>
@@ -75,7 +74,7 @@
 
   <!-- keys are appended from the overlay -->
 <keyset id="mailKeys">
-#include mainKeySet.inc
+#include mainKeySet.inc.xul
   <keyset id="tasksKeys">
     <key id="key_newMessage" key="&newMessageCmd.key;" command="cmd_newMessage"
          modifiers="accel,shift"/>
@@ -85,7 +84,7 @@
 </keyset>
 
 <commandset id="mailCommands">
-#include mainCommandSet.inc
+#include mainCommandSet.inc.xul
   <commandset id="mailSearchMenuItems"/>
   <commandset id="globalEditMenuItems"
               commandupdater="true"
@@ -110,9 +109,9 @@
        on a platform that wants to leave the app running, like the Mac.
   -->
 
-#include mainNavigationToolbox.inc
+#include mainNavigationToolbox.inc.xul
   </toolbox>
-#include mainMailToolbox.inc
+#include mainMailToolbox.inc.xul
 
 <browser id="hiddenBrowser" disablehistory="true"/>
 

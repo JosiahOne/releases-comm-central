@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm");
+var { fixIterator } = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var { Services } = ChromeUtils.import("resource:///modules/imServices.jsm");
 
 var addBuddy = {
-  onload: function ab_onload() {
+  onload() {
     let accountList = document.getElementById("accountlist");
     for (let acc of fixIterator(Services.accounts.getAccounts())) {
       if (!acc.connected)
@@ -18,21 +18,23 @@ var addBuddy = {
     }
     if (!accountList.itemCount) {
       document.getElementById("addBuddyDialog").cancelDialog();
-      throw "No connected account!";
+      throw new Error("No connected account!");
     }
     accountList.selectedIndex = 0;
   },
 
-  oninput: function ab_oninput() {
+  oninput() {
     document.documentElement.getButton("accept").disabled =
       !addBuddy.getValue("name");
   },
 
-  getValue: function ab_getValue(aId) { return document.getElementById(aId).value; },
+  getValue(aId) { return document.getElementById(aId).value; },
 
-  create: function ab_create() {
+  create() {
     let account = Services.accounts.getAccountById(this.getValue("accountlist"));
     let group = document.getElementById("chatBundle").getString("defaultGroup");
     account.addBuddy(Services.tags.createTag(group), this.getValue("name"));
-  }
+  },
 };
+
+document.addEventListener("dialogaccept", addBuddy.create);

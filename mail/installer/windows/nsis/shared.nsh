@@ -19,6 +19,9 @@
   ; Win7 taskbar and start menu link maintenance
   Call FixShortcutAppModelIDs
 
+  ; Upgrade the copies of the MAPI DLL's
+  ${UpgradeMapiDLLs}
+
   ClearErrors
   WriteRegStr HKLM "Software\Mozilla" "${BrandShortName}InstallerTest" "Write Test"
   ${If} ${Errors}
@@ -358,6 +361,7 @@
   WriteRegStr ${RegKey} "$0" "" "${ClientsRegName}"
   WriteRegStr ${RegKey} "$0\DefaultIcon" "" "$8,0"
   WriteRegStr ${RegKey} "$0" "DLLPath" "$6"
+  WriteRegDWORD ${RegKey} "$0" "SupportUTF8" 0
 
   ; The MapiProxy dll can exist in multiple installs of the application.
   ; Registration occurs as follows with the last action to occur being the one

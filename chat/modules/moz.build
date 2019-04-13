@@ -9,19 +9,16 @@ EXTRA_JS_MODULES += [
     'ArrayBufferUtils.jsm',
     'BigInteger.jsm',
     'DNS.jsm',
+    'hiddenWindow.jsm',
     'imContentSink.jsm',
     'imServices.jsm',
     'imSmileys.jsm',
     'imStatusUtils.jsm',
+    'imTextboxUtils.jsm',
     'imThemes.jsm',
     'imXPCOMUtils.jsm',
     'jsProtoHelper.jsm',
     'NormalizedMap.jsm',
     'socket.jsm',
     'ToLocaleFormat.jsm',
-]
-
-EXTRA_PP_JS_MODULES += [
-    'hiddenWindow.jsm',
-    'imTextboxUtils.jsm',
 ]

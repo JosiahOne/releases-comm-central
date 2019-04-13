@@ -9,14 +9,15 @@
 
 // make SOLO_TEST=composition/test-draft-identity.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-draft-identity";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                        "compose-helpers", "notificationbox-helpers"];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gDrafts;
 var gAccount;

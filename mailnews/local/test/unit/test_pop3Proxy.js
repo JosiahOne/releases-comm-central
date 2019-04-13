@@ -2,8 +2,8 @@
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 // Test that POP3 over a proxy works.
 
-ChromeUtils.import("resource://testing-common/mailnews/NetworkTestUtils.jsm");
-ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+const {NetworkTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/NetworkTestUtils.jsm");
+const {PromiseTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 const PORT = 110;
 
@@ -47,7 +47,3 @@ add_task(async function cleanUp() {
   incomingServer.closeCachedConnections();
   server.stop();
 });
-
-function run_test() {
-  run_next_test();
-}

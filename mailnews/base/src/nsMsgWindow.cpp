@@ -33,8 +33,9 @@
 #include "nsServiceManagerUtils.h"
 #include "nsIAuthPrompt.h"
 #include "nsMsgUtils.h"
-
-static NS_DEFINE_CID(kTransactionManagerCID, NS_TRANSACTIONMANAGER_CID);
+#include "mozilla/TransactionManager.h"
+#include "mozilla/dom/LoadURIOptionsBinding.h"
+#include "mozilla/Components.h"
 
 NS_IMPL_ISUPPORTS(nsMsgWindow,
                               nsIMsgWindow,
@@ -57,17 +58,15 @@ nsresult nsMsgWindow::Init()
 {
   // register ourselves as a content listener with the uri dispatcher service
   nsresult rv;
-  nsCOMPtr<nsIURILoader> dispatcher =
-           do_GetService(NS_URI_LOADER_CONTRACTID, &rv);
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIURILoader> dispatcher = mozilla::components::URILoader::Service();
+  NS_ENSURE_TRUE(dispatcher, NS_ERROR_UNEXPECTED);
 
   rv = dispatcher->RegisterContentListener(this);
   if (NS_FAILED(rv))
     return rv;
 
   // create Undo/Redo Transaction Manager
-  mTransactionManager = do_CreateInstance(kTransactionManagerCID, &rv);
-  NS_ENSURE_SUCCESS(rv, rv);
+  mTransactionManager = new mozilla::TransactionManager();
   return mTransactionManager->SetMaxTransactionCount(-1);
 }
 
@@ -98,10 +97,9 @@ NS_IMETHODIMP nsMsgWindow::GetMessageWindowDocShell(nsIDocShell ** aDocShell)
 
 NS_IMETHODIMP nsMsgWindow::CloseWindow()
 {
-  nsresult rv = NS_OK;
-  nsCOMPtr<nsIURILoader> dispatcher = do_GetService(NS_URI_LOADER_CONTRACTID, &rv);
+  nsCOMPtr<nsIURILoader> dispatcher = mozilla::components::URILoader::Service();
   if (dispatcher) // on shut down it's possible dispatcher will be null.
-    rv = dispatcher->UnRegisterContentListener(this);
+    dispatcher->UnRegisterContentListener(this);
 
   mMsgWindowCommands = nullptr;
   mStatusFeedback = nullptr;
@@ -337,7 +335,7 @@ NS_IMETHODIMP nsMsgWindow::SetDomWindow(mozIDOMWindowProxy * aWindow)
   if (win)
     docShell = win->GetDocShell();
 
-  nsCOMPtr<nsIDocShellTreeItem> docShellAsItem(do_QueryInterface(docShell));
+  nsCOMPtr<nsIDocShellTreeItem> docShellAsItem(docShell);
 
   if(docShellAsItem)
   {
@@ -495,7 +493,7 @@ NS_IMETHODIMP nsMsgWindow::SetPromptDialog(nsIPrompt* aPromptDialog)
 }
 
 NS_IMETHODIMP
-nsMsgWindow::DisplayURIInMessagePane(const char16_t *uri, bool clearMsgHdr, nsIPrincipal *principal)
+nsMsgWindow::DisplayURIInMessagePane(const nsAString& uri, bool clearMsgHdr, nsIPrincipal *principal)
 {
   if (clearMsgHdr && mMsgWindowCommands)
     mMsgWindowCommands->ClearMsgPane();
@@ -507,9 +505,9 @@ nsMsgWindow::DisplayURIInMessagePane(const char16_t *uri, bool clearMsgHdr, nsIP
   nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(docShell));
   NS_ENSURE_TRUE(webNav, NS_ERROR_FAILURE);
 
-  return webNav->LoadURI(uri, nsIWebNavigation::LOAD_FLAGS_NONE,
-                         nullptr, nullptr, nullptr,
-                         principal);
+  mozilla::dom::LoadURIOptions loadURIOptions;
+  loadURIOptions.mTriggeringPrincipal = principal;
+  return webNav->LoadURI(uri, loadURIOptions);
 }
 
 NS_IMETHODIMP
@@ -530,7 +528,7 @@ nsMsgWindow::DisplayHTMLInMessagePane(const nsAString& title, const nsAString& b
 
   PR_FREEIF(encodedHtml);
 
-  return DisplayURIInMessagePane(NS_ConvertASCIItoUTF16(dataSpec).get(),
+  return DisplayURIInMessagePane(NS_ConvertASCIItoUTF16(dataSpec),
                                  clearMsgHdr, nsContentUtils::GetSystemPrincipal());
 }
 

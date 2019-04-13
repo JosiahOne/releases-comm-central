@@ -20,7 +20,7 @@
 #include "nsIDocShellTreeItem.h"
 #include "nsIWebNavigation.h"
 #include "nsContentPolicyUtils.h"
-#include "nsIFrameLoaderOwner.h"
+#include "nsFrameLoaderOwner.h"
 #include "nsFrameLoader.h"
 #include "nsIWebProgress.h"
 #include "nsMsgUtils.h"
@@ -30,6 +30,7 @@
 #include "nsINntpUrl.h"
 #include "nsILoadInfo.h"
 #include "nsSandboxFlags.h"
+#include "nsQueryObject.h"
 
 static const char kBlockRemoteImages[] = "mailnews.message_display.disable_remote_image";
 static const char kTrustedDomains[] =  "mail.trusteddomains";
@@ -117,7 +118,7 @@ nsMsgContentPolicy::ShouldAcceptRemoteContentForSender(nsIMsgDBHdr *aMsgHdr)
 
   // check with permission manager
   uint32_t permission = 0;
-  rv = mPermissionManager->TestPermission(mailURI, "image", &permission);
+  rv = mPermissionManager->TestPermission(mailURI, NS_LITERAL_CSTRING("image"), &permission);
   NS_ENSURE_SUCCESS(rv, false);
 
   // Only return true if the permission manager has an explicit allow
@@ -189,10 +190,8 @@ nsMsgContentPolicy::ShouldLoad(nsIURI           *aContentLocation,
                                  getter_AddRefs(rootDocShell));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  uint32_t appType;
-  rv = rootDocShell->GetAppType(&appType);
   // We only want to deal with mailnews
-  if (NS_FAILED(rv) || appType != nsIDocShell::APP_TYPE_MAIL)
+  if (rootDocShell->GetAppType() != nsIDocShell::APP_TYPE_MAIL)
     return NS_OK;
 #endif
 
@@ -267,15 +266,15 @@ nsMsgContentPolicy::ShouldLoad(nsIURI           *aContentLocation,
       // Mail message (mailbox, imap or JsAccount) content requested, for example
       // a message part, like an image:
       // To load mail message content the requester must have the same
-      // "normalised" principal. This is basically a "same origin" test, it
+      // "normalized" principal. This is basically a "same origin" test, it
       // protects against cross-loading of mail message content from
       // other mail or news messages.
       nsCOMPtr<nsIMsgMessageUrl> requestURL(do_QueryInterface(aRequestingLocation));
       // If the request URL is not also a message URL, then we don't accept.
       if (requestURL) {
         nsCString contentPrincipalSpec, requestPrincipalSpec;
-        nsresult rv1 = contentURL->GetPrincipalSpec(contentPrincipalSpec);
-        nsresult rv2 = requestURL->GetPrincipalSpec(requestPrincipalSpec);
+        nsresult rv1 = contentURL->GetNormalizedSpec(contentPrincipalSpec);
+        nsresult rv2 = requestURL->GetNormalizedSpec(requestPrincipalSpec);
         if (NS_SUCCEEDED(rv1) && NS_SUCCEEDED(rv2) &&
             contentPrincipalSpec.Equals(requestPrincipalSpec))
           *aDecision = nsIContentPolicy::ACCEPT; // (1)
@@ -377,7 +376,7 @@ nsMsgContentPolicy::ShouldLoad(nsIURI           *aContentLocation,
   }
 
   uint32_t permission;
-  mPermissionManager->TestPermission(aContentLocation, "image", &permission);
+  mPermissionManager->TestPermission(aContentLocation, NS_LITERAL_CSTRING("image"), &permission);
   switch (permission) {
     case nsIPermissionManager::UNKNOWN_ACTION:
     {
@@ -771,7 +770,7 @@ void nsMsgContentPolicy::ComposeShouldLoad(nsIMsgCompose *aMsgCompose,
 
         // Test whitelist.
         uint32_t permission;
-        mPermissionManager->TestPermission(aContentLocation, "image", &permission);
+        mPermissionManager->TestPermission(aContentLocation, NS_LITERAL_CSTRING("image"), &permission);
         if (permission == nsIPermissionManager::ALLOW_ACTION)
           *aDecision = nsIContentPolicy::ACCEPT;
       }
@@ -786,8 +785,7 @@ already_AddRefed<nsIMsgCompose> nsMsgContentPolicy::GetMsgComposeForContext(nsIS
   nsIDocShell *shell = NS_CP_GetDocShellFromContext(aRequestingContext);
   if (!shell)
     return nullptr;
-  nsCOMPtr<nsIDocShellTreeItem> docShellTreeItem(do_QueryInterface(shell, &rv));
-  NS_ENSURE_SUCCESS(rv, nullptr);
+  nsCOMPtr<nsIDocShellTreeItem> docShellTreeItem(shell);
 
   nsCOMPtr<nsIDocShellTreeItem> rootItem;
   rv = docShellTreeItem->GetSameTypeRootTreeItem(getter_AddRefs(rootItem));
@@ -824,6 +822,7 @@ nsresult nsMsgContentPolicy::SetDisableItemsOnMailNewsUrlDocshells(
   nsresult rv;
   bool isAllowedContent = !ShouldBlockUnexposedProtocol(aContentLocation);
   nsCOMPtr<nsIMsgMessageUrl> msgUrl = do_QueryInterface(aContentLocation, &rv);
+  mozilla::Unused << msgUrl;
   if (NS_FAILED(rv) && !isAllowedContent) {
     // If it's not a mailnews url or allowed content url (http[s]|file) then
     // bail; otherwise set whether js and plugins are allowed.
@@ -832,9 +831,8 @@ nsresult nsMsgContentPolicy::SetDisableItemsOnMailNewsUrlDocshells(
 
   // since NS_CP_GetDocShellFromContext returns the containing docshell rather
   // than the contained one we need, we can't use that here, so...
-  nsCOMPtr<nsIFrameLoaderOwner> flOwner = do_QueryInterface(aRequestingContext,
-                                                            &rv);
-  NS_ENSURE_SUCCESS(rv, rv);
+  RefPtr<nsFrameLoaderOwner> flOwner = do_QueryObject(aRequestingContext);
+  NS_ENSURE_TRUE(flOwner, NS_ERROR_INVALID_POINTER);
 
   RefPtr<nsFrameLoader> frameLoader = flOwner->GetFrameLoader();
   NS_ENSURE_TRUE(frameLoader, NS_ERROR_INVALID_POINTER);
@@ -842,8 +840,7 @@ nsresult nsMsgContentPolicy::SetDisableItemsOnMailNewsUrlDocshells(
   nsCOMPtr<nsIDocShell> docShell = frameLoader->GetDocShell(mozilla::IgnoreErrors());
   NS_ENSURE_TRUE(docShell, NS_ERROR_INVALID_POINTER);
 
-  nsCOMPtr<nsIDocShellTreeItem> docshellTreeItem(do_QueryInterface(docShell, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIDocShellTreeItem> docshellTreeItem(docShell);
 
   // what sort of docshell is this?
   int32_t itemType;
@@ -861,8 +858,6 @@ nsresult nsMsgContentPolicy::SetDisableItemsOnMailNewsUrlDocshells(
     NS_ENSURE_SUCCESS(rv, rv);
     rv = docShell->SetAllowContentRetargetingOnChildren(false);
     NS_ENSURE_SUCCESS(rv, rv);
-    rv = docShell->SetAllowPlugins(false);
-    NS_ENSURE_SUCCESS(rv, rv);
 
     uint32_t sandboxFlags;
     rv = docShell->GetSandboxFlags(&sandboxFlags);
@@ -872,14 +867,15 @@ nsresult nsMsgContentPolicy::SetDisableItemsOnMailNewsUrlDocshells(
     NS_ENSURE_SUCCESS(rv, rv);
   }
   else {
-    // JavaScript and plugins are allowed on non-message URLs.
+    // JavaScript is allowed on non-message URLs.
     rv = docShell->SetAllowJavascript(true);
     NS_ENSURE_SUCCESS(rv, rv);
     rv = docShell->SetAllowContentRetargetingOnChildren(true);
     NS_ENSURE_SUCCESS(rv, rv);
-    rv = docShell->SetAllowPlugins(true);
-    NS_ENSURE_SUCCESS(rv, rv);
   }
+
+  rv = docShell->SetAllowPlugins(false);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   return NS_OK;
 }
@@ -895,8 +891,8 @@ nsMsgContentPolicy::GetRootDocShellForContext(nsISupports *aRequestingContext,
   nsresult rv;
 
   nsIDocShell *shell = NS_CP_GetDocShellFromContext(aRequestingContext);
-  nsCOMPtr<nsIDocShellTreeItem> docshellTreeItem(do_QueryInterface(shell, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
+  NS_ENSURE_TRUE(shell, NS_ERROR_NULL_POINTER);
+  nsCOMPtr<nsIDocShellTreeItem> docshellTreeItem(shell);
 
   nsCOMPtr<nsIDocShellTreeItem> rootItem;
   rv = docshellTreeItem->GetRootTreeItem(getter_AddRefs(rootItem));
@@ -925,8 +921,7 @@ nsMsgContentPolicy::GetOriginatingURIForContext(nsISupports *aRequestingContext,
     *aURI = nullptr;
     return NS_OK;
   }
-  nsCOMPtr<nsIDocShellTreeItem> docshellTreeItem(do_QueryInterface(shell, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIDocShellTreeItem> docshellTreeItem(shell);
 
   nsCOMPtr<nsIDocShellTreeItem> rootItem;
   rv = docshellTreeItem->GetSameTypeRootTreeItem(getter_AddRefs(rootItem));
@@ -1023,26 +1018,23 @@ nsMsgContentPolicy::OnLocationChange(nsIWebProgress *aWebProgress,
 #endif
 
   nsCOMPtr<nsIMsgMessageUrl> messageUrl = do_QueryInterface(aLocation, &rv);
-
+  mozilla::Unused << messageUrl;
   if (NS_SUCCEEDED(rv)) {
     // Disable javascript on message URLs.
     rv = docShell->SetAllowJavascript(false);
     NS_ASSERTION(NS_SUCCEEDED(rv),
                  "Failed to set javascript disabled on docShell");
-    // Also disable plugins if the preference requires it.
-    rv = docShell->SetAllowPlugins(false);
-    NS_ASSERTION(NS_SUCCEEDED(rv),
-                 "Failed to set plugins disabled on docShell");
   }
   else {
-    // Disable javascript and plugins are allowed on non-message URLs.
+    // Javascript is allowed on non-message URLs. Plugins are not.
     rv = docShell->SetAllowJavascript(true);
     NS_ASSERTION(NS_SUCCEEDED(rv),
                  "Failed to set javascript allowed on docShell");
-    rv = docShell->SetAllowPlugins(true);
-    NS_ASSERTION(NS_SUCCEEDED(rv),
-                 "Failed to set plugins allowed on docShell");
   }
+
+  rv = docShell->SetAllowPlugins(false);
+  NS_ASSERTION(NS_SUCCEEDED(rv),
+               "Failed to set plugins disabled on docShell");
 
   return NS_OK;
 }
@@ -1058,6 +1050,13 @@ nsMsgContentPolicy::OnStatusChange(nsIWebProgress *aWebProgress,
 NS_IMETHODIMP
 nsMsgContentPolicy::OnSecurityChange(nsIWebProgress *aWebProgress,
                                      nsIRequest *aRequest, uint32_t aState)
+{
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMsgContentPolicy::OnContentBlockingEvent(nsIWebProgress *aWebProgress,
+                                           nsIRequest *aRequest, uint32_t aEvent)
 {
   return NS_OK;
 }

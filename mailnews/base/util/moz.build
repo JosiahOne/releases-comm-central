@@ -58,7 +58,7 @@ EXTRA_JS_MODULES += [
     'jsTreeSelection.js',
     'JXON.js',
     'mailnewsMigrator.js',
-    'mailServices.js',
+    'MailServices.jsm',
     'mailstoreConverter.jsm',
     'msgDBCacheManager.js',
     'OAuth2.jsm',
@@ -69,6 +69,9 @@ EXTRA_JS_MODULES += [
 ]
 
 LOCAL_INCLUDES += [
+  '/%s/extensions/universalchardet/src/base' % CONFIG['mozreltopsrcdir'],
+  '/%s/extensions/universalchardet/src/xpcom' % CONFIG['mozreltopsrcdir'],
+  '/%s/intl/chardet' % CONFIG['mozreltopsrcdir'],
   '/%s/netwerk/base' % CONFIG['mozreltopsrcdir']
 ]
 

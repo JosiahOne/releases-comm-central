@@ -2,8 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calExtract.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { Extractor } = ChromeUtils.import("resource://calendar/modules/calExtract.jsm");
 
 var extractor = new Extractor("en-US", 8);
 
@@ -181,7 +180,7 @@ function test_overrides() {
         "from.tomorrow": { add: "worromot" }
     };
 
-    Preferences.set("calendar.patterns.override", JSON.stringify(overrides));
+    Services.prefs.setStringPref("calendar.patterns.override", JSON.stringify(overrides));
 
     collected = extractor.extract(title, content, date, undefined);
     guessed = extractor.guessStart(false);

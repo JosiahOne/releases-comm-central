@@ -9,13 +9,12 @@
 
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/am-archiveoptions.dtd" >
 
-<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         id="archive-options"
         title="&dialogTitle.label;"
         width="350" height="350"
         persist="width height"
-        onload="onLoadArchiveOptions();"
-        ondialogaccept="onAcceptArchiveOptions();">
+        onload="onLoadArchiveOptions();">
 
   <script type="application/javascript" src="chrome://messenger/content/am-archiveoptions.js"/>
 
@@ -34,7 +33,7 @@
               accesskey="&keepFolderStructure.accesskey;"/>
 
     <groupbox flex="1">
-      <caption label="&archiveExample.label;"/>
+      <label class="header">&archiveExample.label;</label>
       <tree id="archiveTree" hidecolumnpicker="true" disabled="true" flex="1">
         <treecols>
           <treecol primary="true" hideheader="true" flex="1"

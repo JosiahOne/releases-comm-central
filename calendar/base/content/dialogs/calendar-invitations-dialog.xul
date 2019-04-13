@@ -16,12 +16,10 @@
   title="&calendar.invitations.dialog.invitations.text;"
   windowtype="Calendar:InvitationsDialog"
   buttons="accept,cancel"
-  ondialogaccept="return onAccept();"
-  ondialogcancel="return onCancel();"
   onload="return onLoad();"
   onunload="return onUnload();"
   persist="screenX screenY width height"
-  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <!-- Javascript includes -->
   <script type="application/javascript" src="chrome://calendar/content/calendar-invitations-dialog.js"/>
@@ -33,7 +31,7 @@
 
   <vbox id="dialog-box" flex="1">
     <stack flex="1">
-      <calendar-invitations-richlistbox id="invitations-listbox" flex="1"/>
+      <richlistbox id="invitations-listbox" flex="1"/>
       <hbox id="updating-box" align="center" pack="center" hidden="true">
         <label value="&calendar.invitations.dialog.statusmessage.updating.text;"
                crop="end"/>

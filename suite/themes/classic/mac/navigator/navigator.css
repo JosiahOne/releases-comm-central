@@ -254,6 +254,10 @@ toolbar[mode="text"] > #window-controls > toolbarbutton > .toolbarbutton-icon {
   list-style-image: url("chrome://communicator/skin/icons/geolocation-64.png");
 }
 
+.popup-notification-icon[popupid="persistent-storage"] {
+  list-style-image: url("chrome://communicator/skin/icons/notification-icons.svg#persistent-storage");
+}
+
 .popup-notification-icon[popupid="web-notifications"] {
   list-style-image: url("chrome://communicator/skin/icons/notification-64.png");
 }
@@ -1016,4 +1020,12 @@ toolbar[mode="text"] toolbarbutton.chevron > .toolbarbutton-icon {
 
 #feedsButton[open="true"] {
   -moz-image-region: rect(48px 32px 64px 16px) !important;
+}
+
+/* Need to set fixed width to stop the zoom display from changing size and moving around the zoom buttons */
+#zoomLevel-display {
+  width: 60px;
+  max-width: 60px;
+  margin-left: 0px;
+  margin-right: 0px;
 }

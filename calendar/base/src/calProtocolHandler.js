@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
  * Generic webcal constructor
@@ -20,32 +20,26 @@ calProtocolHandler.prototype = {
     get protocolFlags() { return this.mHttpProtocol.protocolFlags; },
 
     newURI: function(aSpec, anOriginalCharset, aBaseURI) {
-        return Components.classes["@mozilla.org/network/standard-url-mutator;1"]
-                         .createInstance(Components.interfaces.nsIStandardURLMutator)
-                         .init(Components.interfaces.nsIStandardURL.URLTYPE_STANDARD,
-                               this.mHttpProtocol.defaultPort,
-                               aSpec, anOriginalCharset, aBaseURI)
-                         .finalize()
-                         .QueryInterface(Components.interfaces.nsIStandardURL);
+        return Cc["@mozilla.org/network/standard-url-mutator;1"]
+            .createInstance(Ci.nsIStandardURLMutator)
+            .init(Ci.nsIStandardURL.URLTYPE_STANDARD, this.mHttpProtocol.defaultPort, aSpec, anOriginalCharset, aBaseURI)
+            .finalize()
+            .QueryInterface(Ci.nsIStandardURL);
     },
 
-    newChannel: function(aUri) {
-        return this.newChannel2(aUri, null);
-    },
-
-    newChannel2: function(aUri, aLoadInfo) {
+    newChannel: function(aUri, aLoadInfo) {
         let uri = aUri.mutate().setScheme(this.mHttpProtocol.scheme).finalize();
 
         let channel;
         if (aLoadInfo) {
             channel = Services.io.newChannelFromURIWithLoadInfo(uri, aLoadInfo);
         } else {
-            channel = Services.io.newChannelFromURI2(uri,
-                                                     null,
-                                                     Services.scriptSecurityManager.getSystemPrincipal(),
-                                                     null,
-                                                     Components.interfaces.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                                     Components.interfaces.nsIContentPolicy.TYPE_OTHER);
+            channel = Services.io.newChannelFromURI(uri,
+                                                    null,
+                                                    Services.scriptSecurityManager.getSystemPrincipal(),
+                                                    null,
+                                                    Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                                    Ci.nsIContentPolicy.TYPE_OTHER);
         }
         channel.originalURI = aUri;
         return channel;
@@ -66,7 +60,7 @@ calProtocolHandlerWebcal.prototype = {
     classID: Components.ID("{1153c73a-39be-46aa-9ba9-656d188865ca}"),
 };
 
-/** Constructor for webcals: protocl handler */
+/** Constructor for webcals: protocol handler */
 function calProtocolHandlerWebcals() {
     calProtocolHandler.call(this, "webcals");
 }

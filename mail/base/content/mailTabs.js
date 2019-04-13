@@ -2,9 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/MsgHdrSyntheticView.js");
-ChromeUtils.import("resource:///modules/errUtils.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+/* import-globals-from commandglue.js */
+/* import-globals-from mail3PaneWindowCommands.js */
+/* import-globals-from mailContextMenus.js */
+/* import-globals-from mailWindow.js */
+/* import-globals-from mailWindowOverlay.js */
+/* import-globals-from messageDisplay.js */
+/* import-globals-from msgMail3PaneWindow.js */
+
+var {MsgHdrSyntheticView} = ChromeUtils.import("resource:///modules/MsgHdrSyntheticView.jsm");
+var { logException } = ChromeUtils.import("resource:///modules/errUtils.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var { getSpecialFolderString } = ChromeUtils.import("resource:///modules/folderUtils.jsm");
+var { MsgHdrToMimeMessage } = ChromeUtils.import("resource:///modules/gloda/mimemsg.js");
 
 /**
  * Displays message "folder"s, mail "message"s, and "glodaList" results.  The
@@ -51,31 +62,22 @@ var mailTabType = {
     folder: {
       isDefault: true,
       type: "folder",
-      /// The set of panes that are legal to be displayed in this mode
+      // The set of panes that are legal to be displayed in this mode
       legalPanes: {
         folder: true,
         thread: true,
-        message: true
+        message: true,
       },
-      /// The set of panes that are legal when we are showing account central
+      // The set of panes that are legal when we are showing account central
       accountCentralLegalPanes: {
         folder: true,
         accountCentral: true,
-        message: false
+        message: false,
       },
-      openFirstTab: function(aTab) {
+      openFirstTab(aTab) {
         this.openTab(aTab, true, new MessagePaneDisplayWidget(), true);
         // persistence and restoreTab wants to know if we are the magic first tab
         aTab.firstTab = true;
-        // Inherit the search mode from a window
-        let windowToInheritFrom = null;
-        if (window.opener &&
-            (window.opener.document.documentElement.getAttribute("windowtype") ==
-             "mail:3pane"))
-          windowToInheritFrom = window.opener;
-        else
-          windowToInheritFrom = FindOther3PaneWindow();
-
         aTab.folderDisplay.makeActive();
       },
       /**
@@ -91,7 +93,7 @@ var mailTabType = {
        *            filters to select the message. This has no effect if
        *            aArgs.msgHdr isn't specified. Defaults to false.
        */
-      openTab: function(aTab, aArgs) {
+      openTab(aTab, aArgs) {
         // persistence and restoreTab wants to know if we are the magic first tab
         aTab.firstTab = false;
 
@@ -163,7 +165,7 @@ var mailTabType = {
 
         aTab.mode.onTitleChanged.call(this, aTab, aTab.tabNode);
       },
-      persistTab: function(aTab) {
+      persistTab(aTab) {
         try {
           if (!aTab.folderDisplay.displayedFolder)
             return null;
@@ -173,7 +175,7 @@ var mailTabType = {
             // whether the box is collapsed
             folderPaneVisible: aTab.folderDisplay.folderPaneVisible,
             messagePaneVisible: aTab.messageDisplay.visible,
-            firstTab: aTab.firstTab
+            firstTab: aTab.firstTab,
           };
           return retval;
         } catch (e) {
@@ -181,74 +183,70 @@ var mailTabType = {
           return null;
         }
       },
-      restoreTab: function(aTabmail, aPersistedState) {
-      try {
-        let rdfService = Cc['@mozilla.org/rdf/rdf-service;1']
-                           .getService(Ci.nsIRDFService);
-        let folder = rdfService.GetResource(aPersistedState.folderURI)
-                       .QueryInterface(Ci.nsIMsgFolder);
-        // if the folder no longer exists, we can't restore the tab
-        if (folder) {
-          let folderPaneVisible = ("folderPaneVisible" in aPersistedState) ?
-                                    aPersistedState.folderPaneVisible :
-                                    true;
-          // If we are talking about the first tab, it already exists and we
-          //  should poke it.  We are assuming it is the currently displayed
-          //  tab because we are privvy to the implementation details and know
-          //  it to be true.
-          if (aPersistedState.firstTab) {
-            // Poke the folder pane box and splitter
-            document.getElementById("folderPaneBox").collapsed =
-              !folderPaneVisible;
-            document.getElementById("folderpane_splitter").setAttribute("state",
-              (folderPaneVisible ? "open" : "collapsed"));
+      restoreTab(aTabmail, aPersistedState) {
+        try {
+          let folder = MailUtils.getExistingFolder(aPersistedState.folderURI);
+          // if the folder no longer exists, we can't restore the tab
+          if (folder) {
+            let folderPaneVisible = ("folderPaneVisible" in aPersistedState) ?
+                                      aPersistedState.folderPaneVisible :
+                                      true;
+            // If we are talking about the first tab, it already exists and we
+            //  should poke it.  We are assuming it is the currently displayed
+            //  tab because we are privvy to the implementation details and know
+            //  it to be true.
+            if (aPersistedState.firstTab) {
+              // Poke the folder pane box and splitter
+              document.getElementById("folderPaneBox").collapsed =
+                !folderPaneVisible;
+              document.getElementById("folderpane_splitter").setAttribute("state",
+                (folderPaneVisible ? "open" : "collapsed"));
 
-            if (gMessageDisplay.visible != aPersistedState.messagePaneVisible) {
-              MsgToggleMessagePane();
-              // For reasons that are not immediately obvious, sometimes the
-              //  message display is not active at this time.  In that case, we
-              //  need to explicitly set the _visible value because otherwise it
-              //  misses out on the toggle event.
-              if (!gMessageDisplay._active)
-                gMessageDisplay._visible = aPersistedState.messagePaneVisible;
-            }
-
-            if (!("dontRestoreFirstTab" in aPersistedState &&
-                  aPersistedState.dontRestoreFirstTab))
-              gFolderTreeView.selectFolder(folder);
-
-            // We need to manually trigger the tab monitor restore trigger
-            // for this tab.  In theory this should be in tabmail, but the
-            // special nature of the first tab will last exactly long as this
-            // implementation right here so it does not particularly matter
-            // and is a bit more honest, if ugly, to do it here.
-            let tabmail = document.getElementById("tabmail");
-            let restoreState = tabmail._restoringTabState;
-            let tab = tabmail.tabInfo[0];
-            for (let tabMonitor of tabmail.tabMonitors) {
-              if (("onTabRestored" in tabMonitor) &&
-                  (tabMonitor.monitorName in restoreState.ext)) {
-                tabMonitor.onTabRestored(tab,
-                                         restoreState.ext[tabMonitor.monitorName],
-                                         true);
+              if (gMessageDisplay.visible != aPersistedState.messagePaneVisible) {
+                MsgToggleMessagePane();
+                // For reasons that are not immediately obvious, sometimes the
+                //  message display is not active at this time.  In that case, we
+                //  need to explicitly set the _visible value because otherwise it
+                //  misses out on the toggle event.
+                if (!gMessageDisplay._active)
+                  gMessageDisplay._visible = aPersistedState.messagePaneVisible;
               }
+
+              if (!("dontRestoreFirstTab" in aPersistedState &&
+                    aPersistedState.dontRestoreFirstTab))
+                gFolderTreeView.selectFolder(folder);
+
+              // We need to manually trigger the tab monitor restore trigger
+              // for this tab.  In theory this should be in tabmail, but the
+              // special nature of the first tab will last exactly long as this
+              // implementation right here so it does not particularly matter
+              // and is a bit more honest, if ugly, to do it here.
+              let tabmail = document.getElementById("tabmail");
+              let restoreState = tabmail._restoringTabState;
+              let tab = tabmail.tabInfo[0];
+              for (let tabMonitor of tabmail.tabMonitors) {
+                if (("onTabRestored" in tabMonitor) &&
+                    (tabMonitor.monitorName in restoreState.ext)) {
+                  tabMonitor.onTabRestored(tab,
+                                           restoreState.ext[tabMonitor.monitorName],
+                                           true);
+                }
+              }
+            } else {
+              let tabArgs = {
+                folder,
+                folderPaneVisible,
+                messagePaneVisible: aPersistedState.messagePaneVisible,
+                background: true,
+              };
+              aTabmail.openTab("folder", tabArgs);
             }
           }
-          else {
-            let tabArgs = {
-              folder: folder,
-              folderPaneVisible: folderPaneVisible,
-              messagePaneVisible: aPersistedState.messagePaneVisible,
-              background: true
-            };
-            aTabmail.openTab("folder", tabArgs);
-          }
+        } catch (e) {
+          logException(e);
         }
-      } catch (e) {
-        logException(e);
-      }
       },
-      onTitleChanged: function(aTab, aTabNode) {
+      onTitleChanged(aTab, aTabNode) {
         if (!aTab.folderDisplay || !aTab.folderDisplay.displayedFolder) {
           // Don't show "undefined" as title when there is no account.
           aTab.title = " ";
@@ -263,12 +261,12 @@ var mailTabType = {
 
         // Update the appropriate attributes on the tab.
         let specialFolderStr = getSpecialFolderString(folder);
-        aTabNode.setAttribute('SpecialFolder', specialFolderStr);
-        aTabNode.setAttribute('ServerType', folder.server.type);
-        aTabNode.setAttribute('IsServer', folder.isServer);
-        aTabNode.setAttribute('IsSecure', folder.server.isSecure);
+        aTabNode.setAttribute("SpecialFolder", specialFolderStr);
+        aTabNode.setAttribute("ServerType", folder.server.type);
+        aTabNode.setAttribute("IsServer", folder.isServer);
+        aTabNode.setAttribute("IsSecure", folder.server.isSecure);
         let feedUrls = FeedUtils.getFeedUrlsInFolder(folder);
-        aTabNode.setAttribute("IsFeedFolder", feedUrls ? true : false);
+        aTabNode.setAttribute("IsFeedFolder", !!feedUrls);
 
         // Set the favicon for feed folders.
         aTabNode.removeAttribute("image");
@@ -300,13 +298,13 @@ var mailTabType = {
           FeedUtils.getFavicon(folder, null, favicon, window, callback);
         }
       },
-      getBrowser: function(aTab) {
+      getBrowser(aTab) {
         // If we are currently a thread summary, we want to select the multi
         // message browser rather than the message pane.
         return gMessageDisplay.singleMessageDisplay ?
                document.getElementById("messagepane") :
                document.getElementById("multimessage");
-      }
+      },
     },
     /**
      * The message view displays a single message.  In this view, the folder
@@ -315,13 +313,13 @@ var mailTabType = {
      */
     message: {
       type: "message",
-      /// The set of panes that are legal to be displayed in this mode
+      // The set of panes that are legal to be displayed in this mode
       legalPanes: {
         folder: false,
         thread: false,
-        message: true
+        message: true,
       },
-      openTab: function(aTab, aArgs) {
+      openTab(aTab, aArgs) {
         this.openTab(aTab, false, new MessageTabDisplayWidget(), false);
 
         let viewWrapperToClone = ("viewWrapperToClone" in aArgs) &&
@@ -336,8 +334,7 @@ var mailTabType = {
             viewWrapperToClone.dbView.findIndexOfMsgHdr(aArgs.msgHdr, true);
 
           aTab.folderDisplay.cloneView(viewWrapperToClone);
-        }
-        else {
+        } else {
           // Create a synthetic message view for the header
           let synView = new MsgHdrSyntheticView(aArgs.msgHdr);
           aTab.folderDisplay.show(synView);
@@ -359,26 +356,25 @@ var mailTabType = {
         if (!background) {
           aTab.folderDisplay.makeActive();
           this.restoreFocus(aTab);
-        }
-        else {
+        } else {
           // We don't want to null out the real tree box view, as that
           // corresponds to the _current_ tab, not the new one
-          aTab.folderDisplay.hookUpFakeTreeBox(false);
+          aTab.folderDisplay.hookUpFakeTree(false);
         }
       },
-      persistTab: function(aTab) {
+      persistTab(aTab) {
         let msgHdr = aTab.folderDisplay.selectedMessage;
         return {
-          messageURI: msgHdr.folder.getUriForMsg(msgHdr)
+          messageURI: msgHdr.folder.getUriForMsg(msgHdr),
         };
       },
-      restoreTab: function(aTabmail, aPersistedState) {
+      restoreTab(aTabmail, aPersistedState) {
         let msgHdr = messenger.msgHdrFromURI(aPersistedState.messageURI);
         // if the message no longer exists, we can't restore the tab
         if (msgHdr)
-          aTabmail.openTab("message", {msgHdr: msgHdr, background: true});
+          aTabmail.openTab("message", {msgHdr, background: true});
       },
-      onTitleChanged: function(aTab, aTabNode, aMsgHdr) {
+      onTitleChanged(aTab, aTabNode, aMsgHdr) {
         // Try and figure out the selected message if one was not provided.
         // It is possible that the folder has yet to load, so it may still be
         //  null.
@@ -420,10 +416,10 @@ var mailTabType = {
           }, false, {saneBodySize: true});
         }
       },
-      getBrowser: function(aTab) {
+      getBrowser(aTab) {
         // Message tabs always use the messagepane browser.
         return document.getElementById("messagepane");
-      }
+      },
     },
     /**
      * The glodaList view displays a gloda-backed nsMsgDBView with only the
@@ -432,7 +428,7 @@ var mailTabType = {
      */
     glodaList: {
       type: "glodaSearch",
-      /// The set of panes that are legal to be displayed in this mode
+      // The set of panes that are legal to be displayed in this mode
       legalPanes: {
         folder: false,
         thread: true,
@@ -458,7 +454,7 @@ var mailTabType = {
        *
        * XXX This needs to handle opening in the background
        */
-      openTab: function(aTab, aArgs) {
+      openTab(aTab, aArgs) {
         aTab.glodaSynView = new GlodaSyntheticView(aArgs);
         aTab.title = aArgs.title;
 
@@ -476,17 +472,17 @@ var mailTabType = {
             aTab.folderDisplay.selectMessage(hdr);
         }
       },
-      getBrowser: function(aTab) {
+      getBrowser(aTab) {
         // If we are currently a thread summary, we want to select the multi
         // message browser rather than the message pane.
         return gMessageDisplay.singleMessageDisplay ?
                document.getElementById("messagepane") :
                document.getElementById("multimessage");
-      }
+      },
     },
   },
 
-  _getNumberOfRealAccounts : function() {
+  _getNumberOfRealAccounts() {
     let accountCount = MailServices.accounts.accounts.length;
     // If we have an account, we also always have a "Local Folders" account.
     return accountCount > 0 ? (accountCount - 1) : 0;
@@ -495,7 +491,7 @@ var mailTabType = {
   /**
    * Common tab opening code shared by the various tab modes.
    */
-  openTab: function(aTab, aIsFirstTab, aMessageDisplay, aFolderPaneVisible) {
+  openTab(aTab, aIsFirstTab, aMessageDisplay, aFolderPaneVisible) {
     // Set the messagepane as the primary browser for content.
     document.getElementById("messagepane").setAttribute("type", "content");
     document.getElementById("messagepane").setAttribute("primary", "true");
@@ -504,14 +500,11 @@ var mailTabType = {
     aTab.folderDisplay = new FolderDisplayWidget(aTab, aTab.messageDisplay);
     aTab.folderDisplay.msgWindow = msgWindow;
     aTab.folderDisplay.tree = document.getElementById("threadTree");
-    aTab.folderDisplay.treeBox = aTab.folderDisplay.tree.boxObject.QueryInterface(
-                                   Ci.nsITreeBoxObject);
     aTab.folderDisplay.folderPaneVisible = aFolderPaneVisible;
 
     if (aIsFirstTab) {
       aTab.folderDisplay.messenger = messenger;
-    }
-    else {
+    } else {
       // Each tab gets its own messenger instance; this provides each tab with
       // its own undo/redo stack and back/forward navigation history.
       // If this is a foreground tab, folderDisplay.makeActive() is going to
@@ -523,7 +516,7 @@ var mailTabType = {
     }
   },
 
-  closeTab: function(aTab) {
+  closeTab(aTab) {
     aTab.folderDisplay.close();
   },
 
@@ -534,17 +527,17 @@ var mailTabType = {
    * - If the thread tree or folder tree is focused, save that as the focused
    *   element.
    */
-  saveFocus: function mailTabType_saveFocus(aTab) {
+  saveFocus(aTab) {
     aTab._focusedElement = aTab.folderDisplay.focusedPane;
   },
 
   /**
    * Restore the tab's focused element or window.
    */
-  restoreFocus: function mailTabType_restoreFocus(aTab) {
+  restoreFocus(aTab) {
     // There seem to be issues with opening multiple messages at once, so allow
     // things to stabilize a bit before proceeding
-    let reallyRestoreFocus = function mailTabType_reallyRestoreFocus(aTab) {
+    let reallyRestoreFocus = function(aTab) {
       if ("_focusedElement" in aTab && aTab._focusedElement) {
         aTab._focusedElement.focus();
 
@@ -563,7 +556,7 @@ var mailTabType = {
     window.setTimeout(reallyRestoreFocus, 0, aTab);
   },
 
-  saveTabState: function(aTab) {
+  saveTabState(aTab) {
     // Now let other tabs have a primary browser if they want.
     let messagepane = document.getElementById("messagepane");
     messagepane.setAttribute("type", "content");
@@ -607,15 +600,13 @@ var mailTabType = {
    *     - folder: The folder (tree) pane.
    *     - message: The message pane.
    */
-  _setPaneStates: function mailTabType_setPaneStates(aLegalStates,
-                                                     aVisibleStates) {
+  _setPaneStates(aLegalStates, aVisibleStates) {
     // The display deck hosts both the thread pane and account central.
     let displayDeckLegal = aLegalStates.thread ||
                            aLegalStates.accountCentral;
 
     let layout = Services.prefs.getIntPref("mail.pane_config.dynamic");
-    if (layout == kWidePaneConfig)
-    {
+    if (layout == kWidePaneConfig) {
       // in the "wide" configuration, the #messengerBox is left holding the
       //  folder pane and thread pane, and the message pane has migrated to be
       //  its sibling (under #mailContent).
@@ -648,6 +639,7 @@ var mailTabType = {
     // -- display deck (thread pane / account central)
     // in a vertical view, the threadContentArea sits in the #threadPaneBox
     //  next to the message pane and its splitter.
+    var kVerticalMailLayout = 2;
     if (layout == kVerticalMailLayout)
       document.getElementById("threadContentArea").collapsed =
         !displayDeckLegal;
@@ -698,7 +690,7 @@ var mailTabType = {
       messagePaneToggleKey.setAttribute("disabled", "true");
   },
 
-  showTab: function(aTab) {
+  showTab(aTab) {
     // Set the messagepane as the primary browser for content.
     document.getElementById("messagepane").setAttribute("type", "content");
     document.getElementById("messagepane").setAttribute("primary", "true");
@@ -711,8 +703,7 @@ var mailTabType = {
       gFolderTreeView.selection.selectEventsSuppressed = true;
       try {
         gFolderTreeView.selectFolder(aTab.folderDisplay.displayedFolder);
-      }
-      finally {
+      } finally {
         gIgnoreSyntheticFolderPaneSelectionChange = true;
         gFolderTreeView.selection.selectEventsSuppressed = false;
       }
@@ -724,7 +715,7 @@ var mailTabType = {
 
   // nsIController implementation
 
-  supportsCommand: function mailTabType_supportsCommand(aCommand, aTab) {
+  supportsCommand(aCommand, aTab) {
     switch (aCommand) {
       case "cmd_viewClassicMailLayout":
       case "cmd_viewWideMailLayout":
@@ -740,7 +731,7 @@ var mailTabType = {
   },
 
   // We only depend on what's illegal
-  isCommandEnabled: function mailTabType_isCommandEnabled(aCommand, aTab) {
+  isCommandEnabled(aCommand, aTab) {
     switch (aCommand) {
       case "cmd_viewClassicMailLayout":
       case "cmd_viewWideMailLayout":
@@ -758,11 +749,11 @@ var mailTabType = {
     }
   },
 
-  doCommand: function mailTabType_doCommand(aCommand, aTab) {
+  doCommand(aCommand, aTab) {
     if (!this.isCommandEnabled(aCommand, aTab))
       return;
 
     // DefaultController knows how to handle this
     DefaultController.doCommand(aCommand, aTab);
-  }
+  },
 };

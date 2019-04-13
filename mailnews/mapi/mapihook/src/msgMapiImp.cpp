@@ -4,7 +4,7 @@
 
 #include <mapidefs.h>
 #include <mapi.h>
-#include "msgMapi.h"
+#include <winstring.h>
 #include "msgMapiImp.h"
 #include "msgMapiFactory.h"
 #include "msgMapiMain.h"
@@ -121,8 +121,8 @@ STDMETHODIMP CMapiImp::Initialize()
     return hr;
 }
 
-STDMETHODIMP CMapiImp::Login(unsigned long aUIArg, LOGIN_PW_TYPE aLogin, LOGIN_PW_TYPE aPassWord,
-                unsigned long aFlags, unsigned long *aSessionId)
+STDMETHODIMP CMapiImp::Login(unsigned long aUIArg, LPSTR aLogin, LPSTR aPassWord,
+                             unsigned long aFlags, unsigned long *aSessionId)
 {
     HRESULT hr = E_FAIL;
      bool bNewSession = false;
@@ -135,7 +135,7 @@ STDMETHODIMP CMapiImp::Login(unsigned long aUIArg, LOGIN_PW_TYPE aLogin, LOGIN_P
     // Check For Profile Name
     if (aLogin != nullptr && aLogin[0] != '\0')
     {
-        if (!nsMapiHook::VerifyUserName(nsString(aLogin), id_key))
+        if (!nsMapiHook::VerifyUserName(nsDependentCString(aLogin), id_key))
         {
             *aSessionId = MAPI_E_LOGIN_FAILURE;
             MOZ_LOG(MAPI, mozilla::LogLevel::Debug, ("CMapiImp::Login failed for username %s\n", aLogin));
@@ -150,10 +150,14 @@ STDMETHODIMP CMapiImp::Login(unsigned long aUIArg, LOGIN_PW_TYPE aLogin, LOGIN_P
       nsCOMPtr <nsIMsgAccountManager> accountManager =
         do_GetService(NS_MSGACCOUNTMANAGER_CONTRACTID, &rv);
       NS_ENSURE_SUCCESS(rv,MAPI_E_LOGIN_FAILURE);
-      nsCOMPtr <nsIMsgAccount> account;
-      nsCOMPtr <nsIMsgIdentity> identity;
+
+      nsCOMPtr<nsIMsgAccount> account;
       rv = accountManager->GetDefaultAccount(getter_AddRefs(account));
       NS_ENSURE_SUCCESS(rv,MAPI_E_LOGIN_FAILURE);
+      if (!account)
+        return MAPI_E_LOGIN_FAILURE;
+
+      nsCOMPtr<nsIMsgIdentity> identity;
       rv = account->GetDefaultIdentity(getter_AddRefs(identity));
       NS_ENSURE_SUCCESS(rv,MAPI_E_LOGIN_FAILURE);
       if (!identity)
@@ -167,9 +171,11 @@ STDMETHODIMP CMapiImp::Login(unsigned long aUIArg, LOGIN_PW_TYPE aLogin, LOGIN_P
 
     nsMAPIConfiguration *pConfig = nsMAPIConfiguration::GetMAPIConfiguration();
     if (pConfig != nullptr)
-        nResult = pConfig->RegisterSession(aUIArg, char16ptr_t(aLogin), char16ptr_t(aPassWord),
-                                           (aFlags & MAPI_FORCE_DOWNLOAD), bNewSession,
-                                           &nSession_Id, id_key.get());
+        nResult = pConfig->RegisterSession(aUIArg,
+            aLogin ? nsDependentCString(aLogin) : EmptyCString(),
+            aPassWord ? nsDependentCString(aPassWord) : EmptyCString(),
+            (aFlags & MAPI_FORCE_DOWNLOAD), bNewSession,
+            &nSession_Id, id_key.get());
     switch (nResult)
     {
         case -1 :
@@ -194,28 +200,22 @@ STDMETHODIMP CMapiImp::Login(unsigned long aUIArg, LOGIN_PW_TYPE aLogin, LOGIN_P
 }
 
 STDMETHODIMP CMapiImp::SendMail( unsigned long aSession, lpnsMapiMessage aMessage,
-     short aRecipCount, lpnsMapiRecipDesc aRecips , short aFileCount, lpnsMapiFileDesc aFiles ,
      unsigned long aFlags, unsigned long aReserved)
 {
-    nsresult rv = NS_OK ;
-
-    MOZ_LOG(MAPI, mozilla::LogLevel::Debug, ("CMapiImp::SendMail using flags %d\n", aFlags));
-    // Assign the pointers in the aMessage struct to the array of Recips and Files
-    // received here from MS COM. These are used in BlindSendMail and ShowCompWin fns
-    aMessage->lpRecips = aRecips ;
-    aMessage->lpFiles = aFiles ;
-
-    MOZ_LOG(MAPI, mozilla::LogLevel::Debug, ("CMapiImp::SendMail flags=%x subject: %s sender: %s\n",
-      aFlags, (char *) aMessage->lpszSubject, (aMessage->lpOriginator) ? aMessage->lpOriginator->lpszAddress : ""));
+    MOZ_LOG(MAPI, mozilla::LogLevel::Debug,
+      ("CMapiImp::SendMail flags=%lx subject: %s sender: %s\n",
+       aFlags,
+       (aMessage && aMessage->lpszSubject) ? aMessage->lpszSubject : "(no subject)",
+       (aMessage && aMessage->lpOriginator && aMessage->lpOriginator->lpszAddress) ?
+          aMessage->lpOriginator->lpszAddress : "(no sender)"));
 
     /** create nsIMsgCompFields obj and populate it **/
+    nsresult rv = NS_OK ;
     nsCOMPtr<nsIMsgCompFields> pCompFields = do_CreateInstance(NS_MSGCOMPFIELDS_CONTRACTID, &rv) ;
     if (NS_FAILED(rv) || (!pCompFields) ) return MAPI_E_INSUFFICIENT_MEMORY ;
 
-    if (aFlags & MAPI_UNICODE)
-        rv = nsMapiHook::PopulateCompFields(aMessage, pCompFields) ;
-    else
-        rv = nsMapiHook::PopulateCompFieldsWithConversion(aMessage, pCompFields) ;
+    if (aMessage)
+      rv = nsMapiHook::PopulateCompFieldsWithConversion(aMessage, pCompFields);
 
     if (NS_SUCCEEDED (rv))
     {
@@ -233,9 +233,43 @@ STDMETHODIMP CMapiImp::SendMail( unsigned long aSession, lpnsMapiMessage aMessag
     return nsMAPIConfiguration::GetMAPIErrorFromNSError (rv) ;
 }
 
+STDMETHODIMP CMapiImp::SendMailW(unsigned long aSession, lpnsMapiMessageW aMessage,
+                                 unsigned long aFlags, unsigned long aReserved)
+{
+    MOZ_LOG(MAPI, mozilla::LogLevel::Debug,
+      ("CMapiImp::SendMailW flags=%lx subject: %s sender: %s\n",
+       aFlags,
+       (aMessage && aMessage->lpszSubject) ?
+          NS_ConvertUTF16toUTF8(aMessage->lpszSubject).get() : "(no subject)",
+       (aMessage && aMessage->lpOriginator && aMessage->lpOriginator->lpszAddress) ?
+          NS_ConvertUTF16toUTF8(aMessage->lpOriginator->lpszAddress).get() : "(no sender)"));
 
-STDMETHODIMP CMapiImp::SendDocuments( unsigned long aSession, LPTSTR aDelimChar,
-                            LPTSTR aFilePaths, LPTSTR aFileNames, ULONG aFlags)
+    // Create nsIMsgCompFields obj and populate it.
+    nsresult rv = NS_OK;
+    nsCOMPtr<nsIMsgCompFields> pCompFields = do_CreateInstance(NS_MSGCOMPFIELDS_CONTRACTID, &rv);
+    if (NS_FAILED(rv) || !pCompFields) return MAPI_E_INSUFFICIENT_MEMORY;
+
+    if (aMessage)
+      rv = nsMapiHook::PopulateCompFieldsW(aMessage, pCompFields);
+
+    if (NS_SUCCEEDED (rv))
+    {
+      // Check flag to see if UI needs to be brought up.
+      if (!(aFlags & MAPI_DIALOG))
+      {
+        rv = nsMapiHook::BlindSendMail(aSession, pCompFields);
+      }
+      else
+      {
+        rv = nsMapiHook::ShowComposerWindow(aSession, pCompFields);
+      }
+    }
+
+    return nsMAPIConfiguration::GetMAPIErrorFromNSError(rv);
+}
+
+STDMETHODIMP CMapiImp::SendDocuments(unsigned long aSession, LPSTR aDelimChar,
+                                     LPSTR aFilePaths, LPSTR aFileNames, ULONG aFlags)
 {
     nsresult rv = NS_OK ;
 
@@ -268,6 +302,8 @@ nsresult CMapiImp::GetDefaultInbox(nsIMsgFolder **inboxFolder)
   nsCOMPtr <nsIMsgAccount> account;
   rv = accountManager->GetDefaultAccount(getter_AddRefs(account));
   NS_ENSURE_SUCCESS(rv,rv);
+  if (!account)
+    return NS_ERROR_FAILURE;
 
   // get incoming server
   nsCOMPtr <nsIMsgIncomingServer> server;
@@ -364,9 +400,9 @@ LONG CMapiImp::InitContext(unsigned long session, MsgMapiListContext **listConte
   return SUCCESS_SUCCESS;
 }
 
-STDMETHODIMP CMapiImp::FindNext(unsigned long aSession, unsigned long ulUIParam, LPTSTR lpszMessageType,
-                              LPTSTR lpszSeedMessageID, unsigned long flFlags, unsigned long ulReserved,
-                              unsigned char lpszMessageID[64])
+STDMETHODIMP CMapiImp::FindNext(unsigned long aSession, unsigned long ulUIParam, LPSTR lpszMessageType,
+                                LPSTR lpszSeedMessageID, unsigned long flFlags, unsigned long ulReserved,
+                                unsigned char lpszMessageID[64])
 
 {
   //
@@ -409,8 +445,8 @@ STDMETHODIMP CMapiImp::FindNext(unsigned long aSession, unsigned long ulUIParam,
   return(SUCCESS_SUCCESS);
 }
 
-STDMETHODIMP CMapiImp::ReadMail(unsigned long aSession, unsigned long ulUIParam, LPTSTR lpszMessageID,
-                              unsigned long flFlags, unsigned long ulReserved, lpnsMapiMessage *lppMessage)
+STDMETHODIMP CMapiImp::ReadMail(unsigned long aSession, unsigned long ulUIParam, LPSTR lpszMessageID,
+                                unsigned long flFlags, unsigned long ulReserved, lpnsMapiMessage *lppMessage)
 {
   nsresult irv;
   nsAutoCString keyString((char *) lpszMessageID);
@@ -435,8 +471,8 @@ STDMETHODIMP CMapiImp::ReadMail(unsigned long aSession, unsigned long ulUIParam,
 }
 
 
-STDMETHODIMP CMapiImp::DeleteMail(unsigned long aSession, unsigned long ulUIParam, LPTSTR lpszMessageID,
-                              unsigned long flFlags, unsigned long ulReserved)
+STDMETHODIMP CMapiImp::DeleteMail(unsigned long aSession, unsigned long ulUIParam, LPSTR lpszMessageID,
+                                  unsigned long flFlags, unsigned long ulReserved)
 {
   nsresult irv;
   nsAutoCString keyString((char *) lpszMessageID);
@@ -451,8 +487,8 @@ STDMETHODIMP CMapiImp::DeleteMail(unsigned long aSession, unsigned long ulUIPara
   return (listContext->DeleteMessage(msgKey)) ? SUCCESS_SUCCESS : MAPI_E_INVALID_MESSAGE;
 }
 
-STDMETHODIMP CMapiImp::SaveMail(unsigned long aSession, unsigned long ulUIParam,  lpnsMapiMessage lppMessage,
-                              unsigned long flFlags, unsigned long ulReserved, LPTSTR lpszMessageID)
+STDMETHODIMP CMapiImp::SaveMail(unsigned long aSession, unsigned long ulUIParam, lpnsMapiMessage lppMessage,
+                                unsigned long flFlags, unsigned long ulReserved, LPSTR lpszMessageID)
 {
   MsgMapiListContext *listContext;
   LONG ret = InitContext(aSession, &listContext);
@@ -574,7 +610,7 @@ lpnsMapiMessage MsgMapiListContext::GetMessage (nsMsgKey key, unsigned long flFl
     nsCString author;
     nsCOMPtr <nsIMsgDBHdr> msgHdr;
 
-    nsresult rv = m_db->GetMsgHdrForKey (key, getter_AddRefs(msgHdr));
+    m_db->GetMsgHdrForKey (key, getter_AddRefs(msgHdr));
     if (msgHdr)
     {
       msgHdr->GetSubject (getter_Copies(subject));
@@ -691,7 +727,6 @@ char *MsgMapiListContext::ConvertBodyToMapiFormat (nsIMsgDBHdr *hdr)
   if (!folder)
     return nullptr;
 
-  nsCOMPtr <nsIInputStream> inputStream;
   nsCOMPtr <nsIFile> localFile;
   folder->GetFilePath(getter_AddRefs(localFile));
 
@@ -700,58 +735,55 @@ char *MsgMapiListContext::ConvertBodyToMapiFormat (nsIMsgDBHdr *hdr)
   NS_ENSURE_SUCCESS(rv, nullptr);
 
   rv = fileStream->Init(localFile,  PR_RDONLY, 0664, false);  //just have to read the messages
-  inputStream = do_QueryInterface(fileStream);
+  NS_ENSURE_SUCCESS(rv, nullptr);
 
-  if (inputStream)
+  nsCOMPtr <nsILineInputStream> fileLineStream = do_QueryInterface(fileStream);
+  if (!fileLineStream)
+    return nullptr;
+
+  // ### really want to skip past headers...
+  uint64_t messageOffset;
+  uint32_t lineCount;
+  hdr->GetMessageOffset(&messageOffset);
+  hdr->GetLineCount(&lineCount);
+  nsCOMPtr <nsISeekableStream> seekableStream = do_QueryInterface(fileStream);
+  seekableStream->Seek(PR_SEEK_SET, messageOffset);
+  bool hasMore = true;
+  nsAutoCString curLine;
+
+  while (hasMore) // advance past message headers
   {
-    nsCOMPtr <nsILineInputStream> fileLineStream = do_QueryInterface(inputStream);
-    if (!fileLineStream)
-      return nullptr;
-    // ### really want to skip past headers...
-    uint64_t messageOffset;
-    uint32_t lineCount;
-    hdr->GetMessageOffset(&messageOffset);
-    hdr->GetLineCount(&lineCount);
-    nsCOMPtr <nsISeekableStream> seekableStream = do_QueryInterface(inputStream);
-    seekableStream->Seek(PR_SEEK_SET, messageOffset);
-    bool hasMore = true;
-    nsAutoCString curLine;
-    nsresult rv = NS_OK;
-    while (hasMore) // advance past message headers
-    {
-      nsresult rv = fileLineStream->ReadLine(curLine, &hasMore);
-      if (NS_FAILED(rv) || EMPTY_MESSAGE_LINE(curLine))
-        break;
-    }
-    uint32_t msgSize;
-    hdr->GetMessageSize(&msgSize);
-    if (msgSize > kBufLen)
-      msgSize = kBufLen - 1;
-    // this is too big, since it includes the msg hdr size...oh well
-    char *body = (char*) CoTaskMemAlloc (msgSize + 1);
-
-    if (!body)
-      return nullptr;
-    int32_t bytesCopied = 0;
-    for (hasMore = TRUE; lineCount > 0 && hasMore && NS_SUCCEEDED(rv); lineCount--)
-    {
-      rv = fileLineStream->ReadLine(curLine, &hasMore);
-      if (NS_FAILED(rv))
-        break;
-      curLine.Append(CRLF);
-      // make sure we have room left
-      if (bytesCopied + curLine.Length() < msgSize)
-      {
-        strcpy(body + bytesCopied, curLine.get());
-        bytesCopied += curLine.Length();
-      }
-    }
-    MOZ_LOG(MAPI, mozilla::LogLevel::Debug, ("ConvertBodyToMapiFormat size=%x allocated size %x body = %100.100s\n",
-        bytesCopied, msgSize + 1, (char *) body) );
-    body[bytesCopied] = '\0';   // rhp - fix last line garbage...
-    return body;
+    nsresult rv = fileLineStream->ReadLine(curLine, &hasMore);
+    if (NS_FAILED(rv) || EMPTY_MESSAGE_LINE(curLine))
+      break;
   }
-  return nullptr;
+  uint32_t msgSize;
+  hdr->GetMessageSize(&msgSize);
+  if (msgSize > kBufLen)
+    msgSize = kBufLen - 1;
+  // this is too big, since it includes the msg hdr size...oh well
+  char *body = (char*) CoTaskMemAlloc (msgSize + 1);
+
+  if (!body)
+    return nullptr;
+  int32_t bytesCopied = 0;
+  for (hasMore = TRUE; lineCount > 0 && hasMore && NS_SUCCEEDED(rv); lineCount--)
+  {
+    rv = fileLineStream->ReadLine(curLine, &hasMore);
+    if (NS_FAILED(rv))
+      break;
+    curLine.Append(CRLF);
+    // make sure we have room left
+    if (bytesCopied + curLine.Length() < msgSize)
+    {
+      strcpy(body + bytesCopied, curLine.get());
+      bytesCopied += curLine.Length();
+    }
+  }
+  MOZ_LOG(MAPI, mozilla::LogLevel::Debug, ("ConvertBodyToMapiFormat size=%x allocated size %x body = %100.100s\n",
+      bytesCopied, msgSize + 1, (char *) body) );
+  body[bytesCopied] = '\0';   // rhp - fix last line garbage...
+  return body;
 }
 
 

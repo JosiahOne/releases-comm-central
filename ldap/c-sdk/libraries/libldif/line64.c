@@ -262,7 +262,7 @@ ldif_base64_decode( char *src, unsigned char *dst )
  * or \0.  this routine handles continued lines, bundling them into
  * a single big line before returning.  if a line begins with a white
  * space character, it is a continuation of the previous line. the white
- * space character (nb: only one char), and preceeding newline are changed
+ * space character (nb: only one char), and preceding newline are changed
  * into CONTINUED_LINE_MARKER chars, to be deleted later by the
  * ldif_parse_line() routine above.
  *
@@ -566,7 +566,7 @@ ldif_get_entry( FILE *fp, int *lineno )
 		}
 		/* ldif entries are terminated by a \n on a line by itself */
 		if ( line[0] == '\0' || line[0] == '\n'
-#if !defined( XP_WIN32 )
+#if !defined( XP_WIN )
 		     || ( line[0] == '\r' && line[1] == '\n' ) /* DOS format */
 #endif
 		   ) {
@@ -580,7 +580,7 @@ ldif_get_entry( FILE *fp, int *lineno )
 		}
 		gotsome = 1;
 		len = strlen( line );
-#if !defined( XP_WIN32 )
+#if !defined( XP_WIN )
 		/* DOS format */
 		if ( len > 0 && line[len-1] == '\r' ) {
 			--len;

@@ -3,8 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /**
- * This test verifies that we don't display text attachments inline
- * when mail.inline_attachments is false.
+ * This test verifies that we generate proper attachment filenames.
  */
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -66,11 +65,11 @@ var gStreamListener = {
   index: 0, // The index of the message we're currently looking at.
 
   // nsIRequestObserver part
-  onStartRequest: function (aRequest, aContext) {
+  onStartRequest: function (aRequest) {
     this.contents = "";
     this.stream = null;
   },
-  onStopRequest: function (aRequest, aContext, aStatusCode) {
+  onStopRequest: function (aRequest, aStatusCode) {
     // Check that the attachments' filenames are as expected. Just use a regex
     // here because it's simple.
     let regex = /<legend class="mimeAttachmentHeaderName">(.*?)<\/legend>/gi;
@@ -87,7 +86,7 @@ var gStreamListener = {
   },
 
   // nsIStreamListener part
-  onDataAvailable: function (aRequest,aContext,aInputStream,aOffset,aCount) {
+  onDataAvailable: function (aRequest, aInputStream, aOffset, aCount) {
     if (this.stream === null) {
       this.stream = Cc["@mozilla.org/scriptableinputstream;1"].
                     createInstance(Ci.nsIScriptableInputStream);
@@ -150,5 +149,6 @@ var gInbox;
 
 function run_test() {
   gInbox = configure_message_injection({mode: "local"});
+  Services.prefs.setBoolPref("mail.inline_attachments.text", true);
   async_run_tests(tests);
 }

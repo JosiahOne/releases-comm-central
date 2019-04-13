@@ -3,6 +3,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from emailWizard.js */
+
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {OAuth2Providers} = ChromeUtils.import("resource:///modules/OAuth2Providers.jsm");
+var { logException } = ChromeUtils.import("resource:///modules/errUtils.js");
+
+if (typeof gEmailWizardLogger == "undefined") {
+  var {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+  var gEmailWizardLogger = Log4Moz.getConfiguredLogger("mail.wizard");
+}
+
 /**
  * This checks a given config, by trying a real connection and login,
  * with username and password.
@@ -28,18 +39,8 @@
  *   because there was an error (e.g. no network connection).
  *   The ex.message will contain a user-presentable message.
  */
-
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/OAuth2Providers.jsm");
-
-if (typeof gEmailWizardLogger == "undefined") {
-  ChromeUtils.import("resource:///modules/gloda/log4moz.js");
-  var gEmailWizardLogger = Log4Moz.getConfiguredLogger("mail.wizard");
-}
-
-function verifyConfig(config, alter, msgWindow, successCallback, errorCallback)
-{
-  ddump(debugObject(config, "config", 3));
+function verifyConfig(config, alter, msgWindow, successCallback, errorCallback) {
+  ddump("verify config:\n" + config);
   assert(config instanceof AccountConfig,
          "BUG: Arg 'config' needs to be an AccountConfig object");
   assert(typeof(alter) == "boolean");
@@ -48,8 +49,7 @@ function verifyConfig(config, alter, msgWindow, successCallback, errorCallback)
 
   if (MailServices.accounts.findRealServer(config.incoming.username,
                                            config.incoming.hostname,
-                                           sanitize.enum(config.incoming.type,
-                                                         ["pop3", "imap", "nntp"]),
+                                           config.incoming.type,
                                            config.incoming.port)) {
     errorCallback("Incoming server exists");
     return;
@@ -59,8 +59,7 @@ function verifyConfig(config, alter, msgWindow, successCallback, errorCallback)
   let inServer =
     MailServices.accounts.createIncomingServer(config.incoming.username,
                                                config.incoming.hostname,
-                                               sanitize.enum(config.incoming.type,
-                                                             ["pop3", "imap", "nntp"]));
+                                               config.incoming.type);
   inServer.port = config.incoming.port;
   inServer.password = config.incoming.password;
   if (config.incoming.socketType == 1) // plain
@@ -88,7 +87,7 @@ function verifyConfig(config, alter, msgWindow, successCallback, errorCallback)
         if (hostDetails)
           [config.oauthSettings.issuer, config.oauthSettings.scope] = hostDetails;
         if (!config.oauthSettings.issuer || !config.oauthSettings.scope)
-          throw "Could not get issuer for oauth2 authentication";
+          throw new Error("Could not get issuer for oauth2 authentication");
       }
       gEmailWizardLogger.info("Saving oauth parameters for issuer " +
                                config.oauthSettings.issuer);
@@ -97,29 +96,33 @@ function verifyConfig(config, alter, msgWindow, successCallback, errorCallback)
       gEmailWizardLogger.info("OAuth2 issuer, scope is " +
                               config.oauthSettings.issuer + ", " + config.oauthSettings.scope);
     }
+    if (config.incoming.owaURL) {
+      inServer.setUnicharValue("owa_url", config.incoming.owaURL);
+    }
+    if (config.incoming.ewsURL) {
+      inServer.setUnicharValue("ews_url", config.incoming.ewsURL);
+    }
+    if (config.incoming.easURL) {
+      inServer.setUnicharValue("eas_url", config.incoming.easURL);
+    }
 
-    if (inServer.password ||
-        inServer.authMethod == Ci.nsMsgAuthMethod.OAuth2)
-      verifyLogon(config, inServer, alter, msgWindow,
-                  successCallback, errorCallback);
-    else {
+    if (inServer.password || inServer.authMethod == Ci.nsMsgAuthMethod.OAuth2) {
+      verifyLogon(config, inServer, alter, msgWindow, successCallback, errorCallback);
+    } else {
       // Avoid pref pollution, clear out server prefs.
       MailServices.accounts.removeIncomingServer(inServer, true);
       successCallback(config);
     }
-    return;
-  }
-  catch (e) {
+  } catch (e) {
     gEmailWizardLogger.error("ERROR: verify logon shouldn't have failed");
+    // Avoid pref pollution, clear out server prefs.
+    MailServices.accounts.removeIncomingServer(inServer, true);
+    errorCallback(e);
   }
-  // Avoid pref pollution, clear out server prefs.
-  MailServices.accounts.removeIncomingServer(inServer, true);
-  errorCallback(e);
 }
 
 function verifyLogon(config, inServer, alter, msgWindow, successCallback,
-                     errorCallback)
-{
+                     errorCallback) {
   gEmailWizardLogger.info("verifyLogon for server at " + inServer.hostName);
   // hack - save away the old callbacks.
   let saveCallbacks = msgWindow.notificationCallbacks;
@@ -135,9 +138,7 @@ function verifyLogon(config, inServer, alter, msgWindow, successCallback,
     let uri = inServer.verifyLogon(listener, msgWindow);
     // clear msgWindow so url won't prompt for passwords.
     uri.QueryInterface(Ci.nsIMsgMailNewsUrl).msgWindow = null;
-  }
-  catch (e) { gEmailWizardLogger.error("verifyLogon failed: " + e); throw e;}
-  finally {
+  } catch (e) { gEmailWizardLogger.error("verifyLogon failed: " + e); throw e; } finally {
     // restore them
     msgWindow.notificationCallbacks = saveCallbacks;
   }
@@ -151,8 +152,7 @@ function verifyLogon(config, inServer, alter, msgWindow, successCallback,
  */
 
 function urlListener(config, server, alter, msgWindow, successCallback,
-                     errorCallback)
-{
+                     errorCallback) {
   this.mConfig = config;
   this.mServer = server;
   this.mAlter = alter;
@@ -162,10 +162,8 @@ function urlListener(config, server, alter, msgWindow, successCallback,
   this.mCertError = false;
   this._log = Log4Moz.getConfiguredLogger("mail.wizard");
 }
-urlListener.prototype =
-{
-  OnStartRunningUrl: function(aUrl)
-  {
+urlListener.prototype = {
+  OnStartRunningUrl(aUrl) {
     this._log.info("Starting to test username");
     this._log.info("  username=" + (this.mConfig.incoming.username !=
                           this.mConfig.identity.emailAddress) +
@@ -174,33 +172,26 @@ urlListener.prototype =
     this._log.info("  authMethod=" + this.mServer.authMethod);
   },
 
-  OnStopRunningUrl: function(aUrl, aExitCode)
-  {
+  OnStopRunningUrl(aUrl, aExitCode) {
     this._log.info("Finished verifyConfig resulted in " + aExitCode);
-    if (Components.isSuccessCode(aExitCode))
-    {
+    if (Components.isSuccessCode(aExitCode)) {
       this._cleanup();
       this.mSuccessCallback(this.mConfig);
-    }
-    // Logon failed, and we aren't supposed to try other variations.
-    else if (!this.mAlter)
-    {
+    } else if (!this.mAlter) {
+      // Logon failed, and we aren't supposed to try other variations.
       this._cleanup();
       var errorMsg = getStringBundle(
           "chrome://messenger/locale/accountCreationModel.properties")
           .GetStringFromName("cannot_login.error");
       this.mErrorCallback(new Exception(errorMsg));
-    }
-    // Try other variations, unless there's a cert error, in which
-    // case we'll see what the user chooses.
-    else if (!this.mCertError)
-    {
-      this.tryNextLogon()
+    } else if (!this.mCertError) {
+      // Try other variations, unless there's a cert error, in which
+      // case we'll see what the user chooses.
+      this.tryNextLogon();
     }
   },
 
-  tryNextLogon: function()
-  {
+  tryNextLogon() {
     this._log.info("tryNextLogon()");
     this._log.info("  username=" + (this.mConfig.incoming.username !=
                           this.mConfig.identity.emailAddress) +
@@ -208,8 +199,7 @@ urlListener.prototype =
                           (this.mConfig.usernameSaved ? "true" : "false"));
     this._log.info("  authMethod=" + this.mServer.authMethod);
     // check if we tried full email address as username
-    if (this.mConfig.incoming.username != this.mConfig.identity.emailAddress)
-    {
+    if (this.mConfig.incoming.username != this.mConfig.identity.emailAddress) {
       this._log.info("  Changing username to email address.");
       this.mConfig.usernameSaved = this.mConfig.incoming.username;
       this.mConfig.incoming.username = this.mConfig.identity.emailAddress;
@@ -221,8 +211,7 @@ urlListener.prototype =
       return;
     }
 
-    if (this.mConfig.usernameSaved)
-    {
+    if (this.mConfig.usernameSaved) {
       this._log.info("  Re-setting username.");
       // If we tried the full email address as the username, then let's go
       // back to trying just the username before trying the other cases.
@@ -242,11 +231,10 @@ urlListener.prototype =
         (this.mServer.socketType == Ci.nsMsgSocketType.SSL ||
          this.mServer.socketType == Ci.nsMsgSocketType.alwaysSTARTTLS));
     if (this.mConfig.incoming.authAlternatives &&
-        this.mConfig.incoming.authAlternatives.length)
-        // We may be dropping back to insecure auth methods here,
-        // which is not good. But then again, we already warned the user,
-        // if it is a config without SSL.
-    {
+        this.mConfig.incoming.authAlternatives.length) {
+      // We may be dropping back to insecure auth methods here,
+      // which is not good. But then again, we already warned the user,
+      // if it is a config without SSL.
       this._log.info("  auth alternatives = " +
           this.mConfig.incoming.authAlternatives.join(","));
       this._log.info("  Decreasing auth.");
@@ -261,9 +249,9 @@ urlListener.prototype =
       // Broken assumption, but we currently have no SMTP verification.
       // TODO implement real SMTP verification
       if (this.mConfig.outgoing.auth == brokenAuth &&
-          this.mConfig.outgoing.authAlternatives.indexOf(
-            this.mConfig.incoming.auth) != -1)
+          this.mConfig.outgoing.authAlternatives.includes(this.mConfig.incoming.auth)) {
         this.mConfig.outgoing.auth = this.mConfig.incoming.auth;
+      }
       this._log.info("  outgoing auth: " + this.mConfig.outgoing.auth);
       verifyLogon(this.mConfig, this.mServer, this.mAlter, this.mMsgWindow,
                   this.mSuccessCallback, this.mErrorCallback);
@@ -277,11 +265,9 @@ urlListener.prototype =
         "chrome://messenger/locale/accountCreationModel.properties")
         .GetStringFromName("cannot_login.error");
     this.mErrorCallback(new Exception(errorMsg));
-    return;
   },
 
-  _cleanup : function()
-  {
+  _cleanup() {
     try {
       // Avoid pref pollution, clear out server prefs.
       if (this.mServer) {
@@ -292,27 +278,27 @@ urlListener.prototype =
   },
 
   // Suppress any certificate errors
-  notifyCertProblem: function(socketInfo, status, targetSite) {
+  notifyCertProblem(socketInfo, status, targetSite) {
     this.mCertError = true;
     this._log.error("cert error");
     let self = this;
-    setTimeout(function () {
+    setTimeout(function() {
       try {
         self.informUserOfCertError(socketInfo, status, targetSite);
-      } catch (e)  { logException(e); }
+      } catch (e) { logException(e); }
     }, 0);
     return true;
   },
 
-  informUserOfCertError : function(socketInfo, status, targetSite) {
+  informUserOfCertError(socketInfo, secInfo, targetSite) {
     var params = {
-      exceptionAdded : false,
-      sslStatus : status,
-      prefetchCert : true,
-      location : targetSite,
+      exceptionAdded: false,
+      securityInfo: secInfo,
+      prefetchCert: true,
+      location: targetSite,
     };
     window.openDialog("chrome://pippki/content/exceptionDialog.xul",
-                      "","chrome,centerscreen,modal", params);
+                      "", "chrome,centerscreen,modal", params);
     this._log.info("cert exception dialog closed");
     this._log.info("cert exceptionAdded = " + params.exceptionAdded);
     if (!params.exceptionAdded) {
@@ -321,8 +307,7 @@ urlListener.prototype =
           "chrome://messenger/locale/accountCreationModel.properties")
           .GetStringFromName("cannot_login.error");
       this.mErrorCallback(new Exception(errorMsg));
-    }
-    else {
+    } else {
       // Retry the logon now that we've added the cert exception.
       verifyLogon(this.mConfig, this.mServer, this.mAlter, this.mMsgWindow,
                   this.mSuccessCallback, this.mErrorCallback);
@@ -330,7 +315,7 @@ urlListener.prototype =
   },
 
   // nsIInterfaceRequestor
-  getInterface: function(iid) {
+  getInterface(iid) {
     return this.QueryInterface(iid);
   },
 
@@ -338,4 +323,4 @@ urlListener.prototype =
   QueryInterface: ChromeUtils.generateQI(["nsIBadCertListener2",
                                           "nsIInterfaceRequestor",
                                           "nsIUrlListener"]),
-}
+};

@@ -2,16 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* exported onLoad, onReminderSelected, updateReminder, onNewReminder,
- *          onRemoveReminder, onAccept, onCancel
- */
+/* exported onLoad, onReminderSelected, updateReminder, onNewReminder, onRemoveReminder */
 
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+/* import-globals-from ../calendar-ui-utils.js */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { PluralForm } = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 var allowedActionsMap = {};
+var suppressListUpdate = false;
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
 
 /**
  * Sets up the reminder dialog.
@@ -169,7 +173,7 @@ function setupMaxReminders() {
     setElementValue("reminder-new-button", cond && "true", "disabled");
 
     if (!setupMaxReminders.notification) {
-        let notification = createXULElement("notification");
+        let notification = document.createXULElement("xbl-notification");
         let localeErrorString =
             cal.l10n.getString("calendar-alarms",
                                getItemBundleStringName("reminderErrorMaxCountReached"),
@@ -208,7 +212,7 @@ function setupMaxReminders() {
  * @return              The  XUL listitem node showing the passed reminder.
  */
 function setupListItem(aListItem, aReminder, aItem) {
-    let listitem = aListItem || createXULElement("listitem");
+    let listitem = aListItem || document.createXULElement("richlistitem");
 
     // Create a random id to be used for accessibility
     let reminderId = cal.getUUID();
@@ -216,10 +220,25 @@ function setupListItem(aListItem, aReminder, aItem) {
 
     listitem.reminder = aReminder;
     listitem.setAttribute("id", reminderId);
-    listitem.setAttribute("label", aReminder.toString(aItem));
+    listitem.setAttribute("align", "center");
     listitem.setAttribute("aria-labelledby", ariaLabel);
-    listitem.setAttribute("class", "reminder-icon listitem-iconic");
     listitem.setAttribute("value", aReminder.action);
+
+    let image = listitem.querySelector("image");
+    if (!image) {
+        image = document.createXULElement("image");
+        image.setAttribute("class", "reminder-icon");
+        listitem.appendChild(image);
+    }
+    image.setAttribute("value", aReminder.action);
+
+    let label = listitem.querySelector("label");
+    if (!label) {
+        label = document.createXULElement("label");
+        listitem.appendChild(label);
+    }
+    label.setAttribute("value", aReminder.toString(aItem));
+
     return listitem;
 }
 
@@ -239,45 +258,50 @@ function onReminderSelected() {
     let listitem = listbox.selectedItem;
 
     if (listitem) {
-        let reminder = listitem.reminder;
+        try {
+            suppressListUpdate = true;
+            let reminder = listitem.reminder;
 
-        // Action
-        actionType.value = reminder.action;
+            // Action
+            actionType.value = reminder.action;
 
-        // Absolute/relative things
-        if (reminder.related == Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE) {
-            relationType.value = "absolute";
+            // Absolute/relative things
+            if (reminder.related == Ci.calIAlarm.ALARM_RELATED_ABSOLUTE) {
+                relationType.value = "absolute";
 
-            // Date
-            absDate.value = cal.dtz.dateTimeToJsDate(reminder.alarmDate || cal.dtz.getDefaultStartDate());
-        } else {
-            relationType.value = "relative";
-
-            // Unit and length
-            let alarmlen = Math.abs(reminder.offset.inSeconds / 60);
-            if (alarmlen % 1440 == 0) {
-                unit.value = "days";
-                length.value = alarmlen / 1440;
-            } else if (alarmlen % 60 == 0) {
-                unit.value = "hours";
-                length.value = alarmlen / 60;
+                // Date
+                absDate.value = cal.dtz.dateTimeToJsDate(reminder.alarmDate || cal.dtz.getDefaultStartDate());
             } else {
-                unit.value = "minutes";
-                length.value = alarmlen;
+                relationType.value = "relative";
+
+                // Unit and length
+                let alarmlen = Math.abs(reminder.offset.inSeconds / 60);
+                if (alarmlen % 1440 == 0) {
+                    unit.value = "days";
+                    length.value = alarmlen / 1440;
+                } else if (alarmlen % 60 == 0) {
+                    unit.value = "hours";
+                    length.value = alarmlen / 60;
+                } else {
+                    unit.value = "minutes";
+                    length.value = alarmlen;
+                }
+
+                // Relation
+                let relation = (reminder.offset.isNegative ? "before" : "after");
+
+                // Origin
+                let origin;
+                if (reminder.related == Ci.calIAlarm.ALARM_RELATED_START) {
+                    origin = "START";
+                } else if (reminder.related == Ci.calIAlarm.ALARM_RELATED_END) {
+                    origin = "END";
+                }
+
+                relationOrigin.value = [relation, origin].join("-");
             }
-
-            // Relation
-            let relation = (reminder.offset.isNegative ? "before" : "after");
-
-            // Origin
-            let origin;
-            if (reminder.related == Components.interfaces.calIAlarm.ALARM_RELATED_START) {
-                origin = "START";
-            } else if (reminder.related == Components.interfaces.calIAlarm.ALARM_RELATED_END) {
-                origin = "END";
-            }
-
-            relationOrigin.value = [relation, origin].join("-");
+        } finally {
+            suppressListUpdate = false;
         }
     } else {
         // no list item is selected, disable elements
@@ -292,7 +316,9 @@ function onReminderSelected() {
  * @param event         The DOM event caused by the change.
  */
 function updateReminder(event) {
-    if (event.explicitOriginalTarget.localName == "listitem" ||
+    if (suppressListUpdate ||
+        event.explicitOriginalTarget.localName == "richlistitem" ||
+        event.explicitOriginalTarget.parentNode.localName == "richlistitem" ||
         event.explicitOriginalTarget.id == "reminder-remove-button" ||
         !document.commandDispatcher.focusedElement) {
         // Do not set things if the select came from selecting or removing an
@@ -320,9 +346,9 @@ function updateReminder(event) {
 
     if (relationItem.value == "relative") {
         if (origin == "START") {
-            reminder.related = Components.interfaces.calIAlarm.ALARM_RELATED_START;
+            reminder.related = Ci.calIAlarm.ALARM_RELATED_START;
         } else if (origin == "END") {
-            reminder.related = Components.interfaces.calIAlarm.ALARM_RELATED_END;
+            reminder.related = Ci.calIAlarm.ALARM_RELATED_END;
         }
 
         // Set up offset, taking units and before/after into account
@@ -332,7 +358,7 @@ function updateReminder(event) {
         offset.isNegative = (relation == "before");
         reminder.offset = offset;
     } else if (relationItem.value == "absolute") {
-        reminder.related = Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE;
+        reminder.related = Ci.calIAlarm.ALARM_RELATED_ABSOLUTE;
 
         if (absDate.value) {
             reminder.alarmDate = cal.dtz.jsDateToDateTime(absDate.value,
@@ -346,7 +372,7 @@ function updateReminder(event) {
 }
 
 /**
- * Gets the locale stringname that is dependant on the item type. This function
+ * Gets the locale stringname that is dependent on the item type. This function
  * appends the item type, i.e |aPrefix + "Event"|.
  *
  * @param aPrefix       The prefix to prepend to the item type
@@ -369,13 +395,20 @@ function onNewReminder() {
     let listbox = document.getElementById("reminder-listbox");
 
     let reminder = cal.createAlarm();
-    let alarmlen = Preferences.get("calendar.alarms." + itemType + "alarmlen", 15);
+    let alarmlen = Services.prefs.getIntPref("calendar.alarms." + itemType + "alarmlen", 15);
+    let alarmunit = Services.prefs.getStringPref("calendar.alarms." + itemType + "alarmunit", "minutes");
 
     // Default is a relative DISPLAY alarm, |alarmlen| minutes before the event.
     // If DISPLAY is not supported by the provider, then pick the provider's
     // first alarm type.
     let offset = cal.createDuration();
-    offset.minutes = alarmlen;
+    if (alarmunit == "days") {
+        offset.days = alarmlen;
+    } else if (alarmunit == "hours") {
+        offset.hours = alarmlen;
+    } else {
+        offset.minutes = alarmlen;
+    }
     offset.normalize();
     offset.isNegative = true;
     reminder.related = reminder.ALARM_RELATED_START;
@@ -432,8 +465,6 @@ function onAccept() {
     if (window.arguments[0].onOk) {
         window.arguments[0].onOk(reminders);
     }
-
-    return true;
 }
 
 /**

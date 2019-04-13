@@ -7,16 +7,10 @@
  *  Original author: Kent James
  */
 
-load("../../../../mailnews/resources/logHelper.js");
-load("../../../../mailnews/resources/asyncTestUtils.js");
-
-load("../../../../mailnews/resources/messageGenerator.js");
-load("../../../../mailnews/resources/messageModifier.js");
-load("../../../../mailnews/resources/messageInjection.js");
-
+/* import-globals-from resources/viewWrapperTestUtils.js */
 load("resources/viewWrapperTestUtils.js");
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 initViewWrapperTestUtils({mode: "imap", offline: false});
 
@@ -26,17 +20,17 @@ initViewWrapperTestUtils({mode: "imap", offline: false});
 var gCustomSearchTermSubject = {
   id: "mailnews@mozilla.org#test",
   name: "Test-mailbase Subject",
-  getEnabled: function subject_getEnabled(scope, op) {
+  getEnabled(scope, op) {
     return true;
   },
-  getAvailable: function subject_getAvailable(scope, op) {
+  getAvailable(scope, op) {
     return true;
   },
-  getAvailableOperators: function subject_getAvailableOperators(scope, length) {
+  getAvailableOperators(scope, length) {
     length.value = 1;
     return [Ci.nsMsgSearchOp.Contains];
   },
-  match: function subject_match(aMsgHdr, aSearchValue, aSearchOp) {
+  match(aMsgHdr, aSearchValue, aSearchOp) {
     return (aMsgHdr.subject.includes(aSearchValue));
   },
   needsBody: false,
@@ -51,8 +45,7 @@ MailServices.filters.addCustomTerm(gCustomSearchTermSubject);
 function* test_virtual_folder_single_load_custom_pred() {
   let viewWrapper = make_view_wrapper();
 
-  let [folderOne, oneSubjFoo, oneNopers] = make_folder_with_sets([
-    {subject: "foo"}, {}]);
+  let [folderOne, oneSubjFoo] = make_folder_with_sets([{subject: "foo"}, {}]);
 
   yield wait_for_message_injection();
 

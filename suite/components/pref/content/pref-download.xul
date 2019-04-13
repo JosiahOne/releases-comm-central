@@ -31,17 +31,11 @@
       <preference id="browser.download.folderList"
                   name="browser.download.folderList"
                   type="int"
-                  onchange="DisplayDownloadDirPref();"/>
-      <preference id="browser.download.manager.retention"
-                  name="browser.download.manager.retention"
-                  type="int"/>
+                  onchange="displayDownloadDirPref();"/>
       <preference id="browser.download.finished_download_sound"
                   name="browser.download.finished_download_sound"
                   type="bool"
-                  onchange="SetSoundEnabled(this.value);"/>
-      <preference id="browser.download.manager.showAlertOnComplete"
-                  name="browser.download.manager.showAlertOnComplete"
-                  type="bool"/>
+                  onchange="setSoundEnabled(this.value);"/>
       <preference id="browser.download.finished_sound_url"
                   name="browser.download.finished_sound_url"
                   type="string"/>
@@ -72,7 +66,7 @@
       <caption label="&downloadLocation.label;"/>
       <radiogroup id="saveWhere"
                   preference="browser.download.useDownloadDir"
-                  onsyncfrompreference="return document.getElementById('download_pane').ReadUseDownloadDir();">
+                  onsyncfrompreference="return document.getElementById('download_pane').readUseDownloadDir();">
         <hbox id="saveToRow">
           <radio id="saveTo" value="true"
                  label="&saveTo.label;"
@@ -82,8 +76,8 @@
                      preference="browser.download.dir"
                      preference-editable="true"
                      aria-labelledby="saveTo"
-                     onsyncfrompreference="document.getElementById('download_pane').DisplayDownloadDirPref();"/>
-          <button id="chooseFolder" oncommand="ChooseFolder();"
+                     onsyncfrompreference="document.getElementById('download_pane').displayDownloadDirPref();"/>
+          <button id="chooseFolder" oncommand="chooseFolder();"
                   label="&chooseDownloadFolder.label;"
                   accesskey="&chooseDownloadFolder.accesskey;"/>
         </hbox>
@@ -94,33 +88,12 @@
     </groupbox>
 
     <groupbox>
-      <caption label="&downloadHistory.label;"/>
-      <hbox align="center">
-        <label value="&removeEntries.label;"
-               accesskey="&removeEntries.accesskey;"
-               control="downloadHistory"/>
-        <menulist id="downloadHistory"
-                  preference="browser.download.manager.retention">
-          <menupopup>
-            <menuitem value="0" label="&whenCompleted.label;"/>
-            <menuitem value="1" label="&whenQuittingApp.label;"/>
-            <menuitem value="2" label="&neverRemove.label;"/>
-          </menupopup>
-        </menulist>
-      </hbox>
-    </groupbox>
-
-    <groupbox>
       <caption label="&finishedBehavior.label;"/>
       <hbox align="center">
         <checkbox id="finishedNotificationSound"
                   label="&playSound.label;"
                   preference="browser.download.finished_download_sound"
                   accesskey="&playSound.accesskey;"/>
-        <checkbox id="finishedNotificationAlert"
-                  label="&showAlert.label;"
-                  preference="browser.download.manager.showAlertOnComplete"
-                  accesskey="&showAlert.accesskey;"/>
       </hbox>
 
       <hbox align="center" class="indent">

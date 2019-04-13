@@ -3,8 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from mailWindow.js */
+
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+
 var ToolbarIconColor = {
-  init: function () {
+  init() {
     this._initialized = true;
 
     window.addEventListener("activate", this);
@@ -18,7 +22,7 @@ var ToolbarIconColor = {
       this.inferFromText();
   },
 
-  uninit: function () {
+  uninit() {
     this._initialized = false;
 
     window.removeEventListener("activate", this);
@@ -26,7 +30,7 @@ var ToolbarIconColor = {
     Services.obs.removeObserver(this, "lightweight-theme-styling-update");
   },
 
-  handleEvent: function (event) {
+  handleEvent(event) {
     switch (event.type) {
       case "activate":
       case "deactivate":
@@ -35,7 +39,7 @@ var ToolbarIconColor = {
     }
   },
 
-  observe: function (aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     switch (aTopic) {
       case "lightweight-theme-styling-update":
         // inferFromText needs to run after LightweightThemeConsumer.jsm's
@@ -45,7 +49,7 @@ var ToolbarIconColor = {
     }
   },
 
-  inferFromText: function () {
+  inferFromText() {
     if (!this._initialized)
       return;
 
@@ -56,9 +60,9 @@ var ToolbarIconColor = {
     }
 
     let toolbarSelector = "toolbox > toolbar:not([collapsed=true])";
-#ifdef XP_MACOSX
-    toolbarSelector += ":not([type=menubar])";
-#endif
+    if (AppConstants.platform == "macosx") {
+      toolbarSelector += ":not([type=menubar])";
+    }
 
     for (let toolbar of document.querySelectorAll(toolbarSelector)) {
       let [r, g, b] = parseRGB(getComputedStyle(toolbar).color);
@@ -68,5 +72,5 @@ var ToolbarIconColor = {
       else
         toolbar.setAttribute("brighttext", "true");
     }
-  }
-}
+  },
+};

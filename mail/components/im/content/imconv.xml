@@ -30,9 +30,12 @@
         <xul:label anonid="unreadCount" class="convUnreadCount"
                    crop="end" mousethrough="never"
                    xbl:inherits="value=unreadCount"/>
-        <xul:label anonid="unreadTargetedCount" class="convUnreadTargetedCount"
-                   crop="end" mousethrough="never"
-                   xbl:inherits="value=unreadTargetedCount"/>
+        <xul:box class="convUnreadTargetedCount"
+                 xbl:inherits="value=unreadTargetedCount">
+          <xul:label anonid="unreadTargetedCount" class="convUnreadTargetedCountLabel"
+                     crop="end" mousethrough="never"
+                     xbl:inherits="value=unreadTargetedCount"/>
+        </xul:box>
         <xul:spacer flex="1000000"/>
       </xul:hbox>
     </content>
@@ -46,7 +49,7 @@
           if (this.hasAttribute("selected"))
             this.convView.switchingToPanel();
           else
-            this.convView.switchingAwayFromPanel();
+            this.convView.switchingAwayFromPanel(true);
         }).observe(this, {attributes: true, attributeFilter: ["selected"]});
       ]]>
      </constructor>
@@ -132,8 +135,7 @@
           this.setAttribute("unreadTargetedCount", "0");
           this.removeAttribute("unread");
           this.removeAttribute("attention");
-        }
-        else {
+        } else {
           let unreadCount = this.conv.unreadIncomingMessageCount;
           let directedMessages = unreadCount;
           if (unreadCount) {
@@ -164,14 +166,13 @@
             this.setAttribute("status", "left");
           else
             this.removeAttribute("status");
-        }
-        else {
+        } else {
           let statusType = Ci.imIStatusInfo.STATUS_UNKNOWN;
           let buddy = this.conv.buddy;
           if (buddy && buddy.account.connected)
             statusType = buddy.statusType;
-          if (!("Status" in window))
-            ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
+
+          const {Status} = ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
           this.setAttribute("status", Status.toAttribute(statusType));
         }
 
@@ -206,8 +207,7 @@
         if (this.log) {
           this.hidden = true;
           delete this.log;
-        }
-        else {
+        } else {
           this.remove();
           delete this.conv;
         }
@@ -243,7 +243,7 @@
         // If a character was typed or the accel+v copy shortcut was used,
         // focus the input box and resend the key event.
         if (aEvent.charCode != 0 && !aEvent.altKey &&
-            (accelKeyPressed && aEvent.charCode == 'v'.charCodeAt(0) ||
+            (accelKeyPressed && aEvent.charCode == "v".charCodeAt(0) ||
              !aEvent.ctrlKey && !aEvent.metaKey)) {
           this.convView.focus();
 
@@ -260,7 +260,7 @@
        <![CDATA[
          let anonid = event.originalTarget.getAttribute("anonid");
          if (anonid == "closeConversationButton") {
-           closeConversation();
+           this.closeConversation();
            event.stopPropagation();
            event.preventDefault();
          }

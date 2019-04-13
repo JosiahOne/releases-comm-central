@@ -8,12 +8,15 @@
  * there don't influence the results here.
  */
 
+"use strict";
+
 var MODULE_NAME = 'test-folder-pane';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['folder-display-helpers'];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 function setupModule(module) {
   collector.getModule('folder-display-helpers').installInto(module);
@@ -38,17 +41,18 @@ function test_all_folders_toggle_folder_open_state() {
   let accounts = 2;
   assert_folder_tree_view_row_count(accounts);
 
-  let inbox = trash = outbox = archives = folderPaneA = 1;
+  let inbox = 1;
+  let trash = 1;
+  let outbox = 1;
+  let archives = 1;
+  let folderPaneA = 1;
   // Create archives folder - this is ugly, but essentially the same as
   // what mailWindowOverlay.js does. We can't use the built-in helper
   // method to create the folder because we need the archive flag to get
   // set before the folder added notification is sent out, which means
   // creating the folder object via RDF, setting the flag, and then
   // creating the storage, which sends the notification.
-  let rdfService = Cc['@mozilla.org/rdf/rdf-service;1']
-                     .getService(Ci.nsIRDFService);
-  folder = rdfService.GetResource(pop3Server.rootFolder.URI + "/Archives").
-           QueryInterface(Ci.nsIMsgFolder);
+  let folder = MailUtils.getOrCreateFolder(pop3Server.rootFolder.URI + "/Archives");
   folder.setFlag(Ci.nsMsgFolderFlags.Archive);
   folder.createStorageIfMissing(null);
   // After creating Archives, account should have expanded

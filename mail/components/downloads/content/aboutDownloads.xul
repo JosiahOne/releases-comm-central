@@ -13,7 +13,7 @@
 ]>
 
 <window id="aboutDownloads"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         xmlns:xhtml="http://www.w3.org/1999/xhtml"
         title="&aboutDownloads.title;"
         onload="DownloadsView.init();">
@@ -23,6 +23,8 @@
           src="chrome://global/content/globalOverlay.js"/>
   <script type="application/javascript"
           src="chrome://messenger/content/downloads/aboutDownloads.js"/>
+  <script type="application/javascript"
+          src="chrome://messenger/content/downloads/downloads-view-item.js"/>
 
   <commandset id="msgDownloadCommands"
               commandupdater="true"

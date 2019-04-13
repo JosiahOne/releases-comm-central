@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {PluralForm} = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
 
 // Copied from nsILookAndFeel.h, see comments on eMetric_AlertNotificationOrigin
 var NS_ALERT_HORIZONTAL = 1;
@@ -56,12 +56,20 @@ function prefillAlertInfo()
   folderSummaryInfoEl.mMaxMsgHdrsInPopup = gNumNewMsgsToShowInAlert;
   for (let folder of fixIterator(allFolders, Ci.nsIMsgFolder))
   {
-    if (folder.hasNewMessages && !folder.getFlag(Ci.nsMsgFolderFlags.Virtual))
-    {
-      var asyncFetch = {};
-      folderSummaryInfoEl.parseFolder(folder, new urlListener(folder), asyncFetch);
-      if (asyncFetch.value)
-        gPendingPreviewFetchRequests++;
+    if (folder.hasNewMessages) {
+      let notify =
+        // Any folder which is an inbox or ...
+        folder.getFlag(Ci.nsMsgFolderFlags.Inbox) ||
+        // any non-special or non-virtual folder. In other words, we don't
+        // notify for Drafts|Trash|SentMail|Templates|Junk|Archive|Queue or virtual.
+        !(folder.flags & (Ci.nsMsgFolderFlags.SpecialUse | Ci.nsMsgFolderFlags.Virtual));
+
+      if (notify) {
+        var asyncFetch = {};
+        folderSummaryInfoEl.parseFolder(folder, new urlListener(folder), asyncFetch);
+        if (asyncFetch.value)
+          gPendingPreviewFetchRequests++;
+      }
     }
   }
 }
@@ -79,7 +87,7 @@ urlListener.prototype =
 
   OnStopRunningUrl: function(aUrl, aExitCode)
   {
-    var folderSummaryInfoEl = document.getElementById('folderSummaryInfo');
+    let folderSummaryInfoEl = document.getElementById("folderSummaryInfo");
     folderSummaryInfoEl.parseFolder(this.mFolder, null, {});
     gPendingPreviewFetchRequests--;
 
@@ -93,11 +101,8 @@ urlListener.prototype =
 function onAlertLoad()
 {
   prefillAlertInfo();
-  // read out our initial settings from prefs.
-  try
-  {
-    gOpenTime = Services.prefs.getIntPref("alerts.totalOpenTime");
-  } catch (ex) {}
+
+  gOpenTime = Services.prefs.getIntPref("alerts.totalOpenTime");
 
   // bogus call to make sure the window is moved offscreen until we are ready for it.
   resizeAlert(true);

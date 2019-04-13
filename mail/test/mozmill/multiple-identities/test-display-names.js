@@ -6,13 +6,16 @@
  * Test that we can open and close a standalone message display window from the
  *  folder pane.
  */
+
+"use strict";
+
 var MODULE_NAME = "test-display-names";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "address-book-helpers"];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var folder;
 var decoyFolder;
@@ -89,9 +92,8 @@ function help_test_display_name(message, field, expectedValue) {
   be_in_folder(folder);
   let curMessage = select_click_row(message);
 
-  let value = mc.window.document.getAnonymousElementByAttribute(
-    mc.a("expanded"+field+"Box", {tagName: "mail-emailaddress"}),
-    "class", "emaillabel").value;
+  let value = mc.e("expanded"+field+"Box", {tagName: "mail-emailaddress"})
+                .querySelector(".emaillabel").value;
 
   if (value != expectedValue)
     throw new Error("got '"+value+"' but expected '"+expectedValue+"'");

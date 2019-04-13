@@ -3,7 +3,7 @@
  * Test suite for nsIMsgFolder functions.
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 function run_test() {
   // Create a local mail account (we need this first)
@@ -23,8 +23,7 @@ function run_test() {
   var caught = false;
   try {
     root.getChildNamed("folder");
-  }
-  catch (e) {
+  } catch (e) {
     caught = true;
   }
   Assert.equal(caught, true);
@@ -32,8 +31,7 @@ function run_test() {
   caught = false;
   try {
     root.getChildNamed("Trash1");
-  }
-  catch (e) {
+  } catch (e) {
     caught = true;
   }
   Assert.equal(caught, true);

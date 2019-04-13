@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from ../content/calendar-views.js */
+
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Object that contains a set of filter properties that may be used by a calFilter object
@@ -18,7 +19,7 @@ ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
  *               to reflect changes in the current date and time, and changes to the view.
  *
  *
- *                 The properties may be set to one of the folowing values:
+ *                 The properties may be set to one of the following values:
  *               - FILTER_DATE_ALL: An unbound date range.
  *               - FILTER_DATE_XXX: One of the defined relative date ranges.
  *               - A string that may be converted to a calIDuration object that will be used
@@ -50,7 +51,7 @@ ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
  *
  *   category:     Specifies the filter property for the item category.
  *
- *                 The property may be set to one of the folowing values:
+ *                 The property may be set to one of the following values:
  *               - null: The item category will not be considered when filtering.
  *               - A string: The item will match the filter if any of it's categories match the
  *               category specified by the property.
@@ -59,7 +60,7 @@ ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
  *
  *   occurrences:  Specifies the filter property for returning occurrences of repeating items.
  *
- *                 The property may be set to one of the folowing values:
+ *                 The property may be set to one of the following values:
  *               - null, FILTER_OCCURRENCES_BOUND: The default occurrence handling. Occurrences
  *               will be returned only for date ranges with a bound end date.
  *               - FILTER_OCCURRENCES_NONE: Only the parent items will be returned.
@@ -163,7 +164,7 @@ function calFilter() {
     this.wrappedJSObject = this;
     this.mFilterProperties = new calFilterProperties();
     this.initDefinedFilters();
-    this.mMaxIterations = Preferences.get("calendar.filter.maxiterations", 50);
+    this.mMaxIterations = Services.prefs.getIntPref("calendar.filter.maxiterations", 50);
 }
 
 calFilter.prototype = {
@@ -329,7 +330,7 @@ calFilter.prototype = {
      *                            not previously defined.
      */
     getDefinedFilterName: function(aFilterProperties) {
-        for (filter in this.mDefinedFilters) {
+        for (let filter in this.mDefinedFilters) {
             if (this.mDefinedFilters[filter].equals(aFilterProperties)) {
                 return filter;
             }
@@ -777,9 +778,11 @@ calFilter.prototype = {
                     // there are no more occurrences
                     return null;
                 }
+
                 if (this.isItemInFilters(next)) {
                     return next;
                 }
+                next.QueryInterface(Ci.calIEvent);
                 start = next.startDate || next.entryDate;
             }
 
@@ -792,6 +795,7 @@ calFilter.prototype = {
             let exMatch = null;
             aItem.recurrenceInfo.getExceptionIds({}).forEach(function(rID) {
                 let ex = aItem.recurrenceInfo.getExceptionFor(rID);
+                ex.QueryInterface(Ci.calIEvent);
                 if (ex && cal.dtz.now().compare(ex.startDate || ex.entryDate) < 0 &&
                     this.isItemInFilters(ex)) {
                     exMatch = ex;
@@ -899,7 +903,7 @@ calFilter.prototype = {
         let endDate = this.endDate;
 
         // we only want occurrences returned from calICalendar.getItems() with a default
-        // occurence filter property and a bound date range, otherwise the local listener
+        // occurrence filter property and a bound date range, otherwise the local listener
         // will handle occurrence expansion.
         if (!props.occurrences && this.endDate) {
             filter |= aCalendar.ITEM_FILTER_CLASS_OCCURRENCES;

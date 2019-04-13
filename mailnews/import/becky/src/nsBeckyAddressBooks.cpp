@@ -7,7 +7,7 @@
 #include "nsComponentManagerUtils.h"
 #include "nsServiceManagerUtils.h"
 #include "nsIFile.h"
-#include "nsISimpleEnumerator.h"
+#include "nsIDirectoryEnumerator.h"
 #include "nsIMutableArray.h"
 #include "nsString.h"
 #include "nsAbBaseCID.h"
@@ -156,17 +156,14 @@ nsBeckyAddressBooks::HasAddressBookFile(nsIFile *aDirectory)
   if (NS_FAILED(rv) || !isDirectory)
     return false;
 
-  nsCOMPtr<nsISimpleEnumerator> entries;
+  nsCOMPtr<nsIDirectoryEnumerator> entries;
   rv = aDirectory->GetDirectoryEntries(getter_AddRefs(entries));
   NS_ENSURE_SUCCESS(rv, false);
 
   bool more;
-  nsCOMPtr<nsISupports> entry;
   while (NS_SUCCEEDED(entries->HasMoreElements(&more)) && more) {
-    rv = entries->GetNext(getter_AddRefs(entry));
-    NS_ENSURE_SUCCESS(rv, false);
-
-    nsCOMPtr<nsIFile> file = do_QueryInterface(entry, &rv);
+    nsCOMPtr<nsIFile> file;
+    rv = entries->GetNextFile(getter_AddRefs(file));
     NS_ENSURE_SUCCESS(rv, false);
     if (IsAddressBookFile(file))
       return true;
@@ -187,18 +184,15 @@ nsBeckyAddressBooks::CountAddressBookSize(nsIFile *aDirectory)
   if (NS_FAILED(rv) || !isDirectory)
     return 0;
 
-  nsCOMPtr<nsISimpleEnumerator> entries;
+  nsCOMPtr<nsIDirectoryEnumerator> entries;
   rv = aDirectory->GetDirectoryEntries(getter_AddRefs(entries));
   NS_ENSURE_SUCCESS(rv, 0);
 
   uint32_t total = 0;
   bool more;
-  nsCOMPtr<nsISupports> entry;
   while (NS_SUCCEEDED(entries->HasMoreElements(&more)) && more) {
-    rv = entries->GetNext(getter_AddRefs(entry));
-    NS_ENSURE_SUCCESS(rv, 0);
-
-    nsCOMPtr<nsIFile> file = do_QueryInterface(entry, &rv);
+    nsCOMPtr<nsIFile> file;
+    rv = entries->GetNextFile(getter_AddRefs(file));
     NS_ENSURE_SUCCESS(rv, 0);
 
     int64_t size;
@@ -244,17 +238,14 @@ nsBeckyAddressBooks::CollectAddressBooks(nsIFile *aTarget,
   nsresult rv = AppendAddressBookDescriptor(aTarget, aCollected);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsISimpleEnumerator> entries;
+  nsCOMPtr<nsIDirectoryEnumerator> entries;
   rv = aTarget->GetDirectoryEntries(getter_AddRefs(entries));
   NS_ENSURE_SUCCESS(rv, rv);
 
   bool more;
-  nsCOMPtr<nsISupports> entry;
   while (NS_SUCCEEDED(entries->HasMoreElements(&more)) && more) {
-    rv = entries->GetNext(getter_AddRefs(entry));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    nsCOMPtr<nsIFile> file = do_QueryInterface(entry, &rv);
+    nsCOMPtr<nsIFile> file;
+    rv = entries->GetNextFile(getter_AddRefs(file));
     NS_ENSURE_SUCCESS(rv, rv);
 
     bool isDirectory = false;
@@ -318,18 +309,15 @@ nsBeckyAddressBooks::ImportAddressBook(nsIImportABDescriptor *aSource,
   nsresult rv = aSource->GetAbFile(getter_AddRefs(file));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsISimpleEnumerator> entries;
+  nsCOMPtr<nsIDirectoryEnumerator> entries;
   rv = file->GetDirectoryEntries(getter_AddRefs(entries));
   NS_ENSURE_SUCCESS(rv, rv);
 
   bool more;
-  nsCOMPtr<nsISupports> entry;
   nsAutoString error;
   while (NS_SUCCEEDED(entries->HasMoreElements(&more)) && more) {
-    rv = entries->GetNext(getter_AddRefs(entry));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    nsCOMPtr<nsIFile> file = do_QueryInterface(entry, &rv);
+    nsCOMPtr<nsIFile> file;
+    rv = entries->GetNextFile(getter_AddRefs(file));
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (!IsAddressBookFile(file))

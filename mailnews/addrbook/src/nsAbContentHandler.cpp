@@ -8,7 +8,7 @@
 #include "nsNetUtil.h"
 #include "nsCOMPtr.h"
 #include "nsAutoPtr.h"
-#include "NullPrincipal.h"
+#include "mozilla/NullPrincipal.h"
 #include "nsISupportsPrimitives.h"
 #include "plstr.h"
 #include "nsPIDOMWindow.h"
@@ -72,8 +72,6 @@ nsAbContentHandler::HandleContent(const char *aContentType,
             nsCOMPtr<mozIDOMWindowProxy> domWindow = do_GetInterface(aWindowContext);
             NS_ENSURE_TRUE(domWindow, NS_ERROR_FAILURE);
             nsCOMPtr<nsPIDOMWindowOuter> parentWindow = nsPIDOMWindowOuter::From(domWindow);
-            parentWindow = parentWindow->GetOuterWindow();
-            NS_ENSURE_ARG_POINTER(parentWindow);
 
             nsCOMPtr<nsIAbManager> ab =
               do_GetService(NS_ABMANAGER_CONTRACTID, &rv);
@@ -175,8 +173,6 @@ nsAbContentHandler::OnStreamComplete(nsIStreamLoader *aLoader,
       nsCOMPtr<mozIDOMWindowProxy> domWindow = do_GetInterface(aContext);
       NS_ENSURE_TRUE(domWindow, NS_ERROR_FAILURE);
       nsCOMPtr<nsPIDOMWindowOuter> parentWindow = nsPIDOMWindowOuter::From(domWindow);
-      parentWindow = parentWindow->GetOuterWindow();
-      NS_ENSURE_ARG_POINTER(parentWindow);
 
       nsCOMPtr<nsPIDOMWindowOuter> dialogWindow;
       rv = parentWindow->OpenDialog(

@@ -2,13 +2,26 @@
 
 module.exports = {
     globals: {
+        __file__: true,
         elementslib: true,
         controller: true,
         mozmill: true,
         utils: true,
         require: true,
         exports: true,
-        module: true
+        module: true,
+        registeredFunctions: true,
+        collector: true,
+        persisted: true,
+
+        lookup: true,
+        eid: true,
+        xpath: true,
+        sleep: true,
+        getEventBoxPath: true,
+        lookupEventBox: true,
+        iframeLookup: true,
+        getDateTimePicker: true,
     },
     rules: {
         // Allow mozmill test methods to be used without warning

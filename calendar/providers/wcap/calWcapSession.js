@@ -4,11 +4,11 @@
 
 /* exported getWcapSessionFor */
 
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from calWcapCalendarModule.js */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function calWcapTimezone(tzProvider, tzid_, component_) {
     this.wrappedJSObject = this;
@@ -109,13 +109,13 @@ var calWcapSessionInterfaces = [
     calIWcapSession,
     calIFreeBusyProvider,
     calICalendarSearchProvider,
-    Components.interfaces.calITimezoneProvider,
-    Components.interfaces.calICalendarManagerObserver
+    Ci.calITimezoneProvider,
+    Ci.calICalendarManagerObserver
 ];
 calWcapSession.prototype = {
     classID: calWcapSessionClassID,
     QueryInterface: cal.generateQI(calWcapSessionInterfaces),
-    classInfo: XPCOMUtils.generateCI({
+    classInfo: cal.generateCI({
         classID: calWcapSessionClassID,
         contractID: "@mozilla.org/calendar/wcap/session;1",
         classDescription: "Sun Java System Calendar Server WCAP Session",
@@ -150,10 +150,13 @@ calWcapSession.prototype = {
         }
         return { // nsIUTF8StringEnumerator:
             m_index: 0,
+            [Symbol.iterator]: function() {
+                return tzids.values();
+            },
             getNext: function() {
                 if (this.m_index >= tzids) {
                     cal.ASSERT(false, "calWcapSession::timezoneIds enumerator!");
-                    throw Components.results.NS_ERROR_UNEXPECTED;
+                    throw Cr.NS_ERROR_UNEXPECTED;
                 }
                 return tzids[this.m_index++];
             },
@@ -180,7 +183,7 @@ calWcapSession.prototype = {
     getServerTime: function(localTime) {
         if (this.m_serverTimeDiff === null) {
             throw new Components.Exception("early run into getServerTime()!",
-                                           Components.results.NS_ERROR_NOT_AVAILABLE);
+                                           Cr.NS_ERROR_NOT_AVAILABLE);
         }
         let ret = (localTime ? localTime.clone() : getTime());
         ret.addDuration(this.m_serverTimeDiff);
@@ -303,7 +306,16 @@ calWcapSession.prototype = {
                     } else {
                         if (outSavePW.value) {
                             // so try to remove old pw from db first:
-                            cal.auth.passwordManagerSave(outUser.value, outPW.value, this.uri.spec, "wcap login");
+                            try {
+                                cal.auth.passwordManagerSave(outUser.value, outPW.value, this.uri.spec, "wcap login");
+                            } catch (e) {
+                                // User might have cancelled the master password prompt, or password saving
+                                // could be disabled. That is ok, throw for everything else.
+                                if (e.result != Cr.NS_ERROR_ABORT &&
+                                    e.result != Cr.NS_ERROR_NOT_AVAILABLE) {
+                                    throw e;
+                                }
+                            }
                         }
                         this.credentials.userId = outUser.value;
                         this.credentials.pw = outPW.value; // eslint-disable-line id-length
@@ -397,7 +409,7 @@ calWcapSession.prototype = {
                                     if (err) {
                                         throw err;
                                     }
-                                    stringToXml(this, str, -1 /* logout successfull */);
+                                    stringToXml(this, str, -1 /* logout successful */);
                                 }, url);
         } else {
             request.execRespFunc();
@@ -607,7 +619,7 @@ calWcapSession.prototype = {
                                 throw oprequest.status;
                             }
                             if (result.length < 1) {
-                                throw Components.results.NS_ERROR_UNEXPECTED;
+                                throw Cr.NS_ERROR_UNEXPECTED;
                             }
                             for (let calendar of result) {
                                 // user may have dangling users referred in his subscription list, so
@@ -1127,7 +1139,7 @@ function confirmInsecureLogin(uri) {
             }
             confirmedEntry = (bConfirmed ? "1" : "0");
             newConfirmedLogins += encodedHost + ":" + confirmedEntry;
-            Preferences.set("calendar.wcap.confirmed_http_logins", newConfirmedLogins);
+            Services.prefs.setStringPref("calendar.wcap.confirmed_http_logins", newConfirmedLogins);
             getPref("calendar.wcap.confirmed_http_logins"); // log written entry
             confirmInsecureLogin.m_confirmedHttpLogins[encodedHost] = confirmedEntry;
         }

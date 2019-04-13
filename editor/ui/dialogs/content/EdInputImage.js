@@ -2,21 +2,26 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+/* import-globals-from EdImageDialog.js */
+
 // dialog initialization code
 
-function Startup()
-{
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+function Startup() {
   var editor = GetCurrentEditor();
-  if (!editor)
-  {
+  if (!editor) {
     window.close();
     return;
   }
 
   gDialog = {
-    inputName:      document.getElementById( "InputName" ),
-    inputDisabled:  document.getElementById( "InputDisabled" ),
-    inputTabIndex:  document.getElementById( "InputTabIndex" )
+    inputName:      document.getElementById("InputName"),
+    inputDisabled:  document.getElementById("InputDisabled"),
+    inputTabIndex:  document.getElementById("InputTabIndex"),
   };
 
   ImageStartup();
@@ -27,23 +32,19 @@ function Startup()
     imageElement = editor.getSelectedElement(tagName);
   } catch (e) {}
 
-  if (imageElement)
-  {
+  if (imageElement) {
     // We found an element and don't need to insert one
     gInsertNewImage = false;
-  }
-  else
-  {
+  } else {
     gInsertNewImage = true;
 
     // We don't have an element selected,
     //  so create one with default attributes
     try {
       imageElement = editor.createElementWithDefaults(tagName);
-    } catch(e) {}
+    } catch (e) {}
 
-    if (!imageElement )
-    {
+    if (!imageElement) {
       dump("Failed to get selected element or create a new one!\n");
       window.close();
       return;
@@ -51,13 +52,12 @@ function Startup()
     var imgElement;
     try {
       imgElement = editor.getSelectedElement("img");
-    } catch(e) {}
+    } catch (e) {}
 
-    if (imgElement)
-    {
+    if (imgElement) {
       // We found an image element, convert it to an input type="image"
       var attributes = ["src", "alt", "width", "height", "hspace", "vspace", "border", "align", "usemap", "ismap"];
-      for (i in attributes)
+      for (let i in attributes)
         imageElement.setAttribute(attributes[i], imgElement.getAttribute(attributes[i]));
     }
   }
@@ -83,16 +83,14 @@ function Startup()
   SetWindowLocation();
 }
 
-function InitDialog()
-{
+function InitDialog() {
   InitImage();
   gDialog.inputName.value = globalElement.getAttribute("name");
   gDialog.inputDisabled.setAttribute("checked", globalElement.hasAttribute("disabled"));
   gDialog.inputTabIndex.value = globalElement.getAttribute("tabindex");
 }
 
-function ValidateData()
-{
+function ValidateData() {
   if (!ValidateImage())
     return false;
   if (gDialog.inputName.value)
@@ -111,45 +109,36 @@ function ValidateData()
   return true;
 }
 
-function onAccept()
-{
+function onAccept(event) {
   // Show alt text error only once
   // (we don't initialize doAltTextError=true
   //  so Advanced edit button dialog doesn't trigger that error message)
   // Use this now (default = false) so Advanced Edit button dialog doesn't trigger error message
   gDoAltTextError = true;
 
-  if (ValidateData())
-  {
-
+  if (ValidateData()) {
     var editor = GetCurrentEditor();
     editor.beginTransaction();
 
     try {
-      if (gRemoveImageMap)
-      {
+      if (gRemoveImageMap) {
         globalElement.removeAttribute("usemap");
-        if (gImageMap)
-        {
+        if (gImageMap) {
           editor.deleteNode(gImageMap);
           gInsertNewIMap = true;
           gImageMap = null;
         }
-      }
-      else if (gImageMap)
-      {
+      } else if (gImageMap) {
         // Assign to map if there is one
         var mapName = gImageMap.getAttribute("name");
-        if (mapName != "")
-        {
-          globalElement.setAttribute("usemap", ("#"+mapName));
+        if (mapName != "") {
+          globalElement.setAttribute("usemap", ("#" + mapName));
           if (globalElement.getAttribute("border") == "")
             globalElement.setAttribute("border", 0);
         }
       }
 
-      if (gInsertNewImage)
-      {
+      if (gInsertNewImage) {
         // 'true' means delete the selection before inserting
         // in case were are converting an image to an input type="image"
         editor.insertElementAtSelection(imageElement, true);
@@ -158,8 +147,7 @@ function onAccept()
 
       // If document is empty, the map element won't insert,
       //  so always insert the image element first
-      if (gImageMap && gInsertNewIMap)
-      {
+      if (gImageMap && gInsertNewIMap) {
         // Insert the ImageMap element at beginning of document
         var body = editor.rootElement;
         editor.setShouldTxnSetSelection(false);
@@ -172,8 +160,8 @@ function onAccept()
 
     SaveWindowLocation();
 
-    return true;
+    return;
   }
-  return false;
+  event.preventDefault();
 }
 

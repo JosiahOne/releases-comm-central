@@ -2,17 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-
 /*
  * Test the many horrors involving right-clicks, middle clicks, and selections.
  */
+
+"use strict";
 
 var MODULE_NAME = 'test-right-click-middle-click-messages';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['folder-display-helpers', 'window-helpers'];
+
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 
 var folder, threadedFolder;
 
@@ -75,9 +76,8 @@ function test_right_click_column_header_shows_col_picker() {
   //   |- hbox                item 0
   //   |- treecolpicker   <-- item 1 this is the one we want
   let threadCols = mc.window.document.getElementById("threadCols");
-  let treeColPicker = mc.window.document.getAnonymousNodes(threadCols).item(1);
-  let popup = mc.window.document.getAnonymousElementByAttribute(
-                treeColPicker, "anonid", "popup");
+  let treeColPicker = threadCols.querySelector("treecolpicker");
+  let popup = treeColPicker.querySelector("[anonid=popup]");
 
   // Right click the subject column header
   // This should show the column picker popup.
@@ -85,7 +85,7 @@ function test_right_click_column_header_shows_col_picker() {
 
   // Check that the popup opens.
   wait_for_popup_to_open(popup);
-  // Hide it again, we just wanted to know it was gonna be shown.
+  // Hide it again, we just wanted to know it was going to be shown.
   close_popup(mc, new elib.Elem(popup));
 }
 
@@ -318,12 +318,12 @@ function _middle_click_on_collapsed_thread_root_helper(aBackground) {
 
   let folderTab = mc.tabmail.currentTabInfo;
 
-  let treeBox = mc.threadTree.treeBoxObject;
+  let tree = mc.threadTree;
   // Scroll to the top, then to the bottom
-  treeBox.ensureRowIsVisible(0);
-  treeBox.scrollByLines(mc.folderDisplay.view.dbView.rowCount);
+  tree.ensureRowIsVisible(0);
+  tree.scrollByLines(mc.folderDisplay.view.dbView.rowCount);
   // Note the first visible row
-  let preFirstRow = treeBox.getFirstVisibleRow();
+  let preFirstRow = tree.getFirstVisibleRow();
 
   // Since reflowing a tree (eg when switching tabs) ensures that the current
   // index is brought into view, we need to set the current index so that we
@@ -342,9 +342,9 @@ function _middle_click_on_collapsed_thread_root_helper(aBackground) {
   }
 
   // Make sure the first visible row is still the same
-  if (treeBox.getFirstVisibleRow() != preFirstRow)
+  if (tree.getFirstVisibleRow() != preFirstRow)
     throw new Error("The first visible row should have been " + preFirstRow +
-        ", but is actually " + treeBox.getFirstVisibleRow() + ".");
+        ", but is actually " + tree.getFirstVisibleRow() + ".");
 
   close_tab(tabMessage);
 }
@@ -360,13 +360,13 @@ function _middle_click_on_expanded_thread_root_helper(aBackground) {
 
   let folderTab = mc.tabmail.currentTabInfo;
 
-  let treeBox = mc.threadTree.treeBoxObject;
+  let tree = mc.threadTree;
   // Scroll to the top, then to near (but not exactly) the bottom
-  treeBox.ensureRowIsVisible(0);
-  treeBox.scrollToRow(mc.folderDisplay.view.dbView.rowCount -
-      treeBox.getPageLength() - (NUM_MESSAGES_IN_THREAD / 2));
+  tree.ensureRowIsVisible(0);
+  tree.scrollToRow(mc.folderDisplay.view.dbView.rowCount -
+      tree.getPageLength() - (NUM_MESSAGES_IN_THREAD / 2));
   // Note the first visible row
-  let preFirstRow = treeBox.getFirstVisibleRow();
+  let preFirstRow = tree.getFirstVisibleRow();
 
   // Since reflowing a tree (eg when switching tabs) ensures that the current
   // index is brought into view, we need to set the current index so that we
@@ -385,9 +385,9 @@ function _middle_click_on_expanded_thread_root_helper(aBackground) {
   }
 
   // Make sure the first visible row is still the same
-  if (treeBox.getFirstVisibleRow() != preFirstRow)
+  if (tree.getFirstVisibleRow() != preFirstRow)
     throw new Error("The first visible row should have been " + preFirstRow +
-        ", but is actually " + treeBox.getFirstVisibleRow() + ".");
+        ", but is actually " + tree.getFirstVisibleRow() + ".");
 
   close_tab(tabMessage);
 }
@@ -397,18 +397,18 @@ function _middle_click_on_expanded_thread_root_helper(aBackground) {
  *
  * @param aTests an array of test names
  */
+var global = this;
 function _generate_background_foreground_tests(aTests) {
-  let self = this;
   for (let test of aTests) {
-    let helperFunc = this["_" + test + "_helper"];
-    this["test_" + test + "_background"] = function() {
+    let helperFunc = global["_" + test + "_helper"];
+    global["test_" + test + "_background"] = function() {
       set_context_menu_background_tabs(true);
-      helperFunc.apply(self, [true]);
+      helperFunc(true);
       reset_context_menu_background_tabs();
     };
-    this["test_" + test + "_foreground"] = function() {
+    global["test_" + test + "_foreground"] = function() {
       set_context_menu_background_tabs(false);
-      helperFunc.apply(self, [false]);
+      helperFunc(false);
       reset_context_menu_background_tabs();
     };
   }

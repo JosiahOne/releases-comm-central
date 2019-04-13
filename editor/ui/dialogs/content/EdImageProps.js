@@ -2,6 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+/* import-globals-from EdImageDialog.js */
+
 var gAnchorElement = null;
 var gLinkElement = null;
 var gOriginalHref = "";
@@ -9,11 +13,12 @@ var gHNodeArray = {};
 
 // dialog initialization code
 
-function Startup()
-{
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+function Startup() {
   var editor = GetCurrentEditor();
-  if (!editor)
-  {
+  if (!editor) {
     window.close();
     return;
   }
@@ -27,15 +32,12 @@ function Startup()
 
   // Get a single selected image element
   var tagName = "img";
-  if ("arguments" in window && window.arguments[0])
-  {
+  if ("arguments" in window && window.arguments[0]) {
     imageElement = window.arguments[0];
     // We've been called from form field properties, so we can't insert a link
     gDialog.linkTab.remove();
     gDialog.linkTab = null;
-  }
-  else
-  {
+  } else {
     // First check for <input type="image">
     try {
       imageElement = editor.getSelectedElement("input");
@@ -47,31 +49,25 @@ function Startup()
           gAnchorElement = editor.getElementOrParentByTagName("href", imageElement);
       }
     } catch (e) {}
-
   }
 
-  if (imageElement)
-  {
+  if (imageElement) {
     // We found an element and don't need to insert one
-    if (imageElement.hasAttribute("src"))
-    {
+    if (imageElement.hasAttribute("src")) {
       gInsertNewImage = false;
       gActualWidth  = imageElement.naturalWidth;
       gActualHeight = imageElement.naturalHeight;
     }
-  }
-  else
-  {
+  } else {
     gInsertNewImage = true;
 
     // We don't have an element selected,
     //  so create one with default attributes
     try {
       imageElement = editor.createElementWithDefaults(tagName);
-    } catch(e) {}
+    } catch (e) {}
 
-    if (!imageElement)
-    {
+    if (!imageElement) {
       dump("Failed to get selected element or create a new one!\n");
       window.close();
       return;
@@ -88,14 +84,11 @@ function Startup()
   gHaveDocumentUrl = GetDocumentBaseUrl();
 
   InitDialog();
-  if (gAnchorElement)
-  {
+  if (gAnchorElement) {
     gOriginalHref = gAnchorElement.getAttribute("href");
     // Make a copy to use for AdvancedEdit
     gLinkElement = gAnchorElement.cloneNode(false);
-  }
-  else
-  {
+  } else {
     gLinkElement = editor.createElementWithDefaults("a");
   }
   gDialog.hrefInput.value = gOriginalHref;
@@ -112,13 +105,12 @@ function Startup()
     gDialog.heightUnitsMenulist.selectedIndex == 0;
 
   // Start in "Link" tab if 2nd argument is true
-  if (gDialog.linkTab && "arguments" in window && window.arguments[1])
-  {
+  if (gDialog.linkTab && "arguments" in window && window.arguments[1]) {
     document.getElementById("TabBox").selectedTab = gDialog.linkTab;
     SetTextboxFocus(gDialog.hrefInput);
-  }
-  else
+  } else {
     SetTextboxFocus(gDialog.srcInput);
+  }
 
   SetWindowLocation();
 }
@@ -126,15 +118,13 @@ function Startup()
 // Set dialog widgets with attribute data
 // We get them from globalElement copy so this can be used
 //   by AdvancedEdit(), which is shared by all property dialogs
-function InitDialog()
-{
+function InitDialog() {
   InitImage();
   var border = TrimString(gDialog.border.value);
   gDialog.showLinkBorder.checked = border != "" && border > 0;
 }
 
-function ChangeLinkLocation()
-{
+function ChangeLinkLocation() {
   var href = TrimString(gDialog.hrefInput.value);
   SetRelativeCheckbox(gDialog.makeRelativeLink);
   gDialog.showLinkBorder.disabled = !href;
@@ -142,58 +132,45 @@ function ChangeLinkLocation()
   gLinkElement.setAttribute("href", href);
 }
 
-function ToggleShowLinkBorder()
-{
-  if (gDialog.showLinkBorder.checked)
-  {
+function ToggleShowLinkBorder() {
+  if (gDialog.showLinkBorder.checked) {
     var border = TrimString(gDialog.border.value);
     if (!border || border == "0")
       gDialog.border.value = "2";
-  }
-  else
-  {
+  } else {
     gDialog.border.value = "0";
   }
 }
 
 // Get data from widgets, validate, and set for the global element
 //   accessible to AdvancedEdit() [in EdDialogCommon.js]
-function ValidateData()
-{
+function ValidateData() {
   return ValidateImage();
 }
 
-function onAccept()
-{
+function onAccept(event) {
   // Use this now (default = false) so Advanced Edit button dialog doesn't trigger error message
   gDoAltTextError = true;
 
-  if (ValidateData())
-  {
-    if ("arguments" in window && window.arguments[0])
-    {
+  if (ValidateData()) {
+    if ("arguments" in window && window.arguments[0]) {
       SaveWindowLocation();
-      return true;
+      return;
     }
 
     var editor = GetCurrentEditor();
 
     editor.beginTransaction();
 
-    try
-    {
-      if (gRemoveImageMap)
-      {
+    try {
+      if (gRemoveImageMap) {
         globalElement.removeAttribute("usemap");
-        if (gImageMap)
-        {
+        if (gImageMap) {
           editor.deleteNode(gImageMap);
           gInsertNewIMap = true;
           gImageMap = null;
         }
-      }
-      else if (gImageMap)
-      {
+      } else if (gImageMap) {
         // un-comment to see that inserting image maps does not work!
         /*
         gImageMap = editor.createElementWithDefaults("map");
@@ -207,9 +184,8 @@ function onAccept()
 
         // Assign to map if there is one
         var mapName = gImageMap.getAttribute("name");
-        if (mapName != "")
-        {
-          globalElement.setAttribute("usemap", ("#"+mapName));
+        if (mapName != "") {
+          globalElement.setAttribute("usemap", ("#" + mapName));
           if (globalElement.getAttribute("border") == "")
             globalElement.setAttribute("border", 0);
         }
@@ -217,52 +193,43 @@ function onAccept()
 
       // Create or remove the link as appropriate
       var href = gDialog.hrefInput.value;
-      if (href != gOriginalHref)
-      {
-        if (href && !gInsertNewImage)
-        {
+      if (href != gOriginalHref) {
+        if (href && !gInsertNewImage) {
           EditorSetTextProperty("a", "href", href);
           // gAnchorElement is needed for cloning attributes later.
           if (!gAnchorElement)
             gAnchorElement = editor.getElementOrParentByTagName("href", imageElement);
-        }
-        else
-        {
+        } else {
           EditorRemoveTextProperty("href", "");
         }
       }
 
       // If inside a link, always write the 'border' attribute
-      if (href)
-      {
-        if (gDialog.showLinkBorder.checked)
-        {
+      if (href) {
+        if (gDialog.showLinkBorder.checked) {
           // Use default = 2 if border attribute is empty
           if (!globalElement.hasAttribute("border"))
             globalElement.setAttribute("border", "2");
-        }
-        else
+        } else {
           globalElement.setAttribute("border", "0");
+        }
       }
 
-      if (gInsertNewImage)
-      {
+      if (gInsertNewImage) {
         if (href) {
           gLinkElement.appendChild(imageElement);
           editor.insertElementAtSelection(gLinkElement, true);
-        }
-        else
+        } else {
           // 'true' means delete the selection before inserting
           editor.insertElementAtSelection(imageElement, true);
+        }
       }
 
       // Check to see if the link was to a heading
       // Do this last because it moves the caret (BAD!)
-      if (href in gHNodeArray)
-      {
+      if (href in gHNodeArray) {
         var anchorNode = editor.createElementWithDefaults("a");
-        if (anchorNode)
-        {
+        if (anchorNode) {
           anchorNode.name = href.substr(1);
           // Remember to use editor method so it is undoable!
           editor.insertNode(anchorNode, gHNodeArray[href], 0, false);
@@ -276,33 +243,29 @@ function onAccept()
 
       // If document is empty, the map element won't insert,
       //  so always insert the image first
-      if (gImageMap && gInsertNewIMap)
-      {
+      if (gImageMap && gInsertNewIMap) {
         // Insert the ImageMap element at beginning of document
         var body = editor.rootElement;
         editor.setShouldTxnSetSelection(false);
         editor.insertNode(gImageMap, body, 0);
         editor.setShouldTxnSetSelection(true);
       }
-    }
-    catch (e)
-    {
+    } catch (e) {
       dump(e);
     }
 
     editor.endTransaction();
 
     SaveWindowLocation();
-    return true;
+    return;
   }
 
   gDoAltTextError = false;
 
-  return false;
+  event.preventDefault();
 }
 
-function onLinkAdvancedEdit()
-{
+function onLinkAdvancedEdit() {
   window.AdvancedEditOK = false;
   window.openDialog("chrome://editor/content/EdAdvancedEdit.xul", "_blank",
                     "chrome,close,titlebar,modal,resizable=yes", "",

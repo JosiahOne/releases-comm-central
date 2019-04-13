@@ -60,8 +60,10 @@ NS_IMETHODIMP nsAbView::ClearView()
 {
   mDirectory = nullptr;
   mAbViewListener = nullptr;
-  if (mTree)
-    mTree->SetView(nullptr);
+  if (mTree) {
+    IgnoredErrorResult rv2;
+    mTree->SetView(nullptr, mozilla::dom::CallerType::System, rv2);
+  }
   mTree = nullptr;
   mTreeSelection = nullptr;
 
@@ -86,7 +88,7 @@ NS_IMETHODIMP nsAbView::ClearView()
 
   int32_t i = mCards.Length();
   while(i-- > 0)
-    NS_ASSERTION(NS_SUCCEEDED(RemoveCardAt(i)), "remove card failed\n");
+    NS_ASSERTION(NS_SUCCEEDED(RemoveCardAt(i)), "remove card failed");
 
   return NS_OK;
 }
@@ -105,8 +107,7 @@ nsresult nsAbView::RemoveCardAt(int32_t row)
 
   // This needs to happen after we remove the card, as RowCountChanged() will call GetRowCount()
   if (mTree) {
-    rv = mTree->RowCountChanged(row, -1);
-    NS_ENSURE_SUCCESS(rv,rv);
+    mTree->RowCountChanged(row, -1);
   }
 
   if (mAbViewListener && !mSuppressCountChange) {
@@ -172,7 +173,8 @@ NS_IMETHODIMP nsAbView::SetView(nsIAbDirectory *aAddressBook,
   {
     // Try and speed deletion of old cards by disconnecting the tree from us.
     mTreeSelection->ClearSelection();
-    mTree->SetView(nullptr);
+    IgnoredErrorResult rv2;
+    mTree->SetView(nullptr, mozilla::dom::CallerType::System, rv2);
   }
 
   // Clear out old cards
@@ -180,7 +182,7 @@ NS_IMETHODIMP nsAbView::SetView(nsIAbDirectory *aAddressBook,
   while(i-- > 0)
   {
     rv = RemoveCardAt(i);
-    NS_ASSERTION(NS_SUCCEEDED(rv), "remove card failed\n");
+    NS_ASSERTION(NS_SUCCEEDED(rv), "remove card failed");
   }
 
   // We replace all cards so any sorting is no longer valid.
@@ -508,7 +510,7 @@ nsresult nsAbView::RefreshTree()
     // Although the selection hasn't changed, the card that is selected may need
     // to be displayed differently, therefore pretend that the selection has
     // changed to force that update.
-    SelectionChanged();
+    SelectionChangedXPCOM();
   }
 
   return rv;
@@ -523,7 +525,7 @@ NS_IMETHODIMP nsAbView::GetCellText(int32_t row, nsTreeColumn* col, nsAString& _
   return GetCardValue(card, colID, _retval);
 }
 
-NS_IMETHODIMP nsAbView::SetTree(nsITreeBoxObject *tree)
+NS_IMETHODIMP nsAbView::SetTree(mozilla::dom::XULTreeElement *tree)
 {
   mTree = tree;
   return NS_OK;
@@ -545,12 +547,13 @@ nsresult nsAbView::InvalidateTree(int32_t row)
     return NS_OK;
 
   if (row == ALL_ROWS)
-    return mTree->Invalidate();
+    mTree->Invalidate();
   else
-    return mTree->InvalidateRow(row);
+    mTree->InvalidateRow(row);
+  return NS_OK;
 }
 
-NS_IMETHODIMP nsAbView::SelectionChanged()
+NS_IMETHODIMP nsAbView::SelectionChangedXPCOM()
 {
   if (mAbViewListener && !mSuppressSelectionChange) {
     nsresult rv = mAbViewListener->OnSelectionChanged();
@@ -565,11 +568,6 @@ NS_IMETHODIMP nsAbView::CycleCell(int32_t row, nsTreeColumn* col)
 }
 
 NS_IMETHODIMP nsAbView::IsEditable(int32_t row, nsTreeColumn* col, bool* _retval)
-{
-    return NS_ERROR_NOT_IMPLEMENTED;
-}
-
-NS_IMETHODIMP nsAbView::IsSelectable(int32_t row, nsTreeColumn* col, bool* _retval)
 {
     return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -838,6 +836,9 @@ nsCString getQuery(nsCOMPtr<nsIAbDirectory> aDir)
 
 NS_IMETHODIMP nsAbView::OnItemAdded(nsISupports *parentDir, nsISupports *item)
 {
+  if (!mDirectory)  // No address book selected.
+    return NS_OK;
+
   nsresult rv;
   nsCOMPtr <nsIAbDirectory> directory = do_QueryInterface(parentDir, &rv);
   NS_ENSURE_SUCCESS(rv,rv);
@@ -909,7 +910,7 @@ nsresult nsAbView::AddCard(AbCard *abcard, bool selectCardAfterAdding, int32_t *
 
   // This needs to happen after we insert the card, as RowCountChanged() will call GetRowCount()
   if (mTree)
-    rv = mTree->RowCountChanged(*index, 1);
+    mTree->RowCountChanged(*index, 1);
 
   // Checking for mTree here works around core bug 399227
   if (selectCardAfterAdding && mTreeSelection && mTree) {
@@ -1085,11 +1086,11 @@ NS_IMETHODIMP nsAbView::OnItemPropertyChanged(nsISupports *item, const char *pro
 
     // Remove the old card.
     rv = RemoveCardAt(index);
-    NS_ASSERTION(NS_SUCCEEDED(rv), "remove card failed\n");
+    NS_ASSERTION(NS_SUCCEEDED(rv), "remove card failed");
 
     // Add the card we created, and select it (to restore selection) if it was selected.
     rv = AddCard(newCard, cardWasSelected /* select card */, &index);
-    NS_ASSERTION(NS_SUCCEEDED(rv), "add card failed\n");
+    NS_ASSERTION(NS_SUCCEEDED(rv), "add card failed");
 
     mSuppressSelectionChange = false;
     mSuppressCountChange = false;
@@ -1103,7 +1104,7 @@ NS_IMETHODIMP nsAbView::OnItemPropertyChanged(nsISupports *item, const char *pro
   // to be displayed differently, therefore pretend that the selection has
   // changed to force that update.
   if (cardWasSelected)
-    SelectionChanged();
+    SelectionChangedXPCOM();
 
   return NS_OK;
 }
@@ -1164,8 +1165,7 @@ nsresult nsAbView::ReselectCards(nsIArray *aCards, nsIAbCard *aIndexCard)
     NS_ENSURE_SUCCESS(rv, rv);
 
     if (mTree) {
-      rv = mTree->EnsureRowIsVisible(currentIndex);
-      NS_ENSURE_SUCCESS(rv, rv);
+      mTree->EnsureRowIsVisible(currentIndex);
     }
   }
 

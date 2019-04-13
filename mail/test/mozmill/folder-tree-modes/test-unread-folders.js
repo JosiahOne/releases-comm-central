@@ -8,6 +8,8 @@
  * is rebuilt because a folder has become newly unread.
  */
 
+"use strict";
+
 var MODULE_NAME = "test-unread-folders";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -18,8 +20,6 @@ var inboxSubfolder;
 var trashFolder;
 var trashSubfolder;
 var inboxSet;
-
-var nsMsgFolderFlags = Ci.nsMsgFolderFlags;
 
 function setupModule(module) {
   let fdh = collector.getModule("folder-display-helpers");
@@ -32,7 +32,7 @@ function setupModule(module) {
   inboxSubfolder = inboxFolder.getChildNamed("UnreadFoldersA");
 
   trashFolder = inboxFolder.server.rootFolder.getFolderWithFlags(
-    nsMsgFolderFlags.Trash);
+    Ci.nsMsgFolderFlags.Trash);
   trashFolder.createSubfolder("UnreadFoldersB", null);
   trashSubfolder = trashFolder.getChildNamed("UnreadFoldersB");
 

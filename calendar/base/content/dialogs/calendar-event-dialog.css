@@ -2,18 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-daypicker-weekday {
-    -moz-binding: url(chrome://calendar/content/calendar-daypicker.xml#daypicker-weekday);
+#daypicker-weekday {
     -moz-user-focus: normal;
 }
 
-daypicker-monthday {
-    -moz-binding: url(chrome://calendar/content/calendar-daypicker.xml#daypicker-monthday);
-    -moz-user-focus: normal;
-}
-
-recurrence-preview {
-    -moz-binding: url(chrome://calendar/content/calendar-event-dialog-recurrence-preview.xml#recurrence-preview);
+.daypicker-monthday {
     -moz-user-focus: normal;
 }
 
@@ -41,8 +34,7 @@ freebusy-day {
     -moz-user-focus: normal;
 }
 
-freebusy-timebar {
-    -moz-binding: url(chrome://calendar/content/calendar-event-dialog-freebusy.xml#freebusy-timebar);
+calendar-event-freebusy-timebar {
     -moz-user-focus: normal;
 }
 

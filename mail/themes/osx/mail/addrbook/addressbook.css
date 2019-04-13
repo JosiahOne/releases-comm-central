@@ -15,17 +15,16 @@
 
 #ab-toolbox:-moz-lwtheme {
   -moz-appearance: none;
-  /* Uses a background image instead of a border to avoid jumping of the toolbar
-     when a theme is enabled. */
-  background-image: linear-gradient(to bottom, var(--tabs-border-color, transparent) 1px, transparent 1px);
 }
 
-#ab-toolbox:-moz-lwtheme::after {
+#ab-toolbox:-moz-lwtheme::before {
   content: "";
   display: -moz-box;
+  position: absolute;
+  top: 100%;
   margin-top: -1px;
   height: 1px;
-  border-bottom: 1px solid var(--toolbox-border-bottom-color);
+  border-bottom: 1px solid var(--chrome-content-separator-color);
 }
 
 #ab-toolbox > toolbar {
@@ -35,12 +34,7 @@
 
 /* ::::: directory pane icons ::::: */
 
-#abDirTreeHeader {
-  -moz-appearance: treeheadercell;
-  height: 16px;
-}
-
-#dirTree {
+:root:not([lwt-tree]) #dirTree {
   -moz-appearance: -moz-mac-source-list;
   -moz-font-smoothing-background-color: -moz-mac-source-list;
   border-inline-end: 1px solid #bdbdbd;
@@ -51,13 +45,13 @@
   background-color: transparent;
 }
 
-#dirTree treechildren::-moz-tree-row(selected) {
+:root:not([lwt-tree]) #dirTree treechildren::-moz-tree-row(selected) {
   -moz-appearance: -moz-mac-source-list-selection;
   -moz-font-smoothing-background-color: -moz-mac-source-list-selection;
 }
 
 @media not all and (-moz-mac-yosemite-theme) {
-  #dirTree treechildren::-moz-tree-row(selected, focus) {
+  :root:not([lwt-tree]) #dirTree treechildren::-moz-tree-row(selected, focus) {
     -moz-appearance: -moz-mac-active-source-list-selection;
     -moz-font-smoothing-background-color: -moz-mac-active-source-list-selection;
   }
@@ -73,7 +67,7 @@
     font-size: 9.5pt;
     font-weight: 300;
   }
-  
+
   #dirTree treechildren::-moz-tree-cell-text(selected, focus) {
     color: #282828;
   }
@@ -105,59 +99,29 @@
 
 /* ::::: splitters ::::: */
 
-splitter {
+#dirTree-splitter {
+  border-width: 0;
+  border-inline-end: 1px solid var(--splitter-color);
+  min-width: 0;
+  width: 5px;
   background-color: transparent;
-  width: 7px;
-  min-width: 7px;
-  min-height: 7px;
+  margin-inline-start: -5px;
+  position: relative;
+  z-index: 10;
 }
 
-#dirTree-splitter,
 #results-splitter {
-  height: 7px !important;
-  min-height: 7px;
-}
-
-#status-bar {
-  border-top: none !important;
+  border-width: 0;
+  border-top: 1px solid var(--splitter-color);
+  min-height: 0;
+  height: 5px;
+  background-color: transparent;
+  margin-bottom: -5px;
+  position: relative;
+  z-index: 10;
 }
 
 /* ::::: results pane ::::: */
-
-#abResultsTree {
-  -moz-appearance: -moz-mac-source-list;
-  -moz-font-smoothing-background-color: -moz-mac-source-list;
-}
-
-#abResultsTree treechildren::-moz-tree-row {
-  background-color: transparent;
-}
-
-#abResultsTree treechildren::-moz-tree-row(selected) {
-  -moz-appearance: -moz-mac-source-list-selection;
-  -moz-font-smoothing-background-color: -moz-mac-source-list-selection;
-}
-
-@media not all and (-moz-mac-yosemite-theme) {
-  #abResultsTree treechildren::-moz-tree-row(selected, focus) {
-    -moz-appearance: -moz-mac-active-source-list-selection;
-    -moz-font-smoothing-background-color: -moz-mac-active-source-list-selection;
-  }
-
-  #abResultsTree treechildren::-moz-tree-cell-text(selected) {
-    color: white;
-  }
-}
-
-@media (-moz-mac-yosemite-theme) {
-  #abResultsTree treechildren::-moz-tree-cell-text(selected, focus) {
-    color: black;
-  }
-}
-
-#abResultsTree + separator {
-  border-top: 1px solid #bebebe;
-}
 
 #GeneratedName {
   padding-inline-start: 42px;
@@ -184,18 +148,9 @@ splitter {
 }
 
 #CardViewOuterBox {
+  color: -moz-DialogText;
   margin: 0px;
   padding: 0px;
-}
-
-#CardViewBox {
-  -moz-user-focus: ignore;
-  overflow: auto;
-  min-width: 150px;
-  margin: 0px;
-  padding: 0px;
-  border-top: 1px solid #8E8E8E;
-  border-left: 1px solid #BEBEBE;
 }
 
 #CardViewInnerBox {

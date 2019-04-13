@@ -6,6 +6,8 @@
  * Tests the get an account (account provisioning) workflow.
  */
 
+"use strict";
+
 var MODULE_NAME = 'test-newmailaccount';
 
 var RELATIVE_ROOT = '../shared-modules';
@@ -16,12 +18,10 @@ var MODULE_REQUIRES = ['folder-display-helpers',
                        'keyboard-helpers',
                        'dom-helpers'];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-ChromeUtils.import('resource://gre/modules/Services.jsm');
-ChromeUtils.import('resource:///modules/iteratorUtils.jsm');
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("chrome://mozmill/content/stdlib/httpd.js");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {HttpServer} = ChromeUtils.import("chrome://mozmill/content/stdlib/httpd.jsm");
 
 // RELATIVE_ROOT messes with the collector, so we have to bring the path back
 // so we get the right path for the resources.
@@ -47,7 +47,7 @@ var gProvisionerEnabled = Services.prefs.getBoolPref(kProvisionerEnabledPref);
 // Record what the original value of the mail.provider.enabled pref is so
 // that we can put it back once the tests are done.
 var gProvisionerEnabled = Services.prefs.getBoolPref(kProvisionerEnabledPref);
-var gOldAcceptLangs = Services.locale.getRequestedLocales();
+var gOldAcceptLangs = Services.locale.requestedLocales;
 var gNumAccounts;
 
 function setupModule(module) {
@@ -58,7 +58,7 @@ function setupModule(module) {
   // Make sure we enable the Account Provisioner.
   Services.prefs.setBoolPref(kProvisionerEnabledPref, true);
   // Restrict the user's language to just en-US
-  Services.locale.setRequestedLocales(["en-US"]);
+  Services.locale.requestedLocales = ["en-US"];
 
   // Add a "bar" search engine that we can switch to be the default.
   Services.search.addEngineWithDetails("bar", null, null, null, "post",
@@ -69,7 +69,7 @@ function teardownModule(module) {
   // Put the mail.provider.enabled pref back the way it was.
   Services.prefs.setBoolPref(kProvisionerEnabledPref, gProvisionerEnabled);
   // And same with the user languages
-  Services.locale.setRequestedLocales(gOldAcceptLangs);
+  Services.locale.requestedLocales = gOldAcceptLangs;
 }
 
 /* Helper function that returns the number of accounts associated with the
@@ -95,8 +95,9 @@ function nAccounts() {
  *                         restore the Account Provisioner tab before filling
  *                         in the form. Defaults to false.
  */
+test_get_an_account.__force_skip__ = true;
 function test_get_an_account(aCloseAndRestore) {
-  let originalEngine = Services.search.currentEngine;
+  let originalEngine = Services.search.defaultEngine;
   // Open the provisioner - once opened, let subtest_get_an_account run.
   plan_for_modal_dialog("AccountCreation", subtest_get_an_account);
   open_provisioner_window();
@@ -144,10 +145,10 @@ function test_get_an_account(aCloseAndRestore) {
 
   // Make sure we set the default search engine
   let engine = Services.search.getEngineByName("bar");
-  assert_equals(engine, Services.search.currentEngine);
+  assert_equals(engine, Services.search.defaultEngine);
 
   // Restore the original search engine.
-  Services.search.currentEngine = originalEngine;
+  Services.search.defaultEngine = originalEngine;
   remove_email_account("green@example.com");
 }
 
@@ -158,7 +159,7 @@ function test_get_an_account(aCloseAndRestore) {
 function subtest_get_an_account(w) {
   // Make sure we don't have bar as the default engine yet.
   let engine = Services.search.getEngineByName("bar");
-  assert_not_equals(engine, Services.search.currentEngine);
+  assert_not_equals(engine, Services.search.defaultEngine);
 
   wait_for_provider_list_loaded(w);
   wait_for_search_ready(w);
@@ -205,6 +206,7 @@ function subtest_get_an_account_part_2(w) {
  * Runs test_get_an_account again, but this time, closes and restores the
  * order form tab before submitting it.
  */
+test_restored_ap_tab_works.__force_skip__ = true;
 function test_restored_ap_tab_works() {
   test_get_an_account(true);
 }
@@ -721,7 +723,7 @@ function subtest_search_button_disabled_cases(w) {
 
   // Case 3:  Search input has text, no providers selected
   // Make sure no provider checkboxes are checked.
-  inputs = w.window.document.querySelectorAll('input[type="checkbox"]:checked');
+  let inputs = w.window.document.querySelectorAll('input[type="checkbox"]:checked');
   for (input of inputs) {
     mc.click(new elib.Elem(input));
   }
@@ -1122,8 +1124,8 @@ function subtest_disabled_fields_when_searching(aController) {
 function test_search_button_disabled_if_no_lang_support() {
   // Set the user's supported language to something ridiculous (caching the
   // old one so we can put it back later).
-  let originalReqLocales = Services.locale.getRequestedLocales();
-  Services.locale.setRequestedLocales(["foo"]);
+  let originalReqLocales = Services.locale.requestedLocales;
+  Services.locale.requestedLocales = ["foo"];
 
   plan_for_modal_dialog("AccountCreation", function(aController) {
     wait_for_provider_list_loaded(aController);
@@ -1135,7 +1137,7 @@ function test_search_button_disabled_if_no_lang_support() {
   open_provisioner_window();
   wait_for_modal_dialog("AccountCreation");
 
-  Services.locale.setRequestedLocales(originalReqLocales);
+  Services.locale.requestedLocales = originalReqLocales;
 }
 
 /**
@@ -1161,8 +1163,8 @@ function subtest_search_button_enabled_state_on_init(aController) {
  * is not set to "*".
  */
 function test_provider_language_wildcard() {
-  let originalReqLocales = Services.locale.getRequestedLocales();
-  Services.locale.setRequestedLocales(["foo-ba"]);
+  let originalReqLocales = Services.locale.requestedLocales;
+  Services.locale.requestedLocales = ["foo-ba"];
 
   let original = Services.prefs.getCharPref(kProviderListPref);
   Services.prefs.setCharPref(kProviderListPref, url + "providerListWildcard");
@@ -1172,7 +1174,7 @@ function test_provider_language_wildcard() {
   open_provisioner_window();
   wait_for_modal_dialog("AccountCreation");
   Services.prefs.setCharPref(kProviderListPref, original);
-  Services.locale.setRequestedLocales(originalReqLocales);
+  Services.locale.requestedLocales = originalReqLocales;
 }
 
 /**
@@ -1199,7 +1201,7 @@ function subtest_provider_language_wildcard(aController) {
 function test_search_button_disabled_if_no_query_on_init() {
   // We have to do a little bit of gymnastics to access the local storage
   // for the accountProvisioner dialog...
-  let url = "chrome://content/messenger/accountProvisionerStorage/accountProvisioner";
+  let url = "https://accountprovisioner.thunderbird.invalid";
   let dsm = Services.domStorageManager;
 
   let uri = Services.io.newURI(url);

@@ -2,10 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-LOCALE_TOPDIR=$(commtopsrcdir)
+LOCALE_TOPDIR=$(topsrcdir)/comm
 LOCALE_RELATIVEDIR=suite/locales
 
-include $(moztopsrcdir)/config/config.mk
+include $(topsrcdir)/config/config.mk
 
 MERGE_FILES = $(foreach f,$(1),$(call MERGE_FILE,$(f)))
 
@@ -14,8 +14,6 @@ MERGE_FILES = $(foreach f,$(1),$(call MERGE_FILE,$(f)))
 EN_US_OR_L10N_FILE = $(firstword \
 	$(wildcard $(srcdir)/en-US/$(1)) \
 	$(LOCALE_SRCDIR)/$(1) )
-
-_ABS_SRCDIR := $(abspath $(commtopsrcdir))
 
 SUBMAKEFILES += \
 	$(DEPTH)/$(MOZ_BRANDING_DIRECTORY)/Makefile \
@@ -44,7 +42,7 @@ MOZ_PKG_MAC_ICON=$(ABS_DIST)/branding/disk.icns
 MOZ_PKG_MAC_EXTRA=--symlink '/Applications:/ '
 endif
 
-MOZ_SFX_PACKAGE=$(commtopsrcdir)/other-licenses/7zstub/seamonkey/7zSD.sfx
+MOZ_SFX_PACKAGE=$(topsrcdir)/comm/other-licenses/7zstub/seamonkey/7zSD.sfx
 
 NON_OMNIJAR_FILES = \
 	defaults/messenger/mailViews.dat \
@@ -74,13 +72,11 @@ libs:: searchplugins
 # Currently not set in SeaMonkey.
 DIST_SUBDIRS = $(DIST_SUBDIR)
 
-include $(moztopsrcdir)/config/rules.mk
+include $(topsrcdir)/config/rules.mk
 
-ifeq ($(commreltopsrcdir),comm)
 COMPARE_LOCALES_DEFINES += -Dmozilla=..
-endif
 
-include $(moztopsrcdir)/toolkit/locales/l10n.mk
+include $(topsrcdir)/toolkit/locales/l10n.mk
 
 $(list-txt): $(call mkdir_deps,$(SEARCHPLUGINS_PATH)) $(if $(IS_LANGUAGE_REPACK),FORCE)
 	$(RM) $(list-txt)
@@ -147,6 +143,9 @@ libs-%:
 ifdef MOZ_IRC
 	@$(MAKE) -C $(DEPTH)/extensions/irc/locales libs-$*
 endif
+ifdef MOZ_DEBUGQA
+	@$(MAKE) -C ../extensions/debugQA/locales AB_CD=$* XPI_NAME=locale-$*
+endif
 	@$(MAKE) -C $(DEPTH)/extensions/spellcheck/locales AB_CD=$* XPI_NAME=locale-$*
 	@$(MAKE) -B searchplugins AB_CD=$* XPI_NAME=locale-$*
 	@$(MAKE) -C $(DEPTH)/devtools/client/locales AB_CD=$* XPI_NAME=locale-$*
@@ -161,11 +160,9 @@ repackage-extensions: $(STAGEDIST)
 ifdef MOZ_IRC
 	$(MAKE) -C $(DEPTH)/extensions/irc/locales repackage-zip-$(AB_CD) STAGEDIST=$(STAGEDIST)
 endif
-ifeq ($(MOZ_PACKAGER_FORMAT),omni)
 	$(NSINSTALL) -D $(STAGEDIST)/distribution/extensions
 	$(MAKE) -C ../app pack-ext AB_CD=$(AB_CD) STAGEDIST=$(STAGEDIST)/extensions;
 	$(MAKE) -C ../app pack-ext AB_CD=$(AB_CD) STAGEDIST=$(STAGEDIST)/distribution/extensions;
-endif
 
 langpack: langpack-$(AB_CD)
 
@@ -204,13 +201,13 @@ endif
 
 ident:
 	@printf 'comm_revision '
-	@$(PYTHON) $(moztopsrcdir)/config/printconfigsetting.py \
+	@$(PYTHON) $(topsrcdir)/config/printconfigsetting.py \
 	    '$(STAGEDIST)/application.ini' App SourceStamp
 	@printf 'moz_revision '
-	@$(PYTHON) $(moztopsrcdir)/config/printconfigsetting.py \
+	@$(PYTHON) $(topsrcdir)/config/printconfigsetting.py \
 	    '$(STAGEDIST)/platform.ini' Build SourceStamp
 	@printf 'buildid '
-	@$(PYTHON) $(moztopsrcdir)/config/printconfigsetting.py \
+	@$(PYTHON) $(topsrcdir)/config/printconfigsetting.py \
 	    '$(STAGEDIST)/application.ini' App BuildID
 
 ifdef MOZ_IRC

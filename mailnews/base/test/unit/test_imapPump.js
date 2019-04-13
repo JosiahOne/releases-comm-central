@@ -7,15 +7,24 @@
  */
 
 // async support
+/* import-globals-from ../../../test/resources/logHelper.js */
+/* import-globals-from ../../../test/resources/alertTestUtils.js */
 load("../../../resources/logHelper.js");
 load("../../../resources/alertTestUtils.js");
-ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+const {PromiseTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 // IMAP pump
-ChromeUtils.import("resource://testing-common/mailnews/IMAPpump.js");
-ChromeUtils.import("resource://testing-common/mailnews/imapd.js");
+var {
+  IMAPPump,
+  setupIMAPPump,
+  teardownIMAPPump,
+} = ChromeUtils.import("resource://testing-common/mailnews/IMAPpump.js");
+var {
+  imapMessage,
+} = ChromeUtils.import("resource://testing-common/mailnews/imapd.js");
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {fsDebugAll} = ChromeUtils.import("resource://testing-common/mailnews/maild.js");
 
 // Globals
 
@@ -26,21 +35,17 @@ var gMessage = "bugmail10"; // message file used as the test message
 
 // load and update a message in the imap fake server
 
-var gTestArray =
-[
+var gTestArray = [
   // initial setup of IMAP environment
   setupIMAPPump,
 
   // optionally set server parameters, here enabling debug messages
   function serverParms() {
-    if (typeof fsDebugAll == "undefined")
-      ChromeUtils.import("resource://testing-common/mailnews/maild.js");
     IMAPPump.server.setDebugLevel(fsDebugAll);
   },
 
   // the main test
-  async function loadImapMessage()
-  {
+  async function loadImapMessage() {
     IMAPPump.mailbox.addMessage(
       new imapMessage(specForFileName(gMessage),
                       IMAPPump.mailbox.uidnext++, []));

@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "test-account-actions";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -100,16 +102,17 @@ function test_account_actions() {
   open_advanced_settings(function(amc) {
     subtest_check_account_actions(amc, imapAccount.key, true, true, true);
   });
+
   // NNTP (News) account: can't be default, can be removed.
   open_advanced_settings(function(amc) {
     subtest_check_account_actions(amc, nntpAccount.key, false, true, true);
   });
+
   // Local Folders account: can't be removed, can't be default.
-  localFoldersAccount = MailServices.accounts.FindAccountForServer(MailServices.accounts.localFoldersServer);
+  var localFoldersAccount = MailServices.accounts.FindAccountForServer(MailServices.accounts.localFoldersServer);
   open_advanced_settings(function(amc) {
     subtest_check_account_actions(amc, localFoldersAccount.key, false, false, true);
   });
-
   // SMTP server row: can't be removed, can't be default.
   open_advanced_settings(function(amc) {
     subtest_check_account_actions(amc, null, false, false, true);

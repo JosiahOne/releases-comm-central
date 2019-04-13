@@ -8,13 +8,12 @@
  *          adaptScheduleAgent
  */
 
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+/* import-globals-from ../../../lightning/content/lightning-item-iframe.js */
+/* import-globals-from ../calendar-ui-utils.js */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 // Variables related to whether we are in a tab or a window dialog.
 var gInTab = false;
@@ -44,34 +43,19 @@ function dispose() {
     if (args.job && args.job.dispose) {
         args.job.dispose();
     }
-    resetDialogId(document.documentElement);
 }
 
 /**
- * Sets the id of a Dialog to another value to allow different window-icons to be displayed.
- * The original name is stored as new Attribute of the Dialog to set it back later.
+ * Sets the id of a Dialog to another value to allow different styles and the icon
+ * attribute for window-icons to be displayed.
  *
  * @param aDialog               The Dialog to be changed.
  * @param aNewId                The new ID as String.
  */
 function setDialogId(aDialog, aNewId) {
-    aDialog.setAttribute("originalId", aDialog.getAttribute("id"));
     aDialog.setAttribute("id", aNewId);
-    applyPersitedProperties(aDialog);
-}
-
-/**
- * Sets the Dialog id back to previously stored one,
- * so that the persisted values are correctly saved.
- *
- * @param aDialog               The Dialog which is to be restored.
- */
-function resetDialogId(aDialog) {
-    let id = aDialog.getAttribute("originalId");
-    if (id != "") {
-        aDialog.setAttribute("id", id);
-    }
-    aDialog.removeAttribute("originalId");
+    aDialog.setAttribute("icon", aNewId);
+    applyPersistedProperties(aDialog);
 }
 
 /**
@@ -81,20 +65,34 @@ function resetDialogId(aDialog) {
  *
  * @param aDialog               The Dialog to apply the property values for
  */
-function applyPersitedProperties(aDialog) {
-    let xulStore = Components.classes["@mozilla.org/xul/xulstore;1"]
-                             .getService(Components.interfaces.nsIXULStore);
+function applyPersistedProperties(aDialog) {
+    let xulStore = Services.xulStore;
     // first we need to detect which properties are persisted
     let persistedProps = aDialog.getAttribute("persist") || "";
     if (persistedProps == "") {
         return;
     }
     let propNames = persistedProps.split(" ");
+    let { outerWidth: width, outerHeight: height } = aDialog;
+    let doResize = false;
     // now let's apply persisted values if applicable
     for (let propName of propNames) {
         if (xulStore.hasValue(aDialog.baseURI, aDialog.id, propName)) {
-            aDialog.setAttribute(propName, xulStore.getValue(aDialog.baseURI, aDialog.id, propName));
+            let propValue = xulStore.getValue(aDialog.baseURI, aDialog.id, propName);
+            if (propName == "width") {
+                width = propValue;
+                doResize = true;
+            } else if (propName == "height") {
+                height = propValue;
+                doResize = true;
+            } else {
+                aDialog.setAttribute(propName, propValue);
+            }
         }
+    }
+
+    if (doResize) {
+        aDialog.ownerGlobal.resizeTo(width, height);
     }
 }
 
@@ -145,7 +143,7 @@ function editReminder() {
     args.calendar = getCurrentCalendar();
 
     // While these are "just" callbacks, the dialog is opened modally, so aside
-    // from whats needed to set up the reminders, nothing else needs to be done.
+    // from what's needed to set up the reminders, nothing else needs to be done.
     args.onOk = function(reminders) {
         customItem.reminders = reminders;
     };
@@ -224,11 +222,11 @@ var gLastAlarmSelection = 0;
 function matchCustomReminderToMenuitem(reminder) {
     let defaultAlarmType = getDefaultAlarmType();
     let reminderList = document.getElementById("item-alarm");
-    let reminderPopup = reminderList.firstChild;
-    if (reminder.related != Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE &&
+    let reminderPopup = reminderList.menupopup;
+    if (reminder.related != Ci.calIAlarm.ALARM_RELATED_ABSOLUTE &&
         reminder.offset &&
         reminder.action == defaultAlarmType) {
-        // Exactly one reminder thats not absolute, we may be able to match up
+        // Exactly one reminder that's not absolute, we may be able to match up
         // popup items.
         let relation = (reminder.related == reminder.ALARM_RELATED_START ? "START" : "END");
         let origin;
@@ -362,11 +360,10 @@ function saveReminder(item) {
 
         // Recurring item alarms potentially have more snooze props, remove them
         // all.
-        let propIterator = fixIterator(item.propertyEnumerator, Components.interfaces.nsIProperty);
         let propsToDelete = [];
-        for (let prop of propIterator) {
-            if (prop.name.startsWith(cmp)) {
-                propsToDelete.push(prop.name);
+        for (let [name] of item.properties) {
+            if (name.startsWith(cmp)) {
+                propsToDelete.push(name);
             }
         }
 
@@ -542,9 +539,9 @@ function updateLink() {
             return;
         }
 
-        // Only show if its either an internal protcol handler, or its external
+        // Only show if its either an internal protocol handler, or its external
         // and there is an external app for the scheme
-        handler = cal.wrapInstance(handler, Components.interfaces.nsIExternalProtocolHandler);
+        handler = cal.wrapInstance(handler, Ci.nsIExternalProtocolHandler);
         hideOrShow(!handler || handler.externalAppExistsForScheme(uri.scheme));
 
         setTimeout(() => {
@@ -699,7 +696,7 @@ function determineAttendeesInRow() {
     // as default value a reasonable high value is appropriate
     // it will be recalculated anyway.
     let minWidth = window.maxLabelWidth || 200;
-    let inRow = Math.floor(document.width / minWidth);
+    let inRow = Math.floor(document.documentElement.clientWidth / minWidth);
     return inRow > 1 ? inRow : 1;
 }
 
@@ -714,7 +711,7 @@ function adaptScheduleAgent(aItem) {
         aItem.calendar.getProperty("capabilities.autoschedule.supported")) {
         let identity = aItem.calendar.getProperty("imip.identity");
         let orgEmail = identity &&
-                       identity.QueryInterface(Components.interfaces.nsIMsgIdentity).email;
+                       identity.QueryInterface(Ci.nsIMsgIdentity).email;
         let organizerAction = aItem.organizer && orgEmail &&
                               aItem.organizer.id == "mailto:" + orgEmail;
         if (aItem.calendar.getProperty("forceEmailScheduling")) {
@@ -723,7 +720,7 @@ function adaptScheduleAgent(aItem) {
             // organizer triggered action
             if (organizerAction) {
                 aItem.getAttendees({}).forEach((aAttendee) => {
-                    // overwritting must always happen consistently for all
+                    // overwriting must always happen consistently for all
                     // attendees regarding SERVER or CLIENT but must not override
                     // e.g. NONE, so we only overwrite if the param is set to
                     // SERVER or doesn't exist

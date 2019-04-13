@@ -3,7 +3,7 @@
  * null instead of 0-length strings.
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 function run_test() {
   let addresses = {}, names = {}, fullAddresses = {};

@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function calAttendee() {
     this.wrappedJSObject = this;
-    this.mProperties = new cal.data.PropertyMap();
+    this.mProperties = new Map();
 }
 
 calAttendee.prototype = {
@@ -18,7 +18,7 @@ calAttendee.prototype = {
 
     modify: function() {
         if (this.mImmutable) {
-            throw Components.results.NS_ERROR_OBJECT_IS_IMMUTABLE;
+            throw Cr.NS_ERROR_OBJECT_IS_IMMUTABLE;
         }
     },
 
@@ -76,7 +76,7 @@ calAttendee.prototype = {
 
         // Reset the property bag for the parameters, it will be re-initialized
         // from the ical property.
-        this.mProperties = new cal.data.PropertyMap();
+        this.mProperties = new Map();
 
         for (let [name, value] of cal.iterate.icalParameter(icalatt)) {
             if (!promotedProps[name]) {
@@ -95,7 +95,7 @@ calAttendee.prototype = {
         }
 
         if (!this.id) {
-            throw Components.results.NS_ERROR_NOT_INITIALIZED;
+            throw Cr.NS_ERROR_NOT_INITIALIZED;
         }
         icalatt.valueAsIcalString = this.id;
         for (let i = 0; i < this.icalAttendeePropMap.length; i++) {
@@ -104,7 +104,7 @@ calAttendee.prototype = {
                 try {
                     icalatt.setParameter(prop.ics, this[prop.cal]);
                 } catch (e) {
-                    if (e.result == Components.results.NS_ERROR_ILLEGAL_VALUE) {
+                    if (e.result == Cr.NS_ERROR_ILLEGAL_VALUE) {
                         // Illegal values should be ignored, but we could log them if
                         // the user has enabled logging.
                         cal.LOG("Warning: Invalid attendee parameter value " + prop.ics + "=" + this[prop.cal]);
@@ -118,7 +118,7 @@ calAttendee.prototype = {
             try {
                 icalatt.setParameter(key, value);
             } catch (e) {
-                if (e.result == Components.results.NS_ERROR_ILLEGAL_VALUE) {
+                if (e.result == Cr.NS_ERROR_ILLEGAL_VALUE) {
                     // Illegal values should be ignored, but we could log them if
                     // the user has enabled logging.
                     cal.LOG("Warning: Invalid attendee parameter value " + key + "=" + value);
@@ -137,13 +137,13 @@ calAttendee.prototype = {
     set icalString(val) {
         let prop = cal.getIcsService().createIcalPropertyFromString(val);
         if (prop.propertyName != "ORGANIZER" && prop.propertyName != "ATTENDEE") {
-            throw Components.results.NS_ERROR_ILLEGAL_VALUE;
+            throw Cr.NS_ERROR_ILLEGAL_VALUE;
         }
         this.icalProperty = prop;
         return val;
     },
 
-    get propertyEnumerator() { return this.mProperties.simpleEnumerator; },
+    get properties() { return this.mProperties.entries(); },
 
     // The has/get/set/deleteProperty methods are case-insensitive.
     getProperty: function(aName) {

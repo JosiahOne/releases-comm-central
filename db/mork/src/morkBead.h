@@ -62,7 +62,7 @@ public: // morkNode virtual methods
   virtual ~morkBead(); // assert that CloseBead() executed earlier
 
 public: // special case for stack construction for map usage:
-  morkBead(mork_color inBeadColor); // stack-based bead instance
+  explicit morkBead(mork_color inBeadColor); // stack-based bead instance
 
 protected: // special case for morkObject:
   morkBead(const morkUsage& inUsage, nsIMdbHeap* ioHeap,
@@ -195,7 +195,7 @@ public:
 
   // virtual mork_bool ProbeMapIsKeyNil(morkEnv* ev, void* ioMapKey);
 
-  // virtual void ProbeMapClearKey(morkEnv* ev, // put 'nil' alls keys inside map
+  // virtual void ProbeMapClearKey(morkEnv* ev, // put 'nil' into all keys inside map
   //   void* ioMapKey, mork_count inKeyCount); // array of keys inside map
 
   // virtual void ProbeMapPushIn(morkEnv* ev, // move (key,val) into the map

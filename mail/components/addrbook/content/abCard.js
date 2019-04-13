@@ -3,8 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+/* import-globals-from abCommon.js */
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var kNonVcardFields =
         ["NickNameContainer", "SecondaryEmailContainer", "ScreenNameContainer",
@@ -65,12 +67,12 @@ var kVcardFields =
          ["MSN", "_MSN"],
          ["ICQ", "_ICQ"],
          ["XMPP", "_JabberId"],
-         ["IRC", "_IRC"]
+         ["IRC", "_IRC"],
         ];
 
 var gEditCard;
-var gOnSaveListeners = new Array();
-var gOnLoadListeners = new Array();
+var gOnSaveListeners = [];
+var gOnLoadListeners = [];
 var gOkCallback = null;
 var gHideABPicker = false;
 var gPhotoHandlers = {};
@@ -81,8 +83,7 @@ var gOldPhotos = [];
 // If a new photo was added, the name is stored here.
 var gNewPhoto = null;
 
-function OnLoadNewCard()
-{
+function OnLoadNewCard() {
   InitEditCard();
 
   gEditCard.card =
@@ -94,8 +95,7 @@ function OnLoadNewCard()
   gEditCard.titleProperty = "newContactTitle";
   gEditCard.selectedAB = "";
 
-  if ("arguments" in window && window.arguments[0])
-  {
+  if ("arguments" in window && window.arguments[0]) {
     gEditCard.selectedAB = kPersonalAddressbookURI;
 
     if ("selectedAB" in window.arguments[0] &&
@@ -108,9 +108,9 @@ function OnLoadNewCard()
         var parentURI = GetParentDirectoryFromMailingListURI(abURI);
         if (parentURI)
           gEditCard.selectedAB = parentURI;
-      }
-      else if (!directory.readOnly)
+      } else if (!directory.readOnly) {
         gEditCard.selectedAB = window.arguments[0].selectedAB;
+      }
     }
 
     // we may have been given properties to pre-initialize the window with....
@@ -147,7 +147,7 @@ function OnLoadNewCard()
   }
 
   // set popup with address book names
-  var abPopup = document.getElementById('abPopup');
+  var abPopup = document.getElementById("abPopup");
   abPopup.value = gEditCard.selectedAB || kPersonalAddressbookURI;
 
   if (gHideABPicker && abPopup) {
@@ -167,7 +167,7 @@ function OnLoadNewCard()
                                       ? "LastName" : "FirstName");
   if (focus) {
     // XXX Using the setTimeout hack until bug 103197 is fixed
-    setTimeout( function(firstTextBox) { firstTextBox.focus(); }, 0, focus );
+    setTimeout(function(firstTextBox) { firstTextBox.focus(); }, 0, focus);
   }
 }
 
@@ -187,10 +187,11 @@ function getContainingDirectory() {
   return directory;
 }
 
-function EditCardOKButton()
-{
-  if (!CheckCardRequiredDataPresence(document))
-    return false;  // don't close window
+function EditCardOKButton(event) {
+  if (!CheckCardRequiredDataPresence(document)) {
+    event.preventDefault();  // don't close window
+    return;
+  }
 
   // See if this card is in any mailing list
   // if so then we need to update the addresslists of those mailing lists
@@ -219,7 +220,7 @@ function EditCardOKButton()
         let card = subdir.addressLists
                          .queryElementAt(index, Ci.nsIAbCard);
         if (card.equals(gEditCard.card))
-          foundDirectories.push({directory:subdir, cardIndex:index});
+          foundDirectories.push({directory: subdir, cardIndex: index});
       }
     }
   }
@@ -241,24 +242,19 @@ function EditCardOKButton()
   // callback to allow caller to update
   if (gOkCallback)
     gOkCallback();
-
-  return true;  // close the window
 }
 
-function EditCardCancelButton()
-{
+function EditCardCancelButton() {
   // If a new photo was created, remove it now as it won't be used.
   purgeOldPhotos(false);
 }
 
-function OnLoadEditCard()
-{
+function OnLoadEditCard() {
   InitEditCard();
 
   gEditCard.titleProperty = "editContactTitle";
 
-  if (window.arguments && window.arguments[0])
-  {
+  if (window.arguments && window.arguments[0]) {
     if (window.arguments[0].card)
       gEditCard.card = window.arguments[0].card;
     if (window.arguments[0].okCallback)
@@ -272,8 +268,7 @@ function OnLoadEditCard()
   if (gEditCard.generateDisplayName &&
       (gEditCard.card.firstName.length +
        gEditCard.card.lastName.length +
-       gEditCard.card.displayName.length > 0))
-  {
+       gEditCard.card.displayName.length > 0)) {
     gEditCard.generateDisplayName = false;
   }
 
@@ -283,20 +278,20 @@ function OnLoadEditCard()
 
   // check if selectedAB is a writeable
   // if not disable all the fields
-  if ("arguments" in window && window.arguments[0])
-  {
+  if ("arguments" in window && window.arguments[0]) {
     if ("abURI" in window.arguments[0]) {
       var abURI = window.arguments[0].abURI;
       var directory = GetDirectoryFromURI(abURI);
 
-      if (directory.readOnly)
-      {
+      if (directory.readOnly) {
         // Set all the editable vcard fields to read only
-        for (var i = kVcardFields.length; i-- > 0; )
+        for (var i = kVcardFields.length; i-- > 0;) {
           document.getElementById(kVcardFields[i][0]).readOnly = true;
+        }
 
         // the birthday fields
-        document.getElementById("Birthday").readOnly = true;
+        document.getElementById("BirthDay").readOnly = true;
+        document.getElementById("BirthMonth").readOnly = true;
         document.getElementById("BirthYear").readOnly = true;
         document.getElementById("Age").readOnly = true;
 
@@ -330,21 +325,18 @@ function OnLoadEditCard()
  * extensions have added extra fields to the nsIAbCard, and
  * need to display them in the contact editor.
  */
-function RegisterLoadListener(aFunc)
-{
+function RegisterLoadListener(aFunc) {
   gOnLoadListeners[gOnLoadListeners.length] = aFunc;
 }
 
-function UnregisterLoadListener(aFunc)
-{
+function UnregisterLoadListener(aFunc) {
   var fIndex = gOnLoadListeners.indexOf(aFunc);
   if (fIndex != -1)
     gOnLoadListeners.splice(fIndex, 1);
 }
 
 // Notifies load listeners that an nsIAbCard is being loaded.
-function NotifyLoadListeners(aCard, aDoc)
-{
+function NotifyLoadListeners(aCard, aDoc) {
   if (!gOnLoadListeners.length)
     return;
 
@@ -357,21 +349,18 @@ function NotifyLoadListeners(aCard, aDoc)
  * fields to the user interface, and need to set those values
  * in their nsIAbCard.
  */
-function RegisterSaveListener(func)
-{
+function RegisterSaveListener(func) {
   gOnSaveListeners[gOnSaveListeners.length] = func;
 }
 
-function UnregisterSaveListener(aFunc)
-{
+function UnregisterSaveListener(aFunc) {
   var fIndex = gOnSaveListeners.indexOf(aFunc);
   if (fIndex != -1)
     gOnSaveListeners.splice(fIndex, 1);
 }
 
 // Notifies save listeners that an nsIAbCard is being saved.
-function NotifySaveListeners(directory)
-{
+function NotifySaveListeners(directory) {
   if (!gOnSaveListeners.length)
     return;
 
@@ -383,29 +372,72 @@ function NotifySaveListeners(directory)
   directory.modifyCard(gEditCard.card);
 }
 
-function InitPhoneticFields()
-{
+function InitPhoneticFields() {
   var showPhoneticFields =
     Services.prefs.getComplexValue("mail.addr_book.show_phonetic_fields",
       Ci.nsIPrefLocalizedString).data;
 
   // show phonetic fields if indicated by the pref
-  if (showPhoneticFields == "true")
-  {
-    for (var i = kPhoneticFields.length; i-- > 0; )
+  if (showPhoneticFields == "true") {
+    for (var i = kPhoneticFields.length; i-- > 0;) {
       document.getElementById(kPhoneticFields[i]).hidden = false;
+    }
   }
 }
 
-function InitEditCard()
-{
+function InitBirthDateFields() {
+  let birthMonth = document.getElementById("BirthMonth");
+  let birthDay = document.getElementById("BirthDay");
+  let birthYear = document.getElementById("BirthYear");
+
+  if (birthMonth.menupopup.childElementCount == 1) {
+    let formatter = Intl.DateTimeFormat(undefined, { month: "long" });
+    for (let m = 1; m <= 12; m++) {
+      let menuitem = document.createElement("menuitem");
+      menuitem.setAttribute("value", m);
+      menuitem.setAttribute("label", formatter.format(new Date(2000, m - 1, 2)));
+      birthMonth.menupopup.appendChild(menuitem);
+    }
+
+    formatter = Intl.DateTimeFormat(undefined, { day: "numeric" });
+    for (let d = 1; d <= 31; d++) {
+      let menuitem = document.createElement("menuitem");
+      menuitem.setAttribute("value", d);
+      menuitem.setAttribute("label", formatter.format(new Date(2000, 0, d)));
+      birthDay.menupopup.appendChild(menuitem);
+    }
+  }
+
+  birthMonth.addEventListener("command", setDisabledMonthDays);
+  birthYear.addEventListener("change", setDisabledMonthDays);
+}
+
+function InitEditCard() {
+  // Fix broken element IDs caused by translation mistakes. NameField1's ID should be either
+  // "FirstName" or "LastName", and if it isn't, make it so.
+  let nameField1Container = document.getElementById("NameField1Container");
+  let nameField1 = nameField1Container.querySelector("textbox");
+  if (nameField1.id != "FirstName" && nameField1.id != "LastName") {
+    nameField1Container.querySelector("label").setAttribute("control", "FirstName");
+    nameField1.id = "FirstName";
+    nameField1Container.querySelector("textbox ~ label").setAttribute("control", "PhoneticFirstName");
+    nameField1Container.querySelector("textbox ~ textbox").id = "PhoneticFirstName";
+
+    let nameField2Container = document.getElementById("NameField2Container");
+    nameField2Container.querySelector("label").setAttribute("control", "LastName");
+    nameField2Container.querySelector("textbox").id = "LastName";
+    nameField2Container.querySelector("textbox ~ label").setAttribute("control", "PhoneticLastName");
+    nameField2Container.querySelector("textbox ~ textbox").id = "PhoneticLastName";
+  }
+
   InitPhoneticFields();
+  InitBirthDateFields();
 
   InitCommonJS();
 
   // Create gEditCard object that contains global variables for the current js
   //   file.
-  gEditCard = new Object();
+  gEditCard = {};
 
   // get specific prefs that gEditCard will need
   try {
@@ -415,38 +447,39 @@ function InitEditCard()
     gEditCard.displayLastNameFirst = (displayLastNameFirst == "true");
     gEditCard.generateDisplayName =
       Services.prefs.getBoolPref("mail.addr_book.displayName.autoGeneration");
-  }
-  catch (ex) {
+  } catch (ex) {
     dump("ex: failed to get pref" + ex + "\n");
   }
 }
 
-function NewCardOKButton()
-{
-  if (gOkCallback)
-  {
-    if (!CheckAndSetCardValues(gEditCard.card, document, true))
-      return false;  // don't close window
+function NewCardOKButton(event) {
+  if (gOkCallback) {
+    if (!CheckAndSetCardValues(gEditCard.card, document, true)) {
+      event.preventDefault();  // don't close window
+      return;
+    }
 
     gOkCallback(gEditCard.card.translateTo("vcard"));
-    return true;  // close the window
+    return;  // close the window
   }
 
-  var popup = document.getElementById('abPopup');
-  if (popup)
-  {
+  var popup = document.getElementById("abPopup");
+  if (popup) {
     var uri = popup.value;
 
     // FIX ME - hack to avoid crashing if no ab selected because of blank option bug from template
     // should be able to just remove this if we are not seeing blank lines in the ab popup
-    if (!uri)
-      return false;  // don't close window
+    if (!uri) {
+      event.preventDefault();
+      return;  // don't close window
+    }
     // -----
 
-    if (gEditCard.card)
-    {
-      if (!CheckAndSetCardValues(gEditCard.card, document, true))
-        return false;  // don't close window
+    if (gEditCard.card) {
+      if (!CheckAndSetCardValues(gEditCard.card, document, true)) {
+        event.preventDefault();
+        return;  // don't close window
+      }
 
       // replace gEditCard.card with the card we added
       // so that save listeners can get / set attributes on
@@ -456,19 +489,15 @@ function NewCardOKButton()
       NotifySaveListeners(directory);
     }
   }
-
-  return true;  // close the window
 }
 
-function NewCardCancelButton()
-{
+function NewCardCancelButton() {
   // If a new photo was created, remove it now as it won't be used.
   purgeOldPhotos(false);
 }
 
 // Move the data from the cardproperty to the dialog
-function GetCardValues(cardproperty, doc)
-{
+function GetCardValues(cardproperty, doc) {
   if (!cardproperty)
     return;
 
@@ -476,45 +505,42 @@ function GetCardValues(cardproperty, doc)
   // to give extensions a chance to populate custom fields.
   NotifyLoadListeners(cardproperty, doc);
 
-  for (var i = kVcardFields.length; i-- > 0; ) {
+  for (var i = kVcardFields.length; i-- > 0;) {
     doc.getElementById(kVcardFields[i][0]).value =
       cardproperty.getProperty(kVcardFields[i][1], "");
   }
-
-  var birthday = doc.getElementById("Birthday");
-  modifyDatepicker(birthday);
 
   // Get the year first, so that the following month/day
   // calculations can take leap years into account.
   var year = cardproperty.getProperty("BirthYear", null);
   var birthYear = doc.getElementById("BirthYear");
   // set the year in the datepicker to the stored year
-  birthday.year = saneBirthYear(year);
   birthYear.value = year;
 
-  // get the month of the year (1 - 12)
   var month = cardproperty.getProperty("BirthMonth", null);
-  if (month > 0 && month < 13)
-    birthday.month = month - 1;
-  else
-    birthday.monthField.value = null;
-
-  // get the date of the month (1 - 31)
-  var date = cardproperty.getProperty("BirthDay", null);
-  if (date > 0 && date < 32)
-    birthday.date = date;
-  else
-    birthday.dateField.value = null;
+  var day = cardproperty.getProperty("BirthDay", null);
+  var birthMonth = doc.getElementById("BirthMonth");
+  var birthDay = doc.getElementById("BirthDay");
+  birthDay.value = -1;
+  if (month > 0 && month < 13) {
+    birthMonth.value = month;
+    setDisabledMonthDays();
+    if (day > 0 && day < 32)
+      birthDay.value = day;
+  } else {
+    birthMonth.value = -1;
+  }
 
   // get the current age
-  calculateAge(null, birthYear);
+  calculateAge();
 
   // when the birth year changes, update the datepicker's year to the new value
   // or to kDefaultYear if the value is null
-  birthYear.onchange = calculateAge;
-  birthday.onchange = calculateAge;
+  birthMonth.addEventListener("command", calculateAge);
+  birthDay.addEventListener("command", calculateAge);
+  birthYear.addEventListener("change", calculateAge);
   var age = doc.getElementById("Age");
-  age.onchange = calculateYear;
+  age.addEventListener("change", calculateYear);
 
   var popup = document.getElementById("PreferMailFormatPopup");
   if (popup)
@@ -523,14 +549,13 @@ function GetCardValues(cardproperty, doc)
   var preferDisplayNameEl = document.getElementById("preferDisplayName");
   if (preferDisplayNameEl)
     // getProperty may return a "1" or "0" string, we want a boolean
-    preferDisplayNameEl.checked = cardproperty.getProperty("PreferDisplayName", true) != false;
+    preferDisplayNameEl.checked = !!cardproperty.getProperty("PreferDisplayName", true);
 
   // get phonetic fields if exist
   try {
     doc.getElementById("PhoneticFirstName").value = cardproperty.getProperty("PhoneticFirstName", "");
     doc.getElementById("PhoneticLastName").value = cardproperty.getProperty("PhoneticLastName", "");
-  }
-  catch (ex) {}
+  } catch (ex) {}
 
   // Select the type if there is a valid value stored for that type, otherwise
   // select the generic photo
@@ -542,23 +567,23 @@ function GetCardValues(cardproperty, doc)
 // when the ab card dialog is being loaded to show a vCard,
 // hide the fields which aren't supported
 // by vCard so the user does not try to edit them.
-function HideNonVcardFields()
-{
+function HideNonVcardFields() {
   document.getElementById("homeTabButton").hidden = true;
   document.getElementById("chatTabButton").hidden = true;
   document.getElementById("photoTabButton").hidden = true;
   var i;
-  for (i = kNonVcardFields.length; i-- > 0; )
+  for (i = kNonVcardFields.length; i-- > 0;) {
     document.getElementById(kNonVcardFields[i]).collapsed = true;
-  for (i = kPhoneticFields.length; i-- > 0; )
+  }
+  for (i = kPhoneticFields.length; i-- > 0;) {
     document.getElementById(kPhoneticFields[i]).collapsed = true;
+  }
 }
 
 // Move the data from the dialog to the cardproperty to be stored in the database
 // @Returns false - Some required data are missing (card values were not set);
 //          true - Card values were set, or there is no card to set values on.
-function CheckAndSetCardValues(cardproperty, doc, check)
-{
+function CheckAndSetCardValues(cardproperty, doc, check) {
   // If requested, check the required data presence.
   if (check && !CheckCardRequiredDataPresence(document))
     return false;
@@ -566,19 +591,19 @@ function CheckAndSetCardValues(cardproperty, doc, check)
   if (!cardproperty)
     return true;
 
-  for (var i = kVcardFields.length; i-- > 0; )
+  for (var i = kVcardFields.length; i-- > 0;) {
     cardproperty.setProperty(kVcardFields[i][1],
       doc.getElementById(kVcardFields[i][0]).value);
+  }
 
   // get the birthday information from the dialog
-  var birthdayElem = doc.getElementById("Birthday");
-  var birthMonth = birthdayElem.monthField.value;
-  var birthDay = birthdayElem.dateField.value;
+  var birthMonth = document.getElementById("BirthMonth").value;
+  var birthDay = document.getElementById("BirthDay").value;
   var birthYear = doc.getElementById("BirthYear").value;
 
   // set the birth day, month, and year properties
-  cardproperty.setProperty("BirthDay", birthDay);
-  cardproperty.setProperty("BirthMonth", birthMonth);
+  cardproperty.setProperty("BirthDay", (birthDay == -1) ? null : birthDay);
+  cardproperty.setProperty("BirthMonth", (birthMonth == -1) ? null : birthMonth);
   cardproperty.setProperty("BirthYear", birthYear);
 
   var popup = document.getElementById("PreferMailFormatPopup");
@@ -593,8 +618,7 @@ function CheckAndSetCardValues(cardproperty, doc, check)
   try {
     cardproperty.setProperty("PhoneticFirstName", doc.getElementById("PhoneticFirstName").value);
     cardproperty.setProperty("PhoneticLastName", doc.getElementById("PhoneticLastName").value);
-  }
-  catch (ex) {}
+  } catch (ex) {}
 
   let photoType = doc.getElementById("PhotoType").value;
   if (gPhotoHandlers[photoType]) {
@@ -610,25 +634,20 @@ function CheckAndSetCardValues(cardproperty, doc, check)
   return true;
 }
 
-function CleanUpWebPage(webPage)
-{
+function CleanUpWebPage(webPage) {
   // no :// yet so we should add something
-  if (webPage.length && !webPage.includes("://"))
-  {
+  if (webPage.length && !webPage.includes("://")) {
     // check for missing / on http://
     if (webPage.startsWith("http:/"))
-      return("http://" + webPage.substr(6));
-    else
-      return("http://" + webPage);
+      return ("http://" + webPage.substr(6));
+    return ("http://" + webPage);
   }
-  else
-    return(webPage);
+  return (webPage);
 }
 
 // @Returns false - Some required data are missing;
 //          true - All required data are present.
-function CheckCardRequiredDataPresence(doc)
-{
+function CheckCardRequiredDataPresence(doc) {
   // Bug 314995 We require at least one of the following fields to be
   // filled in: email address, first name, last name, display name,
   //            organization (company name).
@@ -637,8 +656,7 @@ function CheckCardRequiredDataPresence(doc)
     doc.getElementById("FirstName").textLength == 0 &&
     doc.getElementById("LastName").textLength == 0 &&
     doc.getElementById("DisplayName").textLength == 0 &&
-    doc.getElementById("Company").textLength == 0)
-  {
+    doc.getElementById("Company").textLength == 0) {
     Services.prompt.alert(
       window,
       gAddressBookBundle.getString("cardRequiredDataMissingTitle"),
@@ -650,8 +668,7 @@ function CheckCardRequiredDataPresence(doc)
   // Simple checks that the primary email should be of the form |user@host|.
   // Note: if the length of the primary email is 0 then we skip the check
   // as some other field must have something as per the check above.
-  if (primaryEmail.textLength != 0 && !/.@./.test(primaryEmail.value))
-  {
+  if (primaryEmail.textLength != 0 && !/.@./.test(primaryEmail.value)) {
     Services.prompt.alert(
       window,
       gAddressBookBundle.getString("incorrectEmailAddressFormatTitle"),
@@ -667,8 +684,7 @@ function CheckCardRequiredDataPresence(doc)
   return true;
 }
 
-function GenerateDisplayName()
-{
+function GenerateDisplayName() {
   if (!gEditCard.generateDisplayName)
     return;
 
@@ -680,8 +696,7 @@ function GenerateDisplayName()
     displayName = (gEditCard.displayLastNameFirst)
       ? gAddressBookBundle.getFormattedString("lastFirstFormat", [lastNameValue, firstNameValue])
       : gAddressBookBundle.getFormattedString("firstLastFormat", [firstNameValue, lastNameValue]);
-  }
-  else {
+  } else {
     // one (or both) of these is empty, so this works.
     displayName = firstNameValue + lastNameValue;
   }
@@ -691,215 +706,72 @@ function GenerateDisplayName()
   SetCardDialogTitle(displayName);
 }
 
-function DisplayNameChanged()
-{
+function DisplayNameChanged() {
   // turn off generateDisplayName if the user changes the display name
   gEditCard.generateDisplayName = false;
 
   SetCardDialogTitle(document.getElementById("DisplayName").value);
 }
 
-function SetCardDialogTitle(displayName)
-{
+function SetCardDialogTitle(displayName) {
   document.title = displayName
     ? gAddressBookBundle.getFormattedString(gEditCard.titleProperty + "WithDisplayName", [displayName])
     : gAddressBookBundle.getString(gEditCard.titleProperty);
 }
 
-/**
- * Calculates the duration of time between an event and now and updates the year
- * of whichever element did not call this function.
- * @param aEvent   The event calling this method.
- * @param aElement Optional, but required if this function is not called from an
- *                 element's event listener. The element that would call this.
- */
-function calculateAge(aEvent, aElement) {
-  var datepicker, yearElem, ageElem;
-  if (aEvent)
-    aElement = this;
-  if (aElement.id == "BirthYear" || aElement.id == "Birthday") {
-    datepicker = document.getElementById("Birthday");
-    yearElem = document.getElementById("BirthYear");
-    ageElem = document.getElementById("Age");
-  }
-  if (!datepicker || !yearElem || !ageElem)
-    return;
+function setDisabledMonthDays() {
+  let birthMonth = document.getElementById("BirthMonth").value;
+  let birthYear = document.getElementById("BirthYear").value;
+  let popup = document.getElementById("BirthDay").menupopup;
 
-  // if the datepicker was updated, update the year element
-  if (aElement == datepicker && !(datepicker.year == kDefaultYear && !yearElem.value))
-    yearElem.value = datepicker.year;
-
-  var year = yearElem.value;
-  // if the year element's value is invalid set the year and age elements to null
-  if (isNaN(year) || year < kMinYear || year > kMaxYear) {
-    yearElem.value = null;
-    ageElem.value = null;
-    datepicker.year = kDefaultYear;
-    return;
+  if (!isNaN(birthYear) && birthYear >= kMinYear && birthYear <= kMaxYear) {
+    popup.children[29].disabled = (birthYear % 4 != 0) && birthMonth == "2";
   }
-  else if (aElement == yearElem)
-    datepicker.year = year;
-  // calculate the length of time between the event and now
-  try {
-    var event = new Date(datepicker.year, datepicker.month, datepicker.date);
-    // if the year is only 2 digits, then the year won't be set correctly
-    // using setFullYear fixes this issue
-    event.setFullYear(datepicker.year);
-    // get the difference between today and the event
-    var age = new Date(new Date() - event);
-    // get the number of years of the difference and subtract 1970 (epoch)
-    ageElem.value = age.getFullYear() - 1970;
-  }
-  catch(e) {
-    datepicker.year = kDefaultYear;
-    // if there was an error (like invalid year) set the year and age to null
-    yearElem.value = null;
-    ageElem.value = null;
-  }
+  popup.children[30].disabled = birthMonth == "2";
+  popup.children[31].disabled = ["2", "4", "6", "9", "11"].includes(birthMonth);
 }
 
-/**
- * Calculates the year an event occurred based on the number of years, months,
- * and days since the event and updates the relevant element.
- * @param aEvent   The event calling this method.
- * @param aElement Optional, but required if this function is not called from an
- *                 element's event listener. The element that would call this.
- */
-function calculateYear(aEvent, aElement) {
-  var yearElem, datepicker;
-  if (aEvent)
-    aElement = this;
-  if (aElement.id == "Age") {
-    datepicker = document.getElementById("Birthday");
-    yearElem = document.getElementById("BirthYear");
-  }
-  if (!datepicker || !yearElem)
-    return;
+function calculateAge() {
+  let birthMonth = document.getElementById("BirthMonth").value;
+  let birthDay = document.getElementById("BirthDay").value;
+  let birthYear = document.getElementById("BirthYear").value;
+  document.getElementById("Age").value = "";
 
-  // if the age is null, remove the year from the year element, and set the
-  // datepicker to the default year
-  if (!aElement.value) {
-    datepicker.year = kDefaultYear;
-    yearElem.value = null;
+  if (birthMonth == -1 || birthDay == -1) {
     return;
   }
-  var today = new Date();
-  try {
-    var date = new Date(aElement.value, datepicker.month, datepicker.date);
-    date.setFullYear(aElement.value);
-    // get the difference between today and the age (the year is offset by 1970)
-    var difference = new Date(today - date);
-    datepicker.year = yearElem.value = difference.getFullYear() - 1970;
+  if (isNaN(birthYear) || birthYear < kMinYear || birthYear > kMaxYear) {
+    return;
   }
-  // the above code may throw an invalid year exception.  If that happens, set
-  // the year to kDefaultYear and set the year element's value to 0
-  catch (e) {
-    datepicker.year = kDefaultYear;
-    // if there was an error (like invalid year) set the year and age to null
-    yearElem.value = null;
-    let ageElem = document.getElementById("Age");
-    if (ageElem)
-      ageElem.value = null;
+
+  let today = new Date();
+  let age = today.getFullYear() - birthYear;
+  if (birthMonth > today.getMonth()) {
+    age--;
+  } else if (birthMonth == today.getMonth() && birthDay > today.getDate()) {
+    age--;
   }
+  document.getElementById("Age").value = age;
 }
 
-/**
- * Modifies a datepicker in the following ways:
- *  - Removes the scroll arrows
- *  - Hides the year
- *  - Allows the day and month to be blank
- * NOTE:
- * The datepicker's date, month, year, and dateValue properties are not always
- * what appear physically to the user in the datepicker fields.
- * If any field is blank, the corresponding property is either the previous
- * value if there was one since the card was opened or the relevant portion of
- * the current date.
- *
- * To get the displayed values, get the value of the individual field, such as
- * datepicker.yyyyField.value where yyyy is "year", "month", or "date" for the
- * year, month, and day, respectively.
- * If the value is null, then the field is blank and vice versa.
- * @param aDatepicker The datepicker to modify.
- */
-function modifyDatepicker(aDatepicker) {
-  // collapse the year field and separator
-  aDatepicker.yearField.parentNode.collapsed = true;
-  if (aDatepicker.yearField == aDatepicker._fieldThree ||
-      aDatepicker.yearField == aDatepicker._fieldTwo)
-    aDatepicker._separatorSecond.collapsed = true;
-  else
-    aDatepicker._separatorFirst.collapsed = true;
-  // collapse the spinner element
-  document.getAnonymousElementByAttribute(aDatepicker, "anonid", "buttons")
-          .collapsed = true;
-  // this modified constrain value function ignores values less than the minimum
-  // to let the value be blank (null)
-  // from: mozilla/toolkit/content/widgets/datetimepicker.xml#759
-  aDatepicker._constrainValue = function newConstrainValue(aField, aValue, aNoWrap) {
-    // if the value is less than one, make the field's value null
-    if (aValue < 1) {
-      aField.value = null;
-      return null;
-    }
-    if (aNoWrap && aField == this.monthField)
-      aValue--;
-    // make sure the date is valid for the given month
-    if (aField == this.dateField) {
-      var currentMonth = this.month;
-      var dt = new Date(this.year, currentMonth, aValue);
-      return dt.getMonth() != currentMonth ? 1 : aValue;
-    }
-    var max = (aField == this.monthField) ? 11 : kMaxYear;
-    // make sure the value isn't too high
-    if (aValue > max)
-      return aNoWrap ? max : min;
-    return aValue;
+function calculateYear() {
+  let age = document.getElementById("Age").value;
+  if (isNaN(age)) {
+    return;
   }
-  // sets the specified field to the given value, but allows blank fields
-  // from: mozilla/toolkit/content/widgets/datetimepicker.xml#698
-  aDatepicker._setFieldValue = function setValue(aField, aValue) {
-    if (aField == this.yearField && aValue >= kMinYear && aValue <= kMaxYear) {
-      var oldDate = this._dateValue;
-      this._dateValue.setFullYear(aValue);
-      if (oldDate != this._dateValue) {
-        this._dateValue.setDate(0);
-        this._updateUI(this.dateField, this.date);
-      }
-    }
-    // update the month if the value isn't null
-    else if (aField == this.monthField && aValue != null) {
-      var oldDate = this.date;
-      this._dateValue.setMonth(aValue);
-      if (oldDate != this.date)
-        this._dateValue.setDate(0);
-      this._updateUI(this.dateField, this.date);
-      var date = this._dateValue.getDate();
-      this.dateField.value = date < 10 && this.dateLeadingZero ? "0" + date : date;
-      var month = this._dateValue.getMonth() + 1;
-      this.monthField.value = month < 10 && this.monthLeadingZero ? "0" + month : month;
-    }
-    // update the date if the value isn't null
-    else if (aField == this.dateField && aValue != null) {
-      this._dateValue.setDate(aValue);
-      this._updateUI(this.dateField, this.date);
-      var date = this._dateValue.getDate();
-      this.dateField.value = date < 10 && this.dateLeadingZero ? "0" + date : date;
-      var month = this._dateValue.getMonth() + 1;
-      this.monthField.value = month < 10 && this.monthLeadingZero ? "0" + month : month;
-    }
-    this.setAttribute("value", this.value);
 
-    if (this.attachedControl)
-      this.attachedControl._setValueNoSync(this._dateValue);
-    // if the aField's value is null or 0, set both field's values to null
-    if (!aField.value && aField != this.yearField) {
-      this.dateField.value = null;
-      this.monthField.value = null;
-    }
-    // make the field's value null if aValue is null and the field's value isn't
-    if (aValue == null && aField.value != null)
-      aField.value = null;
+  let today = new Date();
+  let year = today.getFullYear() - age;
+
+  let birthMonth = document.getElementById("BirthMonth").value;
+  let birthDay = document.getElementById("BirthDay").value;
+  if (birthMonth > today.getMonth()) {
+    year--;
+  } else if (birthMonth == today.getMonth() && birthDay > today.getDate()) {
+    year--;
   }
+  document.getElementById("BirthYear").value = year;
+  setDisabledMonthDays();
 }
 
 var chatNameFieldIds =
@@ -909,10 +781,9 @@ var chatNameFieldIds =
  * Show the 'Chat' tab and focus the first field that has a value, or
  * the first field if none of them has a value.
  */
-function showChat()
-{
-  document.getElementById('abTabPanels').parentNode.selectedTab =
-    document.getElementById('chatTabButton');
+function showChat() {
+  document.getElementById("abTabPanels").parentNode.selectedTab =
+    document.getElementById("chatTabButton");
   for (let id of chatNameFieldIds) {
     let elt = document.getElementById(id);
     if (elt.value) {
@@ -927,8 +798,7 @@ function showChat()
  * Fill in the value of the ChatName readonly field with the first
  * value of the fields in the Chat tab.
  */
-function updateChatName()
-{
+function updateChatName() {
   let value = "";
   for (let id of chatNameFieldIds) {
     let val = document.getElementById(id).value;
@@ -1012,8 +882,7 @@ function removePhoto(aName) {
     file.append(aName);
     file.remove(false);
     return true;
-  }
-  catch (e) {}
+  } catch (e) {}
   return false;
 }
 
@@ -1061,7 +930,7 @@ function browsePhoto(aEvent) {
   fp.init(window, gAddressBookBundle.getString("browsePhoto"), Ci.nsIFilePicker.modeOpen);
 
   // Open the directory of the currently chosen photo (if any)
-  let currentPhotoFile = document.getElementById("PhotoFile").file
+  let currentPhotoFile = document.getElementById("PhotoFile").file;
   if (currentPhotoFile) {
     fp.displayDirectory = currentPhotoFile.parent;
   }
@@ -1128,7 +997,7 @@ var gPhotoDownloadUI = (function() {
   let elPhotoType;
   let elProgressContainer;
 
-  window.addEventListener("load", function load(event) {
+  window.addEventListener("load", function(event) {
     if (!elProgressbar)
       elProgressbar = document.getElementById("PhotoDownloadProgress");
     if (!elProgressLabel)
@@ -1137,7 +1006,7 @@ var gPhotoDownloadUI = (function() {
       elPhotoType = document.getElementById("PhotoType");
     if (!elProgressContainer)
       elProgressContainer = document.getElementById("ProgressContainer");
-  }, false);
+  });
 
   function onStart() {
     elProgressContainer.setAttribute("class", "expanded");
@@ -1175,16 +1044,18 @@ var gPhotoDownloadUI = (function() {
   }
 
   function onProgress(state, percent) {
-    elProgressbar.value = percent;
+    if (percent !== undefined) {
+      elProgressbar.value = percent;
+    }
     elProgressLabel.value = gAddressBookBundle.getString("stateImageSave");
   }
 
   return {
-    onStart: onStart,
-    onSuccess: onSuccess,
-    onError: onError,
-    onProgress: onProgress
-  }
+    onStart,
+    onSuccess,
+    onError,
+    onProgress,
+  };
 })();
 
 /* A photo handler defines the behaviour of the contact editor
@@ -1223,11 +1094,11 @@ var gPhotoDownloadUI = (function() {
  */
 
 var genericPhotoHandler = {
-  onLoad: function(aCard, aDocument) {
+  onLoad(aCard, aDocument) {
     return true;
   },
 
-  onShow: function(aCard, aDocument, aTargetID) {
+  onShow(aCard, aDocument, aTargetID) {
     // XXX TODO: this ignores any other value from the generic photos
     // menulist than "default".
     aDocument.getElementById(aTargetID)
@@ -1235,7 +1106,7 @@ var genericPhotoHandler = {
     return true;
   },
 
-  onRead: function(aCard, aDocument) {
+  onRead(aCard, aDocument) {
     gPhotoDownloadUI.onSuccess();
 
     newPhotoAdded("", aCard);
@@ -1244,7 +1115,7 @@ var genericPhotoHandler = {
     return true;
   },
 
-  onSave: function(aCard, aDocument) {
+  onSave(aCard, aDocument) {
     // XXX TODO: this ignores any other value from the generic photos
     // menulist than "default".
 
@@ -1252,11 +1123,11 @@ var genericPhotoHandler = {
     aCard.setProperty("PhotoName", "");
     aCard.setProperty("PhotoURI", "");
     return true;
-  }
-}
+  },
+};
 
 var filePhotoHandler = {
-  onLoad: function(aCard, aDocument) {
+  onLoad(aCard, aDocument) {
     let photoURI = aCard.getProperty("PhotoURI", "");
     let file;
     try {
@@ -1274,14 +1145,14 @@ var filePhotoHandler = {
     return true;
   },
 
-  onShow: function(aCard, aDocument, aTargetID) {
+  onShow(aCard, aDocument, aTargetID) {
     let photoName = gNewPhoto || aCard.getProperty("PhotoName", null);
     let photoURI = getPhotoURI(photoName);
     aDocument.getElementById(aTargetID).setAttribute("src", photoURI);
     return true;
   },
 
-  onRead: function(aCard, aDocument) {
+  onRead(aCard, aDocument) {
     let file = aDocument.getElementById("PhotoFile").file;
     filePhotoHandler._showFilename(aCard, aDocument);
     if (!file)
@@ -1302,7 +1173,6 @@ var filePhotoHandler = {
       aDocument.getElementById("PhotoFile").setAttribute("PhotoURI", photoURI);
 
       filePhotoHandler.onShow(aCard, aDocument, "photo");
-
     };
 
     gImageDownloader.savePhoto(photoURI, cbSuccess,
@@ -1311,7 +1181,7 @@ var filePhotoHandler = {
     return true;
   },
 
-  onSave: function(aCard, aDocument) {
+  onSave(aCard, aDocument) {
     // Update contact
     if (gNewPhoto) {
       // The file may not be valid unless the photo has changed.
@@ -1322,7 +1192,7 @@ var filePhotoHandler = {
     return true;
   },
 
-  _showFilename: function(aCard, aDocument) {
+  _showFilename(aCard, aDocument) {
     let photoElem = aDocument.getElementById("PhotoFile");
     let photoFile = photoElem.file ? photoElem.file : null;
     let photoSpec = Services.io.getProtocolHandler("file")
@@ -1334,11 +1204,11 @@ var filePhotoHandler = {
     } else {
       photoElem.value = "";
     }
-  }
-}
+  },
+};
 
 var webPhotoHandler = {
-  onLoad: function(aCard, aDocument) {
+  onLoad(aCard, aDocument) {
     let photoURI = aCard.getProperty("PhotoURI", null);
 
     if (!photoURI)
@@ -1348,7 +1218,7 @@ var webPhotoHandler = {
     return true;
   },
 
-  onShow: function(aCard, aDocument, aTargetID) {
+  onShow(aCard, aDocument, aTargetID) {
     let photoName = gNewPhoto || aCard.getProperty("PhotoName", null);
     if (!photoName)
       return false;
@@ -1359,7 +1229,7 @@ var webPhotoHandler = {
     return true;
   },
 
-  onRead: function(aCard, aDocument) {
+  onRead(aCard, aDocument) {
     let photoURI = aDocument.getElementById("PhotoURI").value;
     if (!photoURI)
       return false;
@@ -1372,8 +1242,7 @@ var webPhotoHandler = {
       newPhotoAdded(newPhotoName, aCard);
 
       webPhotoHandler.onShow(aCard, aDocument, "photo");
-
-    }
+    };
 
     gImageDownloader.savePhoto(photoURI, cbSuccess,
                                gPhotoDownloadUI.onError,
@@ -1381,7 +1250,7 @@ var webPhotoHandler = {
     return true;
   },
 
-  onSave: function(aCard, aDocument) {
+  onSave(aCard, aDocument) {
     // Update contact
     if (gNewPhoto) {
       let photoURI = aDocument.getElementById("PhotoURI").value;
@@ -1389,11 +1258,11 @@ var webPhotoHandler = {
       aCard.setProperty("PhotoURI", photoURI);
     }
     return true;
-  }
-}
+  },
+};
 
 function newPhotoAdded(aPhotoName, aCard) {
-  // If we had the photo saved locally, shedule it for removal if card is saved.
+  // If we had the photo saved locally, schedule it for removal if card is saved.
   gOldPhotos.push(gNewPhoto !== null ? gNewPhoto : aCard.getProperty("PhotoName", null));
   gNewPhoto = aPhotoName;
 }
@@ -1404,8 +1273,7 @@ function newPhotoAdded(aPhotoName, aCard) {
  * @param aType the type of photo to handle
  * @param aPhotoHandler the photo handler to register
  */
-function registerPhotoHandler(aType, aPhotoHandler)
-{
+function registerPhotoHandler(aType, aPhotoHandler) {
   gPhotoHandlers[aType] = aPhotoHandler;
 }
 

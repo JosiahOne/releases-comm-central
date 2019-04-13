@@ -24,6 +24,7 @@
 #include "nsITextToSubURI.h"
 #include "nsIURL.h"
 #include "nsIFileURL.h"
+#include "nsIDirectoryEnumerator.h"
 #include "nsNetCID.h"
 #include "nsIMimeStreamConverter.h"
 #include "nsMsgMimeCID.h"
@@ -31,9 +32,9 @@
 #include "nsNativeCharsetUtils.h"
 #include "nsComposeStrings.h"
 #include "nsIZipWriter.h"
-#include "nsIDirectoryEnumerator.h"
 #include "mozilla/Services.h"
 #include "mozilla/mailnews/MimeEncoder.h"
+#include "mozilla/Preferences.h"
 #include "nsIPrincipal.h"
 #include "nsIURIMutator.h"
 
@@ -90,11 +91,8 @@ nsresult nsSimpleZipper::AddToZip(nsIZipWriter *aZipWriter,
 
   // if it's a directory, add all its contents too
   if (isDirectory) {
-    nsCOMPtr<nsISimpleEnumerator> e;
-    nsresult rv = aFile->GetDirectoryEntries(getter_AddRefs(e));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    nsCOMPtr<nsIDirectoryEnumerator> dirEnumerator = do_QueryInterface(e, &rv);
+    nsCOMPtr<nsIDirectoryEnumerator> dirEnumerator;
+    nsresult rv = aFile->GetDirectoryEntries(getter_AddRefs(dirEnumerator));
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsIFile> currentFile;
@@ -486,25 +484,26 @@ nsMsgAttachmentHandler::PickEncoding(const char *charset, nsIMsgSend *mime_deliv
     m_encoder = nullptr;
   }
 
-  /* Do some cleanup for documents with unknown content type.
+  /*
+    Do some cleanup for documents with unknown content type.
     There are two issues: how they look to MIME users, and how they look to
     non-MIME users.
 
-      If the user attaches a "README" file, which has unknown type because it
-      has no extension, we still need to send it with no encoding, so that it
-      is readable to non-MIME users.
+    If the user attaches a "README" file, which has unknown type because it
+    has no extension, we still need to send it with no encoding, so that it
+    is readable to non-MIME users.
 
-        But if the user attaches some random binary file, then base64 encoding
-        will have been chosen for it (above), and in this case, it won't be
-        immediately readable by non-MIME users.  However, if we type it as
-        text/plain instead of application/octet-stream, it will show up inline
-        in a MIME viewer, which will probably be ugly, and may possibly have
-        bad charset things happen as well.
+    But if the user attaches some random binary file, then base64 encoding
+    will have been chosen for it (above), and in this case, it won't be
+    immediately readable by non-MIME users.  However, if we type it as
+    text/plain instead of application/octet-stream, it will show up inline
+    in a MIME viewer, which will probably be ugly, and may possibly have
+    bad charset things happen as well.
 
-          So, the heuristic we use is, if the type is unknown, then the type is
-          set to application/octet-stream for data which needs base64 (binary data)
-          and is set to text/plain for data which didn't need base64 (unencoded or
-          lightly encoded data.)
+    So, the heuristic we use is, if the type is unknown, then the type is
+    set to application/octet-stream for data which needs base64 (binary data)
+    and is set to text/plain for data which didn't need base64 (unencoded or
+    lightly encoded data.)
   */
 DONE:
   if (m_type.IsEmpty() || m_type.LowerCaseEqualsLiteral(UNKNOWN_CONTENT_TYPE))
@@ -526,12 +525,10 @@ nsMsgAttachmentHandler::PickCharset()
   if (!m_charset.IsEmpty() || !m_type.LowerCaseEqualsLiteral(TEXT_PLAIN))
     return NS_OK;
 
-  nsCOMPtr<nsIFile> tmpFile =
-    do_QueryInterface(mTmpFile);
-  if (!tmpFile)
+  if (!mTmpFile)
     return NS_OK;
 
-  return MsgDetectCharsetFromFile(tmpFile, m_charset);
+  return MsgDetectCharsetFromFile(mTmpFile, m_charset);
 }
 
 static nsresult
@@ -579,7 +576,7 @@ nsMsgAttachmentHandler::SnarfMsgAttachment(nsMsgCompFields *compFields)
     nsCOMPtr <nsIFile> tmpFile;
     rv = nsMsgCreateTempFile("nsmail.tmp", getter_AddRefs(tmpFile));
     NS_ENSURE_SUCCESS(rv, rv);
-    mTmpFile = do_QueryInterface(tmpFile);
+    mTmpFile = tmpFile;
     mDeleteFile = true;
     mCompFields = compFields;
     m_type = MESSAGE_RFC822;
@@ -643,10 +640,6 @@ nsMsgAttachmentHandler::SnarfMsgAttachment(nsMsgCompFields *compFields)
         mimeConverter->SetOriginalMsgURI(nullptr);
       }
 
-      nsCOMPtr<nsIStreamListener> convertedListener = do_QueryInterface(m_mime_parser, &rv);
-      if (NS_FAILED(rv))
-        goto done;
-
       nsCOMPtr<nsIURI> aURL;
       rv = messageService->GetUrlForUri(uri.get(), getter_AddRefs(aURL), nullptr);
       if (NS_FAILED(rv))
@@ -674,7 +667,7 @@ nsMsgAttachmentHandler::SnarfMsgAttachment(nsMsgCompFields *compFields)
         goto done;
 
       nsCOMPtr<nsIURI> dummyNull;
-      rv = messageService->DisplayMessage(uri.get(), convertedListener, nullptr, nullptr, nullptr,
+      rv = messageService->DisplayMessage(uri.get(), m_mime_parser, nullptr, nullptr, nullptr,
                                           getter_AddRefs(dummyNull));
     }
   }
@@ -721,7 +714,7 @@ nsMsgAttachmentHandler::SnarfAttachment(nsMsgCompFields *compFields)
   nsCOMPtr <nsIFile> tmpFile;
   nsresult rv = nsMsgCreateTempFile("nsmail.tmp", getter_AddRefs(tmpFile));
   NS_ENSURE_SUCCESS(rv, rv);
-  mTmpFile = do_QueryInterface(tmpFile);
+  mTmpFile = tmpFile;
   mDeleteFile = true;
 
   rv = MsgNewBufferedFileOutputStream(getter_AddRefs(mOutFile), mTmpFile, -1, 00600);
@@ -806,7 +799,7 @@ nsMsgAttachmentHandler::ConvertToZipFile(nsILocalFileMac *aSourceFile)
   nsCOMPtr <nsIFile> tmpFile;
   rv = nsMsgCreateTempFile(zippedName.get(), getter_AddRefs(tmpFile));
   NS_ENSURE_SUCCESS(rv, rv);
-  mEncodedWorkingFile = do_QueryInterface(tmpFile);
+  mEncodedWorkingFile = tmpFile;
 
   // point our URL at the zipped temp file
   NS_NewFileURI(getter_AddRefs(mURL), mEncodedWorkingFile);
@@ -860,20 +853,14 @@ nsMsgAttachmentHandler::ConvertToAppleEncoding(const nsCString &aFileURI,
     {
       nsAutoCString ext;
       rv = fileUrl->GetFileExtension(ext);
-      if (NS_SUCCEEDED(rv) && !ext.IsEmpty())
-      {
-        sendResourceFork =
-        PL_strcasecmp(ext.get(), "TXT") &&
-        PL_strcasecmp(ext.get(), "JPG") &&
-        PL_strcasecmp(ext.get(), "GIF") &&
-        PL_strcasecmp(ext.get(), "TIF") &&
-        PL_strcasecmp(ext.get(), "HTM") &&
-        PL_strcasecmp(ext.get(), "HTML") &&
-        PL_strcasecmp(ext.get(), "ART") &&
-        PL_strcasecmp(ext.get(), "XUL") &&
-        PL_strcasecmp(ext.get(), "XML") &&
-        PL_strcasecmp(ext.get(), "CSS") &&
-        PL_strcasecmp(ext.get(), "JS");
+      if (NS_SUCCEEDED(rv) && !ext.IsEmpty()) {
+        // Check the preference to see whether AppleDouble was requested for this extension.
+        nsAutoCString extensionWhitelist;
+        mozilla::Preferences::GetCString("mailnews.extensions_using_appledouble", extensionWhitelist);
+        if (extensionWhitelist.IsEmpty() ||
+            (!extensionWhitelist.Equals("*") &&
+             extensionWhitelist.Find(ext, /* ignoreCase = */ true) == kNotFound))
+          sendResourceFork = false;  // Ignore resource fork and don't use AppleDouble.
       }
     }
   }
@@ -890,7 +877,7 @@ nsMsgAttachmentHandler::ConvertToAppleEncoding(const nsCString &aFileURI,
     nsCOMPtr <nsIFile> tmpFile;
     nsresult rv = nsMsgCreateTempFile("appledouble", getter_AddRefs(tmpFile));
     if (NS_SUCCEEDED(rv))
-      mEncodedWorkingFile = do_QueryInterface(tmpFile);
+      mEncodedWorkingFile = tmpFile;
     if (!mEncodedWorkingFile)
     {
       PR_FREEIF(separator);
@@ -992,13 +979,6 @@ nsMsgAttachmentHandler::ConvertToAppleEncoding(const nsCString &aFileURI,
   }
   else
   {
-    if ( sendResourceFork )
-    {
-      // For now, just do the encoding, but in the old world we would ask the
-      // user about doing this conversion
-      printf("...we could ask the user about this conversion, but for now, nahh..\n");
-    }
-
     bool      useDefault;
     char      *macType, *macEncoding;
     if (m_type.IsEmpty() || m_type.LowerCaseEqualsLiteral(TEXT_PLAIN))
@@ -1104,7 +1084,7 @@ nsMsgAttachmentHandler::UrlExit(nsresult status, const char16_t* aMsg)
   {
     nsCOMPtr <nsIFile> tmpFile;
     mTmpFile->Clone(getter_AddRefs(tmpFile));
-    mTmpFile = do_QueryInterface(tmpFile);
+    mTmpFile = tmpFile;
   }
   mRequest = nullptr;
 
@@ -1240,7 +1220,7 @@ nsMsgAttachmentHandler::UrlExit(nsresult status, const char16_t* aMsg)
           {
             nsCOMPtr <nsIFile> tmpFile;
             mTmpFile->Clone(getter_AddRefs(tmpFile));
-            mTmpFile = do_QueryInterface(tmpFile);
+            mTmpFile = tmpFile;
           }
 
         }

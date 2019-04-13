@@ -9,3 +9,8 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     DIRS += ['osx']
 else:
     DIRS += ['windows']
+
+DIRS += [
+    'addons/dark',
+    'addons/light',
+]

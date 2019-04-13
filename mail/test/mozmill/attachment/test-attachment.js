@@ -6,19 +6,20 @@
  * Checks various attachments display correctly
  */
 
+"use strict";
+
 var MODULE_NAME = 'test-attachment';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['folder-display-helpers', 'compose-helpers',
                        'window-helpers'];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-var EventUtils = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/EventUtils.js", EventUtils);
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var EventUtils = ChromeUtils.import("chrome://mozmill/content/stdlib/EventUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var folder;
+var messages;
 
 var textAttachment =
   "One of these days... people like me will rise up and overthrow you, and " +
@@ -365,13 +366,13 @@ function test_selected_attachments_are_cleared() {
 
   // Select both the attachments.
   let attachmentList = mc.e("attachmentList");
-  assert_equals(attachmentList.selectedItems.length, 0,
-                "We had selected items on first load, when we shouldn't have!");
+  assert_equals(attachmentList.selectedItems.length, 1,
+                "On first load the first item should be selected");
 
   // We can just click on the first element, but the second one needs a
   // ctrl-click (or cmd-click for those Mac-heads among us).
-  mc.click(new elib.Elem(attachmentList.children[0]), 5, 5);
-  EventUtils.synthesizeMouse(attachmentList.children[1], 5, 5,
+  mc.click(new elib.Elem(attachmentList.itemChildren[0]), 5, 5);
+  EventUtils.synthesizeMouse(attachmentList.itemChildren[1], 5, 5,
                              {accelKey: true}, mc.window);
 
   assert_equals(attachmentList.selectedItems.length, 2,
@@ -385,8 +386,8 @@ function test_selected_attachments_are_cleared() {
   // Expand the attachment list again.
   mc.click(mc.eid("attachmentToggle"));
 
-  assert_equals(attachmentList.selectedItems.length, 0,
-                "We had selected items after loading a new message!");
+  assert_equals(attachmentList.selectedItems.length, 1,
+                "After loading a new message the first item should be selected");
 }
 
 function test_attachment_toolbar_customize() {

@@ -6,9 +6,12 @@
  *          ltnSaveMailIdentitySelection, ltnNotifyOnIdentitySelection
  */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from ../../base/content/calendar-ui-utils.js */
+/* globals gCalendar */
+
+var { fixIterator } = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Initializing the email identity row
@@ -49,13 +52,13 @@ function ltnInitMailIdentitiesRow() {
     } else {
         identities = MailServices.accounts.allIdentities;
     }
-    for (let identity of fixIterator(identities, Components.interfaces.nsIMsgIdentity)) {
+    for (let identity of fixIterator(identities, Ci.nsIMsgIdentity)) {
         addMenuItem(menuPopup, identity.identityName, identity.key);
     }
     try {
         let sel = gCalendar.getProperty("imip.identity");
         if (sel) {
-            sel = sel.QueryInterface(Components.interfaces.nsIMsgIdentity);
+            sel = sel.QueryInterface(Ci.nsIMsgIdentity);
         }
         menuListSelectItem("email-identity-menulist", sel ? sel.key : "none");
     } catch (exc) {

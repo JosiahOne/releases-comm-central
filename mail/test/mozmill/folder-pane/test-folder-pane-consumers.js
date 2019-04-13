@@ -6,13 +6,15 @@
  * Tests for other dialogs using the tree view implementation in folderPane.js.
  */
 
+"use strict";
+
 var MODULE_NAME = 'test-folder-pane';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                        "nntp-helpers"];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var nntpAccount;
 

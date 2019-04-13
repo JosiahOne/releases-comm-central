@@ -13,7 +13,8 @@
 |   longer term, this code will be restructured to make it more reusable.      |
 ------------------------------------------------------------------------------*/
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gContextMenuContentData = null;
 
@@ -29,10 +30,12 @@ XPCOMUtils.defineLazyGetter(this, "PageMenuParent", function() {
   return new tmp.PageMenuParent();
 });
 
-ChromeUtils.defineModuleGetter(this, "DevToolsShim",
-  "chrome://devtools-shim/content/DevToolsShim.jsm");
-ChromeUtils.defineModuleGetter(this, "findCssSelector",
-  "resource://gre/modules/css-selector.js");
+XPCOMUtils.defineLazyModuleGetters(this, {
+  DevToolsShim: "chrome://devtools-shim/content/DevToolsShim.jsm",
+  findCssSelector: "resource://gre/modules/css-selector.js",
+  NetUtil: "resource://gre/modules/NetUtil.jsm",
+  ShellService: "resource:///modules/ShellService.jsm",
+});
 
 function nsContextMenu(aXulMenu, aIsShift, aEvent) {
   this.shouldDisplay = true;
@@ -86,7 +89,7 @@ nsContextMenu.prototype = {
         let imageCache = Cc["@mozilla.org/image/tools;1"]
                            .getService(Ci.imgITools)
                            .getImgCacheForDocument(doc);
-        let props = imageCache.findEntryProperties(popupNode.currentURI);
+        let props = imageCache.findEntryProperties(popupNode.currentURI, doc);
         if (props) {
           let nsISupportsCString = Ci.nsISupportsCString;
           contentType = props.get("type", nsISupportsCString).data;
@@ -236,14 +239,8 @@ nsContextMenu.prototype = {
                     this.onCanvas || this.onVideo || this.onAudio));
     // Set Desktop Background depends on whether an image was clicked on,
     // and requires the shell service.
-    var canSetDesktopBackground = false;
-    if ("@mozilla.org/suite/shell-service;1" in Cc) try {
-      canSetDesktopBackground =
-          Cc["@mozilla.org/suite/shell-service;1"]
-            .getService(Ci.nsIShellService)
-            .canSetDesktopBackground;
-    } catch (e) {
-    }
+    var canSetDesktopBackground = ShellService &&
+                                  ShellService.canSetDesktopBackground;
     this.showItem("context-setDesktopBackground",
                   canSetDesktopBackground && (this.onLoadedImage || this.onStandaloneImage));
 
@@ -970,7 +967,8 @@ nsContextMenu.prototype = {
     saveImageURL(canvas.toDataURL("image/jpeg", ""), name, "SaveImageTitle",
                                   true, true,
                                   this.target.ownerDocument.documentURIObject,
-                                  null, null, null, (gPrivate ? true : false));
+                                  null, null, null, (gPrivate ? true : false),
+                                  this.target.ownerDocument.nodePrincipal);
   },
 
   // Full screen video playback
@@ -995,8 +993,11 @@ nsContextMenu.prototype = {
   },
 
   setDesktopBackground: function() {
+    let url = (new URL(this.target.ownerDocument.location.href)).pathname;
+    let imageName = url.substr(url.lastIndexOf("/") + 1);
     openDialog("chrome://communicator/content/setDesktopBackground.xul",
-               "_blank", "chrome,modal,titlebar,centerscreen", this.target);
+               "_blank", "chrome,modal,titlebar,centerscreen", this.target,
+               imageName);
   },
 
   // Save URL of clicked-on frame.
@@ -1143,12 +1144,14 @@ nsContextMenu.prototype = {
       // Bypass cache, since it's a data: URL.
       saveImageURL(this.target.toDataURL(), "canvas.png", "SaveImageTitle",
                    true, false, referrerURI, null, null, null,
-                   (gPrivate ? true : false));
+                   (gPrivate ? true : false),
+                   doc.nodePrincipal /* system, because blob: */);
     else if (this.onImage) {
       saveImageURL(this.mediaURL, null, "SaveImageTitle", false,
                    false, referrerURI, null, gContextMenuContentData.contentType,
                    gContextMenuContentData.contentDisposition,
-                   (gPrivate ? true : false));
+                   (gPrivate ? true : false),
+                   doc.nodePrincipal);
     }
     else if (this.onVideo || this.onAudio) {
       var dialogTitle = this.onVideo ? "SaveVideoTitle" : "SaveAudioTitle";

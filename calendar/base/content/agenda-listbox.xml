@@ -3,6 +3,10 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from ../../resources/content/mouseoverPreviews.js -->
+<!-- import-globals-from agenda-listbox.js -->
+<!-- import-globals-from calendar-dnd-listener.js -->
+
 <bindings id="agenda-list-bindings"
           xmlns="http://www.mozilla.org/xbl"
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
@@ -40,15 +44,16 @@
   <binding id="agenda-checkbox-richlist-item"
            extends="chrome://global/content/bindings/richlistbox.xml#richlistitem">
     <content>
-      <xul:treenode-checkbox class="agenda-checkbox" anonid="agenda-checkbox-widget"
+      <xul:checkbox class="agenda-checkbox treenode-checkbox" anonid="agenda-checkbox-widget"
                                                    flex="1"
                                                    xbl:inherits="selected,label,hidden,disabled"/>
     </content>
     <implementation>
       <field name="kCheckbox">null</field>;
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
           this.kCheckbox = document.getAnonymousElementByAttribute(this, "anonid", "agenda-checkbox-widget");
+
+          this.dispatchEvent(new CustomEvent("bindingattached", { bubbles: false }));
       ]]></constructor>
 
       <method name="getItem">
@@ -110,16 +115,12 @@
     <implementation>
       <field name="mAllDayItem">null</field>;
 
-      <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-          this.mAllDayItem = document.getAnonymousElementByAttribute(this, "anonid", "allday-item");
-      ]]></constructor>
-
       <method name="setOccurrence">
         <parameter name="aOccurrence"/>
         <parameter name="aPeriod"/>
         <body><![CDATA[
             this.mOccurrence = aOccurrence;
+            this.mAllDayItem = document.getAnonymousElementByAttribute(this, "anonid", "allday-item");
             this.mAllDayItem.occurrence = aOccurrence;
             let dateFormatter = cal.getDateFormatter();
             let periodStartDate = aPeriod.start.clone();
@@ -204,8 +205,8 @@
         <body><![CDATA[
             this.mOccurrence = aItem;
             this.setAttribute("status", aItem.status);
-            let dateFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
-                                          .getService(Components.interfaces.calIDateTimeFormatter);
+            let dateFormatter = Cc["@mozilla.org/calendar/datetime-formatter;1"]
+                                  .getService(Ci.calIDateTimeFormatter);
 
             let periodStartDate = aPeriod.start.clone();
             periodStartDate.isDate = true;

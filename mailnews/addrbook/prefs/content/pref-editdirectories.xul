@@ -7,8 +7,7 @@
 
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/addressbook/pref-directory.dtd">
 
-<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-        xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         id="editDirectories"
         title="&pref.ldap.window.title;"
         buttons="accept"
@@ -26,8 +25,10 @@
   <label value="&directoriesText.label;"
          accesskey="&directoriesText.accesskey;" control="directoriesList"/>
   <hbox flex="1">
-    <listbox id="directoriesList" flex="1" onselect="selectDirectory();"
-             ondblclick="dblClickDirectory(event);"/>
+    <richlistbox id="directoriesList"
+                 flex="1"
+                 onselect="selectDirectory();"
+                 ondblclick="dblClickDirectory(event);"/>
     <vbox>
       <button id="addButton" label="&addDirectory.label;"
               accesskey="&addDirectory.accesskey;"

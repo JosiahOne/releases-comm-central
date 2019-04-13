@@ -6,6 +6,8 @@
 var MILLISECONDS_PER_HOUR   = 60 * 60 * 1000;
 var MICROSECONDS_PER_DAY    = 1000 * MILLISECONDS_PER_HOUR * 24;
 
+document.addEventListener("dialogaccept", onAccept);
+
 function onLoad()
 {
   var upperDateBox = document.getElementById("upperDate");
@@ -56,8 +58,6 @@ function onAccept()
   prUpper += MICROSECONDS_PER_DAY;
 
   markInDatabase( prLower, prUpper );
-
-  return true;  // allow closing
 }
 
 /** marks all headers in the database, whose time is between the two

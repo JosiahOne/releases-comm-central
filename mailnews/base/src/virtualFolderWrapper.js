@@ -8,8 +8,9 @@
 
 this.EXPORTED_SYMBOLS = ['VirtualFolderHelper'];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 var VirtualFolderHelper = {
   /**
@@ -111,15 +112,12 @@ VirtualFolderWrapper.prototype = {
    *     search over.
    */
   get searchFolders() {
-    let rdfService = Cc['@mozilla.org/rdf/rdf-service;1']
-                       .getService(Ci.nsIRDFService);
     let virtualFolderUris =
       this.dbFolderInfo.getCharProperty("searchFolderUri").split("|");
     let folders = [];
     for (let folderURI of virtualFolderUris) {
       if (folderURI)
-        folders.push(rdfService.GetResource(folderURI)
-                               .QueryInterface(Ci.nsIMsgFolder));
+        folders.push(MailUtils.getExistingFolder(folderURI));
     }
     return folders;
   },

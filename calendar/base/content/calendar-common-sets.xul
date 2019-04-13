@@ -10,10 +10,7 @@
 ]>
 
 <overlay id="calendar-common-sets-overlay"
-         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
-  <stringbundleset id="calendar_stringbundles">
-    <stringbundle id="bundle_branding" src="chrome://branding/locale/brand.properties"/>
-  </stringbundleset>
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
   <script type="application/javascript" src="chrome://calendar/content/calendar-common-sets.js"/>
 
   <broadcasterset id="calendar_broadcasters">
@@ -207,7 +204,7 @@
       </menu>
       <menuseparator id="calendar-menuseparator-before-delete"/>
       <!-- the label and accesskey of the following menuitem is set during runtime,
-           and depends on wether the item is a task or an event-->
+           and depends on whether the item is a task or an event -->
       <menuitem id="calendar-item-context-menu-delete-menuitem"
                 key="calendar-delete-item-key"
                 observes="calendar_delete_event_command"/>

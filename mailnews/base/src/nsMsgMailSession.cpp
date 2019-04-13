@@ -14,10 +14,9 @@
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsPIDOMWindow.h"
 #include "nsIDocShell.h"
-#include "nsIDocument.h"
+#include "mozilla/dom/Document.h"
 #include "nsIObserverService.h"
 #include "nsIAppStartup.h"
-#include "nsToolkitCompsCID.h"
 #include "nsISupportsPrimitives.h"
 #include "nsIAppShellService.h"
 #include "nsAppShellCID.h"
@@ -31,6 +30,7 @@
 #include "nsIProperties.h"
 #include "mozilla/Services.h"
 #include "mozilla/dom/Element.h"
+#include "mozilla/Components.h"
 
 NS_IMPL_ISUPPORTS(nsMsgMailSession, nsIMsgMailSession, nsIFolderListener)
 
@@ -265,15 +265,7 @@ nsresult nsMsgMailSession::GetTopmostMsgWindow(nsIMsgWindow **aMsgWindow)
 
     nsCOMPtr<nsISimpleEnumerator> windowEnum;
 
-#if defined (XP_UNIX)
-    // The window managers under Unix/X11 do not support ZOrder information,
-    // so we have to use the normal enumeration call here.
     rv = windowMediator->GetEnumerator(nullptr, getter_AddRefs(windowEnum));
-#else
-    rv = windowMediator->GetZOrderDOMWindowEnumerator(nullptr, true,
-                                                      getter_AddRefs(windowEnum));
-#endif
-
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsISupports> windowSupports;
@@ -293,7 +285,7 @@ nsresult nsMsgMailSession::GetTopmostMsgWindow(nsIMsgWindow **aMsgWindow)
       NS_ENSURE_SUCCESS(rv, rv);
       NS_ENSURE_TRUE(topMostWindow, NS_ERROR_FAILURE);
 
-      nsIDocument* domDocument = topMostWindow->GetDoc();
+      mozilla::dom::Document* domDocument = topMostWindow->GetDoc();
       NS_ENSURE_TRUE(domDocument, NS_ERROR_FAILURE);
 
       Element* domElement = domDocument->GetDocumentElement();
@@ -570,8 +562,7 @@ void nsMsgShutdownService::AttemptShutdown()
   }
   else
   {
-    nsCOMPtr<nsIAppStartup> appStartup =
-      do_GetService(NS_APPSTARTUP_CONTRACTID);
+    nsCOMPtr<nsIAppStartup> appStartup = mozilla::components::AppStartup::Service();
     NS_ENSURE_TRUE_VOID(appStartup);
     NS_ENSURE_SUCCESS_VOID(appStartup->Quit(mQuitMode));
   }

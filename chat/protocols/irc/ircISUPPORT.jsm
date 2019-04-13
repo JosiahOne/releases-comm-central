@@ -14,8 +14,7 @@
 
 this.EXPORTED_SYMBOLS = ["ircISUPPORT", "isupportBase"];
 
-ChromeUtils.import("resource:///modules/ircHandlers.jsm");
-ChromeUtils.import("resource:///modules/ircUtils.jsm");
+const {ircHandlers} = ChromeUtils.import("resource:///modules/ircHandlers.jsm");
 
 /*
  * Parses an ircMessage into an ISUPPORT message for each token of the form:
@@ -67,8 +66,8 @@ var ircISUPPORT = {
       }
 
       return true;
-    }
-  }
+    },
+  },
 };
 
 function setSimpleNumber(aAccount, aField, aMessage, aDefaultValue) {
@@ -231,6 +230,6 @@ var isupportBase = {
     "MAXCHANNELS": aMessage => false,
     "MAXTARGETS": function(aMessage) {
       return setSimpleNumber(this, "maxTargets", aMessage, 1);
-    }
-  }
+    },
+  },
 };

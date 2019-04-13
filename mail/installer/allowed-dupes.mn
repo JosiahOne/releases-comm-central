@@ -5,9 +5,9 @@
 # PLEASE DO NOT ADD MORE EXCEPTIONS TO THIS LIST
 #
 
-# browser (see bug 1451050)
+# browser (see bug 1451050 and bug 1476934)
 defaults/settings/pinning/pins.json
-defaults/settings/main/tippytop.json
+defaults/settings/main/example.json
 
 # mail
 chrome/chat/content/chat/conv.html
@@ -75,6 +75,8 @@ extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/linux/calendar/cal
 extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/windows/calendar/calendar-alarm-dialog.css
 extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/linux/calendar/calendar-management.css
 extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/windows/calendar/calendar-management.css
+extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/linux/calendar/widgets/calendar-widgets.css
+extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/windows/calendar/widgets/calendar-widgets.css
 extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/calendar-js/calFilter.js
 extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/calendar/content/calendar/calFilter.js
 extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/calendar-js/calUtils.js
@@ -108,6 +110,8 @@ distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/linux
 distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/windows/calendar/calendar-alarm-dialog.css
 distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/linux/calendar/calendar-management.css
 distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/windows/calendar/calendar-management.css
+distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/linux/calendar/widgets/calendar-widgets.css
+distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/skin/windows/calendar/widgets/calendar-widgets.css
 distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/calendar-js/calFilter.js
 distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/chrome/calendar/content/calendar/calFilter.js
 distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/calendar-js/calUtils.js
@@ -163,3 +167,7 @@ chrome/devtools/skin/promisedebugger.css
 chrome/devtools/skin/variables.css
 modules/devtools/client/framework/gDevTools.jsm
 modules/devtools/gDevTools.jsm
+
+# Wetransfer locales - Bug 1518076 (en and en_GB are the same)
+features/wetransfer@extensions.thunderbird.net/_locales/en/messages.json
+features/wetransfer@extensions.thunderbird.net/_locales/en_GB/messages.json

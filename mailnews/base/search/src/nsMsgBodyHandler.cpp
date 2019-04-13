@@ -74,9 +74,9 @@ void nsMsgBodyHandler::Initialize()
 {
   // Default transformations for local message search and MAPI access
   m_stripHeaders = true;
-  m_stripHtml = true;
   m_partIsHtml = false;
   m_base64part = false;
+  m_partIsQP = false;
   m_isMultipart = false;
   m_partIsText = true; // Default is text/plain, maybe proven otherwise later.
   m_pastMsgHeaders = false;
@@ -128,6 +128,12 @@ int32_t nsMsgBodyHandler::GetNextLine (nsCString &buf, nsCString &charset)
     m_base64part = false;
     // And reapply our transformations...
     outLength = ApplyTransformations(buf, buf.Length(), eatThisLine, buf);
+  }
+
+  // Process aggregated HTML.
+  if (!m_isMultipart && m_partIsHtml) {
+    StripHtml(buf);
+    outLength = buf.Length();
   }
 
   charset = m_partCharset;
@@ -293,10 +299,15 @@ int32_t nsMsgBodyHandler::ApplyTransformations (const nsCString &line, int32_t l
         eatThisLine = false;
       }
     }
-    else
+    else if (!m_partIsHtml)
     {
       buf.Truncate();
       eatThisLine = true; // We have no content...
+    }
+
+    if (m_partIsHtml)
+    {
+      StripHtml(buf);
     }
 
     // Reset all assumed headers
@@ -309,6 +320,8 @@ int32_t nsMsgBodyHandler::ApplyTransformations (const nsCString &line, int32_t l
     // so no more defaulting to 'true' when the part is done.
     m_partIsText = false;
 
+    // Note: we cannot reset 'm_partIsQP' yet since we still need it to process
+    // the last buffer returned here. Parsing the next part will set a new value.
     return buf.Length();
   }
 
@@ -320,25 +333,21 @@ int32_t nsMsgBodyHandler::ApplyTransformations (const nsCString &line, int32_t l
     return 0;
   }
 
-  if (m_base64part)
+  // Accumulate base64 parts and HTML parts for later decoding or tag stripping.
+  if (m_base64part || m_partIsHtml)
   {
-    // We need to keep track of all lines to parse base64encoded...
+    if (m_partIsHtml && ! m_base64part)  // Replace newline in HTML with a space.
+      buf.Append(' ');
     buf.Append(line.get());
     eatThisLine = true;
     return buf.Length();
   }
 
-  // ... but there's no point if we're not parsing base64.
   buf.Assign(line);
-  if (m_stripHtml && m_partIsHtml)
-  {
-    StripHtml (buf);
-  }
-
   return buf.Length();
 }
 
-void nsMsgBodyHandler::StripHtml (nsCString &pBufInOut)
+void nsMsgBodyHandler::StripHtml(nsCString &pBufInOut)
 {
   char *pBuf = (char*) PR_Malloc (pBufInOut.Length() + 1);
   if (pBuf)
@@ -349,14 +358,15 @@ void nsMsgBodyHandler::StripHtml (nsCString &pBufInOut)
     bool inTag = false;
     while (*pWalkInOut) // throw away everything inside < >
     {
-      if (!inTag)
+      if (!inTag) {
         if (*pWalkInOut == '<')
           inTag = true;
         else
           *pWalk++ = *pWalkInOut;
-        else
-          if (*pWalkInOut == '>')
-            inTag = false;
+      } else {
+        if (*pWalkInOut == '>')
+          inTag = false;
+      }
       pWalkInOut++;
     }
     *pWalk = 0; // null terminator
@@ -382,6 +392,9 @@ void nsMsgBodyHandler::SniffPossibleMIMEHeader(const nsCString &line)
   nsCString lowerCaseLine(line);
   ToLowerCase(lowerCaseLine);
 
+  if (StringBeginsWith(lowerCaseLine, NS_LITERAL_CSTRING("content-transfer-encoding:")))
+    m_partIsQP = lowerCaseLine.Find("quoted-printable", /* ignoreCase = */ true) != -1;
+
   if (StringBeginsWith(lowerCaseLine, NS_LITERAL_CSTRING("content-type:")))
   {
     if (lowerCaseLine.Find("text/html", /* ignoreCase = */ true) != -1)
@@ -395,6 +408,7 @@ void nsMsgBodyHandler::SniffPossibleMIMEHeader(const nsCString &line)
       {
         // Nested multipart, get ready for new headers.
         m_base64part = false;
+        m_partIsQP = false;
         m_pastPartHeaders = false;
         m_partIsHtml = false;
         m_partIsText = false;
@@ -406,6 +420,7 @@ void nsMsgBodyHandler::SniffPossibleMIMEHeader(const nsCString &line)
     {
       // Initialise again.
       m_base64part = false;
+      m_partIsQP = false;
       m_pastPartHeaders = false;
       m_partIsHtml = false;
       m_partIsText = true;  // Default is text/plain, maybe proven otherwise later.

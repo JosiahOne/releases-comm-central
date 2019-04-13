@@ -3,9 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 this.EXPORTED_SYMBOLS = ["Extractor"];
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
 * Initializes extraction
@@ -63,7 +62,7 @@ Extractor.prototype = {
         // ideally this should be considered with lower certainty to fill in
         // missing information
 
-        // remove last line preceeding quoted message and first line of the quote
+        // remove last line preceding quoted message and first line of the quote
         this.email = this.email.replace(/\r?\n[^>].*\r?\n>+.*$/m, "");
         // remove the rest of quoted content
         this.email = this.email.replace(/^>+.*$/gm, "");
@@ -128,24 +127,22 @@ Extractor.prototype = {
             path = this.bundleUrl.replace(/LOCALE/g, this.fallbackLocale);
 
             let pref = "calendar.patterns.last.used.languages";
-            let lastUsedLangs = Preferences.get(pref, "");
+            let lastUsedLangs = Services.prefs.getStringPref(pref, "");
             if (lastUsedLangs == "") {
-                Preferences.set(pref, this.fallbackLocale);
+                Services.prefs.setStringPref(pref, this.fallbackLocale);
             } else {
                 let langs = lastUsedLangs.split(",");
                 let idx = langs.indexOf(this.fallbackLocale);
                 if (idx == -1) {
-                    Preferences.set(pref, this.fallbackLocale + "," + lastUsedLangs);
+                    Services.prefs.setStringPref(pref, this.fallbackLocale + "," + lastUsedLangs);
                 } else {
                     langs.splice(idx, 1);
-                    Preferences.set(pref, this.fallbackLocale + "," + langs.join(","));
+                    Services.prefs.setStringPref(pref, this.fallbackLocale + "," + langs.join(","));
                 }
             }
         } else {
-            let spellclass = "@mozilla.org/spellchecker/engine;1";
-            let mozISpellCheckingEngine = Components.interfaces.mozISpellCheckingEngine;
-            let spellchecker = Components.classes[spellclass]
-                                         .getService(mozISpellCheckingEngine);
+            let spellchecker = Cc["@mozilla.org/spellchecker/engine;1"]
+                                 .getService(Ci.mozISpellCheckingEngine);
 
             let arr = {};
             let cnt = {};
@@ -283,7 +280,7 @@ Extractor.prototype = {
         this.cleanup();
         cal.LOG("[calExtract] Email after processing for extraction: \n" + this.email);
 
-        this.overrides = JSON.parse(Preferences.get("calendar.patterns.override", "{}"));
+        this.overrides = JSON.parse(Services.prefs.getStringPref("calendar.patterns.override", "{}"));
         this.setLanguage();
 
         for (let i = 0; i <= 31; i++) {
@@ -989,8 +986,7 @@ Extractor.prototype = {
             for (let idx = vals.length - 1; idx >= 0; idx--) {
                 if (vals[idx].trim() == "") {
                     vals.splice(idx, 1);
-                    Components.utils.reportError("[calExtract] Faulty extraction pattern " +
-                                                 value + " for " + name);
+                    Cu.reportError("[calExtract] Faulty extraction pattern " + value + " for " + name);
                 }
             }
 
@@ -1042,8 +1038,7 @@ Extractor.prototype = {
             for (let idx = vals.length - 1; idx >= 0; idx--) {
                 if (vals[idx].trim() == "") {
                     vals.splice(idx, 1);
-                    Components.utils.reportError("[calExtract] Faulty extraction pattern " +
-                                                 value + " for " + name);
+                    Cu.reportError("[calExtract] Faulty extraction pattern " + value + " for " + name);
                 }
             }
 
@@ -1107,8 +1102,7 @@ Extractor.prototype = {
         // correctness checking
         for (i = 1; i <= count; i++) {
             if (positions[i] === undefined) {
-                Components.utils.reportError("[calExtract] Faulty extraction pattern " + name +
-                                             ", missing parameter #" + i);
+                Cu.reportError("[calExtract] Faulty extraction pattern " + name + ", missing parameter #" + i);
             }
         }
         return positions;

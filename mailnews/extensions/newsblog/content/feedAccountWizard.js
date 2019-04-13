@@ -3,43 +3,41 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/FeedUtils.jsm");
+var {FeedUtils} = ChromeUtils.import("resource:///modules/FeedUtils.jsm");
 
 /* Feed account standalone wizard functions */
 var FeedAccountWizard = {
   accountName: "",
 
-  accountSetupPageInit: function() {
-    this.accountSetupPageValidate();
+  onLoad() {
+    document.documentElement.addEventListener("wizardfinish", this.onFinish.bind(this));
+    let accountSetupPage = document.getElementById("accountsetuppage");
+    accountSetupPage.addEventListener("pageshow", this.accountSetupPageValidate.bind(this));
+    accountSetupPage.addEventListener("pagehide", this.accountSetupPageValidate.bind(this));
+    let donePage = document.getElementById("done");
+    donePage.addEventListener("pageshow", this.donePageInit.bind(this));
   },
 
-  accountSetupPageValidate: function() {
+  accountSetupPageValidate() {
     this.accountName = document.getElementById("prettyName").value.trim();
     document.documentElement.canAdvance = this.accountName;
   },
 
-  accountSetupPageUnload: function() {
-    return;
-  },
-
-  donePageInit: function() {
+  donePageInit() {
     document.getElementById("account.name.text").value = this.accountName;
   },
 
-  onCancel: function() {
-    return true;
-  },
-
-  onFinish: function() {
+  onFinish() {
     let account = FeedUtils.createRssAccount(this.accountName);
-    if ("gFolderTreeView" in window.opener.top)
+    if ("gFolderTreeView" in window.opener.top) {
       // Opened from 3pane File->New or Appmenu New Message, or
       // Account Central link.
       window.opener.top.gFolderTreeView.selectFolder(account.incomingServer.rootMsgFolder);
-    else if ("selectServer" in window.opener)
+    } else if ("selectServer" in window.opener) {
       // Opened from Account Settings.
       window.opener.selectServer(account.incomingServer);
+    }
 
     window.close();
-  }
-}
+  },
+};

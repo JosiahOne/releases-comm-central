@@ -15,6 +15,9 @@
  *   repeatedly.)
  * - reusing an existing window to show another message
  */
+
+"use strict";
+
 var MODULE_NAME = 'test-opening-messages';
 
 var RELATIVE_ROOT = '../shared-modules';
@@ -188,10 +191,11 @@ function check_message_pane_in_window_full_height(aWC) {
   let messengerChildren = aWC.e("messengerWindow").children;
   let childrenHeightsSum = 0;
   let childrenHeightsStr = "";
-  for (var i=0; i < messengerChildren.length; i++) {
-    childrenHeightsSum += messengerChildren[i].boxObject.height;
-    childrenHeightsStr += '"' + messengerChildren[i].id + '": ' +
-                          messengerChildren[i].boxObject.height + ', ';
+  for (let child of messengerChildren) {
+    if ("boxObject" in child) {
+      childrenHeightsSum += child.boxObject.height;
+      childrenHeightsStr += '"' + child.id + '": ' + child.boxObject.height + ', ';
+    }
   }
 
   assert_equals(messengerWindowHeight, childrenHeightsSum,

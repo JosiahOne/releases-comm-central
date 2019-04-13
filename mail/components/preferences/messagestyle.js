@@ -2,9 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from preferences.js */
+
 var jsProtoHelper = {};
 ChromeUtils.import("resource:///modules/jsProtoHelper.jsm", jsProtoHelper);
-ChromeUtils.import("resource:///modules/imThemes.jsm");
+var {
+  getThemeByName,
+  getThemeVariants,
+} = ChromeUtils.import("resource:///modules/imThemes.jsm");
 
 function Conversation(aName) {
   this._name = aName;
@@ -17,7 +22,7 @@ Conversation.prototype = {
   __proto__: jsProtoHelper.GenericConvIMPrototype,
   account: {protocol: {name: "Fake Protocol"},
             alias: "", name: "Fake Account",
-            statusInfo: Services.core.globalUserStatus}
+            statusInfo: Services.core.globalUserStatus},
 };
 
 function Message(aWho, aMessage, aObject) {
@@ -25,7 +30,7 @@ function Message(aWho, aMessage, aObject) {
 }
 Message.prototype = {
   __proto__: jsProtoHelper.GenericMessagePrototype,
-  get displayMessage() { return this.originalMessage; }
+  get displayMessage() { return this.originalMessage; },
 };
 
 // Message style tooltips use this.
@@ -33,7 +38,7 @@ function getBrowser() { return document.getElementById("previewbrowser"); }
 
 var previewObserver = {
   _loaded: false,
-  load: function() {
+  load() {
     let makeDate = function(aDateString) {
       let array = aDateString.split(":");
       let now = new Date();
@@ -50,22 +55,26 @@ var previewObserver = {
     conv.messages = [
       new Message(msg.buddy1, msg.message1, {outgoing: true, _alias: msg.nick1, time: makeDate("10:42:22"), _conversation: conv}),
       new Message(msg.buddy1, msg.message2, {outgoing: true, _alias: msg.nick1, time: makeDate("10:42:25"), _conversation: conv}),
-      new Message(msg.buddy2, msg.message3, {incoming: true, _alias: msg.nick2, time: makeDate("10:43:01"), _conversation: conv})
+      new Message(msg.buddy2, msg.message3, {incoming: true, _alias: msg.nick2, time: makeDate("10:43:01"), _conversation: conv}),
     ];
     previewObserver.conv = conv;
 
     let themeName = document.getElementById("messagestyle-themename");
-    if (themeName.value && !themeName.selectedItem)
-      themeName.value = themeName.value;
     previewObserver.browser = document.getElementById("previewbrowser");
     document.getElementById("showHeaderCheckbox")
             .addEventListener("CheckboxStateChange",
                               previewObserver.showHeaderChanged);
-    previewObserver.displayTheme(themeName.value);
-    this._loaded = true;
+
+    // If the preferences tab is opened straight to the message styles,
+    // loading the preview fails. Pushing this to back of the event queue
+    // prevents that failure.
+    setTimeout(() => {
+      previewObserver.displayTheme(themeName.value);
+      this._loaded = true;
+    });
   },
 
-  showHeaderChanged: function() {
+  showHeaderChanged() {
     if (!previewObserver._loaded)
       return;
 
@@ -73,7 +82,7 @@ var previewObserver = {
     previewObserver.reloadPreview();
   },
 
-  currentThemeChanged: function() {
+  currentThemeChanged() {
     if (!this._loaded)
       return;
 
@@ -85,7 +94,7 @@ var previewObserver = {
   },
 
   _ignoreVariantChange: false,
-  currentVariantChanged: function() {
+  currentVariantChanged() {
     if (!this._loaded || this._ignoreVariantChange)
       return;
 
@@ -97,18 +106,17 @@ var previewObserver = {
     this.reloadPreview();
   },
 
-  displayTheme: function(aTheme) {
+  displayTheme(aTheme) {
     try {
       this.theme = getThemeByName(aTheme);
-    }
-    catch(e) {
+    } catch (e) {
       document.getElementById("previewDeck").selectedIndex = 0;
       return;
     }
 
     let menulist = document.getElementById("themevariant");
-    if (menulist.firstChild)
-      menulist.firstChild.remove();
+    if (menulist.menupopup)
+      menulist.menupopup.remove();
     let popup = menulist.appendChild(document.createElement("menupopup"));
     let variants = getThemeVariants(this.theme);
 
@@ -140,11 +148,11 @@ var previewObserver = {
       }
     });
     this._ignoreVariantChange = true;
-    if (!this._loaded)
+    if (!this._loaded) {
       menulist.value = this.theme.variant = menulist.value;
-    else {
+    } else {
       menulist.value = this.theme.variant; // (reset to "default")
-      document.getElementById("paneChat").userChangedValue(menulist);
+      Preferences.userChangedValue(menulist);
     }
     this._ignoreVariantChange = false;
 
@@ -160,13 +168,13 @@ var previewObserver = {
     document.getElementById("previewDeck").selectedIndex = 1;
   },
 
-  reloadPreview: function() {
+  reloadPreview() {
     this.browser.init(this.conv);
     this.browser._theme = this.theme;
     Services.obs.addObserver(this, "conversation-loaded");
   },
 
-  observe: function(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     if (aTopic != "conversation-loaded" || aSubject != this.browser)
       return;
 
@@ -175,8 +183,8 @@ var previewObserver = {
     // (bug 1179943). Therefore, we override the method convbrowser
     // uses to determine if it should scroll, as well as its
     // mirror in the contentWindow (that messagestyle JS can call).
-    this.browser.autoScrollEnabled = () => false;
-    this.browser.contentWindow.autoScrollEnabled = () => false;
+    this.browser.convScrollEnabled = () => false;
+    this.browser.contentWindow.convScrollEnabled = () => false;
 
     // Display all queued messages. Use a timeout so that message text
     // modifiers can be added with observers for this notification.
@@ -186,5 +194,5 @@ var previewObserver = {
     }, 0);
 
     Services.obs.removeObserver(this, "conversation-loaded");
-  }
+  },
 };

@@ -2,10 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+/* import-globals-from ../../../base/content/calendar-ui-utils.js */
 
-/* exported migrateSelectedCalendars */
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+
+document.addEventListener("dialogaccept", migrateSelectedCalendars);
 
 /**
  * Migrate the calendar selected in the wizard from ics to gdata.
@@ -19,13 +21,7 @@ function migrateSelectedCalendars() {
         if (item.checked) {
             // Migrate the calendar to a gdata calendar
             let newCal = calmgr.createCalendar("gdata", item.calendar.uri);
-            if (calmgr.removeCalendar) {
-                // Lightning 4.0+
-                calmgr.removeCalendar(item.calendar);
-            } else {
-                calmgr.unregisterCalendar(item.calendar);
-                calmgr.deleteCalendar(item.calendar);
-            }
+            calmgr.removeCalendar(item.calendar);
 
             // Copy some properties to the new calendar
             newCal.name = item.calendar.name;
@@ -47,8 +43,8 @@ function migrateSelectedCalendars() {
     }
 
     // Only bring up the dialog on the next startup if the user wants us to.
-    Preferences.set("calendar.google.migrate",
-                    document.getElementById("showagain-checkbox").checked);
+    Services.prefs.setBoolPref("calendar.google.migrate",
+                               document.getElementById("showagain-checkbox").checked);
 }
 
 /**
@@ -58,7 +54,7 @@ function migrateSelectedCalendars() {
  */
 function getMigratableCalendars() {
     function isMigratable(calendar) {
-        let re = new RegExp("^http[s]?://www\\.google\\.com/calendar/ical/" +
+        let re = new RegExp("^http[s]?://(www|calendar)\\.google\\.com/calendar/ical/" +
                             "[^/]+/(private(-[^/]+)?|public)/" +
                             "(full|full-noattendees|composite|" +
                             "attendees-only|free-busy|basic)(\\.ics)?$");
@@ -73,19 +69,21 @@ function getMigratableCalendars() {
  */
 function gdata_migration_loader() {
     if (document.documentElement.id == "gdata-migration-wizard") {
-        // This is the migration wizard, load the calendars neeeded.
+        // This is the migration wizard, load the calendars needed.
         let listbox = document.getElementById("calendars-listbox");
 
         for (let calendar of sortCalendarArray(getMigratableCalendars())) {
-            let item = listbox.appendItem(calendar.name, calendar.id);
-            item.setAttribute("type", "checkbox");
+            let item = document.createElement("checkbox");
+            item.setAttribute("label", calendar.name);
+            item.setAttribute("value", calendar.id);
             item.calendar = calendar;
+            listbox.appendChild(item);
         }
 
         // Set up the "always check" field
         document.getElementById("showagain-checkbox").checked =
-            Preferences.get("calendar.google.migrate", true);
-    } else if (Preferences.get("calendar.google.migrate", true) &&
+            Services.prefs.getBoolPref("calendar.google.migrate", true);
+    } else if (Services.prefs.getBoolPref("calendar.google.migrate", true) &&
                getMigratableCalendars().length > 0) {
         // This is not the migration wizard, so it must be a main window. Check
         // if the migration wizard needs to be shown and calendars are worth

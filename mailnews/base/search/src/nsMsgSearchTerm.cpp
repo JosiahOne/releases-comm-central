@@ -358,7 +358,6 @@ int32_t NS_MsgGetStatusValueFromName(char *name)
 nsMsgSearchTerm::nsMsgSearchTerm()
 {
     // initialize this to zero
-    m_value.string=nullptr;
     m_value.attribute=0;
     m_value.u.priority=0;
     m_attribute = nsMsgSearchAttrib::Default;
@@ -372,8 +371,7 @@ nsMsgSearchTerm::nsMsgSearchTerm()
     m_booleanOp = nsMsgSearchBooleanOp::BooleanAND;
 }
 
-nsMsgSearchTerm::nsMsgSearchTerm (
-                                  nsMsgSearchAttribValue attrib,
+nsMsgSearchTerm::nsMsgSearchTerm (nsMsgSearchAttribValue attrib,
                                   nsMsgSearchOpValue op,
                                   nsIMsgSearchValue *val,
                                   nsMsgSearchBooleanOperator boolOp,
@@ -400,8 +398,6 @@ nsMsgSearchTerm::nsMsgSearchTerm (
 
 nsMsgSearchTerm::~nsMsgSearchTerm ()
 {
-  if (IS_STRING_ATTRIBUTE (m_attribute) && m_value.string)
-    free(m_value.string);
 }
 
 NS_IMPL_ISUPPORTS(nsMsgSearchTerm, nsIMsgSearchTerm)
@@ -434,21 +430,21 @@ NS_IMPL_ISUPPORTS(nsMsgSearchTerm, nsIMsgSearchTerm)
 
 nsresult nsMsgSearchTerm::OutputValue(nsCString &outputStr)
 {
-  if (IS_STRING_ATTRIBUTE(m_attribute) && m_value.string)
+  if (IS_STRING_ATTRIBUTE(m_attribute) && !m_value.utf8String.IsEmpty())
   {
     bool    quoteVal = false;
     // need to quote strings with ')' and strings starting with '"' or ' '
     // filter code will escape quotes
-    if (PL_strchr(m_value.string, ')') ||
-        (m_value.string[0] == ' ') ||
-        (m_value.string[0] == '"'))
+    if (m_value.utf8String.FindChar(')') != kNotFound ||
+        (m_value.utf8String.First() == ' ') ||
+        (m_value.utf8String.First() == '"'))
     {
       quoteVal = true;
       outputStr += "\"";
     }
-    if (PL_strchr(m_value.string, '"'))
+    if (m_value.utf8String.FindChar('"') != kNotFound)
     {
-      char *escapedString = nsMsgSearchTerm::EscapeQuotesInStr(m_value.string);
+      char *escapedString = nsMsgSearchTerm::EscapeQuotesInStr(m_value.utf8String.get());
       if (escapedString)
       {
         outputStr += escapedString;
@@ -458,7 +454,7 @@ nsresult nsMsgSearchTerm::OutputValue(nsCString &outputStr)
     }
     else
     {
-      outputStr += m_value.string;
+      outputStr += m_value.utf8String;
     }
     if (quoteVal)
       outputStr += "\"";
@@ -604,10 +600,8 @@ nsresult nsMsgSearchTerm::ParseValue(char *inStream)
     if (quoteVal && inStream[valueLen - 1] == '"')
       valueLen--;
 
-    m_value.string = (char *) PR_Malloc(valueLen + 1);
-    PL_strncpy(m_value.string, inStream, valueLen + 1);
-    m_value.string[valueLen] = '\0';
-    CopyUTF8toUTF16(m_value.string, m_value.utf16String);
+    m_value.utf8String.Assign(inStream, valueLen);
+    CopyUTF8toUTF16(m_value.utf8String, m_value.utf16String);
   }
   else
   {
@@ -673,7 +667,7 @@ nsresult
 nsMsgSearchTerm::ParseAttribute(char *inStream, nsMsgSearchAttribValue *attrib)
 {
     while (isspace(*inStream))
-        inStream++;
+      inStream++;
 
     // if we are dealing with an arbitrary header, it will be quoted....
     // it seems like a kludge, but to distinguish arbitrary headers from
@@ -682,14 +676,14 @@ nsMsgSearchTerm::ParseAttribute(char *inStream, nsMsgSearchAttribValue *attrib)
     // leading quote as a flag, but remove the trailing quote.
     bool quoteVal = false;
     if (*inStream == '"')
-        quoteVal = true;
+      quoteVal = true;
 
     // arbitrary headers are quoted. Skip first character, which will be the
     // first quote for arbitrary headers
     char *separator = strchr(inStream + 1, quoteVal ? '"' : ',');
 
     if (separator)
-        *separator = '\0';
+      *separator = '\0';
 
     nsAutoCString customId;
     nsresult rv = NS_MsgGetAttributeFromString(inStream, attrib, m_customId);
@@ -733,8 +727,8 @@ nsresult nsMsgSearchTerm::DeStreamNew (char *inStream, int16_t /*length*/)
     nsAutoCString keyword("$label");
     m_value.attribute = m_attribute = nsMsgSearchAttrib::Keywords;
     keyword.Append('0' + m_value.u.label);
-    m_value.string = PL_strdup(keyword.get());
-    CopyUTF8toUTF16(m_value.string, m_value.utf16String);
+    m_value.utf8String = keyword;
+    CopyUTF8toUTF16(keyword, m_value.utf16String);
   }
   return NS_OK;
 }
@@ -742,78 +736,81 @@ nsresult nsMsgSearchTerm::DeStreamNew (char *inStream, int16_t /*length*/)
 
 // Looks in the MessageDB for the user specified arbitrary header, if it finds the header, it then looks for a match against
 // the value for the header.
-nsresult nsMsgSearchTerm::MatchArbitraryHeader (nsIMsgSearchScopeTerm *scope,
-                                                uint32_t length /* in lines*/,
-                                                const char *charset,
-                                                bool charsetOverride,
-                                                nsIMsgDBHdr *msg,
-                                                nsIMsgDatabase* db,
-                                                const char * headers,
-                                                uint32_t headersSize,
-                                                bool ForFiltering,
-                                                bool *pResult)
+nsresult nsMsgSearchTerm::MatchArbitraryHeader(nsIMsgSearchScopeTerm *scope,
+                                               uint32_t length /* in lines*/,
+                                               const char *charset,
+                                               bool charsetOverride,
+                                               nsIMsgDBHdr *msg,
+                                               nsIMsgDatabase* db,
+                                               const nsACString& headers,
+                                               bool ForFiltering,
+                                               bool *pResult)
 {
   NS_ENSURE_ARG_POINTER(pResult);
 
   *pResult = false;
   nsresult rv = NS_OK;
   bool matchExpected = m_operator == nsMsgSearchOp::Contains ||
-                         m_operator == nsMsgSearchOp::Is ||
-                         m_operator == nsMsgSearchOp::BeginsWith ||
-                         m_operator == nsMsgSearchOp::EndsWith;
-  // init result to what we want if we don't find the header at all
+                       m_operator == nsMsgSearchOp::Is ||
+                       m_operator == nsMsgSearchOp::BeginsWith ||
+                       m_operator == nsMsgSearchOp::EndsWith;
+  // Initialize result to what we want if we don't find the header at all.
   bool result = !matchExpected;
 
   nsCString dbHdrValue;
   msg->GetStringProperty(m_arbitraryHeader.get(), getter_Copies(dbHdrValue));
-  if (!dbHdrValue.IsEmpty())
-    // match value with the other info.
-    return MatchRfc2047String(dbHdrValue, charset, charsetOverride, pResult);
+  if (!dbHdrValue.IsEmpty()) {
+    // Match value with the other info. It doesn't check all header occurrences,
+    // so we use it only if we match and do line by line headers parsing otherwise.
+    rv = MatchRfc2047String(dbHdrValue, charset, charsetOverride, pResult);
+    if (matchExpected == *pResult)
+      return rv;
 
-  nsMsgBodyHandler * bodyHandler =
-    new nsMsgBodyHandler (scope, length, msg, db, headers, headersSize,
-                          ForFiltering);
-  NS_ENSURE_TRUE(bodyHandler, NS_ERROR_OUT_OF_MEMORY);
+    // Preset result in case we don't have access to the headers, like for IMAP.
+    result = *pResult;
+  }
 
+  nsMsgBodyHandler *bodyHandler = new nsMsgBodyHandler(scope, length, msg, db,
+                                                       headers.BeginReading(),
+                                                       headers.Length(),
+                                                       ForFiltering);
   bodyHandler->SetStripHeaders (false);
 
-  nsCString headerFullValue; // contains matched header value accumulated over multiple lines.
+  nsCString headerFullValue;  // Contains matched header value accumulated over multiple lines.
   nsAutoCString buf;
   nsAutoCString curMsgHeader;
-  bool searchingHeaders = true;
+  bool processingHeaders = true;
 
-  // We will allow accumulation of received headers;
-  bool isReceivedHeader = m_arbitraryHeader.EqualsLiteral("received");
-
-  while (searchingHeaders)
+  while (processingHeaders)
   {
     nsCString charsetIgnored;
     if (bodyHandler->GetNextLine(buf, charsetIgnored) < 0 || EMPTY_MESSAGE_LINE(buf))
-      searchingHeaders = false;
-    bool isContinuationHeader = searchingHeaders ? NS_IsAsciiWhitespace(buf.CharAt(0))
-                                                   : false;
+      processingHeaders = false;  // No more lines or empty line terminating headers.
 
-    // We try to match the header from the last time through the loop, which should now
-    //  have accumulated over possible multiple lines. For all headers except received,
-    //  we process a single accumulation, but process accumulated received at the end.
-    if (!searchingHeaders || (!isContinuationHeader &&
-         (!headerFullValue.IsEmpty() && !isReceivedHeader)))
+    bool isContinuationHeader = processingHeaders ?
+      NS_IsAsciiWhitespace(buf.CharAt(0)) : false;
+
+    // If we're not on a continuation header the header value is not empty,
+    // we have finished accumulating the header value by iterating over all
+    // header lines. Now we need to check whether the value is a match.
+    if (!isContinuationHeader && !headerFullValue.IsEmpty())
     {
-      // Make sure buf has info besides just the header.
-      // Otherwise, it's either an empty header, or header not found.
-      if (!headerFullValue.IsEmpty())
+      bool stringMatches;
+      // Match value with the other info.
+      rv = MatchRfc2047String(headerFullValue, charset, charsetOverride, &stringMatches);
+      if (matchExpected == stringMatches) // if we found a match
       {
-        bool stringMatches;
-        // match value with the other info.
-        rv = MatchRfc2047String(headerFullValue, charset, charsetOverride, &stringMatches);
-        if (matchExpected == stringMatches) // if we found a match
-        {
-          searchingHeaders = false;   // then stop examining the headers
-          result = stringMatches;
-        }
+        // If we found a match, stop examining the headers.
+        processingHeaders = false;
+        result = stringMatches;
       }
-      break;
+      // Prepare for repeated header of the same type.
+      headerFullValue.Truncate();
     }
+
+    // We got result or finished processing all lines.
+    if (!processingHeaders)
+      break;
 
     char * buf_end = (char *) (buf.get() + buf.Length());
     int headerLength = m_arbitraryHeader.Length();
@@ -821,38 +818,38 @@ nsresult nsMsgSearchTerm::MatchArbitraryHeader (nsIMsgSearchScopeTerm *scope,
     // If the line starts with whitespace, then we use the current header.
     if (!isContinuationHeader)
     {
-      // here we start a new header
+      // Here we start a new header.
       uint32_t colonPos = buf.FindChar(':');
       curMsgHeader = StringHead(buf, colonPos);
     }
 
     if (curMsgHeader.Equals(m_arbitraryHeader, nsCaseInsensitiveCStringComparator()))
     {
-      // process the value
-      // value occurs after the header name or whitespace continuation char.
-      const char * headerValue = buf.get() + (isContinuationHeader ? 1 : headerLength);
+      // Process the value:
+      // Value occurs after the header name or whitespace continuation char.
+      const char *headerValue = buf.get() + (isContinuationHeader ? 1 : headerLength);
       if (headerValue < buf_end && headerValue[0] == ':')  // + 1 to account for the colon which is MANDATORY
         headerValue++;
 
-      // strip leading white space
+      // Strip leading white space.
       while (headerValue < buf_end && isspace(*headerValue))
-        headerValue++; // advance to next character
+        headerValue++;
 
-      // strip trailing white space
+      // Strip trailing white space.
       char * end = buf_end - 1;
-      while (end > headerValue && isspace(*end)) // while we haven't gone back past the start and we are white space....
+      while (headerValue < end && isspace(*end))
       {
-        *end = '\0';  // eat up the white space
-        end--;      // move back and examine the previous character....
+        *end = '\0';
+        end--;
       }
 
-      // any continuation whitespace is converted to a single space. This includes both a continuation line, or a
-      //  second value of the same header (eg the received header)
+      // Any continuation whitespace is converted to a single space.
       if (!headerFullValue.IsEmpty())
         headerFullValue.Append(' ');
       headerFullValue.Append(nsDependentCString(headerValue));
     }
   }
+
   delete bodyHandler;
   *pResult = result;
   return rv;
@@ -917,8 +914,9 @@ NS_IMETHODIMP nsMsgSearchTerm::MatchUint32HdrProperty(nsIMsgDBHdr *aHdr, bool *a
   return rv;
 }
 
-nsresult nsMsgSearchTerm::MatchBody (nsIMsgSearchScopeTerm *scope, uint64_t offset, uint32_t length /*in lines*/, const char *folderCharset,
-                                      nsIMsgDBHdr *msg, nsIMsgDatabase* db, bool *pResult)
+nsresult nsMsgSearchTerm::MatchBody(nsIMsgSearchScopeTerm *scope, uint64_t offset,
+                                    uint32_t length /*in lines*/, const char *folderCharset,
+                                    nsIMsgDBHdr *msg, nsIMsgDatabase* db, bool *pResult)
 {
   NS_ENSURE_ARG_POINTER(pResult);
 
@@ -930,7 +928,7 @@ nsresult nsMsgSearchTerm::MatchBody (nsIMsgSearchScopeTerm *scope, uint64_t offs
   // Small hack so we don't look all through a message when someone has
   // specified "BODY IS foo". ### Since length is in lines, this is not quite right.
   if ((length > 0) && (m_operator == nsMsgSearchOp::Is || m_operator == nsMsgSearchOp::Isnt))
-    length = PL_strlen (m_value.string);
+    length = m_value.utf8String.Length();
 
   nsMsgBodyHandler * bodyHan  = new nsMsgBodyHandler (scope, length, msg, db);
   if (!bodyHan)
@@ -946,17 +944,6 @@ nsresult nsMsgSearchTerm::MatchBody (nsIMsgSearchScopeTerm *scope, uint64_t offs
   GetMatchAllBeforeDeciding(&boolContinueLoop);
   result = boolContinueLoop;
 
-  // If there's a '=' in the search term, then we're not going to do
-  // quoted printable decoding. Otherwise we assume everything is
-  // quoted printable. Obviously everything isn't quoted printable, but
-  // since we don't have a MIME parser handy, and we want to err on the
-  // side of too many hits rather than not enough, we'll assume in that
-  // general direction. Blech. ### FIX ME
-  // bug fix #314637: for stateful charsets like ISO-2022-JP, we don't
-  // want to decode quoted printable since it contains '='.
-  bool isQuotedPrintable = !nsMsgI18Nstateful_charset(folderCharset) &&
-    (PL_strchr (m_value.string, '=') == nullptr);
-
   nsCString compare;
   nsCString charset;
   while (!endOfFile && result == boolContinueLoop)
@@ -965,7 +952,7 @@ nsresult nsMsgSearchTerm::MatchBody (nsIMsgSearchScopeTerm *scope, uint64_t offs
     {
       bool softLineBreak = false;
       // Do in-place decoding of quoted printable
-      if (isQuotedPrintable)
+      if (bodyHan->IsQP())
       {
         softLineBreak = StringEndsWith(buf, NS_LITERAL_CSTRING("="));
         MsgStripQuotedPrintable(buf);
@@ -997,10 +984,7 @@ nsresult nsMsgSearchTerm::MatchBody (nsIMsgSearchScopeTerm *scope, uint64_t offs
     else
       endOfFile = true;
   }
-#ifdef DO_I18N
-  if(conv)
-    INTL_DestroyCharCodeConverter(conv);
-#endif
+
   delete bodyHan;
   *pResult = result;
   return rv;
@@ -1018,7 +1002,7 @@ nsresult nsMsgSearchTerm::InitializeAddressBook()
     rv = mDirectory->GetURI(uri);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    if (!uri.Equals(m_value.string))
+    if (!uri.Equals(m_value.utf8String))
       // clear out the directory....we are no longer pointing to the right one
       mDirectory = nullptr;
   }
@@ -1027,7 +1011,7 @@ nsresult nsMsgSearchTerm::InitializeAddressBook()
     nsCOMPtr<nsIAbManager> abManager = do_GetService(NS_ABMANAGER_CONTRACTID, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
 
-    rv = abManager->GetDirectory(nsDependentCString(m_value.string), getter_AddRefs(mDirectory));
+    rv = abManager->GetDirectory(m_value.utf8String, getter_AddRefs(mDirectory));
     NS_ENSURE_SUCCESS(rv, rv);
   }
 
@@ -1078,9 +1062,11 @@ nsresult nsMsgSearchTerm::MatchRfc2047String(const nsACString &rfc2047string,
 {
   NS_ENSURE_ARG_POINTER(pResult);
 
-  nsCOMPtr<nsIMimeConverter> mimeConverter = do_GetService(NS_MIME_CONVERTER_CONTRACTID);
+  nsresult rv;
+  nsCOMPtr<nsIMimeConverter> mimeConverter = do_GetService(NS_MIME_CONVERTER_CONTRACTID, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
   nsAutoString stringToMatch;
-  nsresult rv = mimeConverter->DecodeMimeHeader(
+  rv = mimeConverter->DecodeMimeHeader(
     PromiseFlatCString(rfc2047string).get(), charset, charsetOverride, false,
     stringToMatch);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -1116,16 +1102,23 @@ nsresult nsMsgSearchTerm::MatchString(const nsACString &stringToMatch,
   else
   {
     nsAutoString utf16StrToMatch;
-    if (charset != nullptr)
+    rv = NS_ERROR_UNEXPECTED;
+    if (charset)
     {
-      nsMsgI18NConvertToUnicode(nsDependentCString(charset),
-                                stringToMatch,
-                                utf16StrToMatch);
+      rv = nsMsgI18NConvertToUnicode(nsDependentCString(charset),
+                                     stringToMatch,
+                                     utf16StrToMatch);
     }
-    else {
-      NS_ASSERTION(MsgIsUTF8(stringToMatch), "stringToMatch is not UTF-8");
-      CopyUTF8toUTF16(stringToMatch, utf16StrToMatch);
+    if (NS_FAILED(rv)) {
+      // No charset or conversion failed, maybe due to a bad charset, try UTF-8.
+      if (MsgIsUTF8(stringToMatch)) {
+        CopyUTF8toUTF16(stringToMatch, utf16StrToMatch);
+      } else {
+        // Bad luck, let's assume ASCII/windows-1252 then.
+        CopyASCIItoUTF16(stringToMatch, utf16StrToMatch);
+      }
     }
+
     rv = MatchString(utf16StrToMatch, &result);
   }
 
@@ -1191,13 +1184,13 @@ nsresult nsMsgSearchTerm::MatchString(const nsAString &utf16StrToMatch,
 
 NS_IMETHODIMP nsMsgSearchTerm::GetMatchAllBeforeDeciding (bool *aResult)
 {
- *aResult = (m_operator == nsMsgSearchOp::DoesntContain || m_operator == nsMsgSearchOp::Isnt);
- return NS_OK;
+  *aResult = (m_operator == nsMsgSearchOp::DoesntContain || m_operator == nsMsgSearchOp::Isnt);
+  return NS_OK;
 }
 
 NS_IMETHODIMP nsMsgSearchTerm::MatchRfc822String(const nsACString &string,
-                                             const char *charset,
-                                             bool *pResult)
+                                                 const char *charset,
+                                                 bool *pResult)
 {
   NS_ENSURE_ARG_POINTER(pResult);
 
@@ -1399,11 +1392,8 @@ nsresult nsMsgSearchTerm::MatchJunkStatus(const char *aJunkScore, bool *pResult)
   nsMsgJunkStatus junkStatus;
   if (aJunkScore && *aJunkScore) {
       junkStatus = (atoi(aJunkScore) == nsIJunkMailPlugin::IS_SPAM_SCORE) ?
-          nsIJunkMailPlugin::JUNK :
-          nsIJunkMailPlugin::GOOD;
-
-  }
-  else {
+        nsIJunkMailPlugin::JUNK : nsIJunkMailPlugin::GOOD;
+  } else {
     // the in UI, we only show "junk" or "not junk"
     // unknown, or nsIJunkMailPlugin::UNCLASSIFIED is shown as not junk
     // so for the search to work as expected, treat unknown as not junk
@@ -1440,10 +1430,10 @@ nsresult nsMsgSearchTerm::MatchJunkScoreOrigin(const char *aJunkScoreOrigin, boo
   switch (m_operator)
   {
   case nsMsgSearchOp::Is:
-    matches = aJunkScoreOrigin && !strcmp(aJunkScoreOrigin, m_value.string);
+    matches = aJunkScoreOrigin && m_value.utf8String.Equals(aJunkScoreOrigin);
     break;
   case nsMsgSearchOp::Isnt:
-    matches = !aJunkScoreOrigin || strcmp(aJunkScoreOrigin, m_value.string);
+    matches = !aJunkScoreOrigin || !m_value.utf8String.Equals(aJunkScoreOrigin);
     break;
   default:
     rv = NS_ERROR_FAILURE;
@@ -1566,8 +1556,8 @@ nsresult nsMsgSearchTerm::MatchKeyword(const nsACString& keywordList, bool *pRes
       m_operator == nsMsgSearchOp::Contains)
   {
     nsCString keywordString(keywordList);
-    const uint32_t kKeywordLen = PL_strlen(m_value.string);
-    const char* matchStart = PL_strstr(keywordString.get(), m_value.string);
+    const uint32_t kKeywordLen = m_value.utf8String.Length();
+    const char* matchStart = PL_strstr(keywordString.get(), m_value.utf8String.get());
     while (matchStart)
     {
       // For a real match, matchStart must be the start of the keywordList or
@@ -1581,7 +1571,7 @@ nsresult nsMsgSearchTerm::MatchKeyword(const nsACString& keywordList, bool *pRes
         return NS_OK;
       }
       // no match yet, so search on
-      matchStart = PL_strstr(matchEnd, m_value.string);
+      matchStart = PL_strstr(matchEnd, m_value.utf8String.get());
     }
     // keyword not found
     *pResult = m_operator == nsMsgSearchOp::DoesntContain;
@@ -1621,7 +1611,7 @@ nsresult nsMsgSearchTerm::MatchKeyword(const nsACString& keywordList, bool *pRes
       }
 
       // Does this valid tag key match our search term?
-      matches = keywordArray[i].Equals(m_value.string);
+      matches = keywordArray[i].Equals(m_value.utf8String);
 
       // Is or Isn't partly determined on a single unmatched token
       if (!matches)
@@ -1725,7 +1715,7 @@ NS_IMETHODIMP nsMsgSearchTerm::MatchCustom(nsIMsgDBHdr* aHdr, bool *pResult)
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (customTerm)
-    return customTerm->Match(aHdr, nsDependentCString(m_value.string),
+    return customTerm->Match(aHdr, m_value.utf8String,
                              m_operator, pResult);
   *pResult = false;     // default to no match if term is missing
   return NS_ERROR_FAILURE; // missing custom term
@@ -1768,34 +1758,34 @@ nsMsgSearchTerm::SetValue(nsIMsgSearchValue* aValue)
 NS_IMETHODIMP
 nsMsgSearchTerm::GetBooleanAnd(bool *aResult)
 {
-    NS_ENSURE_ARG_POINTER(aResult);
-    *aResult = (m_booleanOp == nsMsgSearchBooleanOp::BooleanAND);
-    return NS_OK;
+  NS_ENSURE_ARG_POINTER(aResult);
+  *aResult = (m_booleanOp == nsMsgSearchBooleanOp::BooleanAND);
+  return NS_OK;
 }
 
 NS_IMETHODIMP
 nsMsgSearchTerm::SetBooleanAnd(bool aValue)
 {
-    if (aValue)
-        m_booleanOp = nsMsgSearchBooleanOperator(nsMsgSearchBooleanOp::BooleanAND);
-    else
-        m_booleanOp = nsMsgSearchBooleanOperator(nsMsgSearchBooleanOp::BooleanOR);
-    return NS_OK;
+  if (aValue)
+    m_booleanOp = nsMsgSearchBooleanOperator(nsMsgSearchBooleanOp::BooleanAND);
+  else
+    m_booleanOp = nsMsgSearchBooleanOperator(nsMsgSearchBooleanOp::BooleanOR);
+  return NS_OK;
 }
 
 NS_IMETHODIMP
 nsMsgSearchTerm::GetArbitraryHeader(nsACString &aResult)
 {
-    aResult = m_arbitraryHeader;
-    return NS_OK;
+  aResult = m_arbitraryHeader;
+  return NS_OK;
 }
 
 NS_IMETHODIMP
 nsMsgSearchTerm::SetArbitraryHeader(const nsACString &aValue)
 {
-    m_arbitraryHeader = aValue;
-    ToLowerCaseExceptSpecials(m_arbitraryHeader);
-    return NS_OK;
+  m_arbitraryHeader = aValue;
+  ToLowerCaseExceptSpecials(m_arbitraryHeader);
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1866,17 +1856,17 @@ NS_IMPL_ISUPPORTS(nsMsgSearchScopeTerm, nsIMsgSearchScopeTerm)
 NS_IMETHODIMP
 nsMsgSearchScopeTerm::GetFolder(nsIMsgFolder **aResult)
 {
-    NS_IF_ADDREF(*aResult = m_folder);
-    return NS_OK;
+  NS_IF_ADDREF(*aResult = m_folder);
+  return NS_OK;
 }
 
 NS_IMETHODIMP
 nsMsgSearchScopeTerm::GetSearchSession(nsIMsgSearchSession** aResult)
 {
-    NS_ENSURE_ARG_POINTER(aResult);
-    nsCOMPtr<nsIMsgSearchSession> searchSession = do_QueryReferent (m_searchSession);
-    searchSession.forget(aResult);
-    return NS_OK;
+  NS_ENSURE_ARG_POINTER(aResult);
+  nsCOMPtr<nsIMsgSearchSession> searchSession = do_QueryReferent (m_searchSession);
+  searchSession.forget(aResult);
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1897,7 +1887,7 @@ nsMsgSearchScopeTerm::GetInputStream(nsIMsgDBHdr *aMsgHdr,
 NS_IMETHODIMP nsMsgSearchScopeTerm::CloseInputStream()
 {
   if (m_inputStream)
-{
+  {
     m_inputStream->Close();
     m_inputStream = nullptr;
   }
@@ -1971,11 +1961,9 @@ nsMsgResultElement::nsMsgResultElement(nsIMsgSearchAdapter *adapter)
   m_adapter = adapter;
 }
 
-
 nsMsgResultElement::~nsMsgResultElement ()
 {
 }
-
 
 nsresult nsMsgResultElement::AddValue (nsIMsgSearchValue *value)
 {
@@ -2038,7 +2026,7 @@ nsresult nsMsgResultElement::AssignValues (nsIMsgSearchValue *src, nsMsgSearchVa
       NS_ASSERTION(IS_STRING_ATTRIBUTE(dst->attribute), "assigning non-string result");
       nsString unicodeString;
       rv = src->GetStr(unicodeString);
-      dst->string = ToNewUTF8String(unicodeString);
+      CopyUTF16toUTF8(unicodeString, dst->utf8String);
       dst->utf16String = unicodeString;
     }
     else
@@ -2083,5 +2071,3 @@ nsresult nsMsgResultElement::Open (void *window)
 {
   return NS_ERROR_NULL_POINTER;
 }
-
-

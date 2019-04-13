@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* exported onLoad, onUnload, onKeyPress, onTextBoxKeyPress, onAccept,
- *          onCancel, onSubscribe, onUnsubscribe
- */
+/* exported onLoad, onUnload, onKeyPress, onTextBoxKeyPress, onSubscribe, onUnsubscribe */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+
+document.addEventListener("dialogaccept", onAccept);
 
 /**
  * Cancels any pending search operations.
@@ -14,7 +14,7 @@ ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 var gCurrentSearchOperation = null;
 function cancelPendingSearchOperation() {
     if (gCurrentSearchOperation && gCurrentSearchOperation.isPending) {
-        gCurrentSearchOperation.cancel(Components.interfaces.calIErrors.OPERATION_CANCELLED);
+        gCurrentSearchOperation.cancel(Ci.calIErrors.OPERATION_CANCELLED);
     }
     gCurrentSearchOperation = null;
 }
@@ -84,13 +84,6 @@ function onAccept() {
             }
         }
     }
-    return true;
-}
-
-/**
- * Handler function to be called when the cancel button is pressed.
- */
-function onCancel() {
 }
 
 /**
@@ -100,7 +93,10 @@ function onSearch() {
     cancelPendingSearchOperation();
 
     let richListBox = document.getElementById("subscriptions-listbox");
-    richListBox.clear();
+
+    while (richListBox.hasChildNodes()) {
+        richListBox.lastChild.remove();
+    }
 
     let registeredCals = {};
     for (let calendar of cal.getCalendarManager().getCalendars({})) {
@@ -111,7 +107,10 @@ function onSearch() {
         onResult: function(operation, result) {
             if (result) {
                 for (let calendar of result) {
-                    richListBox.addCalendar(calendar, registeredCals[calendar.id]);
+                    let newNode = document.createXULElement("calendar-subscriptions-richlistitem");
+                    newNode.calendar = calendar;
+                    newNode.subscribed = registeredCals[calendar.id];
+                    richListBox.appendChild(newNode);
                 }
             }
             if (!operation.isPending) {
@@ -128,13 +127,13 @@ function onSearch() {
     let operation = cal.getCalendarSearchService().searchForCalendars(document.getElementById("search-textbox").value,
                                                                       0 /* hints */, 50, opListener);
     if (operation && operation.isPending) {
-        gCurrentSearchOperation = op;
+        gCurrentSearchOperation = operation;
         document.getElementById("status-deck").selectedIndex = 1;
     }
 }
 
 /**
- * Markes the selected item in the subscriptions-listbox for subscribing. The
+ * Marks the selected item in the subscriptions-listbox for subscribing. The
  * actual subscribe happens when the window is closed.
  */
 function onSubscribe() {

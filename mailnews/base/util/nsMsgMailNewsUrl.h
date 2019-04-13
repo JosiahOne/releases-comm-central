@@ -17,15 +17,17 @@
 #include "nsIMimeHeaders.h"
 #include "nsIMsgMailNewsUrl.h"
 #include "nsIURL.h"
-#include "nsIURIWithPrincipal.h"
+#include "nsIURIWithSpecialOrigin.h"
 #include "nsILoadGroup.h"
 #include "nsIMsgSearchSession.h"
 #include "nsICacheEntry.h"
 #include "nsICacheSession.h"
 #include "nsIMimeMiscStatus.h"
-#include "nsWeakReference.h"
+#include "nsIWeakReferenceUtils.h"
 #include "nsString.h"
 #include "nsIURIMutator.h"
+#include "nsISerializable.h"
+#include "nsIClassInfo.h"
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Okay, I found that all of the mail and news url interfaces needed to support
@@ -39,7 +41,9 @@
 #define IMETHOD_VISIBILITY NS_VISIBILITY_DEFAULT
 
 class NS_MSG_BASE nsMsgMailNewsUrl : public nsIMsgMailNewsUrl,
-                                     public nsIURIWithPrincipal
+                                     public nsIURIWithSpecialOrigin,
+                                     public nsISerializable,
+                                     public nsIClassInfo
 {
 public:
     nsMsgMailNewsUrl();
@@ -48,7 +52,9 @@ public:
     NS_DECL_NSIMSGMAILNEWSURL
     NS_DECL_NSIURI
     NS_DECL_NSIURL
-    NS_DECL_NSIURIWITHPRINCIPAL
+    NS_DECL_NSIURIWITHSPECIALORIGIN
+    NS_DECL_NSISERIALIZABLE
+    NS_DECL_NSICLASSINFO
 
 protected:
   virtual nsresult Clone(nsIURI **_retval);
@@ -64,6 +70,7 @@ protected:
   virtual nsresult SetFilePath(const nsACString &aFilePath);
   virtual nsresult SetQuery(const nsACString &aQuery);
   virtual nsresult SetQueryWithEncoding(const nsACString &aQuery, const mozilla::Encoding* aEncoding);
+  virtual nsresult CreateURL(const nsACString& aSpec, nsIURL **aURL);  // nsMailboxUrl overrides this.
 
 public:
   class Mutator
@@ -103,7 +110,7 @@ protected:
   virtual ~nsMsgMailNewsUrl();
 
   nsCOMPtr<nsIURL> m_baseURL;
-  nsCOMPtr<nsIPrincipal> m_principal;
+  nsCOMPtr<nsIURI> m_normalizedOrigin;
   nsWeakPtr m_statusFeedbackWeak;
   nsWeakPtr m_msgWindowWeak;
   nsWeakPtr m_loadGroupWeak;
@@ -117,7 +124,7 @@ protected:
   bool m_updatingFolder;
   bool m_msgIsInLocalCache;
   bool m_suppressErrorMsgs;
-  bool m_isPrincipalURL;
+  bool m_hasNormalizedOrigin;
 
   // the following field is really a bit of a hack to make
   // open attachments work. The external applications code sometimes tries to figure out the right

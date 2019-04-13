@@ -28,7 +28,7 @@
 #include "nsImapFlagAndUidState.h"
 #include "nsIMAPNamespace.h"
 #include "nsTArray.h"
-#include "nsWeakPtr.h"
+#include "nsIWeakReferenceUtils.h"
 #include "nsMsgLineBuffer.h" // we need this to use the nsMsgLineStreamBuffer helper class...
 #include "nsIInputStream.h"
 #include "nsIMsgIncomingServer.h"
@@ -54,7 +54,7 @@
 class nsIMAPMessagePartIDArray;
 class nsIPrefBranch;
 
-#define kDownLoadCacheSize 16000 // was 1536 - try making it bigger
+#define kDownLoadCacheSize 16000u // was 1536 - try making it bigger
 
 
 typedef struct _msg_line_info {
@@ -154,6 +154,12 @@ class nsImapProtocol : public nsIImapProtocol,
                        public nsIProtocolProxyCallback
 {
 public:
+  struct TCPKeepalive {
+    // For enabling and setting TCP keepalive (not related to IMAP IDLE).
+    std::atomic<bool> enabled;
+    std::atomic<int32_t> idleTimeS;
+    std::atomic<int32_t> retryIntervalS;
+  };
 
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIINPUTSTREAMCALLBACK
@@ -259,7 +265,7 @@ public:
   void DiscoverMailboxSpec(nsImapMailboxSpec * adoptedBoxSpec);
   void AlertUserEventUsingName(const char* aMessageId);
   void AlertUserEvent(const char * message);
-  void AlertUserEventFromServer(const char * aServerEvent);
+  void AlertUserEventFromServer(const char * aServerEvent, bool aForIdle = false);
 
   void ProgressEventFunctionUsingName(const char* aMsgId);
   void ProgressEventFunctionUsingNameWithString(const char* aMsgName, const char *
@@ -338,6 +344,7 @@ private:
   // finish processng a url and it is set whenever we call Load on a url
   bool m_urlInProgress;
   nsCOMPtr<nsIImapUrl> m_runningUrl; // the nsIImapURL that is currently running
+  nsCOMPtr<nsIImapUrl> m_runningUrlLatest;
   nsImapAction m_imapAction;  // current imap action associated with this connection...
 
   nsCString             m_hostName;
@@ -345,7 +352,7 @@ private:
   nsCString             m_serverKey;
   nsCString             m_realHostName;
   char                  *m_dataOutputBuf;
-  nsMsgLineStreamBuffer * m_inputStreamBuffer;
+  RefPtr<nsMsgLineStreamBuffer> m_inputStreamBuffer;
   uint32_t              m_allocatedSize; // allocated size
   uint32_t        m_totalDataSize; // total data size
   uint32_t        m_curReadIndex;  // current read index
@@ -381,6 +388,7 @@ private:
   nsString m_password;
   // Set to the result of nsImapServer::PromptPassword
   nsresult    m_passwordStatus;
+  bool        m_passwordObtained;
 
   bool         m_imapThreadIsRunning;
   void ImapThreadMainLoop(void);
@@ -393,6 +401,7 @@ private:
   RefPtr<ImapMailFolderSinkProxy> m_imapMailFolderSink;
   RefPtr<ImapMessageSinkProxy>    m_imapMessageSink;
   RefPtr<ImapServerSinkProxy>     m_imapServerSink;
+  RefPtr<ImapServerSinkProxy>     m_imapServerSinkLatest;
   RefPtr<ImapProtocolSinkProxy>   m_imapProtocolSink;
 
   // helper function to setup imap sink interface proxies
@@ -414,7 +423,6 @@ private:
   // biff
   void  PeriodicBiff();
   void  SendSetBiffIndicatorEvent(nsMsgBiffState newState);
-  bool  CheckNewMail();
 
   // folder opening and listing header functions
   void FolderHeaderDump(uint32_t *msgUids, uint32_t msgCount);
@@ -638,7 +646,7 @@ private:
   nsDataHashtable<nsCStringHashKey, int32_t> m_specialXListMailboxes;
 
 
-  nsIImapHostSessionList * m_hostSessionList;
+  nsCOMPtr<nsIImapHostSessionList> m_hostSessionList;
 
   bool m_fromHeaderSeen;
 
@@ -657,7 +665,6 @@ private:
   nsCOMPtr<nsIStringBundle> m_bundle;
 
   bool m_notifySearchHit;
-  bool m_checkForNewMailDownloadsHeaders;
   bool m_needNoop;
   bool m_idle;
   bool m_useIdle;
@@ -733,7 +740,7 @@ protected:
   nsCOMPtr<nsILoadGroup> m_loadGroup;
   nsCOMPtr<nsILoadInfo> m_loadInfo;
   nsCOMPtr<nsIStreamListener> m_channelListener;
-  nsISupports * m_channelContext;
+  nsCOMPtr<nsISupports> m_channelContext;
   nsresult m_cancelStatus;
   nsLoadFlags mLoadFlags;
   nsCOMPtr<nsIProgressEventSink> mProgressEventSink;

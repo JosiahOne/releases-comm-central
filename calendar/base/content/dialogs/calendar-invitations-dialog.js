@@ -2,10 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* exported onLoad, onUnload, onAccept, onCancel */
+/* exported onLoad, onUnload */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* globals invitationsText */// From calendar-invitations-dialog.xul.
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
 
 /**
  * Sets up the invitations dialog from the window arguments, retrieves the
@@ -35,7 +39,9 @@ function onLoad() {
             updatingBox.setAttribute("hidden", "true");
             let richListBox = document.getElementById("invitations-listbox");
             for (let item of aItems) {
-                richListBox.addCalendarItem(item);
+                let newNode = document.createXULElement("calendar-invitations-richlistitem");
+                newNode.calendarItem = item;
+                richListBox.appendChild(newNode);
             }
         }
     };
@@ -67,7 +73,6 @@ function onAccept() {
     let args = window.arguments[0];
     fillJobQueue(args.queue);
     args.invitationsManager.processJobQueue(args.queue, args.finishedCallBack);
-    return true;
 }
 
 /**

@@ -13,11 +13,9 @@
 
 <dialog title="&windowTitleSettings.label;"
         id="publishSettingsDlg"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="Startup()"
-        buttons="accept,cancel"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();">
+        buttons="accept,cancel">
 
   <!-- Methods common to all editor dialogs -->
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
@@ -26,11 +24,10 @@
   <script type="application/javascript" src="chrome://editor/content/publishprefs.js"/>
 
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
-  <broadcaster id="args" value=""/>
 
   <hbox id="SettingsPanel">
     <groupbox align="center">
-      <caption label="&publishSites.label;"/>
+      <label class="header">&publishSites.label;</label>
       <!-- XXX: If tree isn't wrapped in vbox, it appears BELOW next vbox -->
       <vbox flex="1">
         <listbox rows="4" id="SiteList" flex="1"  onselect="SelectSiteList();"/>

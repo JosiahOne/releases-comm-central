@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 // defined in nsIContentHandler.idl.
 var NS_ERROR_WONT_HANDLE_CONTENT = 0x805d0001;
@@ -13,16 +13,16 @@ mailContentHandler.prototype = {
   classID: Components.ID("{1c73f03a-b817-4640-b984-18c3478a9ae3}"),
 
   _xpcom_factory: {
-    createInstance: function mch_factory_ci(outer, iid) {
+    createInstance(outer, iid) {
       if (outer)
         throw Cr.NS_ERROR_NO_AGGREGATION;
       return gMailContentHandler.QueryInterface(iid);
-    }
+    },
   },
 
   QueryInterface: ChromeUtils.generateQI([Ci.nsIContentHandler]),
 
-  openInExternal: function mch_OpenInExternal(uri) {
+  openInExternal(uri) {
     Cc["@mozilla.org/uriloader/external-protocol-service;1"]
       .getService(Ci.nsIExternalProtocolService)
       .loadURI(uri);
@@ -30,15 +30,13 @@ mailContentHandler.prototype = {
 
   // nsIContentHandler
 
-  handleContent: function mch_HandleContent(aContentType, aWindowContext,
-                                            aRequest) {
+  handleContent(aContentType, aWindowContext, aRequest) {
     try {
       if (!Cc["@mozilla.org/webnavigation-info;1"]
              .getService(Ci.nsIWebNavigationInfo)
              .isTypeSupported(aContentType, null))
         throw NS_ERROR_WONT_HANDLE_CONTENT;
-    }
-    catch (e) {
+    } catch (e) {
       throw NS_ERROR_WONT_HANDLE_CONTENT;
     }
 
@@ -56,16 +54,16 @@ mailContentHandler.prototype = {
   },
 
   // nsIFactory
-  createInstance: function mch_CI(outer, iid) {
+  createInstance(outer, iid) {
     if (outer != null)
       throw Cr.NS_ERROR_NO_AGGREGATION;
 
     return this.QueryInterface(iid);
   },
 
-  lockFactory: function mch_lock(lock) {
+  lockFactory(lock) {
     // No-op.
-  }
+  },
 };
 var gMailContentHandler = new mailContentHandler();
 

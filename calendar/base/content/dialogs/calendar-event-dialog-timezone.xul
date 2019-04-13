@@ -5,8 +5,10 @@
 
 <?xml-stylesheet type="text/css" href="chrome://global/skin/global.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar/skin/calendar-event-dialog.css"?>
-<?xml-stylesheet type="text/css" href="chrome://calendar/content/datetimepickers/datetimepickers.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/calendar-timezone-highlighter.css"?>
+<?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/widgets/minimonth.css"?>
+<?xml-stylesheet type="text/css" href="chrome://calendar/content/widgets/calendar-widget-bindings.css"?>
+<?xml-stylesheet type="text/css" href="chrome://lightning-common/skin/datetimepickers.css"?>
 
 <!DOCTYPE dialog [
   <!ENTITY % dtd1 SYSTEM "chrome://calendar/locale/global.dtd" > %dtd1;
@@ -19,15 +21,15 @@
         title="&timezone.title.label;"
         windowtype="Calendar:EventDialog:Timezone"
         onload="onLoad()"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();"
         persist="screenX screenY width height"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <!-- Javascript includes -->
   <script type="application/javascript" src="chrome://calendar/content/calendar-event-dialog-timezone.js"/>
   <script type="application/javascript" src="chrome://calendar/content/calendar-dialog-utils.js"/>
   <script type="application/javascript" src="chrome://calendar/content/calendar-ui-utils.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/customElements.js"/>
+  <script type="application/javascript" src="chrome://calendar/content/datetimepickers/datetimepickers.js"/>
 
   <hbox align="center">
     <spacer flex="1"/>
@@ -39,7 +41,7 @@
   </menulist>
 
   <stack id="timezone-stack">
-     <image src="chrome://calendar-common/skin/timezone_map.png"/>
-     <image class="timezone-highlight" tzid="+0000" id="highlighter"/>
+    <image src="chrome://calendar-common/skin/timezone_map.png"/>
+    <image class="timezone-highlight" tzid="+0000" id="highlighter"/>
   </stack>
 </dialog>

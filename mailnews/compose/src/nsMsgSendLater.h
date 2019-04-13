@@ -17,6 +17,7 @@
 #include "nsITimer.h"
 #include "nsCOMPtr.h"
 #include "nsIMsgShutdown.h"
+#include "nsIWeakReferenceUtils.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // This is the listener class for the send operation. We have to create this class
@@ -28,7 +29,7 @@ class SendOperationListener : public nsIMsgSendListener,
                               public nsIMsgCopyServiceListener
 {
 public:
-  SendOperationListener(nsMsgSendLater *aSendLater);
+  explicit SendOperationListener(nsMsgSendLater *aSendLater);
 
   NS_DECL_ISUPPORTS
   NS_DECL_NSIMSGSENDLISTENER
@@ -94,7 +95,7 @@ public:
   uint32_t                  mTotalSendCount;
   nsCOMArray<nsIMsgDBHdr> mMessagesToSend;
   nsCOMPtr<nsISimpleEnumerator> mEnumerator;
-  nsCOMPtr<nsIMsgFolder>    mMessageFolder;
+  nsWeakPtr mMessageFolder;
   nsCOMPtr<nsIMsgStatusFeedback> mFeedback;
 
   // Private Information

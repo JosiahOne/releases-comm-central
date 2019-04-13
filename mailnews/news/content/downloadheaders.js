@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var markreadElement = null;
 var numberElement = null;
@@ -11,8 +11,10 @@ var numberElement = null;
 var nntpServer = null;
 var args = null;
 
-function OnLoad()
-{
+document.addEventListener("dialogaccept", OkButtonCallback);
+document.addEventListener("dialogcancel", CancelButtonCallback);
+
+function OnLoad() {
   let newsBundle = document.getElementById("bundle_news");
 
   if ("arguments" in window && window.arguments[0]) {
@@ -31,7 +33,7 @@ function OnLoad()
 
     let infotext = newsBundle.getFormattedString("downloadHeadersInfoText",
                                                  [args.articleCount]);
-    setText('info', infotext);
+    setText("info", infotext);
     let okButtonText = newsBundle.getString("okButtonText");
     let okbutton = document.documentElement.getButton("accept");
     okbutton.setAttribute("label", okButtonText);
@@ -68,12 +70,10 @@ function OkButtonCallback() {
     args.downloadAll = radio.selected;
 
   args.hitOK = true;
-  return true;
 }
 
 function CancelButtonCallback() {
   args.hitOK = false;
-  return true;
 }
 
 function setupDownloadUI(enable) {

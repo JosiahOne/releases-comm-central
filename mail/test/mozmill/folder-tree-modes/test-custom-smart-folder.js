@@ -7,6 +7,9 @@
  * Tests for custom folder tree modes. The test mode is provided by the test
  * extension in the test-extension subdirectory.
  */
+
+"use strict";
+
 var MODULE_NAME = "test-custom-smart-folder";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -18,7 +21,7 @@ var smartParentNameB="My Smart Folder B";
 
 var rootFolder;
 var inboxSubfolder, subfolderA, subfolderB;
-var smartInboxFolder;
+var smartFolderInbox;
 var smartFolderA;
 
 var nsMsgFolderFlags = Ci.nsMsgFolderFlags;

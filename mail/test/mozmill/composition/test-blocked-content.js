@@ -8,6 +8,8 @@
 
 // make mozmill-one SOLO_TEST=composition/test-blocked-content.js
 
+"use strict";
+
 var MODULE_NAME = "test-blocked-content";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -18,11 +20,10 @@ var MODULE_REQUIRES = [
    "notificationbox-helpers"
 ];
 
-var os = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/os.js", os);
-ChromeUtils.import('resource://gre/modules/Services.jsm');
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/osfile.jsm");
+var os = ChromeUtils.import("chrome://mozmill/content/stdlib/os.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {OS} = ChromeUtils.import("resource://gre/modules/osfile.jsm");
 
 var gOutboxFolder;
 
@@ -111,7 +112,7 @@ function test_paste_file_urls() {
 
   be_in_folder(gOutboxFolder);
   let outMsg = select_click_row(0);
-  let outMsgContent = get_msg_source(outMsg, true);
+  let outMsgContent = get_msg_source(outMsg);
 
   assert_true(outMsgContent.includes("file://foo/non-existant"),
     "non-existant file not in content=" + outMsgContent);

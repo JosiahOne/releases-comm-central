@@ -17,7 +17,7 @@
 #include "nsCOMPtr.h"
 #include "nsCOMArray.h"
 #include "nsIDBChangeListener.h"
-#include "nsWeakPtr.h"
+#include "nsIWeakReferenceUtils.h"
 #include "nsIMsgWindow.h"
 #include "nsImapMoveCoalescer.h"
 #include "nsAutoPtr.h"
@@ -29,11 +29,6 @@
 
 class nsByteArray;
 class nsOutputFileStream;
-class nsIOFileStream;
-class nsInputFileStream;
-class nsIMsgFilter;
-class MSG_FolderInfoMail;
-class nsIMsgFilterList;
 class nsIMsgFolder;
 
 /* Used for the various things that parse RFC822 headers...
@@ -113,6 +108,7 @@ public:
 
   PRTime m_receivedTime;
   uint16_t              m_body_lines;
+  uint16_t              m_lastLineBlank;
 
   bool                  m_IgnoreXMozillaStatus;
 
@@ -130,7 +126,7 @@ protected:
 class nsMsgMailboxParser : public nsIStreamListener, public nsParseMailMessageState, public nsMsgLineBuffer
 {
 public:
-  nsMsgMailboxParser(nsIMsgFolder *);
+  explicit nsMsgMailboxParser(nsIMsgFolder *);
   nsMsgMailboxParser();
   nsresult Init();
 
@@ -146,7 +142,7 @@ public:
   void    SetDB (nsIMsgDatabase *mailDB) {m_mailDB = mailDB; }
 
   // message socket libnet callbacks, which come through folder pane
-  nsresult ProcessMailboxInputStream(nsIURI* aURL, nsIInputStream *aIStream, uint32_t aLength);
+  nsresult ProcessMailboxInputStream(nsIInputStream *aIStream, uint32_t aLength);
 
   virtual void  DoneParsingFolder(nsresult status);
   virtual void  AbortNewHeader();

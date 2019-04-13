@@ -14,11 +14,6 @@
 #include "nsAbBaseCID.h"
 #include "mozilla/Logging.h"
 
-static mozilla::LazyLogModule gAbOutlookDirFactoryLog("AbOutlookDirFactory");
-
-#define PRINTF(args) MOZ_LOG(gAbOutlookDirFactoryLog, mozilla::LogLevel::Debug, args)
-
-
 NS_IMPL_ISUPPORTS(nsAbOutlookDirFactory, nsIAbDirFactory)
 
 nsAbOutlookDirFactory::nsAbOutlookDirFactory(void)
@@ -51,7 +46,6 @@ nsAbOutlookDirFactory::GetDirectories(const nsAString &aDirName,
   }
   nsAbWinHelperGuard mapiAddBook(abType);
   nsMapiEntryArray folders;
-  ULONG nbFolders = 0;
   nsCOMPtr<nsIMutableArray> directories(do_CreateInstance(NS_ARRAY_CONTRACTID));
   NS_ENSURE_SUCCESS(rv, rv);
   if (!mapiAddBook->IsOK() || !mapiAddBook->GetFolders(folders)) {
@@ -73,7 +67,7 @@ nsAbOutlookDirFactory::GetDirectories(const nsAString &aDirName,
     NS_ENSURE_SUCCESS(rv, rv);
     directories->AppendElement(directory);
   }
-  return NS_NewArrayEnumerator(aDirectories, directories);
+  return NS_NewArrayEnumerator(aDirectories, directories, NS_GET_IID(nsIAbDirectory));
 }
 
 // No actual deletion, since you cannot create the address books from Mozilla.

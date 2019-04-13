@@ -3,29 +3,17 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-. ${_topsrcdir}/$MOZ_BUILD_APP/../comm-confvars.sh
-
 MOZ_APP_BASENAME=Thunderbird
 MOZ_APP_NAME=thunderbird
 MOZ_UPDATER=1
 
-if test "$OS_ARCH" = "WINNT" -o \
-        "$OS_ARCH" = "Linux"; then
-  MOZ_BUNDLED_FONTS=1
-fi
-
 if test "$OS_ARCH" = "WINNT"; then
-  MOZ_MAINTENANCE_SERVICE=1
   if ! test "$HAVE_64BIT_BUILD"; then
     MOZ_VERIFY_MAR_SIGNATURE=1
   fi
 fi
 
-MOZ_APP_VERSION_TXT=${_topsrcdir}/$MOZ_BUILD_APP/config/version.txt
-MOZ_APP_VERSION=`cat $MOZ_APP_VERSION_TXT`
-MOZ_APP_VERSION_DISPLAY_TXT=${_topsrcdir}/$MOZ_BUILD_APP/config/version_display.txt
-MOZ_APP_VERSION_DISPLAY=`cat $MOZ_APP_VERSION_DISPLAY_TXT`
-THUNDERBIRD_VERSION=$MOZ_APP_VERSION
+BROWSER_CHROME_URL=chrome://messenger/content/messengercompose/messengercompose.xul
 
 MOZ_BRANDING_DIRECTORY=$commreltopsrcdir/mail/branding/nightly
 MOZ_OFFICIAL_BRANDING_DIRECTORY=$commreltopsrcdir/mail/branding/thunderbird
@@ -45,3 +33,5 @@ MOZ_SEPARATE_MANIFEST_FOR_THEME_OVERRIDES=1
 MOZ_ENABLE_SIGNMAR=1
 
 MOZ_DEVTOOLS=all
+
+NSS_EXTRA_SYMBOLS_FILE=../comm/mailnews/nss-extra.symbols

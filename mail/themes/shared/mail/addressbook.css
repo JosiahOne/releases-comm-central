@@ -5,9 +5,30 @@
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 @namespace html url("http://www.w3.org/1999/xhtml");
 
+:root {
+  --lwt-additional-images: none;
+  --lwt-background-alignment: right top;
+  --lwt-background-tiling: no-repeat;
+
+  --toolbar-bgcolor: var(--toolbar-non-lwt-bgcolor);
+  --toolbar-bgimage: var(--toolbar-non-lwt-bgimage);
+  --toolbar-color: var(--toolbar-non-lwt-textcolor);
+}
+
 #ab-toolbox:-moz-lwtheme {
-  background-color: var(--toolbar-bgcolor);
+  position: relative;
   color: var(--toolbar-color, inherit);
+}
+
+#ab-toolbox:-moz-lwtheme::after {
+  content: "";
+  display: -moz-box;
+  position: absolute;
+  pointer-events: none;
+  top: -1px;
+  width: -moz-available;
+  height: 1px;
+  border-bottom: 1px solid var(--tabs-border-color, transparent);
 }
 
 toolbox[labelalign="end"] > toolbar[mode="full"] deck .toolbarbutton-text {
@@ -74,6 +95,12 @@ treechildren::-moz-tree-image(DirCol, IsRemote-true, IsSecure-true) {
 
 /* ::::: results pane ::::: */
 
+:root[lwt-tree] #abResultsBox {
+  background-color: var(--sidebar-background-color);
+  background-image: linear-gradient(rgba(255,255,255,.15), rgba(255,255,255,.15));
+  color: var(--sidebar-text-color);
+}
+
 treechildren::-moz-tree-image(GeneratedName) {
   margin-inline-end: 2px;
   list-style-image: url("chrome://messenger/skin/addressbook/icons/abcard.png");
@@ -89,6 +116,12 @@ treechildren::-moz-tree-cell-text(GeneratedName) {
 }
 
 /* ::::: card view pane ::::: */
+
+#CardViewBox {
+  -moz-user-focus: ignore;
+  overflow: auto;
+  min-width: 150px;
+}
 
 #cvPhoto {
   list-style-image: url("chrome://messenger/skin/addressbook/icons/contact-generic.png");
@@ -111,11 +144,10 @@ treechildren::-moz-tree-cell-text(GeneratedName) {
   padding-inline-start: 20px;
   padding-inline-end: 2px;
   min-width: 30px;
-  margin: 0px;
+  margin: 0;
 }
 
 .CardViewLink {
-  color: -moz-nativehyperlinktext;
   cursor: pointer;
 }
 
@@ -138,7 +170,7 @@ treechildren::-moz-tree-cell-text(GeneratedName) {
 }
 
 html|a {
-  padding-inline-start: 0px;
+  padding-inline-start: 0;
   padding-inline-end: 2px;
   border: none !important;
   text-decoration: underline;

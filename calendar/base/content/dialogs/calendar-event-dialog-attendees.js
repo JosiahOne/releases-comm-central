@@ -4,12 +4,12 @@
 
 /* exported onLoad, onAccept, onCancel, zoomWithButtons, updateStartTime,
  *          endWidget, updateEndTime, editStartTimezone, editEndTimezone,
- *          changeAllDay, onNextSlot, onPreviousSlot
+ *          changeAllDay, onNextSlot, onPreviousSlot, onFreebusyTimebarInit,
+ *          setFreebusyTimebarTime
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gStartDate = null;
 var gEndDate = null;
@@ -26,10 +26,18 @@ var gUndoStack = [];
 var gForce24Hours = false;
 var gZoomFactor = 100;
 
+document.addEventListener("dialogaccept", onAccept);
+
 /**
  * Sets up the attendee dialog
  */
 function onLoad() {
+    // set calendar-event-freebusy-timebar date and time properties
+    setFreebusyTimebarTime();
+
+    // set up some calendar-event-freebusy-timebar properties
+    onFreebusyTimebarInit();
+
     // first of all, attach all event handlers
     window.addEventListener("resize", onResize, true);
     window.addEventListener("modify", onModify, true);
@@ -89,23 +97,6 @@ function onLoad() {
     scrollToCurrentTime();
     updateButtons();
 
-    // we need to enforce several layout constraints which can't be modelled
-    // with plain xul and css, at least as far as i know.
-    const kStylesheet = "chrome://calendar/skin/calendar-event-dialog.css";
-    for (let stylesheet of document.styleSheets) {
-        if (stylesheet.href == kStylesheet) {
-            // make the dummy-spacer #1 [top] the same height as the timebar
-            let timebar = document.getElementById("timebar");
-            stylesheet.insertRule(".attendee-spacer-top { height: " +
-                                  timebar.boxObject.height + "px; }", 0);
-            // make the dummy-spacer #2 [bottom] the same height as the scrollbar
-            let scrollbar = document.getElementById("horizontal-scrollbar");
-            stylesheet.insertRule(".attendee-spacer-bottom { height: " +
-                                  scrollbar.boxObject.height + "px; }", 0);
-            break;
-        }
-    }
-
     // attach an observer to get notified of changes
     // that are relevant to this dialog.
     let prefObserver = {
@@ -141,17 +132,6 @@ function onAccept() {
         attendees.organizer,
         gStartDate.getInTimezone(gStartTimezone),
         gEndDate.getInTimezone(gEndTimezone));
-    return true;
-}
-
-/**
- * This function should be called when the cancel button was pressed on the
- * attendee dialog.
- *
- * @return      Returns true, if the dialog should be closed.
- */
-function onCancel() {
-    return true;
 }
 
 /**
@@ -478,7 +458,7 @@ function editEndTimezone() {
     let self = this;
     let args = {};
     args.calendar = window.arguments[0].calendar;
-    args.time = gEndTime.getInTimezone(gEndTimezone);
+    args.time = gEndDate.getInTimezone(gEndTimezone);
     args.onOk = function(datetime) {
         if (gStartTimezone && gEndTimezone &&
             cal.data.compareObjects(gStartTimezone, gEndTimezone)) {
@@ -524,16 +504,16 @@ function updateAllDay() {
 
         tzStart.setAttribute("disabled", "true");
         tzEnd.setAttribute("disabled", "true");
-        tzStart.removeAttribute("class");
-        tzEnd.removeAttribute("class");
+        tzStart.classList.remove("text-link");
+        tzEnd.classList.remove("text-link");
     } else {
         startpicker.removeAttribute("timepickerdisabled");
         endpicker.removeAttribute("timepickerdisabled");
 
         tzStart.removeAttribute("disabled");
         tzEnd.removeAttribute("disabled");
-        tzStart.setAttribute("class", "text-link");
-        tzEnd.setAttribute("class", "text-link");
+        tzStart.classList.add("text-link");
+        tzEnd.classList.add("text-link");
     }
 }
 
@@ -622,7 +602,7 @@ function onChangeCalendar(calendar) {
     // assume we're the organizer [in case that the calendar
     // does not support the concept of identities].
     gIsInvitation = false;
-    calendar = cal.wrapInstance(args.item.calendar, Components.interfaces.calISchedulingSupport);
+    calendar = cal.wrapInstance(args.item.calendar, Ci.calISchedulingSupport);
     if (calendar) {
         gIsInvitation = calendar.isInvitation(args.item);
     }
@@ -700,7 +680,7 @@ function onPreviousSlot() {
 
     // In case the new starttime happens to be scheduled
     // on a different day, we also need to update the
-    // complete freebusy informations and appropriate
+    // complete freebusy information and appropriate
     // underlying arrays holding the information.
     let refresh = previousSlot.startTime.day != gStartDate.day;
 
@@ -764,6 +744,10 @@ function setZoomFactor(aValue) {
 function applyCurrentZoomFactor() {
     let timebar = document.getElementById("timebar");
     timebar.zoomFactor = gZoomFactor;
+    // After sepearating window.arguments logic from custom element
+    // it is necessary to call this method to set up some properties of
+    // calendar-event-freebusy-timebar element.
+    onFreebusyTimebarInit();
     let selectionbar = document.getElementById("selection-bar");
     selectionbar.zoomFactor = gZoomFactor;
     let grid = document.getElementById("freebusy-grid");
@@ -800,6 +784,10 @@ function setForce24Hours(aValue) {
     initTimeRange();
     let timebar = document.getElementById("timebar");
     timebar.force24Hours = gForce24Hours;
+    // After sepearating window.arguments logic from custom element
+    // it is necessary to call this method to set up some properties of
+    // calendar-event-freebusy-timebar element.
+    onFreebusyTimebarInit();
     let selectionbar = document.getElementById("selection-bar");
     selectionbar.force24Hours = gForce24Hours;
     let grid = document.getElementById("freebusy-grid");
@@ -833,8 +821,8 @@ function initTimeRange() {
         gStartHour = 0;
         gEndHour = 24;
     } else {
-        gStartHour = Preferences.get("calendar.view.daystarthour", 8);
-        gEndHour = Preferences.get("calendar.view.dayendhour", 19);
+        gStartHour = Services.prefs.getIntPref("calendar.view.daystarthour", 8);
+        gEndHour = Services.prefs.getIntPref("calendar.view.dayendhour", 19);
     }
 }
 
@@ -877,7 +865,7 @@ function onMouseScroll(event) {
 }
 
 /**
- * Hanlder function to take care of attribute changes on the window
+ * Handler function to take care of attribute changes on the window
  *
  * @param event     The DOMAttrModified event caused by this change.
  */
@@ -941,9 +929,14 @@ function onAttrModified(event) {
  * @param event     The "timebar" event with details and height property.
  */
 function onTimebar(event) {
-    document.getElementById(
-        "selection-bar")
-            .init(event.details, event.height);
+    document.getElementById("selection-bar").init(event.details, event.height);
+
+    // we need to enforce several layout constraints which can't be modelled
+    // with plain xul and css, at least as far as i know.
+    let timebar = document.getElementById("timebar");
+    let scrollbar = document.getElementById("horizontal-scrollbar");
+    document.documentElement.style.setProperty("--spacer-top-height", timebar.boxObject.height + "px");
+    document.documentElement.style.setProperty("--spacer-bottom-height", scrollbar.boxObject.height + "px");
 }
 
 /**
@@ -1002,3 +995,67 @@ calFreeBusyListener.prototype = {
         }
     }
 };
+
+function setFreebusyTimebarTime() {
+    const timebar = document.getElementById("timebar");
+    let args = window.arguments[0];
+    let startTime = args.startTime;
+    let endTime = args.endTime;
+
+    timebar.initTimeRange();
+
+    // The basedate is the date/time from which the display
+    // of the timebar starts. The range is the number of days
+    // we should be able to show. The start- and enddate
+    // is the time the event is scheduled for.
+    let kDefaultTimezone = cal.dtz.defaultTimezone;
+    timebar.startDate = startTime.getInTimezone(kDefaultTimezone);
+    timebar.endDate = endTime.getInTimezone(kDefaultTimezone);
+    timebar.mRange = Number(timebar.getAttribute("range"));
+}
+
+function onFreebusyTimebarInit() {
+    const timebar = document.getElementById("timebar");
+    let args = window.arguments[0];
+    let startTime = args.startTime;
+    let endTime = args.endTime;
+
+    let kDefaultTimezone = cal.dtz.defaultTimezone;
+    timebar.mStartDate = startTime.getInTimezone(kDefaultTimezone);
+    timebar.mEndDate = endTime.getInTimezone(kDefaultTimezone);
+
+    // Set the number of 'freebusy-day'-elements
+    // we need to fill up the content box.
+    // TODO: hardcoded value
+    timebar.mNumDays = 4 * timebar.mZoomFactor / 100;
+    if (timebar.mNumDays < 2) {
+        timebar.mNumDays = 2;
+    }
+
+    // Now create those elements and set their date property.
+    let date = timebar.mStartDate.clone();
+    let template = timebar.getElementsByTagName("freebusy-day")[0];
+    template.force24Hours = timebar.mForce24Hours;
+    template.zoomFactor = timebar.mZoomFactor;
+    template.startDate = timebar.mStartDate;
+    template.endDate = timebar.mEndDate;
+    template.date = date;
+    let parent = template.parentNode;
+    if (parent.childNodes.length <= 1) {
+        let count = timebar.mNumDays - 1;
+        if (count > 0) {
+            for (let i = 0; i < count; i++) {
+                date.day++;
+                let newNode = template.cloneNode(false);
+                parent.appendChild(newNode);
+                newNode.force24Hours = timebar.mForce24Hours;
+                newNode.zoomFactor = timebar.mZoomFactor;
+                newNode.startDate = timebar.mStartDate;
+                newNode.endDate = timebar.mEndDate;
+                newNode.date = date;
+            }
+        }
+    }
+
+    timebar.dispatchTimebarEvent();
+}

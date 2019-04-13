@@ -5,6 +5,7 @@
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
 <?xml-stylesheet href="chrome://messenger/skin/" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/textbox.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/folderPane.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger-newsblog/skin/feed-subscriptions.css" type="text/css"?>
@@ -14,17 +15,14 @@
     %feedDTD;
   <!ENTITY % newsblogDTD SYSTEM "chrome://messenger-newsblog/locale/am-newsblog.dtd">
     %newsblogDTD;
-  <!ENTITY % certDTD SYSTEM "chrome://pippki/locale/certManager.dtd">
-    %certDTD;
 ]>
 
 <window id="subscriptionsDialog"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         flex="1"
         title="&feedSubscriptions.label;"
         windowtype="Mail:News-BlogSubscriptions"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-        xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-        xmlns:nc="http://home.netscape.com/NC-rdf#"
         persist="width height screenX screenY sizemode"
         onload="FeedSubscriptions.onLoad();"
         onclose="return FeedSubscriptions.onClose();"
@@ -35,6 +33,10 @@
           src="chrome://messenger/content/specialTabs.js"/>
   <script type="application/javascript"
           src="chrome://messenger-newsblog/content/feed-subscriptions.js"/>
+
+  <linkset>
+    <html:link rel="localization" href="security/certificates/certManager.ftl"/>
+  </linkset>
 
   <keyset id="extensionsKeys">
     <key id="key_close"
@@ -53,8 +55,7 @@
 
   <vbox flex="1" id="contentPane">
     <hbox align="right">
-      <label id="learnMore"
-             class="text-link"
+      <label is="text-link" id="learnMore"
              crop="end"
              value="&learnMore.label;"
              href="https://support.mozilla.org/kb/how-subscribe-news-feeds-and-blogs"/>
@@ -112,9 +113,8 @@
                          onfocus="FeedSubscriptions.onFocusChange();"
                          onblur="FeedSubscriptions.onFocusChange();"/>
                 <hbox align="center">
-                  <label id="locationValidate"
+                  <label is="text-link" id="locationValidate"
                          collapsed="true"
-                         class="text-link"
                          crop="end"
                          value="&locationValidate.label;"
                          onclick="FeedSubscriptions.checkValidation(event);"/>
@@ -170,13 +170,9 @@
                       orient="horizontal"
                       oncommand="FeedSubscriptions.setPrefs(this)">
             <radio id="biffMinutes" value="min" label="&biffMinutes.label;"
-                   accesskey="&biffMinutes.accesskey;">
-              <observes element="updateValue" attribute="disabled"/>
-            </radio>
+                   accesskey="&biffMinutes.accesskey;"/>
             <radio id="biffDays" value="d" label="&biffDays.label;"
-                   accesskey="&biffDays.accesskey;">
-              <observes element="updateValue" attribute="disabled"/>
-            </radio>
+                   accesskey="&biffDays.accesskey;"/>
           </radiogroup>
           <hbox id="recommendedBox">
             <label id="recommendedUnits"
@@ -231,13 +227,12 @@
              onclick="FeedSubscriptions.checkValidation(event);"/>
       <button id="addCertException"
               collapsed="true"
-              label="&certmgr.addException.label;"
-              accesskey="&certmgr.addException.accesskey;"
+              data-l10n-id="certmgr-add-exception"
               oncommand="FeedSubscriptions.addCertExceptionDialog();"/>
-      <progressmeter id="progressMeter"
-                     collapsed="true"
-                     mode="determined"
-                     value="0"/>
+      <html:progress id="progressMeter"
+                     hidden="hidden"
+                     value="0"
+                     max="100"/>
     </hbox>
 
     <hbox align="end">

@@ -2,16 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+// mailnews/base/prefs/content/accountUtils.js
+/* globals NewMailAccountProvisioner */
+
 /**
  * This object takes care of intercepting page loads and creating the
  * corresponding account if the page load turns out to be a text/xml file from
  * one of our account providers.
  */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
-ChromeUtils.import("resource:///modules/JXON.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {NetUtil} = ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
+var {JXON} = ChromeUtils.import("resource:///modules/JXON.js");
 
 /**
  * This is an observer that watches all HTTP requests for one where the
@@ -34,7 +37,7 @@ function httpRequestObserver(aBrowser, aParams) {
 }
 
 httpRequestObserver.prototype = {
-  observe: function(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     if (aTopic != "http-on-examine-response" &&
         aTopic != "http-on-examine-cached-response")
       return;
@@ -48,7 +51,7 @@ httpRequestObserver.prototype = {
     let contentType = "";
     try {
       contentType = aSubject.getResponseHeader("Content-Type");
-    } catch(e) {
+    } catch (e) {
       // If we couldn't get the response header, which can happen,
       // just swallow the exception and return.
       return;
@@ -77,7 +80,7 @@ httpRequestObserver.prototype = {
    *
    * @param aRequest the nsIRequest to analyze
    */
-  _getWindowForRequest: function(aRequest) {
+  _getWindowForRequest(aRequest) {
     try {
       if (aRequest && aRequest.notificationCallbacks) {
         return aRequest.notificationCallbacks
@@ -91,7 +94,7 @@ httpRequestObserver.prototype = {
                        .getInterface(Ci.nsILoadContext)
                        .associatedWindow;
       }
-    } catch(e) {
+    } catch (e) {
       Cu.reportError("Could not find an associated window "
                      + "for an HTTP request. Error: " + e);
     }
@@ -99,7 +102,7 @@ httpRequestObserver.prototype = {
   },
 
   QueryInterface: ChromeUtils.generateQI([Ci.nsIObserver]),
-}
+};
 
 /**
  * TracingListener is an nsITracableChannel implementation that copies
@@ -123,15 +126,12 @@ function TracingListener(aBrowser, aParams) {
 
 TracingListener.prototype = {
 
-  onStartRequest: function (/* nsIRequest */ aRequest,
-                            /* nsISupports */ aContext) {
-    this.oldListener.onStartRequest(aRequest, aContext);
+  onStartRequest(/* nsIRequest */ aRequest) {
+    this.oldListener.onStartRequest(aRequest);
   },
 
-  onStopRequest: function (/* nsIRequest */ aRequest,
-                           /* nsISupports */ aContext,
-                           /* int */ aStatusCode) {
-
+  onStopRequest(/* nsIRequest */ aRequest,
+                /* int */ aStatusCode) {
     // Why don't people use JSMs? Sigh...
     let accountCreationFuncs = {};
     Services.scriptloader.loadSubScript(
@@ -165,7 +165,7 @@ TracingListener.prototype = {
       "chrome://messenger/content/accountcreation/MyBadCertHandler.js",
       accountCreationFuncs);
 
-    let tabmail = document.getElementById('tabmail');
+    let tabmail = document.getElementById("tabmail");
     let success = false;
     let account;
 
@@ -193,26 +193,25 @@ TracingListener.prototype = {
 
     // Find the tab associated with this browser, and close it.
     let myTabInfo = tabmail.tabInfo
-      .filter((function (x) {
+      .filter((function(x) {
             return "browser" in x && x.browser == this.browser;
             }).bind(this))[0];
     tabmail.closeTab(myTabInfo);
 
     // Respawn the account provisioner to announce our success
     NewMailAccountProvisioner(null, {
-      success: success,
+      success,
       search_engine: this.params.searchEngine,
-      account: account,
+      account,
     });
 
-    this.oldListener.onStopRequest(aRequest, aContext, aStatusCode);
+    this.oldListener.onStopRequest(aRequest, aStatusCode);
   },
 
-  onDataAvailable: function (/* nsIRequest */ aRequest,
-                             /* nsISupports */ aContext,
-                             /* nsIInputStream */ aStream,
-                             /* int */ aOffset,
-                             /* int */ aCount) {
+  onDataAvailable(/* nsIRequest */ aRequest,
+                  /* nsIInputStream */ aStream,
+                  /* int */ aOffset,
+                  /* int */ aCount) {
     // We want to read the stream of incoming data, but we also want
     // to make sure it gets passed to the original listener. We do this
     // by passing the input stream through an nsIStorageStream, writing
@@ -236,12 +235,12 @@ TracingListener.prototype = {
     this.chunks.push(data);
 
     outStream.writeBytes(data, aCount);
-    this.oldListener.onDataAvailable(aRequest, aContext,
+    this.oldListener.onDataAvailable(aRequest,
                                      storageStream.newInputStream(0),
                                      aOffset, aCount);
   },
 
   QueryInterface: ChromeUtils.generateQI([Ci.nsIStreamListener,
-                                          Ci.nsIRequestObserver])
+                                          Ci.nsIRequestObserver]),
 
-}
+};

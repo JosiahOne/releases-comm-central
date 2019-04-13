@@ -2,8 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from ../../../../toolkit/content/globalOverlay.js */
+/* import-globals-from ../../lightning/content/messenger-overlay-sidebar.js */
+/* import-globals-from ../../resources/content/publish.js */
+/* import-globals-from agenda-listbox.js */
+/* import-globals-from calendar-clipboard.js */
+/* import-globals-from calendar-management.js */
+/* import-globals-from calendar-task-tree.js */
+/* import-globals-from calendar-ui-utils.js */
+/* import-globals-from calendar-unifinder.js */
+/* import-globals-from calendar-views.js */
+/* import-globals-from import-export.js */
+
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /* exported injectCalendarCommandController, removeCalendarCommandController,
  *          setupContextItemType, minimonthPick, getSelectedItems,
@@ -449,7 +461,7 @@ var calendarController = {
     isInMode: function(mode) {
         switch (mode) {
             case "mail":
-                return !isCalendarInForeground();
+                return !this.isCalendarInForeground();
             case "calendar":
                 return gCurrentMode && gCurrentMode == "calendar";
             case "task":
@@ -651,7 +663,7 @@ var calendarController = {
 
 /**
  * XXX This is a temporary hack so we can release 1.0b2. This will soon be
- * superceeded by a new command controller architecture.
+ * superseded by a new command controller architecture.
  */
 var calendarController2 = {
     defaultController: null,
@@ -717,6 +729,11 @@ var calendarController2 = {
     },
 
     doCommand: function(aCommand) {
+        if (!this.isCommandEnabled(aCommand)) {
+            // doCommand is triggered for cmd_cut even if the command is disabled
+            // so we bail out here
+            return;
+        }
         switch (aCommand) {
             case "cmd_cut":
                 cutToClipboard();
@@ -771,25 +788,13 @@ var calendarController2 = {
 
 /**
  * Inserts the command controller into the document. On Lightning, also make
- * sure that it is inserted before the conflicting thunderbird command
+ * sure that it is inserted before the conflicting Thunderbird command
  * controller.
  */
 function injectCalendarCommandController() {
-    // We need to put our new command controller *before* the one that
-    // gets installed by thunderbird. Since we get called pretty early
-    // during startup we need to install the function below as a callback
-    // that periodically checks when the original thunderbird controller
-    // gets alive. Please note that setTimeout with a value of 0 means that
-    // we leave the current thread in order to re-enter the message loop.
-
-    let tbController = top.controllers.getControllerForCommand("cmd_runJunkControls");
-    if (tbController) {
-        calendarController.defaultController = tbController;
-        top.controllers.insertControllerAt(0, calendarController);
-        document.commandDispatcher.updateCommands("calendar_commands");
-    } else {
-        setTimeout(injectCalendarCommandController, 0);
-    }
+    calendarController.defaultController = document.getElementById("tabmail");
+    top.controllers.insertControllerAt(0, calendarController);
+    document.commandDispatcher.updateCommands("calendar_commands");
 }
 
 /**
@@ -901,10 +906,6 @@ function deleteSelectedItems() {
 }
 
 function calendarUpdateNewItemsCommand() {
-    // keep current current status
-    let oldEventValue = CalendarNewEventsCommandEnabled;
-    let oldTaskValue = CalendarNewTasksCommandEnabled;
-
     // define command set to update
     let eventCommands = [
         "calendar_new_event_command",
@@ -927,13 +928,8 @@ function calendarUpdateNewItemsCommand() {
         CalendarNewTasksCommandEnabled = true;
     }
 
-    // update command status if required
-    if (CalendarNewEventsCommandEnabled != oldEventValue) {
-        eventCommands.forEach(goUpdateCommand);
-    }
-    if (CalendarNewTasksCommandEnabled != oldTaskValue) {
-        taskCommands.forEach(goUpdateCommand);
-    }
+    eventCommands.forEach(goUpdateCommand);
+    taskCommands.forEach(goUpdateCommand);
 }
 
 function calendarUpdateDeleteCommand(selectedItems) {

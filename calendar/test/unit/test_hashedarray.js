@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calHashedArray.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calHashedArray.jsm");
 
 function run_test() {
     test_array_base();
@@ -71,7 +71,7 @@ function checkConsistancy(har, testItems, itemAccessor) {
  * @param har               The Hashed Array
  * @param testItems         The js array with the items
  * @param postprocessFunc   (optional) The function to call after each
- *                            operation, but before checking consistancy.
+ *                            operation, but before checking consistency.
  * @param itemAccessor      (optional) The function to access the item for an
  *                            array element.
  * @param itemCreator       (optional) Function to create a new item for the

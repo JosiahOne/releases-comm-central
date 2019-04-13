@@ -28,12 +28,11 @@
 #include "PLDHashTable.h"
 #include "nsTArray.h"
 #include "nsTObserverArray.h"
-class ListContext;
-class nsMsgKeySet;
+#include "nsSimpleEnumerator.h"
+
 class nsMsgThread;
 class nsMsgDatabase;
 class nsIMsgThread;
-class nsIDBFolderInfo;
 
 const int32_t kMsgDBVersion = 1;
 
@@ -73,9 +72,12 @@ protected:
   AutoTArray<nsMsgDatabase*, kInitialMsgDBCacheSize> m_dbCache;
 };
 
-class nsMsgDBEnumerator : public nsISimpleEnumerator {
+class nsMsgDBEnumerator : public nsSimpleEnumerator {
 public:
-    NS_DECL_ISUPPORTS
+    const nsID& DefaultInterface() override
+    {
+      return NS_GET_IID(nsIMsgDBHdr);
+    }
 
     // nsISimpleEnumerator methods:
     NS_DECL_NSISIMPLEENUMERATOR
@@ -90,7 +92,7 @@ public:
 
     nsresult                        GetRowCursor();
     virtual nsresult                PrefetchNext();
-    RefPtr<nsMsgDatabase>         mDB;
+    RefPtr<nsMsgDatabase>           mDB;
     nsCOMPtr<nsIMdbTableRowCursor>  mRowCursor;
     mdb_pos                         mRowPos;
     nsCOMPtr<nsIMsgDBHdr>           mResultHdr;
@@ -105,7 +107,7 @@ public:
     mdb_pos                         mStopPos;
 
 protected:
-    virtual ~nsMsgDBEnumerator();
+    ~nsMsgDBEnumerator() override;
 };
 
 class nsMsgFilteredDBEnumerator : public nsMsgDBEnumerator
@@ -176,7 +178,7 @@ public:
   // nsMsgDatabase methods:
   nsMsgDatabase();
 
-  void GetMDBFactory(nsIMdbFactory ** aMdbFactory);
+  nsresult GetMDBFactory(nsIMdbFactory ** aMdbFactory);
   nsIMdbEnv             *GetEnv() {return m_mdbEnv;}
   nsIMdbStore           *GetStore() {return m_mdbStore;}
   virtual uint32_t      GetCurVersion();
@@ -271,14 +273,14 @@ protected:
   bool    MatchDbName(nsIFile *dbName);  // returns TRUE if they match
 
   // Flag handling routines
-  virtual nsresult SetKeyFlag(nsMsgKey key, bool set, uint32_t flag,
-                              nsIDBChangeListener *instigator = NULL);
-  virtual nsresult SetMsgHdrFlag(nsIMsgDBHdr *msgHdr, bool set, uint32_t flag,
+  virtual nsresult SetKeyFlag(nsMsgKey key, bool set, nsMsgMessageFlagType flag,
+                              nsIDBChangeListener *instigator = nullptr);
+  virtual nsresult SetMsgHdrFlag(nsIMsgDBHdr *msgHdr, bool set, nsMsgMessageFlagType flag,
                                  nsIDBChangeListener *instigator);
 
   virtual bool    SetHdrFlag(nsIMsgDBHdr *, bool bSet, nsMsgMessageFlagType flag);
   virtual bool    SetHdrReadFlag(nsIMsgDBHdr *, bool pRead);
-  virtual uint32_t GetStatusFlags(nsIMsgDBHdr *msgHdr, uint32_t origFlags);
+  virtual uint32_t GetStatusFlags(nsIMsgDBHdr *msgHdr, nsMsgMessageFlagType origFlags);
   // helper function which doesn't involve thread object
 
   virtual nsresult RemoveHeaderFromDB(nsMsgHdr *msgHdr);

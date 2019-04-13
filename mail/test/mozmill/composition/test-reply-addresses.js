@@ -10,6 +10,8 @@
 
 // make SOLO_TEST=composition/test-reply-addresses.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-reply-addresses";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -25,7 +27,7 @@ var myEmail2 = "otherme@example.com";
 var identity;
 var identity2;
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 function setupModule(module) {
   collector.getModule("folder-display-helpers").installInto(module);

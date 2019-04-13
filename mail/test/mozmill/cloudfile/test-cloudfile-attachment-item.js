@@ -6,15 +6,19 @@
  * Tests Filelink attachment item behaviour.
  */
 
-var MODULE_NAME = 'test-cloudfile-attachment-item';
+"use strict";
 
-var RELATIVE_ROOT = '../shared-modules';
-var MODULE_REQUIRES = ['folder-display-helpers',
-                       'compose-helpers',
-                       'cloudfile-helpers',
-                       'attachment-helpers']
+var MODULE_NAME = "test-cloudfile-attachment-item";
+
+var RELATIVE_ROOT = "../shared-modules";
+var MODULE_REQUIRES = ["folder-display-helpers",
+                       "compose-helpers",
+                       "cloudfile-helpers",
+                       "attachment-helpers"];
 
 var kAttachmentItemContextID = "msgComposeAttachmentItemContext";
+
+var {cloudFileAccounts} = ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
 
 function setupModule(module) {
   for (let lib of MODULE_REQUIRES) {
@@ -56,7 +60,7 @@ function test_upload_cancel_repeat() {
   let started;
   provider.uploadFile = function(aFile, aListener) {
     listener = aListener;
-    listener.onStartRequest(null, null);
+    listener.onStartRequest(null);
     started = true;
   };
 
@@ -75,6 +79,8 @@ function test_upload_cancel_repeat() {
 
     assert_can_cancel_upload(cw, provider, listener, file);
   }
+
+  close_compose_window(cw);
 }
 
 /**
@@ -96,13 +102,16 @@ function test_upload_multiple_and_cancel() {
   let listener;
   provider.uploadFile = function(aFile, aListener) {
     listener = aListener;
-    listener.onStartRequest(null, null);
+    listener.onStartRequest(null);
   };
 
-  cw.window.attachToCloud(provider);
+  add_cloud_attachments(cw, provider, false);
 
-  for (let i = files.length - 1; i >= 0; --i)
+  for (let i = files.length - 1; i >= 0; --i) {
     assert_can_cancel_upload(cw, provider, listener, files[i]);
+  }
+
+  close_compose_window(cw);
 }
 
 /**
@@ -125,9 +134,7 @@ function assert_can_cancel_upload(aController, aProvider, aListener,
   // it's assumed that the provider is a MockCloudfileAccount.
   aProvider.cancelFileUpload = function(aFileToCancel) {
     if (aTargetFile.equals(aFileToCancel)) {
-      aListener.onStopRequest(null, null,
-                              Ci.nsIMsgCloudFileProvider
-                                .uploadCanceled);
+      aListener.onStopRequest(null, cloudFileAccounts.constants.uploadCancelled);
       cancelled = true;
     }
   };

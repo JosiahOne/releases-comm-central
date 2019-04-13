@@ -7,10 +7,10 @@
  */
 var EXPORTED_SYMBOLS = ["OAuth2"];
 
-ChromeUtils.import("resource://gre/modules/Http.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+const {httpRequest} = ChromeUtils.import("resource://gre/modules/Http.jsm");
+const {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 
 function parseURLData(aData) {
   let result = {};
@@ -45,7 +45,7 @@ OAuth2.prototype = {
     consumerSecret: null,
     completionURI: "http://localhost",
     requestWindowURI: "chrome://messenger/content/browserRequest.xul",
-    requestWindowFeatures: "chrome,private,centerscreen,width=980,height=600",
+    requestWindowFeatures: "chrome,private,centerscreen,width=980,height=750",
     requestWindowTitle: "",
     scope: null,
 

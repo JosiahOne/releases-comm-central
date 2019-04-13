@@ -25,7 +25,7 @@
  * object and the database are updated. This process continues until the
  * database is at the latest version.
  *
- * Note that your upgrader is not neccessarily called with a database object,
+ * Note that your upgrader is not necessarily called with a database object,
  * for example if the user's database is already at a higher version. In this
  * case your upgrader is called to compile the table data object. To make
  * calling code easier, there are a bunch of helper functions below that can be
@@ -68,9 +68,14 @@
 
 /* exported upgradeDB */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calStorageHelpers.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var {
+    CAL_ITEM_FLAG,
+    textToDate,
+    getTimezone,
+    newDateTime
+} = ChromeUtils.import("resource://calendar/modules/calStorageHelpers.jsm");
 
 // The current database version. Be sure to increment this when you create a new
 // updater.
@@ -173,7 +178,7 @@ function getVersion(db) {
         }
     }
 
-    throw "cal_calendar_schema_version SELECT returned no results";
+    throw new Error("cal_calendar_schema_version SELECT returned no results");
 }
 
 /**
@@ -187,7 +192,7 @@ function backupDB(db, currentVersion) {
         let backupPath = cal.provider.getCalendarDirectory();
         backupPath.append("backup");
         if (!backupPath.exists()) {
-            backupPath.create(Components.interfaces.nsIFile.DIRECTORY_TYPE, parseInt("0755", 8));
+            backupPath.create(Ci.nsIFile.DIRECTORY_TYPE, parseInt("0755", 8));
         }
 
         // Create a backup file and notify the user via WARN, since LOG will not
@@ -217,7 +222,7 @@ function upgradeDB(db) {
                     " to v" + DB_SCHEMA_VERSION);
             upgrade["v" + DB_SCHEMA_VERSION](db, version);
         } else if (version > DB_SCHEMA_VERSION) {
-            throw Components.interfaces.calIErrors.STORAGE_UNKNOWN_SCHEMA_ERROR;
+            throw Ci.calIErrors.STORAGE_UNKNOWN_SCHEMA_ERROR;
         }
     } else {
         cal.LOG("Storage: Creating tables from scratch");
@@ -458,7 +463,7 @@ function addColumn(tblData, tblName, colName, colType, db) {
  *
  * @param tblData       The table data object to apply the operation on.
  * @param tblName       The table name to delete on
- * @param colNameArray  An array of colum names to delete
+ * @param colNameArray  An array of column names to delete
  * @param db            (optional) The database to apply the operation on
  */
 function deleteColumns(tblData, tblName, colNameArray, db) {
@@ -509,7 +514,7 @@ function copyTable(tblData, tblName, newTblName, db, condition, selectOptions) {
  *
  * @param tblData       The table data object to apply the operation on.
  * @param tblName       The table name to alter
- * @param colNameArray  An array of colum names to delete
+ * @param colNameArray  An array of column names to delete
  * @param newType       The new type of the column
  * @param db            (optional) The database to apply the operation on
  */
@@ -608,7 +613,7 @@ function migrateToIcalString(tblData, tblName, userFuncName, oldColumns, db) {
  * @return              An array with the arguments as js values.
  */
 function mapStorageArgs(storArgs) {
-    const mISVA = Components.interfaces.mozIStorageValueArray;
+    const mISVA = Ci.mozIStorageValueArray;
     let mappedArgs = [];
     for (let i = 0; i < storArgs.numEntries; i++) {
         switch (storArgs.getTypeOfIndex(i)) {
@@ -1116,7 +1121,7 @@ upgrade.v16 = function(db, version) {
                         alarm.offset = cal.createDuration();
                         alarm.offset.inSeconds = aOffset;
                     } else if (aAlarmTime) {
-                        alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE;
+                        alarm.related = Ci.calIAlarm.ALARM_RELATED_ABSOLUTE;
                         let alarmDate = cal.createDateTime();
                         alarmDate.nativeTime = aAlarmTime;
                         if (aTzId == "floating") {
@@ -1427,7 +1432,7 @@ upgrade.v21 = function(db, version) {
             } while (db.affectedRows > 0);
 
             // Finally we can delete the x-dateset rows. Note this will leave
-            // gaps in recur_index, but thats ok since its only used for
+            // gaps in recur_index, but that's ok since its only used for
             // ordering anyway and will be overwritten on the next item write.
             executeSimpleSQL(db, 'DELETE FROM cal_recurrence WHERE recur_type = "x-dateset"');
         }
@@ -1546,8 +1551,8 @@ upgrade.v22 = function(db, version) {
 
                     let ritem;
                     if (aType == "x-date") {
-                        ritem = Components.classes["@mozilla.org/calendar/recurrence-date;1"]
-                                          .createInstance(Components.interfaces.calIRecurrenceDate);
+                        ritem = Cc["@mozilla.org/calendar/recurrence-date;1"]
+                                  .createInstance(Ci.calIRecurrenceDate);
                         ritem.date = textToDate(aDates);
                         ritem.isNegative = !!aIsNegative;
                     } else {

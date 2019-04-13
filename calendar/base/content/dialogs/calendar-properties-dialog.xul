@@ -19,9 +19,6 @@
     buttons="accept,cancel,extra1"
     buttonlabelextra1="&calendarproperties.unsubscribe.label;"
     buttonaccesskeyextra1="&calendarproperties.unsubscribe.accesskey;"
-    ondialogextra1="unsubscribeCalendar()"
-    ondialogaccept="return onAcceptDialog();"
-    ondialogcancel="return true;"
     onload="onLoad()"
     persist="screenX screenY"
     xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
@@ -59,7 +56,6 @@
                control="calendar-color"/>
           <hbox align="center">
             <html:input id="calendar-color"
-                        class="small-margin"
                         type="color"
                         disable-with-calendar="true"/>
           </hbox>
@@ -79,7 +75,7 @@
                   disable-with-calendar="true"
                   label="&calendarproperties.refreshInterval.label;">
           <menupopup id="calendar-refreshInterval-menupopup">
-            <!-- This will be filled programatically to reduce the number of needed strings -->
+            <!-- This will be filled programmatically to reduce the number of needed strings -->
             <menuseparator id="calendar-refreshInterval-manual-separator"/>
             <menuitem id="calendar-refreshInterval-manual"
                       value="0"

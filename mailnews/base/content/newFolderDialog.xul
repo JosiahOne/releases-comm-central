@@ -12,13 +12,11 @@
 <!ENTITY % newFolderDTD SYSTEM "chrome://messenger/locale/newFolderDialog.dtd">%newFolderDTD;
 ]>
 
-<dialog xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         title="&newFolderDialog.title;"
         onload="onLoad();"
         buttonlabelaccept="&accept.label;"
-        buttonaccesskeyaccept="&accept.accesskey;"
-        ondialogaccept="return onOK();">
+        buttonaccesskeyaccept="&accept.accesskey;">
 
   <stringbundleset id="stringbundleset"/>
   <script type="application/javascript" src="chrome://messenger/content/newFolderDialog.js"/>

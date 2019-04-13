@@ -2,8 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/ical.js");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from calICALJSComponents.js */
+
+var { ICAL, unwrapSetter, unwrapSingle, wrapGetter } = ChromeUtils.import("resource://calendar/modules/ical.js");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function calIcalProperty(innerObject) {
     this.innerObject = innerObject || new ICAL.Property();
@@ -90,7 +92,7 @@ calIcalProperty.prototype = {
     get propertyName() { return this.innerObject.name.toUpperCase(); },
 
     getParameter: function(name) {
-        // Unfortuantely getting the "VALUE" parameter won't work, since in
+        // Unfortunately getting the "VALUE" parameter won't work, since in
         // jCal it has been translated to the value type id.
         if (name == "VALUE") {
             let defaultType = this.innerObject.getDefaultType();
@@ -282,7 +284,7 @@ calIcalComponent.prototype = {
     get priority() {
         // If there is no value for this integer property, then we must return
         // the designated INVALID_VALUE.
-        const INVALID_VALUE = Components.interfaces.calIIcalComponent.INVALID_VALUE;
+        const INVALID_VALUE = Ci.calIIcalComponent.INVALID_VALUE;
         let prop = this.innerObject.getFirstProperty("priority");
         let val = prop ? prop.getFirstValue() : null;
         return (val === null ? INVALID_VALUE : val);
@@ -427,8 +429,8 @@ calIcalComponent.prototype = {
     },
 
     serializeToICSStream: function() {
-        let unicodeConverter = Components.classes["@mozilla.org/intl/scriptableunicodeconverter"]
-                                         .createInstance(Components.interfaces.nsIScriptableUnicodeConverter);
+        let unicodeConverter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
+                                 .createInstance(Ci.nsIScriptableUnicodeConverter);
         unicodeConverter.charset = "UTF-8";
         return unicodeConverter.convertToInputStream(this.innerObject.toString());
     }
@@ -455,13 +457,13 @@ calICSService.prototype = {
         try {
             let worker = new ChromeWorker("resource://calendar/calendar-js/calICSService-worker.js");
             worker.onmessage = function(event) {
-                let rc = Components.results.NS_ERROR_FAILURE;
+                let rc = Cr.NS_ERROR_FAILURE;
                 let icalComp = null;
                 try {
                     rc = event.data.rc;
                     icalComp = new calIcalComponent(new ICAL.Component(event.data.data));
                     if (!Components.isSuccessCode(rc)) {
-                        cal.ERROR("[calICSService] Error in parser worker: " + data);
+                        cal.ERROR("[calICSService] Error in parser worker: " + event.data);
                     }
                 } catch (e) {
                     cal.ERROR("[calICSService] Exception parsing item: " + e);
@@ -471,13 +473,13 @@ calICSService.prototype = {
             };
             worker.onerror = function(event) {
                 cal.ERROR("[calICSService] Error in parser worker: " + event.message);
-                listener.onParsingComplete(Components.results.NS_ERROR_FAILURE, null);
+                listener.onParsingComplete(Cr.NS_ERROR_FAILURE, null);
             };
             worker.postMessage(serialized);
         } catch (e) {
             // If an error occurs above, the calling code will hang. Catch the exception just in case
             cal.ERROR("[calICSService] Error starting parsing worker: " + e);
-            listener.onParsingComplete(Components.results.NS_ERROR_FAILURE, null);
+            listener.onParsingComplete(Cr.NS_ERROR_FAILURE, null);
         }
     },
 

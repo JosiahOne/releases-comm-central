@@ -70,12 +70,12 @@ function* verifyContentLength()
   imapS.GetUrlForUri("imap-message://user@localhost/INBOX#1", uri, null);
 
   // Get a channel from this URI, and check its content length
-  let channel = Services.io.newChannelFromURI2(uri.value,
-                                               null,
-                                               Services.scriptSecurityManager.getSystemPrincipal(),
-                                               null,
-                                               Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                               Ci.nsIContentPolicy.TYPE_OTHER);
+  let channel = Services.io.newChannelFromURI(uri.value,
+                                              null,
+                                              Services.scriptSecurityManager.getSystemPrincipal(),
+                                              null,
+                                              Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                              Ci.nsIContentPolicy.TYPE_OTHER);
 
   dump(channel + "\n");
 
@@ -92,12 +92,12 @@ function* verifyContentLength()
   // Now try an attachment. &part=1.2
   // let attachmentURL = Services.io.newURI(neckoURL.value.spec + "&part=1.2",
   //                                        null, null);
-  // let attachmentChannel = Services.io.newChannelFromURI2(attachmentURL,
-  //                                                        null,
-  //                                                        Services.scriptSecurityManager.getSystemPrincipal(),
-  //                                                        null,
-  //                                                        Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-  //                                                        Ci.nsIContentPolicy.TYPE_OTHER);
+  // let attachmentChannel = Services.io.newChannelFromURI(attachmentURL,
+  //                                                       null,
+  //                                                       Services.scriptSecurityManager.getSystemPrincipal(),
+  //                                                       null,
+  //                                                       Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+  //                                                       Ci.nsIContentPolicy.TYPE_OTHER);
   // Currently attachments have their content length set to the length of the
   // entire message
   // do_check_eq(attachmentChannel.contentLength, gFile.fileSize);
@@ -120,14 +120,14 @@ var gStreamListener = {
   QueryInterface : ChromeUtils.generateQI([Ci.nsIStreamListener]),
   _stream : null,
   _data : null,
-  onStartRequest : function (aRequest, aContext) {
+  onStartRequest : function (aRequest) {
     this._data = "";
     this._stream = null;
   },
-  onStopRequest : function (aRequest, aContext, aStatusCode) {
+  onStopRequest : function (aRequest, aStatusCode) {
     async_driver();
   },
-  onDataAvailable : function (aRequest, aContext, aInputStream, aOff, aCount) {
+  onDataAvailable : function (aRequest, aInputStream, aOff, aCount) {
     if (this._stream == null) {
       this._stream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
       this._stream.init(aInputStream);

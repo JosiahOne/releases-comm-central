@@ -2,15 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+
 var labelElement;
 
 // dialog initialization code
 
-function Startup()
-{
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+function Startup() {
   var editor = GetCurrentEditor();
-  if (!editor)
-  {
+  if (!editor) {
     dump("Failed to get active editor!\n");
     window.close();
     return;
@@ -32,8 +36,7 @@ function Startup()
   range.selectNode(labelElement);
   gDialog.labelText.value = range.toString();
 
-  if (labelElement.innerHTML.includes("<"))
-  {
+  if (labelElement.innerHTML.includes("<")) {
     gDialog.editText.checked = false;
     gDialog.editText.disabled = false;
     gDialog.labelText.disabled = true;
@@ -41,28 +44,25 @@ function Startup()
       () => Services.prompt.alert(window, GetString("Alert"), GetString("EditTextWarning")),
       {capture: false, once: true});
     SetTextboxFocus(gDialog.labelFor);
-  }
-  else
+  } else {
     SetTextboxFocus(gDialog.labelText);
+  }
 
   SetWindowLocation();
 }
 
-function InitDialog()
-{
+function InitDialog() {
   gDialog.labelFor.value = globalElement.getAttribute("for");
   gDialog.labelAccessKey.value = globalElement.getAttribute("accesskey");
 }
 
-function RemoveLabel()
-{
+function RemoveLabel() {
   RemoveContainer(labelElement);
   SaveWindowLocation();
   window.close();
 }
 
-function ValidateData()
-{
+function ValidateData() {
   if (gDialog.labelFor.value)
     globalElement.setAttribute("for", gDialog.labelFor.value);
   else
@@ -74,8 +74,7 @@ function ValidateData()
   return true;
 }
 
-function onAccept()
-{
+function onAccept() {
   // All values are valid - copy to actual element in doc
   ValidateData();
 
@@ -84,8 +83,7 @@ function onAccept()
   editor.beginTransaction();
 
   try {
-    if (gDialog.editText.checked)
-    {
+    if (gDialog.editText.checked) {
       editor.setShouldTxnSetSelection(false);
 
       while (labelElement.firstChild)
@@ -97,12 +95,10 @@ function onAccept()
     }
 
     editor.cloneAttributes(labelElement, globalElement);
-  } catch(e) {}
+  } catch (e) {}
 
   editor.endTransaction();
 
   SaveWindowLocation();
-
-  return true;
 }
 

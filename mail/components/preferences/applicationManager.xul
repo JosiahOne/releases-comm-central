@@ -8,11 +8,9 @@
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/preferences/applicationManager.dtd">
 
 <dialog id="appManager"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         buttons="accept,cancel"
         onload="gAppManagerDialog.init();"
-        ondialogaccept="gAppManagerDialog.onOK();"
-        ondialogcancel="gAppManagerDialog.onCancel();"
         title="&appManager.title;"
         style="&appManager.style;"
         persist="screenX screenY">
@@ -42,7 +40,10 @@
   <description id="appDescription"/>
   <separator class="thin"/>
   <hbox flex="1">
-    <listbox id="appList" onselect="gAppManagerDialog.onSelect();" flex="1"/>
+    <richlistbox id="appList"
+                 onselect="gAppManagerDialog.onSelect();"
+                 flex="1"
+                 style="min-height: 150px;"/>
     <vbox>
       <button id="remove"
               label="&remove.label;"

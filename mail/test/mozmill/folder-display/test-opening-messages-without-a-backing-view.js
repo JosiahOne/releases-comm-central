@@ -7,12 +7,15 @@
  * messages without a backing view are those opened from the command line or
  * desktop search integration results.
  */
+
+"use strict";
+
 var MODULE_NAME = 'test-opening-messages-without-a-backing-view';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['folder-display-helpers', 'window-helpers'];
 
-ChromeUtils.import("resource:///modules/MailUtils.js");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
 // One folder's enough
 var folder = null;

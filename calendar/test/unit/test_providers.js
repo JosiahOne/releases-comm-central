@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const cIC = Components.interfaces.calICalendar;
-
 var icalStringArray = [
     // Comments refer to the range defined in testGetItems().
     // 1: one-hour event
@@ -65,7 +63,7 @@ var icalStringArray = [
     "DTEND;VALUE=DATE:20020403\n" +
     "RRULE:FREQ=DAILY;INTERVAL=1;COUNT=10\n" +
     "END:VEVENT\n",
-    // 13: daily recurring allday event. First occurence in the range.
+    // 13: daily recurring allday event. First occurrence in the range.
     "BEGIN:VEVENT\n" +
     "DTSTART;VALUE=DATE:20020401\n" +
     "DTEND;VALUE=DATE:20020402\n" +
@@ -425,6 +423,7 @@ function testMetaData() {
     testMetaData_(getStorageCal());
 }
 
+/*
 async function testOfflineStorage(storageGetter, isRecurring) {
     let storage = storageGetter();
     print(`Running offline storage test for ${storage.type} calendar for ${isRecurring ? "recurring" : "normal"} item`);
@@ -444,7 +443,7 @@ async function testOfflineStorage(storageGetter, isRecurring) {
     equal(result.length, 1);
 
     // When searching for offline added items, there are none
-    let filter = cIC.ITEM_FILTER_ALL_ITEMS | cIC.ITEM_FILTER_OFFLINE_CREATED;
+    let filter = Ci.calICalendar.ITEM_FILTER_ALL_ITEMS | Ci.calICalendar.ITEM_FILTER_OFFLINE_CREATED;
     result = await pcal.getItems(filter, 0, null, null);
     equal(result.length, 0);
 
@@ -463,7 +462,7 @@ async function testOfflineStorage(storageGetter, isRecurring) {
     await pcal.modifyOfflineItem(event2);
 
     // The flag should still be offline added, as it was already marked as such
-    filter = cIC.ITEM_FILTER_ALL_ITEMS | cIC.ITEM_FILTER_OFFLINE_CREATED;
+    filter = Ci.calICalendar.ITEM_FILTER_ALL_ITEMS | Ci.calICalendar.ITEM_FILTER_OFFLINE_CREATED;
     result = await pcal.getItems(filter, 0, null, null);
     equal(result.length, 1);
 
@@ -471,27 +470,27 @@ async function testOfflineStorage(storageGetter, isRecurring) {
     await pcal.resetItemOfflineFlag(event2);
 
     // No more offline items after resetting the flag
-    filter = cIC.ITEM_FILTER_ALL_ITEMS | cIC.ITEM_FILTER_OFFLINE_CREATED;
+    filter = Ci.calICalendar.ITEM_FILTER_ALL_ITEMS | Ci.calICalendar.ITEM_FILTER_OFFLINE_CREATED;
     result = await pcal.getItems(filter, 0, null, null);
     equal(result.length, 0);
 
     // Setting modify flag without one set should actually set that flag
     await pcal.modifyOfflineItem(event2);
-    filter = cIC.ITEM_FILTER_ALL_ITEMS | cIC.ITEM_FILTER_OFFLINE_CREATED;
+    filter = Ci.calICalendar.ITEM_FILTER_ALL_ITEMS | Ci.calICalendar.ITEM_FILTER_OFFLINE_CREATED;
     result = await pcal.getItems(filter, 0, null, null);
     equal(result.length, 0);
 
-    filter = cIC.ITEM_FILTER_ALL_ITEMS | cIC.ITEM_FILTER_OFFLINE_MODIFIED;
+    filter = Ci.calICalendar.ITEM_FILTER_ALL_ITEMS | Ci.calICalendar.ITEM_FILTER_OFFLINE_MODIFIED;
     result = await pcal.getItems(filter, 0, null, null);
     equal(result.length, 1);
 
     // Setting the delete flag should modify the flag accordingly
     await pcal.deleteOfflineItem(event2);
-    filter = cIC.ITEM_FILTER_ALL_ITEMS | cIC.ITEM_FILTER_OFFLINE_MODIFIED;
+    filter = Ci.calICalendar.ITEM_FILTER_ALL_ITEMS | Ci.calICalendar.ITEM_FILTER_OFFLINE_MODIFIED;
     result = await pcal.getItems(filter, 0, null, null);
     equal(result.length, 0);
 
-    filter = cIC.ITEM_FILTER_ALL_ITEMS | cIC.ITEM_FILTER_OFFLINE_DELETED;
+    filter = Ci.calICalendar.ITEM_FILTER_ALL_ITEMS | Ci.calICalendar.ITEM_FILTER_OFFLINE_DELETED;
     result = await pcal.getItems(filter, 0, null, null);
     equal(result.length, 1);
 
@@ -507,3 +506,4 @@ add_task(testOfflineStorage.bind(null, () => getMemoryCal(), false));
 add_task(testOfflineStorage.bind(null, () => getStorageCal(), false));
 add_task(testOfflineStorage.bind(null, () => getMemoryCal(), true));
 add_task(testOfflineStorage.bind(null, () => getStorageCal(), true));
+*/

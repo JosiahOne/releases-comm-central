@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/ltnInvitationUtils.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { ltn } = ChromeUtils.import("resource://calendar/modules/ltnInvitationUtils.jsm");
+var { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 function run_test() {
     do_calendar_startup(run_next_test);
@@ -136,8 +136,7 @@ add_task(async function getItipHeader_test() {
     let i = 0;
     for (let test of data) {
         i++;
-        let itipItem = Components.classes["@mozilla.org/calendar/itip-item;1"]
-                                 .createInstance(Components.interfaces.calIItipItem);
+        let itipItem = Cc["@mozilla.org/calendar/itip-item;1"].createInstance(Ci.calIItipItem);
         let item = getIcs();
         let sender;
         if (test.input.method || test.input.method == "") {
@@ -369,11 +368,9 @@ add_task(async function createInvitationOverlay_test() {
                     break;
             }
         }
-        let itipItem = Components.classes["@mozilla.org/calendar/itip-item;1"]
-                                 .createInstance(Components.interfaces.calIItipItem);
+        let itipItem = Cc["@mozilla.org/calendar/itip-item;1"].createInstance(Ci.calIItipItem);
         itipItem.init(item);
-        let parser = Components.classes["@mozilla.org/calendar/ics-parser;1"]
-                               .createInstance(Components.interfaces.calIIcsParser);
+        let parser = Cc["@mozilla.org/calendar/ics-parser;1"].createInstance(Ci.calIIcsParser);
         parser.parseString(item);
         let dom = ltn.invitation.createInvitationOverlay(parser.getItems({})[0], itipItem);
         let observed = dom.getElementById(test.expected.node).innerHTML;
@@ -400,11 +397,9 @@ add_task(async function compareInvitationOverlay_test() {
                 item = item.replace(new RegExp(regex), aInput[prop]);
             }
         }
-        let itipItem = Components.classes["@mozilla.org/calendar/itip-item;1"]
-                                 .createInstance(Components.interfaces.calIItipItem);
+        let itipItem = Cc["@mozilla.org/calendar/itip-item;1"].createInstance(Ci.calIItipItem);
         itipItem.init(item);
-        let parser = Components.classes["@mozilla.org/calendar/ics-parser;1"]
-                               .createInstance(Components.interfaces.calIIcsParser);
+        let parser = Cc["@mozilla.org/calendar/ics-parser;1"].createInstance(Ci.calIIcsParser);
         parser.parseString(item);
         let dom = ltn.invitation.createInvitationOverlay(parser.getItems({})[0], itipItem);
         return cal.xml.serializeDOM(dom);
@@ -510,11 +505,15 @@ add_task(async function compareInvitationOverlay_test() {
             ]
         }
     }];
-    // we make sure that the Europe/Berlin timezone and long datetime format is set
-    let dateformat = Preferences.get("calendar.date.format", 0);
-    let tzlocal = Preferences.get("calendar.timezone.local", "Europe/Berlin");
-    Preferences.set("calendar.date.format", 0);
-    Preferences.set("calendar.timezone.local", "Europe/Berlin");
+    // make sure that the Europe/Berlin timezone and long datetime format is set
+    // and to use the app locale to avoid test failures when running locally on
+    // an OS with a regional setting other than en-US
+    let dateformat = Services.prefs.getIntPref("calendar.date.format", 0);
+    let tzlocal = Services.prefs.getStringPref("calendar.timezone.local", "Europe/Berlin");
+    let useOsLocale = Services.prefs.getBoolPref("intl.regional_prefs.use_os_locales", false);
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", false);
+    Services.prefs.setIntPref("calendar.date.format", 0);
+    Services.prefs.setStringPref("calendar.timezone.local", "Europe/Berlin");
     let i = 0;
     for (let test of data) {
         i++;
@@ -547,8 +546,9 @@ add_task(async function compareInvitationOverlay_test() {
         }
     }
     // let's reset setting
-    Preferences.set("calendar.date.format", dateformat);
-    Preferences.set("calendar.timezone.local", tzlocal);
+    Services.prefs.setIntPref("calendar.date.format", dateformat);
+    Services.prefs.setStringPref("calendar.timezone.local", tzlocal);
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", useOsLocale);
 });
 
 add_task(async function getHeaderSection_test() {
@@ -640,8 +640,7 @@ add_task(async function getHeaderSection_test() {
         identity.doBcc = test.input.identity.doBcc || (test.input.identity.bcc);
         identity.doBccList = test.input.identity.bcc || null;
 
-        let composeUtils = Components.classes["@mozilla.org/messengercompose/computils;1"]
-                                     .createInstance(Components.interfaces.nsIMsgCompUtils);
+        let composeUtils = Cc["@mozilla.org/messengercompose/computils;1"].createInstance(Ci.nsIMsgCompUtils);
         let messageId = composeUtils.msgGenerateMessageId(identity);
 
         let header = ltn.invitation.getHeaderSection(messageId, identity,
@@ -778,19 +777,19 @@ add_task(async function getRfc5322FormattedDate_test() {
     };
 
     let i = 0;
-    let timezone = Preferences.get("calendar.timezone.local", null);
+    let timezone = Services.prefs.getStringPref("calendar.timezone.local", null);
     for (let test of data.input) {
         i++;
         if (test.timezone) {
-            Preferences.set("calendar.timezone.local", test.timezone);
+            Services.prefs.setStringPref("calendar.timezone.local", test.timezone);
         } else {
-            Preferences.reset("calendar.timezone.local");
+            Services.prefs.clearUserPref("calendar.timezone.local");
         }
         let date = test.date ? new Date(test.date) : null;
         let re = new RegExp(data.expected);
         ok(re.test(ltn.invitation.getRfc5322FormattedDate(date)), "(test #" + i + ")");
     }
-    Preferences.set("calendar.timezone.local", timezone);
+    Services.prefs.setStringPref("calendar.timezone.local", timezone);
 });
 
 add_task(async function parseCounter_test() {
@@ -1030,6 +1029,11 @@ add_task(async function parseCounter_test() {
     }];
     /* eslint-enable object-curly-newline */
 
+    // make sure to use the app locale to avoid test failures when running
+    // locally on an OS with a regional setting other than en-US
+    let useOsLocale = Services.prefs.getBoolPref("intl.regional_prefs.use_os_locales", false);
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", false);
+
     let getItem = function(aProperties) {
         let item = getIcs(true);
 
@@ -1137,4 +1141,6 @@ add_task(async function parseCounter_test() {
         ok(missingProps.length == 0, "(test #" + i + ": differences: check for unexpectedly " +
                                      "missing properties " + missingProps + ")");
     }
+
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", useOsLocale);
 });

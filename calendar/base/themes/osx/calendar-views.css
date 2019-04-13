@@ -65,20 +65,22 @@ agenda-richlist-item[status="CANCELLED"] .agenda-container-box {
 }
 
 .calview-tabs {
+    -moz-box-align: stretch;
+    padding-left: 0;
+    padding-right: 0;
     margin-bottom: 0;
-    padding: 0;
+    position: static;
 }
 
-tab[calview] {
-    color: #2e4e73;
+radio[calview] {
     padding-top: 4px;
 }
 
-tab[calview][selected="true"] {
+radio[calview][selected="true"] {
     background-color: #fff;
 }
 
-tab[calview] > .tab-middle {
+radio[calview] > .tab-middle {
     padding: 0;
 }
 

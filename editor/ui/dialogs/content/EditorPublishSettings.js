@@ -15,6 +15,10 @@ var gCurrentSiteIndex = -1;
 var gPasswordManagerOn = true;
 
 // Dialog initialization code
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
 function Startup()
 {
   if (!GetCurrentEditor())
@@ -316,11 +320,13 @@ function UpdateSettings()
   return true;
 }
 
-function onAccept()
+function onAccept(event)
 {
   // Save any pending changes locally first
-  if (!ApplyChanges())
-    return false;
+  if (!ApplyChanges()) {
+    event.preventDefault();
+    return;
+  }
 
   if (gSiteDataChanged)
   {
@@ -334,6 +340,4 @@ function onAccept()
   }
 
   SaveWindowLocation();
-
-  return true;
 }

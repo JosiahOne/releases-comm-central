@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function calIcsSerializer() {
     this.wrappedJSObject = this;
@@ -43,8 +43,8 @@ calIcsSerializer.prototype = {
 
         // Convert the javascript string to an array of bytes, using the
         // UTF8 encoder
-        let convStream = Components.classes["@mozilla.org/intl/converter-output-stream;1"]
-                                   .createInstance(Components.interfaces.nsIConverterOutputStream);
+        let convStream = Cc["@mozilla.org/intl/converter-output-stream;1"]
+                           .createInstance(Ci.nsIConverterOutputStream);
         convStream.init(aStream, "UTF-8");
 
         convStream.writeString(str);

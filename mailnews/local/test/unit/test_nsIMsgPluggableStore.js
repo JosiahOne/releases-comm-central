@@ -8,14 +8,13 @@
 
 var gPluggableStores = [
   "@mozilla.org/msgstore/berkeleystore;1",
-  "@mozilla.org/msgstore/maildirstore;1"
+  "@mozilla.org/msgstore/maildirstore;1",
 ];
 
 function test_discoverSubFolders() {
   let mailbox = setup_mailbox("none", create_temporary_directory());
 
   mailbox.msgStore.discoverSubFolders(mailbox, true);
-
 }
 
 function run_all_tests() {

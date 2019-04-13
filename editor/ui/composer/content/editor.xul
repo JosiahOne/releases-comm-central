@@ -29,7 +29,7 @@
 ]>
 
 <window id="editorWindow"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="EditorOnLoad()"
         onunload="EditorShutdown()"
         onclose="return Async.promiseSpinningly(EditorCanClose())"
@@ -109,14 +109,6 @@
   </commandset>
 
   <tooltip id="aHTMLTooltip" onpopupshowing="return FillInHTMLTooltipEditor(this);"/>
-
-  <broadcasterset id="editorBroadcasters">
-    <broadcaster id="Editor:Throbber" busy="false"/>
-    <broadcaster id="Communicator:WorkMode"/>
-    <broadcaster id="args" value="about:blank"/>
-  </broadcasterset>
-
-  <broadcasterset id="mainBroadcasterSet"/>
 
   <!-- keys are appended from the overlay -->
   <keyset id="editorKeys">
@@ -252,9 +244,8 @@
       <button id="navigator-throbber"
               oncommand="goClickThrobber('editor.throbber.url', event)"
               onclick="checkForMiddleClick(this, event);"
-              tooltiptext="&throbber.tooltip;">
-        <observes element="Editor:Throbber" attribute="busy"/>
-      </button>
+              tooltiptext="&throbber.tooltip;"
+              busy="false"/>
     </hbox>
   </toolbar>
   <toolbar id="FormatToolbar"
@@ -373,14 +364,17 @@
   </vbox> <!-- appcontent -->
 </hbox><!-- sidebar-parent -->
 
-    <!-- Some of this is from globarOverlay.xul -->
-    <statusbar class="chromeclass-status" id="status-bar">
+    <!-- Some of this is from globalOverlay.xul -->
+    <hbox class="statusbar chromeclass-status" id="status-bar">
       <statusbarpanel id="component-bar"/>
-      <statusbarpanel id="structToolbar" flex="1" pack="end">
-	    <label id="structSpacer" value="" flex="1"/>
-      </statusbarpanel>
-      <statusbarpanel class="statusbarpanel-iconic" id="offline-status"/>
-    </statusbar>
+      <hbox id="structToolbar" class="statusbarpanel" flex="1" pack="end">
+        <label id="structSpacer" value="" flex="1"/>
+      </hbox>
+      <statusbarpanel id="offline-status" class="statusbarpanel-iconic"/>
+      <hbox class="statusbarpanel statusbar-resizerpanel">
+        <resizer dir="bottomend"/>
+      </hbox>
+    </hbox>
 
 
 

@@ -34,3 +34,7 @@ DEFFILE = SRCDIR + '/MapiProxy.def'
 # which clang-cl complains about.  MSVC doesn't, so turn this warning off.
 if CONFIG['CC_TYPE'] == 'clang-cl':
     CFLAGS += ['-Wno-extra-tokens']
+
+# clang-cl complains about these in generated code:
+if CONFIG['CC_TYPE'] == 'clang-cl':
+    CFLAGS += ['-Wno-extern-initializer','-Wno-missing-braces','-Wno-unused-const-variable']

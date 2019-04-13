@@ -1,65 +1,58 @@
-ChromeUtils.import("resource:///modules/mailServices.js");
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var nsIMsgDBHdr = Ci.nsIMsgDBHdr;
-var nsIArray = Ci.nsIArray;
-var nsIMsgFolder = Ci.nsIMsgFolder;
+// ChromeUtils.import should be used for this, but it breaks mozmill.
+// Assume whatever test loaded this file already has mailTestUtils.
+/* globals mailTestUtils */
 
-var gMFNService = Cc["@mozilla.org/messenger/msgnotificationservice;1"]
-                      .getService(Ci.nsIMsgFolderNotificationService);
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var allTestedEvents =
-  gMFNService.msgAdded |
-  gMFNService.msgsClassified |
-  gMFNService.msgsDeleted |
-  gMFNService.msgsMoveCopyCompleted |
-  gMFNService.msgKeyChanged |
-  gMFNService.folderAdded |
-  gMFNService.folderDeleted |
-  gMFNService.folderMoveCopyCompleted |
-  gMFNService.folderRenamed |
-  gMFNService.itemEvent;
-
-var gCopyService = MailServices.copy;
+  MailServices.mfn.msgAdded |
+  MailServices.mfn.msgsClassified |
+  MailServices.mfn.msgsDeleted |
+  MailServices.mfn.msgsMoveCopyCompleted |
+  MailServices.mfn.msgKeyChanged |
+  MailServices.mfn.folderAdded |
+  MailServices.mfn.folderDeleted |
+  MailServices.mfn.folderMoveCopyCompleted |
+  MailServices.mfn.folderRenamed |
+  MailServices.mfn.itemEvent;
 
 // Current test being executed
 var gTest = 1;
 
 // Which events are expected
-var gExpectedEvents;
+var gExpectedEvents = [];
 
 // The current status (what all has been done)
 var gCurrStatus = 0;
-var kStatus =
-{
+var kStatus = {
   notificationsDone: 0x1,
   onStopCopyDone: 0x2,
   functionCallDone: 0x4,
-  everythingDone: 0
+  everythingDone: 0,
 };
 kStatus.everythingDone = kStatus.notificationsDone | kStatus.onStopCopyDone | kStatus.functionCallDone;
 
 // For CopyFileMessage: this stores the header that was received
-var gHdrsReceived = new Array();
+var gHdrsReceived = [];
 
-var gMsgHdrs = new Array();
+var gMsgHdrs = [];
 
 // Our listener, which captures events and verifies them as they are received.
-var gMFListener =
-{
-  msgAdded: function(aMsg)
-  {
-    verify([gMFNService.msgAdded, aMsg]);
+var gMFListener = {
+  msgAdded(aMsg) {
+    verify([MailServices.mfn.msgAdded, aMsg]);
     // We might not actually have a header in gHdrsReceived in the IMAP case,
     // so use the aMsg we got instead
     gMsgHdrs.push({hdr: aMsg, ID: aMsg.messageId});
-    if (gExpectedEvents.length == 0)
-    {
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
-    }
-    else if (gExpectedEvents[0][0] == gMFNService.msgsClassified)
-    {
+    } else if (gExpectedEvents[0][0] == MailServices.mfn.msgsClassified) {
       // XXX this is a hack to deal with limitations of the classification logic
       //  and the new list.  We want to issue a call to clear the list once all
       //  the messages have been added, which would be when the next expected
@@ -69,196 +62,166 @@ var gMFListener =
     }
   },
 
-  msgsClassified: function(aMsgs, aJunkProcessed, aTraitProcessed)
-  {
+  msgsClassified(aMsgs, aJunkProcessed, aTraitProcessed) {
     dump("classified id: " + aMsgs.queryElementAt(0, Ci.nsIMsgDBHdr).messageId + "\n");
-    verify([gMFNService.msgsClassified, aMsgs, aJunkProcessed,
+    verify([MailServices.mfn.msgsClassified, aMsgs, aJunkProcessed,
               aTraitProcessed]);
-    if (gExpectedEvents.length == 0)
-    {
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
   },
 
-  msgsDeleted: function(aMsgs)
-  {
-    verify([gMFNService.msgsDeleted, aMsgs]);
-    if (gExpectedEvents.length == 0)
-    {
+  msgsDeleted(aMsgs) {
+    verify([MailServices.mfn.msgsDeleted, aMsgs]);
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
   },
 
-  msgsMoveCopyCompleted: function(aMove, aSrcMsgs, aDestFolder, aDestMsgs)
-  {
-    verify([gMFNService.msgsMoveCopyCompleted, aMove, aSrcMsgs, aDestFolder,
+  msgsMoveCopyCompleted(aMove, aSrcMsgs, aDestFolder, aDestMsgs) {
+    verify([MailServices.mfn.msgsMoveCopyCompleted, aMove, aSrcMsgs, aDestFolder,
             aDestMsgs]);
-    if (gExpectedEvents.length == 0)
-    {
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
   },
 
-  msgKeyChanged: function(aOldKey, aNewMsgHdr)
-  {
-    verify([gMFNService.msgKeyChanged, aOldKey, aNewMsgHdr]);
-    if (gExpectedEvents.length == 0)
-    {
+  msgKeyChanged(aOldKey, aNewMsgHdr) {
+    verify([MailServices.mfn.msgKeyChanged, aOldKey, aNewMsgHdr]);
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
   },
 
-  folderAdded: function(aFolder)
-  {
-    verify([gMFNService.folderAdded, aFolder]);
-    if (gExpectedEvents.length == 0)
-    {
+  folderAdded(aFolder) {
+    verify([MailServices.mfn.folderAdded, aFolder]);
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
   },
 
-  folderDeleted: function(aFolder)
-  {
-    verify([gMFNService.folderDeleted, aFolder]);
-    if (gExpectedEvents.length == 0)
-    {
+  folderDeleted(aFolder) {
+    verify([MailServices.mfn.folderDeleted, aFolder]);
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
   },
 
-  folderMoveCopyCompleted: function(aMove, aSrcFolder, aDestFolder)
-  {
-    verify([gMFNService.folderMoveCopyCompleted, aMove, aSrcFolder, aDestFolder]);
-    if (gExpectedEvents.length == 0)
-    {
+  folderMoveCopyCompleted(aMove, aSrcFolder, aDestFolder) {
+    verify([MailServices.mfn.folderMoveCopyCompleted, aMove, aSrcFolder, aDestFolder]);
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
   },
 
-  folderRenamed: function(aOrigFolder, aNewFolder)
-  {
-    verify([gMFNService.folderRenamed, aOrigFolder, aNewFolder]);
-    if (gExpectedEvents.length == 0)
-    {
+  folderRenamed(aOrigFolder, aNewFolder) {
+    verify([MailServices.mfn.folderRenamed, aOrigFolder, aNewFolder]);
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
   },
 
-  itemEvent: function(aFolder, aEvent, aBetterBeNull, aBetterBeEmpty)
-  {
+  itemEvent(aFolder, aEvent, aBetterBeNull, aBetterBeEmpty) {
     // we currently require the third argument to be null, and the fourth to be
     // empty...
     Assert.equal(aBetterBeNull, null);
     Assert.equal(aBetterBeEmpty, "");
-    verify([gMFNService.itemEvent, aFolder, aEvent]);
-    if (gExpectedEvents.length == 0)
-    {
+    verify([MailServices.mfn.itemEvent, aFolder, aEvent]);
+    if (gExpectedEvents.length == 0) {
       gCurrStatus |= kStatus.notificationsDone;
       if (gCurrStatus == kStatus.everythingDone)
         resetStatusAndProceed();
     }
-  }
+  },
 };
 
 // Copy listener, for proceeding after each operation.
-var copyListener =
-{
+var copyListener = {
   // For CopyFileMessage: this should be the folder the message is being stored to
   mFolderStoredIn: null,
   mMessageId: "",
-  OnStartCopy: function() {},
-  OnProgress: function(aProgress, aProgressMax) {},
-  SetMessageKey: function(aKey)
-  {
+  OnStartCopy() {},
+  OnProgress(aProgress, aProgressMax) {},
+  SetMessageKey(aKey) {
     gHdrsReceived.push(this.mFolderStoredIn.GetMessageHeader(aKey));
   },
-  GetMessageId: function(aMessageId) {
+  GetMessageId(aMessageId) {
     aMessageId = {value: this.mMessageId};
   },
-  OnStopCopy: function(aStatus)
-  {
+  OnStopCopy(aStatus) {
     // Check: message successfully copied.
     Assert.equal(aStatus, 0);
     gCurrStatus |= kStatus.onStopCopyDone;
     if (gCurrStatus == kStatus.everythingDone)
       resetStatusAndProceed();
-  }
+  },
 };
 
-function resetStatusAndProceed()
-{
+function resetStatusAndProceed() {
   gHdrsReceived.length = 0;
   gCurrStatus = 0;
   // Ugly hack: make sure we don't get stuck in a JS->C++->JS->C++... call stack
   // This can happen with a bunch of synchronous functions grouped together, and
   // can even cause tests to fail because they're still waiting for the listener
   // to return
-  do_timeout(0, function(){doTest(++gTest);});
+  do_timeout(0, () => { this.doTest(++gTest); });
 }
 
 // Checks whether the array returned from a function has exactly these elements.
-function hasExactlyElements(array, elements)
-{
+function hasExactlyElements(array, elements) {
   // If an nsIArray (it could also be a single header or a folder)
-  if (elements instanceof nsIArray)
-  {
+  if (elements instanceof Ci.nsIArray) {
     var count = elements.length;
 
     // Check: array sizes should be equal.
     Assert.equal(count, array.length);
 
-    for (var i = 0; i < count; i++)
-    {
+    for (let i = 0; i < count; i++) {
       // Check: query element, must be a header or folder and present in the array
       var currElement;
       try {
-        currElement = elements.queryElementAt(i, nsIMsgDBHdr);
-      }
-      catch (e) {}
-      if (!currElement)
-      {
+        currElement = elements.queryElementAt(i, Ci.nsIMsgDBHdr);
+      } catch (e) {}
+      if (!currElement) {
         try {
-          currElement = elements.queryElementAt(i, nsIMsgFolder);
-        }
-        catch (e) {}
+          currElement = elements.queryElementAt(i, Ci.nsIMsgFolder);
+        } catch (e) {}
       }
-      Assert.notEqual(currElement, undefined);
+      Assert.equal(typeof currElement, "object");
       Assert.notEqual(mailTestUtils.non_strict_index_of(array, currElement), -1);
     }
-  }
-  // If a single header or a folder
-  else if (elements instanceof nsIMsgDBHdr || elements instanceof nsIMsgFolder)
-  {
+  } else if (elements instanceof Ci.nsIMsgDBHdr || elements instanceof Ci.nsIMsgFolder) {
+    // If a single header or a folder
+
     // Check: there should be only one element in the array.
     Assert.equal(array.length, 1);
 
     // Check: the element should be present
     Assert.notEqual(mailTestUtils.non_strict_index_of(array, elements), -1);
-  }
-  // This shouldn't happen
-  else
+  } else {
+    // This shouldn't happen
     do_throw("Unrecognized item returned from listener");
-};
+  }
+}
 
 // Verifies an event
-function verify(event)
-{
+function verify(event) {
   // Check: make sure we actually have an item to process
   Assert.ok(gExpectedEvents.length >= 1);
   var expected = gExpectedEvents.shift();
@@ -269,23 +232,21 @@ function verify(event)
 
   dump("..... Verifying event type " + eventType + "\n");
 
-  switch (eventType)
-  {
-  case gMFNService.msgAdded:
+  switch (eventType) {
+  case MailServices.mfn.msgAdded:
     // So for IMAP right now, we aren't able to get the actual nsIMsgDBHdr.
     // Instead, we'll match up message ids as a (poor?) substitute.
-    if (expected[1].expectedMessageId)
-    {
-      Assert.equal(event[1].messageId, expected[1].expectedMessageId);
+    if (expected[1].expectedMessageId) {
+      Assert.equal(expected[1].expectedMessageId, event[1].messageId);
       break;
     }
     // If we do have a header, fall through to the case below
-  case gMFNService.msgsDeleted:
-  case gMFNService.folderDeleted:
+  case MailServices.mfn.msgsDeleted:
+  case MailServices.mfn.folderDeleted:
     // Check: headers match/folder matches.
     hasExactlyElements(expected[1], event[1]);
     break;
-  case gMFNService.msgsClassified:
+  case MailServices.mfn.msgsClassified:
     // In the IMAP case expected[1] is a list of mesage-id strings whereas in
     // the local case (where we are copying from files), we actually have
     // the headers.
@@ -300,11 +261,10 @@ function verify(event)
       let ignoreCount = event[1].length - expected[1].length;
       for (let i = 0; i < expected[1].length; i++) {
         let eventHeader = event[1].queryElementAt(i + ignoreCount,
-                                                  nsIMsgDBHdr);
+                                                  Ci.nsIMsgDBHdr);
         Assert.equal(expected[1][i], eventHeader.messageId);
       }
-    }
-    else { // actual headers
+    } else { // actual headers
       hasExactlyElements(expected[1], event[1]);
     }
     // aJunkProcessed: was the message processed for junk?
@@ -312,11 +272,11 @@ function verify(event)
     // aTraitProcessed: was the message processed for traits?
     Assert.equal(expected[3], event[3]);
     break;
-  case gMFNService.msgKeyChanged:
-    Assert.equal(expected[1].messageId, event[2].expectedMessageId);
+  case MailServices.mfn.msgKeyChanged:
+    Assert.equal(expected[1].expectedMessageId, event[2].messageId);
     break;
-  case gMFNService.msgsMoveCopyCompleted:
-  case gMFNService.folderMoveCopyCompleted:
+  case MailServices.mfn.msgsMoveCopyCompleted:
+  case MailServices.mfn.folderMoveCopyCompleted:
     // Check: Move or copy as expected.
     Assert.equal(expected[1], event[1]);
 
@@ -324,46 +284,46 @@ function verify(event)
     hasExactlyElements(expected[2], event[2]);
 
     // Check: destination folder matches.
-    Assert.equal(expected[3], event[3]);
+    Assert.equal(expected[3].URI, event[3].URI);
 
-    if (eventType == gMFNService.folderMoveCopyCompleted)
+    if (eventType == MailServices.mfn.folderMoveCopyCompleted)
       break;
 
     // Check: destination headers.  We expect these for local and imap folders,
     //  but we will not have heard about the headers ahead of time,
     //  so the best we can do is make sure they match up.  To this end,
     //  we check that the message-id header values match up.
-    for (let iMsg = 0; iMsg < event[2].length; iMsg++)
-    {
-      let srcHdr = event[2].queryElementAt(iMsg, nsIMsgDBHdr);
-      let destHdr = event[4].queryElementAt(iMsg, nsIMsgDBHdr);
+    for (let iMsg = 0; iMsg < event[2].length; iMsg++) {
+      let srcHdr = event[2].queryElementAt(iMsg, Ci.nsIMsgDBHdr);
+      let destHdr = event[4].queryElementAt(iMsg, Ci.nsIMsgDBHdr);
       Assert.equal(srcHdr.messageId, destHdr.messageId);
     }
     break;
-  case gMFNService.folderAdded:
+  case MailServices.mfn.folderAdded:
     // Check: parent folder matches
-    Assert.equal(event[1].parent, expected[1]);
+    Assert.equal(expected[1].URI, event[1].parent.URI);
 
     // Check: folder name matches
-    Assert.equal(event[1].prettyName, expected[2]);
-    Assert.equal(event[1].name, expected[2]);
+    Assert.equal(expected[2], event[1].prettyName);
+    Assert.equal(expected[2], event[1].name);
 
-    // Not a check, but if we have to store this folder somewhere, do it
+    // Not a check, but call the passed in callback with the new folder,
+    // used e.g. to store this folder somewhere.
     if (expected[3])
-      eval(expected[3] + "= event[1]");
+      expected[3](event[1]);
     break;
-  case gMFNService.folderRenamed:
+  case MailServices.mfn.folderRenamed:
     // Check: source folder matches
     hasExactlyElements(expected[1], event[1]);
 
     // Check: destination folder name matches
     Assert.equal(expected[2], event[2].prettyName);
     break;
-  case gMFNService.itemEvent:
+  case MailServices.mfn.itemEvent:
     // the event string should match
     Assert.equal(expected[2], event[2]);
     // and so should the folder we are talking about
-    Assert.equal(expected[1], event[1]);
+    Assert.equal(expected[1].URI, event[1].URI);
     break;
   }
 }

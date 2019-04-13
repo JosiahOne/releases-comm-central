@@ -7,9 +7,9 @@
  * creation of folder.
  */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/MailUtils.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -74,7 +74,7 @@ function* saveAsTemplate() {
   let identity = MailServices.accounts
                   .getFirstIdentityForServer(IMAPPump.incomingServer);
   identity.stationeryFolder = IMAPPump.incomingServer.rootFolder.URI + "/Templates";
-  let templates = MailUtils.getFolderForURI(identity.stationeryFolder, false);
+  let templates = MailUtils.getOrCreateFolder(identity.stationeryFolder);
   // Verify that Templates folder doesn't exist, and then create it.
   Assert.equal(templates.parent, null);
   templates.setFlag(Ci.nsMsgFolderFlags.Templates);

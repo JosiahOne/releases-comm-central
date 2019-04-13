@@ -2,19 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = 'test-content-tab';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['folder-display-helpers', 'content-tab-helpers',
                        'dom-helpers', 'window-helpers'];
 
-var controller = {};
-ChromeUtils.import("chrome://mozmill/content/modules/controller.js", controller);
-var mozmill = {};
-ChromeUtils.import("chrome://mozmill/content/modules/mozmill.js", mozmill);
-var elementslib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elementslib);
-ChromeUtils.import('resource://gre/modules/Services.jsm');
+var controller = ChromeUtils.import("chrome://mozmill/content/modules/controller.jsm");
+var mozmill = ChromeUtils.import("chrome://mozmill/content/modules/mozmill.jsm");
+var elementslib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 // RELATIVE_ROOT messes with the collector, so we have to bring the path back
 // so we get the right path for the resources.

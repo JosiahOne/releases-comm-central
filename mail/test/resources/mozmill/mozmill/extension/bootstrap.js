@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/extensionSupport.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {ExtensionSupport} = ChromeUtils.import("resource:///modules/ExtensionSupport.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 function install() {}
 
@@ -13,12 +13,10 @@ function uninstall() {}
 function startup(data, reason) {
   loadDefaultPrefs();
 
-  ExtensionSupport.registerWindowListener(
-    data.id,
-    {
-      chromeURLs: [ "chrome://messenger/content/messenger.xul" ],
-      onLoadWindow: setupUI
-    });
+  ExtensionSupport.registerWindowListener(data.id, {
+    chromeURLs: ["chrome://messenger/content/messenger.xul"],
+    onLoadWindow: setupUI,
+  });
 }
 
 function loadDefaultPrefs() {
@@ -35,30 +33,17 @@ function shutdown(data, reason) {
 
 
 function setupUI(domWindow) {
-  var document = domWindow.document;
-
-  function createMozmillMenu() {
-    let m = document.createElement("menuitem");
-    m.setAttribute("id", "mozmill-mozmill");
-    m.setAttribute("label", "Mozmill");
-    m.setAttribute("oncommand", "MozMill.onMenuItemCommand(event);");
-
-    return m;
-  }
-
   console.log("=== Mozmill: Seen window " + domWindow.document.location.href);
-  document.getElementById("taskPopup").appendChild(createMozmillMenu());
   loadScript("chrome://mozmill/content/overlay.js", domWindow);
 }
 
 function loadScript(url, targetWindow) {
-  let loader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
-  loader.loadSubScript(url, targetWindow);
+  Services.scriptloader.loadSubScript(url, targetWindow);
 }
 
 function logException(exc) {
   try {
     Services.console.logStringMessage(exc.toString() + "\n" + exc.stack);
+  } catch (x) {
   }
-  catch (x) {}
 }

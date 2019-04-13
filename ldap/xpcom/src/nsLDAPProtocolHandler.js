@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 const kNetworkProtocolCIDPrefix = "@mozilla.org/network/protocol;1?name=";
 const nsIProtocolHandler = Ci.nsIProtocolHandler;
@@ -10,7 +10,7 @@ const nsIProtocolHandler = Ci.nsIProtocolHandler;
 function makeProtocolHandler(aCID, aProtocol, aDefaultPort) {
   return {
     classID: Components.ID(aCID),
-    QueryInterface: XPCOMUtils.generateQI([nsIProtocolHandler]),
+    QueryInterface: ChromeUtils.generateQI([nsIProtocolHandler]),
 
     scheme: aProtocol,
     defaultPort: aDefaultPort,
@@ -29,15 +29,12 @@ function makeProtocolHandler(aCID, aProtocol, aDefaultPort) {
       return url;
     },
 
-    newChannel: function (aURI) {
-      return this.newChannel2(aURI, null);
-    },
-
-    newChannel2: function (aURI, aLoadInfo) {
+    newChannel: function (aURI, aLoadInfo) {
       if ("@mozilla.org/network/ldap-channel;1" in Cc) {
         var channel = Cc["@mozilla.org/network/ldap-channel;1"]
                         .createInstance(Ci.nsIChannel);
         channel.init(aURI);
+        channel.loadInfo = aLoadInfo;
         return channel;
       }
 

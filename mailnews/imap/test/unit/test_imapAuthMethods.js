@@ -11,8 +11,8 @@
  * - removeIncomingServer(..., true); (cleanup files) fails.
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 load("../../../resources/alertTestUtils.js");
 
 //const kUsername = "fred";

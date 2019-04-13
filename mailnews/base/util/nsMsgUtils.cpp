@@ -26,7 +26,6 @@
 #include "prmem.h"
 #include "nsNetCID.h"
 #include "nsIIOService.h"
-#include "nsIRDFService.h"
 #include "nsIMimeConverter.h"
 #include "nsMsgMimeCID.h"
 #include "nsIPrefService.h"
@@ -34,6 +33,7 @@
 #include "nsISupportsPrimitives.h"
 #include "nsIPrefLocalizedString.h"
 #include "nsIRelativeFilePref.h"
+#include "mozilla/nsRelativeFilePref.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsISpamSettings.h"
 #include "nsICryptoHash.h"
@@ -67,6 +67,10 @@
 #include "nsReadLine.h"
 #include "nsICharsetDetectionObserver.h"
 #include "nsICharsetDetector.h"
+#include "nsIStringCharsetDetector.h"
+#include "nsCyrillicDetector.h"
+#include "nsUniversalDetector.h"
+#include "nsUdetXPCOMWrapper.h"
 #include "nsILineInputStream.h"
 #include "nsIParserUtils.h"
 #include "nsICharsetConverterManager.h"
@@ -79,6 +83,8 @@
 #include "nsIInputStream.h"
 #include "nsIChannel.h"
 #include "nsIURIMutator.h"
+#include "mozilla/Unused.h"
+#include "mozilla/Preferences.h"
 
 /* for logging to Error Console */
 #include "nsIScriptError.h"
@@ -107,6 +113,7 @@ NS_MSG_BASE void MsgLogToConsole4(const nsAString &aErrorText,
                                   0,
                                   aFlag,
                                   "mailnews",
+                                  false,
                                   false)))
     return;
   console->LogMessage(scriptError);
@@ -115,10 +122,6 @@ NS_MSG_BASE void MsgLogToConsole4(const nsAString &aErrorText,
 
 using namespace mozilla;
 using namespace mozilla::net;
-
-static NS_DEFINE_CID(kImapUrlCID, NS_IMAPURL_CID);
-static NS_DEFINE_CID(kCMailboxUrl, NS_MAILBOXURL_CID);
-static NS_DEFINE_CID(kCNntpUrlCID, NS_NNTPURL_CID);
 
 #define ILLEGAL_FOLDER_CHARS ";#"
 #define ILLEGAL_FOLDER_CHARS_AS_FIRST_LETTER "."
@@ -168,50 +171,6 @@ nsresult GetMsgDBHdrFromURI(const char *uri, nsIMsgDBHdr **msgHdr)
 
   return msgMessageService->MessageURIToMsgHdr(uri, msgHdr);
 }
-
-nsresult CreateStartupUrl(const char *uri, nsIURI** aUrl)
-{
-  nsresult rv = NS_ERROR_NULL_POINTER;
-  if (!uri || !*uri || !aUrl) return rv;
-  *aUrl = nullptr;
-
-  // XXX fix this, so that base doesn't depend on imap, local or news.
-  // we can't do NS_NewURI(uri, aUrl), because these are imap-message://, mailbox-message://, news-message:// uris.
-  // I think we should do something like GetMessageServiceFromURI() to get the service, and then have the service create the
-  // appropriate nsI*Url, and then QI to nsIURI, and return it.
-  // see bug #110689
-  nsCOMPtr<nsIMsgMailNewsUrl> newUri;
-  if (PL_strncasecmp(uri, "imap", 4) == 0)
-  {
-    nsCOMPtr<nsIImapUrl> imapUrl = do_CreateInstance(kImapUrlCID, &rv);
-
-    if (NS_SUCCEEDED(rv) && imapUrl)
-      rv = imapUrl->QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(newUri));
-
-    // XXX Consider: NS_MutateURI(new nsImapUrl::Mutator()).SetSpec(nsDependentCString(uri)).Finalize(newUri);
-  }
-  else if (PL_strncasecmp(uri, "mailbox", 7) == 0)
-  {
-    nsCOMPtr<nsIMailboxUrl> mailboxUrl = do_CreateInstance(kCMailboxUrl, &rv);
-    if (NS_SUCCEEDED(rv) && mailboxUrl)
-      rv = mailboxUrl->QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(newUri));
-  }
-  else if (PL_strncasecmp(uri, "news", 4) == 0)
-  {
-    nsCOMPtr<nsINntpUrl> nntpUrl = do_CreateInstance(kCNntpUrlCID, &rv);
-    if (NS_SUCCEEDED(rv) && nntpUrl)
-      rv = nntpUrl->QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(newUri));
-  }
-
-  if (newUri) {
-    // SetSpec can fail, for mailbox urls, but we still have a url.
-    (void)newUri->SetSpecInternal(nsDependentCString(uri));
-
-    newUri.forget(aUrl);
-  }
-  return rv;
-}
-
 
 // Where should this live? It's a utility used to convert a string priority,
 //  e.g., "High, Low, Normal" to an enum.
@@ -373,7 +332,7 @@ static bool ConvertibleToNative(const nsAutoString& str)
 
 #if defined(XP_UNIX)
   const static uint32_t MAX_LEN = 55;
-#elif defined(XP_WIN32)
+#elif defined(XP_WIN)
   const static uint32_t MAX_LEN = 55;
 #else
   #error need_to_define_your_max_filename_length
@@ -789,7 +748,9 @@ bool WeAreOffline()
   return offline;
 }
 
-nsresult GetExistingFolder(const nsCString& aFolderURI, nsIMsgFolder **aFolder)
+// Find a folder by URL. If it doesn't exist, null will be returned
+// via aFolder.
+nsresult FindFolder(const nsACString& aFolderURI, nsIMsgFolder **aFolder)
 {
   NS_ENSURE_ARG_POINTER(aFolder);
 
@@ -799,7 +760,36 @@ nsresult GetExistingFolder(const nsCString& aFolderURI, nsIMsgFolder **aFolder)
   nsCOMPtr<nsIFolderLookupService> fls(do_GetService(NSIFLS_CONTRACTID, &rv));
   NS_ENSURE_SUCCESS(rv, rv);
 
+  // GetFolderForURL returns NS_OK and null for non-existent folders
   rv = fls->GetFolderForURL(aFolderURI, aFolder);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  return NS_OK;
+}
+
+// Fetch an existing folder by URL
+// The returned aFolder will be non-null if and only if result is NS_OK.
+// NS_OK - folder was found
+// NS_MSG_FOLDER_MISSING - if aFolderURI not found
+nsresult GetExistingFolder(const nsACString& aFolderURI, nsIMsgFolder **aFolder)
+{
+  nsresult rv = FindFolder(aFolderURI, aFolder);
+  NS_ENSURE_SUCCESS(rv, rv);
+  return *aFolder ? NS_OK : NS_MSG_ERROR_FOLDER_MISSING;
+}
+
+
+nsresult GetOrCreateFolder(const nsACString& aFolderURI, nsIMsgFolder **aFolder)
+{
+  NS_ENSURE_ARG_POINTER(aFolder);
+
+  *aFolder = nullptr;
+
+  nsresult rv;
+  nsCOMPtr<nsIFolderLookupService> fls(do_GetService(NSIFLS_CONTRACTID, &rv));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  rv = fls->GetOrCreateFolderForURL(aFolderURI, aFolder);
   NS_ENSURE_SUCCESS(rv, rv);
 
   return *aFolder ? NS_OK : NS_ERROR_FAILURE;
@@ -880,31 +870,24 @@ nsresult IsRFC822HeaderFieldName(const char *aHdr, bool *aResult)
 
 // Warning, currently this routine only works for the Junk Folder
 nsresult
-GetOrCreateFolder(const nsACString &aURI, nsIUrlListener *aListener)
+GetOrCreateJunkFolder(const nsACString &aURI, nsIUrlListener *aListener)
 {
   nsresult rv;
-  nsCOMPtr <nsIRDFService> rdf = do_GetService("@mozilla.org/rdf/rdf-service;1", &rv);
-  NS_ENSURE_SUCCESS(rv, rv);
 
-  // get the corresponding RDF resource
-  // RDF will create the folder resource if it doesn't already exist
-  nsCOMPtr<nsIRDFResource> resource;
-  rv = rdf->GetResource(aURI, getter_AddRefs(resource));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  nsCOMPtr<nsIMsgFolder> folderResource = do_QueryInterface(resource, &rv);
+  nsCOMPtr<nsIMsgFolder> folder;
+  rv = GetOrCreateFolder(aURI, getter_AddRefs(folder));
   NS_ENSURE_SUCCESS(rv, rv);
 
   // don't check validity of folder - caller will handle creating it
   nsCOMPtr<nsIMsgIncomingServer> server;
   // make sure that folder hierarchy is built so that legitimate parent-child relationship is established
-  rv = folderResource->GetServer(getter_AddRefs(server));
+  rv = folder->GetServer(getter_AddRefs(server));
   NS_ENSURE_SUCCESS(rv, rv);
   if (!server)
     return NS_ERROR_UNEXPECTED;
 
   nsCOMPtr <nsIMsgFolder> msgFolder;
-  rv = server->GetMsgFolderFromURI(folderResource, aURI, getter_AddRefs(msgFolder));
+  rv = server->GetMsgFolderFromURI(folder, aURI, getter_AddRefs(msgFolder));
   NS_ENSURE_SUCCESS(rv,rv);
 
   nsCOMPtr <nsIMsgFolder> parent;
@@ -1009,6 +992,7 @@ nsresult IsRSSArticle(nsIURI * aMsgURI, bool *aIsRSSArticle)
   }
 
   nsCOMPtr<nsIMsgMailNewsUrl> mailnewsUrl = do_QueryInterface(aMsgURI, &rv);
+  mozilla::Unused << mailnewsUrl;
   NS_ENSURE_SUCCESS(rv, rv);
 
   // get the folder and the server from the msghdr
@@ -1219,13 +1203,13 @@ NS_MSG_BASE nsresult NS_SetPersistentFile(const char *relPrefName,
     nsresult rv = prefBranch->SetComplexValue(absPrefName, NS_GET_IID(nsIFile), aFile);
 
     // Write the relative path.
-    nsCOMPtr<nsIRelativeFilePref> relFilePref;
-    NS_NewRelativeFilePref(aFile, nsDependentCString(NS_APP_USER_PROFILE_50_DIR), getter_AddRefs(relFilePref));
-    if (relFilePref) {
-        nsresult rv2 = prefBranch->SetComplexValue(relPrefName, NS_GET_IID(nsIRelativeFilePref), relFilePref);
-        if (NS_FAILED(rv2) && NS_SUCCEEDED(rv))
-            prefBranch->ClearUserPref(relPrefName);
-    }
+    nsCOMPtr<nsIRelativeFilePref> relFilePref = new nsRelativeFilePref();
+    mozilla::Unused << relFilePref->SetFile(aFile);
+    mozilla::Unused << relFilePref->SetRelativeToKey(NS_LITERAL_CSTRING(NS_APP_USER_PROFILE_50_DIR));
+
+    nsresult rv2 = prefBranch->SetComplexValue(relPrefName, NS_GET_IID(nsIRelativeFilePref), relFilePref);
+    if (NS_FAILED(rv2) && NS_SUCCEEDED(rv))
+        prefBranch->ClearUserPref(relPrefName);
 
     return rv;
 }
@@ -1906,10 +1890,9 @@ MsgStreamMsgHeaders(nsIInputStream *aInputStream, nsIStreamListener *aConsumer)
         do_CreateInstance("@mozilla.org/io/string-input-stream;1", &rv);
   NS_ENSURE_SUCCESS(rv, rv);
   hdrsStream->SetData(msgHeaders.get(), msgHeaders.Length());
-  nsCOMPtr<nsIInputStream> stream(do_QueryInterface(hdrsStream));
 
   nsCOMPtr<nsIInputStreamPump> pump;
-  rv = NS_NewInputStreamPump(getter_AddRefs(pump), stream.forget());
+  rv = NS_NewInputStreamPump(getter_AddRefs(pump), hdrsStream.forget());
   NS_ENSURE_SUCCESS(rv, rv);
 
   return pump->AsyncRead(aConsumer, nullptr);
@@ -1922,10 +1905,10 @@ public:
   CharsetDetectionObserver() {};
   NS_IMETHOD Notify(const char* aCharset, nsDetectionConfident aConf) override
   {
-    mCharset = aCharset;
+    mCharset.AssignASCII(aCharset);
     return NS_OK;
   };
-  const char *GetDetectedCharset() { return mCharset.get(); }
+  void GetDetectedCharset(nsACString& aCharset) { aCharset = mCharset; }
 
 private:
   virtual ~CharsetDetectionObserver() {}
@@ -1937,20 +1920,17 @@ NS_IMPL_ISUPPORTS(CharsetDetectionObserver, nsICharsetDetectionObserver)
 NS_MSG_BASE nsresult
 MsgDetectCharsetFromFile(nsIFile *aFile, nsACString &aCharset)
 {
-  // First try the universal charset detector
-  nsCOMPtr<nsICharsetDetector> detector
-    = do_CreateInstance(NS_CHARSET_DETECTOR_CONTRACTID_BASE
-                        "universal_charset_detector");
-  if (!detector) {
-    // No universal charset detector, try the default charset detector
-    nsString detectorName;
-    NS_GetLocalizedUnicharPreferenceWithDefault(nullptr, "intl.charset.detector",
-                                                EmptyString(), detectorName);
-    if (!detectorName.IsEmpty()) {
-      nsAutoCString detectorContractID;
-      detectorContractID.AssignLiteral(NS_CHARSET_DETECTOR_CONTRACTID_BASE);
-      AppendUTF16toUTF8(detectorName, detectorContractID);
-      detector = do_CreateInstance(detectorContractID.get());
+  nsCOMPtr<nsICharsetDetector> detector;
+  nsAutoCString detectorName;
+  Preferences::GetLocalizedCString("intl.charset.detector", detectorName);
+  if (!detectorName.IsEmpty()) {
+    // We recognize one of the three magic strings for the following languages.
+    if (detectorName.EqualsLiteral("ruprob")) {
+      detector = new nsRUProbDetector();
+    } else if (detectorName.EqualsLiteral("ukprob")) {
+      detector = new nsUKProbDetector();
+    } else if (detectorName.EqualsLiteral("ja_parallel_state_machine")) {
+      detector = new nsJAPSMDetector();
     }
   }
 
@@ -1983,7 +1963,7 @@ MsgDetectCharsetFromFile(nsIFile *aFile, nsACString &aCharset)
     rv = detector->Done();
     NS_ENSURE_SUCCESS(rv, rv);
 
-    aCharset = observer->GetDetectedCharset();
+    observer->GetDetectedCharset(aCharset);
   } else {
     // no charset detector available, check the BOM
     char sniffBuf[3];
@@ -2090,7 +2070,7 @@ NS_MSG_BASE nsMsgKey msgKeyFromInt(uint64_t aValue)
 nsCString MsgExtractQueryPart(const nsACString& spec, const char* queryToExtract)
 {
   nsCString queryPart;
-  int32_t queryIndex = nsPromiseFlatCString(spec).Find(queryToExtract);
+  int32_t queryIndex = PromiseFlatCString(spec).Find(queryToExtract);
   if (queryIndex == kNotFound)
     return queryPart;
 

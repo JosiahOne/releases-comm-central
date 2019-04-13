@@ -3,14 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 ChromeUtils.defineModuleGetter(this, "ChromeManifest", "resource:///modules/ChromeManifest.jsm");
-ChromeUtils.defineModuleGetter(this, "ExtensionSupport", "resource:///modules/extensionSupport.jsm");
+ChromeUtils.defineModuleGetter(this, "ExtensionSupport", "resource:///modules/ExtensionSupport.jsm");
 ChromeUtils.defineModuleGetter(this, "Overlays", "resource:///modules/Overlays.jsm");
+ChromeUtils.defineModuleGetter(this, "XPIInternal", "resource://gre/modules/addons/XPIProvider.jsm");
 
 Cu.importGlobalProperties(["fetch"]);
 
 var { ExtensionError } = ExtensionUtils;
-
-var loadedOnce = new Set();
 
 this.legacy = class extends ExtensionAPI {
   async onManifestEntry(entryName) {
@@ -20,19 +19,53 @@ this.legacy = class extends ExtensionAPI {
   }
 
   async register() {
-    if (this.extension.startupReason != "APP_STARTUP") {
-      console.log(`Legacy WebExtension ${this.extension.id} loading for other reason than startup (${this.extension.startupReason}), refusing to load immediately`);
-      return;
-    }
-
     this.extension.legacyLoaded = true;
 
-    if (loadedOnce.has(this.extension.id)) {
-      console.log(`Legacy WebExtension ${this.extension.id} has already been loaded in this run, refusing to do so again. Please restart`);
+    let state = {
+      id: this.extension.id,
+      pendingOperation: null,
+      version: this.extension.version,
+    };
+    if (ExtensionSupport.loadedLegacyExtensions.has(this.extension.id)) {
+      state = ExtensionSupport.loadedLegacyExtensions.get(this.extension.id);
+      let versionComparison = Services.vc.compare(this.extension.version, state.version);
+      if (versionComparison > 0) {
+        state.pendingOperation = "upgrade";
+        ExtensionSupport.loadedLegacyExtensions.notifyObservers(state);
+      } else if (versionComparison < 0) {
+        state.pendingOperation = "downgrade";
+        ExtensionSupport.loadedLegacyExtensions.notifyObservers(state);
+      }
+      console.log(`Legacy WebExtension ${this.extension.id} has already been loaded in this run, refusing to do so again. Please restart.`);
       return;
     }
-    loadedOnce.add(this.extension.id);
 
+    ExtensionSupport.loadedLegacyExtensions.set(this.extension.id, state);
+    if (this.extension.startupReason == "ADDON_INSTALL") {
+      // Usually, sideloaded extensions are disabled when they first appear,
+      // but for MozMill to run calendar tests, we disable this.
+      let scope = XPIInternal.XPIStates.findAddon(this.extension.id).location.scope;
+      let autoDisableScopes = Services.prefs.getIntPref("extensions.autoDisableScopes");
+
+      // If the extension was just installed from the distribution folder,
+      // it's in the profile extensions folder. We don't want to disable it.
+      let isDistroAddon = Services.prefs.getBoolPref(
+        "extensions.installedDistroAddon." + this.extension.id, false
+      );
+
+      if (!isDistroAddon && (scope & autoDisableScopes)) {
+        state.pendingOperation = "install";
+        console.log(`Legacy WebExtension ${this.extension.id} loading for other reason than startup (${this.extension.startupReason}), refusing to load immediately.`);
+        ExtensionSupport.loadedLegacyExtensions.notifyObservers(state);
+        return;
+      }
+    }
+    if (this.extension.startupReason == "ADDON_ENABLE") {
+      state.pendingOperation = "enable";
+      console.log(`Legacy WebExtension ${this.extension.id} loading for other reason than startup (${this.extension.startupReason}), refusing to load immediately.`);
+      ExtensionSupport.loadedLegacyExtensions.notifyObservers(state);
+      return;
+    }
 
     let extensionRoot;
     if (this.extension.rootURI instanceof Ci.nsIJARURI) {
@@ -60,7 +93,7 @@ this.legacy = class extends ExtensionAPI {
       platformversion: appinfo.platformVersion,
       os: appinfo.OS,
       osversion: Services.sysinfo.getProperty("version"),
-      abi: appinfo.XPCOMABI
+      abi: appinfo.XPCOMABI,
     };
     let loader = async (filename) => {
       let url = this.extension.getURL(filename);
@@ -81,9 +114,9 @@ this.legacy = class extends ExtensionAPI {
       let instance;
       try {
         if (service) {
-          instance = Components.classes[contractid.substr(8)].getService(Ci.nsIObserver);
+          instance = Cc[contractid.substr(8)].getService(Ci.nsIObserver);
         } else {
-          instance = Components.classes[contractid].createInstance(Ci.nsIObserver);
+          instance = Cc[contractid].createInstance(Ci.nsIObserver);
         }
 
         instance.observe(null, "profile-after-change", null);
@@ -92,23 +125,50 @@ this.legacy = class extends ExtensionAPI {
       }
     }
 
-    // Load overlays for each window
-    console.log("Loading legacy overlays for", this.extension.id);
-    let chromeManifestLoad = Overlays.load.bind(null, chromeManifest);
-    let targets = [...chromeManifest.overlay.keys()];
-    for (let target of targets) {
-      ExtensionSupport.registerWindowListener(this.extension.id + "-" + target, {
-        chromeURLs: [target],
-        onLoadWindow: chromeManifestLoad
-      });
+    // Add overlays to all existing windows.
+    let enumerator = Services.wm.getEnumerator("mail:3pane");
+    if (enumerator.hasMoreElements() && enumerator.getNext().document.readyState == "complete") {
+      getAllWindows().forEach(w => Overlays.load(chromeManifest, w));
     }
+
+    // Listen for new windows to overlay.
+    let documentObserver = {
+      observe(document) {
+        if (ExtensionCommon.instanceOf(document, "XULDocument")) {
+          Overlays.load(chromeManifest, document.defaultView);
+        }
+      },
+    };
+    Services.obs.addObserver(documentObserver, "chrome-document-interactive");
 
     this.extension.callOnClose({
       close: () => {
-        for (let target of targets) {
-          ExtensionSupport.unregisterWindowListener(this.extension.id + "-" + target);
-        }
-      }
+        Services.obs.removeObserver(documentObserver, "chrome-document-interactive");
+      },
     });
   }
 };
+
+function getAllWindows() {
+  function getChildDocShells(parentDocShell) {
+    let docShellEnum = parentDocShell.getDocShellEnumerator(
+      Ci.nsIDocShellTreeItem.typeAll,
+      Ci.nsIDocShell.ENUMERATE_FORWARDS
+    );
+
+    for (let docShell of docShellEnum) {
+      docShell.QueryInterface(Ci.nsIInterfaceRequestor)
+              .getInterface(Ci.nsIWebProgress);
+      domWindows.push(docShell.domWindow);
+    }
+  }
+
+  let domWindows = [];
+  for (let win of Services.ww.getWindowEnumerator()) {
+    let parentDocShell = win.QueryInterface(Ci.nsIInterfaceRequestor)
+                            .getInterface(Ci.nsIWebNavigation)
+                            .QueryInterface(Ci.nsIDocShell);
+    getChildDocShells(parentDocShell);
+  }
+  return domWindows;
+}

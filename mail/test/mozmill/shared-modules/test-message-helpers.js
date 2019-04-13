@@ -6,14 +6,14 @@
  * Helpers to deal with message (nsIMsgDBHdr) parsing.
  */
 
+"use strict";
+
 var MODULE_NAME = "message-helpers";
 
-var frame = {};
-ChromeUtils.import("chrome://mozmill/content/modules/frame.js", frame);
-var utils = {};
-ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
+var frame = ChromeUtils.import("chrome://mozmill/content/modules/frame.jsm");
+var utils = ChromeUtils.import("chrome://mozmill/content/modules/utils.jsm");
 
-ChromeUtils.import("resource:///modules/gloda/mimemsg.js");
+var {MsgHdrToMimeMessage} = ChromeUtils.import("resource:///modules/gloda/mimemsg.js");
 
 function installInto(module) {
   module.to_mime_message = to_mime_message;

@@ -6,18 +6,10 @@
 #ifndef nsMsgSMIMECID_h__
 #define nsMsgSMIMECID_h__
 
-#define NS_MSGSMIMECOMPFIELDS_CONTRACTID \
-  "@mozilla.org/messenger-smime/composefields;1"
-
-#define NS_MSGSMIMECOMPFIELDS_CID                \
-{ /* 122C919C-96B7-49a0-BBC8-0ABC67EEFFE0 */     \
- 0x122c919c, 0x96b7, 0x49a0,                     \
- { 0xbb, 0xc8, 0xa, 0xbc, 0x67, 0xee, 0xff, 0xe0 }}
-
 #define NS_MSGCOMPOSESECURE_CID                  \
-{ /* dd753201-9a23-4e08-957f-b3616bf7e012 */     \
- 0xdd753201, 0x9a23, 0x4e08,                     \
- {0x95, 0x7f, 0xb3, 0x61, 0x6b, 0xf7, 0xe0, 0x12 }}
+{ /* 54976882-7421-4286-8ecc-46373f15d7b5 */     \
+ 0x54976882, 0x7421, 0x4286,                     \
+ {0x8e, 0xcc, 0x46, 0x37, 0x3f, 0x15, 0xd7, 0xb5 }}
 
 #define NS_SMIMEJSHELPER_CONTRACTID \
   "@mozilla.org/messenger-smime/smimejshelper;1"

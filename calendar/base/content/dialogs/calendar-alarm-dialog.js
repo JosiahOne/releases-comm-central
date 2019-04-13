@@ -6,9 +6,17 @@
  *         removeWidgetFor, onSelectAlarm, ensureCalendarVisible
  */
 
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+/* import-globals-from ../calendar-item-editing.js */
+
+var { PluralForm } = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+
+addEventListener("DOMContentLoaded", () => {
+    document.getElementById("alarm-snooze-all-popup").addEventListener("snooze", (event) => {
+        snoozeAllItems(event.detail);
+    });
+});
 
 /**
  * Helper function to get the alarm service and cache it.
@@ -17,8 +25,8 @@ ChromeUtils.import("resource://gre/modules/Preferences.jsm");
  */
 function getAlarmService() {
     if (!("mAlarmService" in window)) {
-        window.mAlarmService = Components.classes["@mozilla.org/calendar/alarm-service;1"]
-                                         .getService(Components.interfaces.calIAlarmService);
+        window.mAlarmService = Cc["@mozilla.org/calendar/alarm-service;1"]
+                                 .getService(Ci.calIAlarmService);
     }
     return window.mAlarmService;
 }
@@ -124,7 +132,7 @@ function finishWindow() {
         // all/snooze all. This can happen when the closer is clicked or escape
         // is pressed. Snooze all remaining items using the default snooze
         // property.
-        let snoozePref = Preferences.get("calendar.alarms.defaultsnoozelength", 0);
+        let snoozePref = Services.prefs.getIntPref("calendar.alarms.defaultsnoozelength", 0);
         if (snoozePref <= 0) {
             snoozePref = 5;
         }
@@ -184,7 +192,7 @@ function snoozeAllItems(aDurationMinutes) {
             getAlarmService().snoozeAlarm(node.item, node.alarm, duration);
         }
     }
-    // we need to close the widget here explicitely because the dialog will stay
+    // we need to close the widget here explicitly because the dialog will stay
     // opened if there a still not snoozable alarms
     document.getElementById("alarm-snooze-all-button").firstChild.hidePopup();
 }
@@ -217,7 +225,7 @@ function getDuration(aMinutes) {
  * @returns {Boolean}
  */
 function aboveSnoozeLimit(aDuration) {
-    const LIMIT = Components.interfaces.calIAlarmService.MAX_SNOOZE_MONTHS;
+    const LIMIT = Ci.calIAlarmService.MAX_SNOOZE_MONTHS;
 
     let currentTime = cal.dtz.now().getInTimezone(cal.dtz.UTC);
     let limitTime = currentTime.clone();
@@ -409,5 +417,5 @@ function ensureCalendarVisible(aCalendar) {
     // This function is called on the alarm dialog from calendar-item-editing.js.
     // Normally, it makes sure that the calendar being edited is made visible,
     // but the alarm dialog is too far away from the calendar views that it
-    // makes sense to force visiblity for the calendar. Therefore, do nothing.
+    // makes sense to force visibility for the calendar. Therefore, do nothing.
 }

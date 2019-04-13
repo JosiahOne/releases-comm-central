@@ -2,12 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Console.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Timer.jsm");
-Cu.importGlobalProperties(["XMLHttpRequest"]);
+const {console} = ChromeUtils.import("resource://gre/modules/Console.jsm");
+const {clearInterval, clearTimeout, setInterval, setTimeout} = ChromeUtils.import("resource://gre/modules/Timer.jsm");
 
-const { Loader, Require, Module } = ChromeUtils.import("resource://devtools/shared/base-loader.js", {});
+const { Loader, Require, Module } = ChromeUtils.import("resource://devtools/shared/base-loader.js");
 
 this.EXPORTED_SYMBOLS = ["MatrixSDK"];
 
@@ -89,18 +87,18 @@ let loader = Loader({
   },
   globals: {
     global: {
-      setInterval: setInterval,
-      clearInterval: clearInterval,
-      setTimeout: setTimeout,
-      clearTimeout: clearTimeout,
+      setInterval,
+      clearInterval,
+      setTimeout,
+      clearTimeout,
     },
-    console: console,
-    XMLHttpRequest: XMLHttpRequest,
-    setTimeout: setTimeout,
-    clearTimeout: clearTimeout,
+    console,
+    XMLHttpRequest,
+    setTimeout,
+    clearTimeout,
     location: { href: "" }, // workaround for browser-request's is_crossDomain
-  }
-})
+  },
+});
 
 let requirer = Module("matrix-module", "");
 let require = Require(loader, requirer);

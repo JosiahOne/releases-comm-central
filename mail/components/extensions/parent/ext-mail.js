@@ -2,10 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+ChromeUtils.defineModuleGetter(this, "MailServices", "resource:///modules/MailServices.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+XPCOMUtils.defineLazyServiceGetter(
+  this, "uuidGenerator", "@mozilla.org/uuid-generator;1", "nsIUUIDGenerator"
+);
+
 var {
   ExtensionError,
-  defineLazyGetter,
 } = ExtensionUtils;
+
+var {
+  defineLazyGetter,
+} = ExtensionCommon;
 
 let tabTracker;
 let windowTracker;
@@ -20,8 +29,8 @@ const getSender = (extension, target, sender) => {
     // page-open listener below).
     tabId = sender.tabId;
     delete sender.tabId;
-  } else if (ExtensionUtils.instanceOf(target, "XULElement") ||
-             ExtensionUtils.instanceOf(target, "HTMLIFrameElement")) {
+  } else if (ExtensionCommon.instanceOf(target, "XULFrameElement") ||
+             ExtensionCommon.instanceOf(target, "HTMLIFrameElement")) {
     tabId = tabTracker.getBrowserData(target).tabId;
   }
 
@@ -118,6 +127,16 @@ class WindowTracker extends WindowTrackerBase {
 
   /**
    * The currently active, or topmost, mail window, or null if no mail window is currently open.
+   *
+   * @property {DOMWindow|null} topWindow
+   * @readonly
+   */
+  get topNonPBWindow() {
+    return Services.wm.getMostRecentWindow("mail:3pane");
+  }
+
+  /**
+   * The currently active, or topmost, mail window, or null if no mail window is currently open.
    * Will only return the topmost "normal" (i.e., not popup) window.
    *
    * @property {?DOMWindow} topNormalWindow
@@ -125,34 +144,18 @@ class WindowTracker extends WindowTrackerBase {
    */
   get topNormalWindow() {
     let win = null;
-    if (AppConstants.platform == "win") {
-      let windowList = Services.wm.getZOrderDOMWindowEnumerator("mail:3pane", true);
-      if (!windowList.hasMoreElements()) {
-        return null;
-      }
 
-      win = windowList.getNext();
-      while (win.document.documentElement.getAttribute("chromehidden")) {
-        if (!windowList.hasMoreElements()) {
-          return null;
-        }
+    win = Services.wm.getMostRecentWindow("mail:3pane", true);
 
-        win = windowList.getNext();
-      }
-    } else {
-      // Platforms other than Windows have a broken z-order...
-      win = Services.wm.getMostRecentWindow("mail:3pane", true);
-
-      // If we're lucky, this isn't a popup, and we can just return this.
-      if (win && win.document.documentElement.getAttribute("chromehidden")) {
-        win = null;
-        let windowList = Services.wm.getEnumerator("mail:3pane", true);
-        // This is oldest to newest, so this gets a bit ugly.
-        while (windowList.hasMoreElements()) {
-          let nextWin = windowList.getNext();
-          if (!nextWin.document.documentElement.getAttribute("chromehidden")) {
-            win = nextWin;
-          }
+    // If we're lucky, this isn't a popup, and we can just return this.
+    if (win && win.document.documentElement.getAttribute("chromehidden")) {
+      win = null;
+      let windowList = Services.wm.getEnumerator("mail:3pane", true);
+      // This is oldest to newest, so this gets a bit ugly.
+      while (windowList.hasMoreElements()) {
+        let nextWin = windowList.getNext();
+        if (!nextWin.document.documentElement.getAttribute("chromehidden")) {
+          win = nextWin;
         }
       }
     }
@@ -177,14 +180,18 @@ class WindowTracker extends WindowTrackerBase {
  *        The listener function to call when a DOM event is received.
  */
 global.WindowEventManager = class extends EventManager {
-  constructor(context, name, event, listener) {
-    super(context, name, fire => {
-      let listener2 = listener.bind(null, fire);
+  constructor({ context, name, event, listener }) {
+    super({
+      context,
+      name,
+      listener: (fire) => {
+        let listener2 = listener.bind(null, fire);
 
-      windowTracker.addListener(event, listener2);
-      return () => {
-        windowTracker.removeListener(event, listener2);
-      };
+        windowTracker.addListener(event, listener2);
+        return () => {
+          windowTracker.removeListener(event, listener2);
+        };
+      },
     });
   }
 };
@@ -420,7 +427,7 @@ class TabTracker extends TabTrackerBase {
 
     this.emit("tab-activated", {
       tabId: this.getId(nativeTabInfo),
-      windowId: windowTracker.getId(browser.ownerGlobal)
+      windowId: windowTracker.getId(browser.ownerGlobal),
     });
   }
 
@@ -488,7 +495,7 @@ class TabTracker extends TabTrackerBase {
   getBrowserData(browser) {
     return {
       tabId: this.getBrowserTabId(browser),
-      windowId: windowTracker.getId(browser.ownerGlobal)
+      windowId: windowTracker.getId(browser.ownerGlobal),
     };
   }
 
@@ -513,6 +520,51 @@ Object.assign(global, { tabTracker, windowTracker });
  * Extension-specific wrapper around a Thunderbird tab.
  */
 class Tab extends TabBase {
+  constructor(extension, nativeTab, id) {
+    if (nativeTab.localName == "tab") {
+      let tabmail = nativeTab.ownerDocument.getElementById("tabmail");
+      nativeTab = tabmail._getTabContextForTabbyThing(nativeTab)[1];
+    }
+    super(extension, nativeTab, id);
+  }
+
+  /** Returns true if this tab is a 3-pane tab. */
+  get mailTab() {
+    return this.nativeTab.mode.type == "folder";
+  }
+
+  /** Overrides the matches function to enable querying for 3-pane tabs. */
+  matches(queryInfo, context) {
+    let result = super.matches(queryInfo, context);
+    return result && (!queryInfo.mailTab || this.mailTab);
+  }
+
+  /** Adds the mailTab property and removes some useless properties from a tab object. */
+  convert(fallback) {
+    let result = super.convert(fallback);
+    result.mailTab = this.mailTab;
+
+    // These properties are not useful to Thunderbird extensions and are not returned.
+    for (let key of [
+      "attention",
+      "audible",
+      "discarded",
+      "hidden",
+      "incognito",
+      "isArticle",
+      "isInReaderMode",
+      "lastAccessed",
+      "mutedInfo",
+      "pinned",
+      "sharingState",
+      "successorTabId",
+    ]) {
+      delete result[key];
+    }
+
+    return result;
+  }
+
   /** Returns the XUL browser for the tab. */
   get browser() {
     return getTabBrowser(this.nativeTab);
@@ -626,6 +678,11 @@ class Tab extends TabBase {
     return windowTracker.getId(this.window);
   }
 
+  /** Returns the attention state of the tab. */
+  get attention() {
+    return false;
+  }
+
   /** Returns the article state of the tab. */
   get isArticle() {
     return false;
@@ -634,6 +691,11 @@ class Tab extends TabBase {
   /** Returns the reader mode state of the tab. */
   get isInReaderMode() {
     return false;
+  }
+
+  /** Returns the id of the successor tab of the tab. */
+  get successorTabId() {
+    return -1;
   }
 }
 
@@ -895,6 +957,18 @@ class TabManager extends TabManagerBase {
   }
 
   /**
+   * Determines access using extension context.
+   *
+   * @param {NativeTab} nativeTab
+   *        The tab to check access on.
+   * @returns {boolean}
+   *        True if the extension has permissions for this tab.
+   */
+  canAccessTab(nativeTab) {
+    return true;
+  }
+
+  /**
    * Returns a new Tab instance wrapping the given native tab info.
    *
    * @param {NativeTabInfo} nativeTabInfo       The native tab for which to return a wrapper.
@@ -944,9 +1018,279 @@ class WindowManager extends WindowManagerBase {
   }
 }
 
+/**
+ * The following functions turn nsIMsgFolder references into more human-friendly forms.
+ * A folder can be referenced with the account key, and the path to the folder in that account.
+ */
+
+/**
+ * Convert a folder URI to a human-friendly path.
+ * @return {String}
+ */
+function folderURIToPath(uri) {
+  let path = Services.io.newURI(uri).filePath;
+  return path.split("/").map(decodeURIComponent).join("/");
+}
+
+/**
+ * Convert a human-friendly path to a folder URI. This function does not assume that the
+ * folder referenced exists.
+ * @return {String}
+ */
+function folderPathToURI(accountId, path) {
+  let rootURI = MailServices.accounts.getAccount(accountId).incomingServer.rootFolder.URI;
+  if (path == "/") {
+    return rootURI;
+  }
+  return rootURI + path.split("/").map(encodeURIComponent).join("/");
+}
+
+const folderTypeMap = new Map([
+  [Ci.nsMsgFolderFlags.Inbox, "inbox"],
+  [Ci.nsMsgFolderFlags.Drafts, "drafts"],
+  [Ci.nsMsgFolderFlags.SentMail, "sent"],
+  [Ci.nsMsgFolderFlags.Trash, "trash"],
+  [Ci.nsMsgFolderFlags.Templates, "templates"],
+  [Ci.nsMsgFolderFlags.Archive, "archives"],
+  [Ci.nsMsgFolderFlags.Junk, "junk"],
+  [Ci.nsMsgFolderFlags.Queue, "outbox"],
+]);
+
+/**
+ * Converts an nsIMsgFolder to a simple object for use in messages.
+ * @return {Object}
+ */
+function convertFolder(folder, accountId) {
+  if (!folder) {
+    return null;
+  }
+  if (!accountId) {
+    let server = folder.server;
+    let account = MailServices.accounts.FindAccountForServer(server);
+    accountId = account.key;
+  }
+
+  let folderObject = {
+    accountId,
+    name: folder.prettyName,
+    path: folderURIToPath(folder.URI),
+  };
+
+  for (let [flag, typeName] of folderTypeMap.entries()) {
+    if (folder.flags & flag) {
+      folderObject.type = typeName;
+    }
+  }
+
+  return folderObject;
+}
+
+class FolderManager {
+  constructor(extension) {
+    this.extension = extension;
+  }
+
+  convert(folder, accountId) {
+    return convertFolder(folder, accountId);
+  }
+
+  get(accountId, path) {
+    return MailServices.folderLookup.getFolderForURL(folderPathToURI(accountId, path));
+  }
+}
+
+/**
+ * Converts an nsIMsgHdr to a simle object for use in messages.
+ * This function WILL change as the API develops.
+ * @return {Object}
+ */
+function convertMessage(msgHdr, extension) {
+  if (!msgHdr) {
+    return null;
+  }
+
+  let composeFields = Cc["@mozilla.org/messengercompose/composefields;1"]
+                        .createInstance(Ci.nsIMsgCompFields);
+
+  let messageObject = {
+    id: messageTracker.getId(msgHdr),
+    date: new Date(msgHdr.dateInSeconds * 1000),
+    author: msgHdr.mime2DecodedAuthor,
+    recipients: composeFields.splitRecipients(msgHdr.mime2DecodedRecipients, false, {}),
+    ccList: composeFields.splitRecipients(msgHdr.ccList, false, {}),
+    bccList: composeFields.splitRecipients(msgHdr.bccList, false, {}),
+    subject: msgHdr.mime2DecodedSubject,
+    read: msgHdr.isRead,
+    flagged: msgHdr.isFlagged,
+  };
+  if (extension.hasPermission("accountsRead")) {
+    messageObject.folder = convertFolder(msgHdr.folder, msgHdr.accountKey);
+  }
+  let tags = msgHdr.getProperty("keywords");
+  messageObject.tags = tags ? tags.split(" ") : [];
+  return messageObject;
+}
+
+/**
+ * A map of numeric identifiers to messages for easy reference.
+ */
+var messageTracker = {
+  _nextId: 1,
+  _messages: new Map(),
+
+  /**
+   * Finds a message in the map or adds it to the map.
+   * @return {int} The identifier of the message
+   */
+  getId(msgHdr) {
+    for (let [key, value] of this._messages.entries()) {
+      if (value.folderURI == msgHdr.folder.URI && value.messageId == msgHdr.messageId) {
+        return key;
+      }
+    }
+    let id = this._nextId++;
+    this.setId(msgHdr, id);
+    return id;
+  },
+
+  /**
+   * Retrieves a message from the map. If the message no longer exists,
+   * it is removed from the map.
+   * @return {nsIMsgHdr} The identifier of the message
+   */
+  getMessage(id) {
+    let value = this._messages.get(id);
+    if (!value) {
+      return null;
+    }
+
+    let folder = MailServices.folderLookup.getFolderForURL(value.folderURI);
+    if (folder) {
+      let msgHdr = folder.msgDatabase.getMsgHdrForMessageID(value.messageId);
+      if (msgHdr) {
+        return msgHdr;
+      }
+    }
+
+    this._messages.delete(id);
+    return null;
+  },
+
+  /**
+   * Adds a message to the map.
+   */
+  setId(msgHdr, id) {
+    this._messages.set(id, { folderURI: msgHdr.folder.URI, messageId: msgHdr.messageId });
+  },
+};
+
+/**
+ * Tracks lists of messages so that an extension can consume them in chunks.
+ * Any WebExtensions method that could return multiple messages should instead call
+ * messageListTracker.startList and return the results, which contain the first
+ * chunk. Further chunks can be fetched by the extension calling
+ * browser.messages.continueList. Chunk size is controlled by a pref.
+ */
+var messageListTracker = {
+  _contextLists: new WeakMap(),
+
+  /**
+   * Takes an array or enumerator of messages and returns the first chunk.
+   * @returns {Object}
+   */
+  startList(messageList, extension) {
+    if (Array.isArray(messageList)) {
+      messageList = this._createEnumerator(messageList);
+    }
+    let firstPage = this._getNextPage(messageList);
+    let messageListId = null;
+    if (messageList.hasMoreElements()) {
+      messageListId = uuidGenerator.generateUUID().number.substring(1, 37);
+      let lists = this._contextLists.get(extension);
+      if (!lists) {
+        lists = new Map();
+        this._contextLists.set(extension, lists);
+      }
+      lists.set(messageListId, messageList);
+    }
+
+    return {
+      id: messageListId,
+      messages: firstPage.map(message => convertMessage(message, extension)),
+    };
+  },
+
+  /**
+   * Returns any subsequent chunk of messages.
+   * @returns {Object}
+   */
+  continueList(messageListId, extension) {
+    let lists = this._contextLists.get(extension);
+    let messageList = lists ? lists.get(messageListId, null) : null;
+    if (!messageList) {
+      throw new ExtensionError(
+        `No message list for id ${messageListId}. Have you reached the end of a list?`
+      );
+    }
+
+    let nextPage = this._getNextPage(messageList);
+    if (!messageList.hasMoreElements()) {
+      lists.delete(messageListId);
+      messageListId = null;
+    }
+    return {
+      id: messageListId,
+      messages: nextPage.map(message => convertMessage(message, extension)),
+    };
+  },
+
+  _createEnumerator(array) {
+    let current = 0;
+    return {
+      hasMoreElements() {
+        return current < array.length;
+      },
+      getNext() {
+        return array[current++];
+      },
+    };
+  },
+
+  _getNextPage(messageList) {
+    let messageCount = Services.prefs.getIntPref("extensions.webextensions.messagesPerPage", 100);
+    let page = [];
+    for (let i = 0; i < messageCount && messageList.hasMoreElements(); i++) {
+      page.push(messageList.getNext().QueryInterface(Ci.nsIMsgDBHdr));
+    }
+    return page;
+  },
+};
+
+class MessageManager {
+  constructor(extension) {
+    this.extension = extension;
+  }
+
+  convert(msgHdr) {
+    return convertMessage(msgHdr, this.extension);
+  }
+
+  get(id) {
+    return messageTracker.getMessage(id);
+  }
+
+  startMessageList(messageList) {
+    return messageListTracker.startList(messageList, this.extension);
+  }
+}
+
 extensions.on("startup", (type, extension) => { // eslint-disable-line mozilla/balanced-listeners
-  defineLazyGetter(extension, "tabManager",
-                   () => new TabManager(extension));
-  defineLazyGetter(extension, "windowManager",
-                   () => new WindowManager(extension));
+  if (extension.hasPermission("accountsRead")) {
+    defineLazyGetter(extension, "folderManager", () => new FolderManager(extension));
+  }
+  if (extension.hasPermission("messagesRead")) {
+    defineLazyGetter(extension, "messageManager", () => new MessageManager(extension));
+  }
+  defineLazyGetter(extension, "tabManager", () => new TabManager(extension));
+  defineLazyGetter(extension, "windowManager", () => new WindowManager(extension));
 });

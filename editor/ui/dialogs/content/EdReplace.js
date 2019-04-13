@@ -4,13 +4,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+
 var gReplaceDialog;      // Quick access to document/form elements.
 var gFindInst;           // nsIWebBrowserFind that we're going to use
 var gFindService;        // Global service which remembers find params
 var gEditor;             // the editor we're using
 
-function initDialogObject()
-{
+document.addEventListener("dialogaccept", (event) => {
+  onFindNext();
+  event.preventDefault();
+});
+
+function initDialogObject() {
   // Create gReplaceDialog object and initialize.
   gReplaceDialog = {};
   gReplaceDialog.findInput       = document.getElementById("dialog.findInput");
@@ -24,8 +31,7 @@ function initDialogObject()
   gReplaceDialog.replaceAll      = document.getElementById("replaceAll");
 }
 
-function loadDialog()
-{
+function loadDialog() {
   // Set initial dialog field contents.
   // Set initial dialog field contents. Use the gFindInst attributes first,
   // this is necessary for window.find()
@@ -46,15 +52,13 @@ function loadDialog()
   doEnabling();
 }
 
-function onLoad()
-{
+function onLoad() {
   // Get the xul <editor> element:
   var editorElement = window.arguments[0];
 
   // If we don't get the editor, then we won't allow replacing.
   gEditor = editorElement.getEditor(editorElement.contentWindow);
-  if (!gEditor)
-  {
+  if (!gEditor) {
     window.close();
     return;
   }
@@ -66,13 +70,16 @@ function onLoad()
   // get the find service, which stores global find state
     gFindService = Cc["@mozilla.org/find/find_service;1"]
                          .getService(Ci.nsIFindService);
-  } catch(e) { dump("No find service!\n"); gFindService = 0; }
+  } catch (e) {
+    dump("No find service!\n");
+    gFindService = 0;
+  }
 
   // Init gReplaceDialog.
   initDialogObject();
 
   // Change "OK" to "Find".
-  //dialog.find.label = document.getElementById("fBLT").getAttribute("label");
+  // dialog.find.label = document.getElementById("fBLT").getAttribute("label");
 
   // Fill dialog.
   loadDialog();
@@ -83,16 +90,9 @@ function onLoad()
     gReplaceDialog.findInput.focus();
 }
 
-function onUnload() {
-  // Disconnect context from this dialog.
-  gFindReplaceData.replaceDialog = null;
-}
-
-function saveFindData()
-{
+function saveFindData() {
   // Set data attributes per user input.
-  if (gFindService)
-  {
+  if (gFindService) {
     gFindService.searchString  = gReplaceDialog.findInput.value;
     gFindService.matchCase     = gReplaceDialog.caseSensitive.checked;
     gFindService.wrapFind      = gReplaceDialog.wrap.checked;
@@ -100,16 +100,14 @@ function saveFindData()
   }
 }
 
-function setUpFindInst()
-{
+function setUpFindInst() {
   gFindInst.searchString  = gReplaceDialog.findInput.value;
   gFindInst.matchCase     = gReplaceDialog.caseSensitive.checked;
   gFindInst.wrapFind      = gReplaceDialog.wrap.checked;
   gFindInst.findBackwards = gReplaceDialog.searchBackwards.checked;
 }
 
-function onFindNext()
-{
+function onFindNext() {
   // Transfer dialog contents to the find service.
   saveFindData();
   // set up the find instance
@@ -118,8 +116,7 @@ function onFindNext()
   // Search.
   var result = gFindInst.findNext();
 
-  if (!result)
-  {
+  if (!result) {
     var bundle = document.getElementById("findBundle");
     Services.prompt.alert(window, GetString("Alert"), bundle.getString("notFoundWarning"));
     SetTextboxFocus(gReplaceDialog.findInput);
@@ -130,8 +127,7 @@ function onFindNext()
   return true;
 }
 
-function onReplace()
-{
+function onReplace() {
   if (!gEditor)
     return false;
 
@@ -140,8 +136,7 @@ function onReplace()
 
   var selStr = selection.toString();
   var specStr = gReplaceDialog.findInput.value;
-  if (!gReplaceDialog.caseSensitive.checked)
-  {
+  if (!gReplaceDialog.caseSensitive.checked) {
     selStr = selStr.toLowerCase();
     specStr = specStr.toLowerCase();
   }
@@ -151,28 +146,21 @@ function onReplace()
   var matches = true;
   var specLen = specStr.length;
   var selLen = selStr.length;
-  if (selLen < specLen)
+  if (selLen < specLen) {
     matches = false;
-  else
-  {
+  } else {
     var specArray = specStr.match(/\S+|\s+/g);
     var selArray = selStr.match(/\S+|\s+/g);
-    if ( specArray.length != selArray.length)
+    if (specArray.length != selArray.length) {
       matches = false;
-    else
-    {
-      for (var i=0; i<selArray.length; i++)
-      {
-        if (selArray[i] != specArray[i])
-        {
-          if ( /\S/.test(selArray[i][0]) || /\S/.test(specArray[i][0]) )
-          {
+    } else {
+      for (var i = 0; i < selArray.length; i++) {
+        if (selArray[i] != specArray[i]) {
+          if (/\S/.test(selArray[i][0]) || /\S/.test(specArray[i][0])) {
             // not a space chunk -- match fails
             matches = false;
             break;
-          }
-          else if ( selArray[i].length < specArray[i].length )
-          {
+          } else if (selArray[i].length < specArray[i].length) {
             // if it's a space chunk then we only care that sel be
             // at least as long as spec
             matches = false;
@@ -196,8 +184,7 @@ function onReplace()
   // For reverse finds, need to remember the caret position
   // before current selection
   var newRange;
-  if (gReplaceDialog.searchBackwards.checked && selection.rangeCount > 0)
-  {
+  if (gReplaceDialog.searchBackwards.checked && selection.rangeCount > 0) {
     newRange = selection.getRangeAt(0).cloneRange();
     newRange.collapse(true);
   }
@@ -211,8 +198,7 @@ function onReplace()
     gEditor.insertText(replStr);
 
   // For reverse finds, need to move caret just before the replaced text
-  if (gReplaceDialog.searchBackwards.checked && newRange)
-  {
+  if (gReplaceDialog.searchBackwards.checked && newRange) {
     gEditor.selection.removeAllRanges();
     gEditor.selection.addRange(newRange);
   }
@@ -220,8 +206,7 @@ function onReplace()
   return true;
 }
 
-function onReplaceAll()
-{
+function onReplaceAll() {
   if (!gEditor)
     return;
 
@@ -258,13 +243,10 @@ function onReplaceAll()
     // And start and end points:
     var endPt = gEditor.document.createRange();
 
-    if (gReplaceDialog.searchBackwards.checked)
-    {
+    if (gReplaceDialog.searchBackwards.checked) {
       endPt.setStart(wholeDocRange.startContainer, wholeDocRange.startOffset);
       endPt.setEnd(wholeDocRange.startContainer, wholeDocRange.startOffset);
-    }
-    else
-    {
+    } else {
       endPt.setStart(wholeDocRange.endContainer, wholeDocRange.endOffset);
       endPt.setEnd(wholeDocRange.endContainer, wholeDocRange.endOffset);
     }
@@ -273,16 +255,14 @@ function onReplaceAll()
     var foundRange;
     var searchRange = wholeDocRange.cloneRange();
     while ((foundRange = finder.Find(findStr, searchRange,
-                                     selecRange, endPt)) != null)
-    {
+                                     selecRange, endPt)) != null) {
       gEditor.selection.removeAllRanges();
       gEditor.selection.addRange(foundRange);
 
       // The editor will leave the caret at the end of the replaced text.
       // For reverse finds, we need it at the beginning,
       // so save the next position now.
-      if (gReplaceDialog.searchBackwards.checked)
-      {
+      if (gReplaceDialog.searchBackwards.checked) {
         selecRange = foundRange.cloneRange();
         selecRange.setEnd(selecRange.startContainer, selecRange.startOffset);
       }
@@ -295,8 +275,7 @@ function onReplaceAll()
         gEditor.insertText(repStr);
 
       // If we're going forward, we didn't save selecRange before, so do it now:
-      if (!gReplaceDialog.searchBackwards.checked)
-      {
+      if (!gReplaceDialog.searchBackwards.checked) {
         selection = gEditor.selection;
         if (selection.rangeCount <= 0) {
           gEditor.endTransaction();
@@ -313,16 +292,13 @@ function onReplaceAll()
     }
 
     // If wrapping, find from start/end of document back to start point.
-    if (gReplaceDialog.searchBackwards.checked)
-    {
+    if (gReplaceDialog.searchBackwards.checked) {
       // Collapse origRange to end
       origRange.setStart(origRange.endContainer, origRange.endOffset);
       // Set current position to document end
       selecRange.setEnd(wholeDocRange.endContainer, wholeDocRange.endOffset);
       selecRange.setStart(wholeDocRange.endContainer, wholeDocRange.endOffset);
-    }
-    else
-    {
+    } else {
       // Collapse origRange to start
       origRange.setEnd(origRange.startContainer, origRange.startOffset);
       // Set current position to document start
@@ -332,14 +308,12 @@ function onReplaceAll()
     }
 
     while ((foundRange = finder.Find(findStr, wholeDocRange,
-                                     selecRange, origRange)) != null)
-    {
+                                     selecRange, origRange)) != null) {
       gEditor.selection.removeAllRanges();
       gEditor.selection.addRange(foundRange);
 
       // Save insert point for backward case
-      if (gReplaceDialog.searchBackwards.checked)
-      {
+      if (gReplaceDialog.searchBackwards.checked) {
         selecRange = foundRange.cloneRange();
         selecRange.setEnd(selecRange.startContainer, selecRange.startOffset);
       }
@@ -352,8 +326,7 @@ function onReplaceAll()
         gEditor.insertText(repStr);
 
       // Get insert point for forward case
-      if (!gReplaceDialog.searchBackwards.checked)
-      {
+      if (!gReplaceDialog.searchBackwards.checked) {
         selection = gEditor.selection;
         if (selection.rangeCount <= 0) {
           gEditor.endTransaction();
@@ -362,16 +335,13 @@ function onReplaceAll()
         selecRange = selection.getRangeAt(0);
       }
     }
-  } // end try
-  catch (e) { }
+  } catch (e) {}
 
   gEditor.endTransaction();
 }
 
-function doEnabling()
-{
+function doEnabling() {
   var findStr = gReplaceDialog.findInput.value;
-  var repStr = gReplaceDialog.replaceInput.value;
   gReplaceDialog.enabled = findStr;
   gReplaceDialog.findNext.disabled = !findStr;
   gReplaceDialog.replace.disabled = !findStr;

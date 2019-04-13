@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "cal", "resource://calendar/modules/calUtils.jsm", "cal");
 
@@ -14,34 +14,6 @@ XPCOMUtils.defineLazyModuleGetter(this, "cal", "resource://calendar/modules/calU
 // including calUtils.jsm under the cal.data namespace.
 
 this.EXPORTED_SYMBOLS = ["caldata"]; /* exported caldata */
-
-class PropertyMap extends Map {
-    get simpleEnumerator() {
-        let entries = [...this.entries()].filter(([key, value]) => value !== undefined);
-        let index = 0;
-
-        return {
-            QueryInterface: ChromeUtils.generateQI([Ci.nsISimpleEnumerator]),
-
-            hasMoreElements: function() {
-                return index < entries.length;
-            },
-
-            getNext: function() {
-                if (!this.hasMoreElements()) {
-                    throw Components.results.NS_ERROR_UNEXPECTED;
-                }
-
-                let [name, value] = entries[index++];
-                return {
-                    QueryInterface: ChromeUtils.generateQI([Ci.nsIProperty]),
-                    name: name,
-                    value: value
-                };
-            }
-        };
-    }
-}
 
 class ListenerSet extends Set {
     constructor(iid, iterable) {
@@ -68,7 +40,7 @@ class ListenerSet extends Set {
                 observer[func](...args);
             } catch (exc) {
                 let stack = exc.stack || (exc.location ? exc.location.formattedStack : null);
-                Components.utils.reportError(exc + "\nSTACK: " + stack);
+                Cu.reportError(exc + "\nSTACK: " + stack);
             }
         }
     }
@@ -133,7 +105,7 @@ class OperationGroup {
 
         this.mCancelFunc = aCancelFunc;
         this.mSubOperations = [];
-        this.mStatus = Components.results.NS_OK;
+        this.mStatus = Cr.NS_OK;
     }
 
     get id() { return this.mId; }
@@ -163,7 +135,7 @@ class OperationGroup {
         }
     }
 
-    cancel(aStatus=Components.interfaces.calIErrors.OPERATION_CANCELLED) {
+    cancel(aStatus=Ci.calIErrors.OPERATION_CANCELLED) {
         if (this.isPending) {
             this.notifyCompleted(aStatus);
             let cancelFunc = this.mCancelFunc;
@@ -174,7 +146,7 @@ class OperationGroup {
             let subOperations = this.mSubOperations;
             this.mSubOperations = [];
             for (let operation of subOperations) {
-                operation.cancel(Components.interfaces.calIErrors.OPERATION_CANCELLED);
+                operation.cancel(Ci.calIErrors.OPERATION_CANCELLED);
             }
         }
     }
@@ -187,7 +159,6 @@ class OperationGroup {
 var caldata = {
     ListenerSet: ListenerSet,
     ObserverSet: ObserverSet,
-    PropertyMap: PropertyMap,
     OperationGroup: OperationGroup,
 
     /**
@@ -202,7 +173,7 @@ var caldata = {
      *
      * @param itemArray             The array to search.
      * @param newItem               The item to search in the array.
-     * @param comptor               A comparation function that can compare two items.
+     * @param comptor               A comparison function that can compare two items.
      * @return                      The index of the new item.
      */
     binarySearch: function(itemArray, newItem, comptor) {
@@ -274,7 +245,7 @@ var caldata = {
      *
      * @param itemArray             The array to insert into.
      * @param item                  The item to insert into the array.
-     * @param comptor               A comparation function that can compare two items.
+     * @param comptor               A comparison function that can compare two items.
      * @param discardDuplicates     Use the comptor function to check if the item in
      *                                question is already in the array. If so, the
      *                                new item is not inserted.
@@ -312,15 +283,15 @@ var caldata = {
         //           XPCOM (like COM, like UNO, ...) defines that QueryInterface *only* needs to return
         //           the very same pointer for nsISupports during its lifetime.
         if (!aIID) {
-            aIID = Components.interfaces.nsISupports;
+            aIID = Ci.nsISupports;
         }
-        let sip1 = Components.classes["@mozilla.org/supports-interface-pointer;1"]
-                             .createInstance(Components.interfaces.nsISupportsInterfacePointer);
+        let sip1 = Cc["@mozilla.org/supports-interface-pointer;1"]
+                     .createInstance(Ci.nsISupportsInterfacePointer);
         sip1.data = aObject;
         sip1.dataIID = aIID;
 
-        let sip2 = Components.classes["@mozilla.org/supports-interface-pointer;1"]
-                             .createInstance(Components.interfaces.nsISupportsInterfacePointer);
+        let sip2 = Cc["@mozilla.org/supports-interface-pointer;1"]
+                     .createInstance(Ci.nsISupportsInterfacePointer);
         sip2.data = aOtherObject;
         sip2.dataIID = aIID;
         return sip1.data == sip2.data;

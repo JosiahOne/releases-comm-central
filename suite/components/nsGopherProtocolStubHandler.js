@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 /* This is a simple module which can be used as a template for any newly
    unsupported protocol. In this case, it redirects gopher:// protocol
@@ -51,11 +51,11 @@ GopherProtocol.prototype = {
     var newURI = ios.newURI("chrome://communicator/content/gopherAddon.xhtml");
     // Create a chrome channel, and de-chrome it, to our information page.
     var chan = loadinfo ? ios.newChannelFromURIWithLoadInfo(newURI, loadinfo) :
-                          ios.newChannelFromURI2(newURI, null,
-                                                 Services.scriptSecurityManager.getSystemPrincipal(),
-                                                 null,
-                                                 Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                                 Ci.nsIContentPolicy.TYPE_OTHER);
+                          ios.newChannelFromURI(newURI, null,
+                                                Services.scriptSecurityManager.getSystemPrincipal(),
+                                                null,
+                                                Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                                Ci.nsIContentPolicy.TYPE_OTHER);
     chan.originalURI = inputURI;
     chan.owner = Cc["@mozilla.org/scriptsecuritymanager;1"]
                    .getService(Ci.nsIScriptSecurityManager)

@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-
 function run_test() {
     do_calendar_startup(really_run_test);
 }
@@ -164,7 +162,7 @@ function test_alarm() {
     let alarm = cal.createAlarm();
 
     alarm.action = "DISPLAY";
-    alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE;
+    alarm.related = Ci.calIAlarm.ALARM_RELATED_ABSOLUTE;
     alarm.alarmDate = cal.createDateTime();
 
     e.addAlarm(alarm);

@@ -2,9 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../../base/content/dialogs/calendar-event-dialog-reminder.js */
+
 (function() {
     const FOUR_WEEKS_BEFORE = -2419200;
-    ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
+    const { cal } = ChromeUtils.import("resource://gdata-provider/modules/calUtilsShim.jsm");
+    const {
+        monkeyPatch,
+        getProviderString,
+    } = ChromeUtils.import("resource://gdata-provider/modules/gdataUtils.jsm");
 
     // NOTE: This function exits early if its not a gdata calendar
     let item = window.arguments[0].item;
@@ -14,24 +20,13 @@
     }
 
     let label = getProviderString("reminderOutOfRange");
-    let notification = createXULElement("notification");
+    let notification = document.createXULElement("xbl-notification");
     notification.setAttribute("label", label);
     notification.setAttribute("type", "critical");
     notification.setAttribute("hideclose", "true");
 
-    function calculateAlarmOffset(alarmitem, reminder) {
-        let offset = cal.alarms.calculateAlarmOffset(alarmitem, reminder);
-        // bug 1196455: The offset calcuated for absolute alarms is flipped
-        if (Services.vc.compare(Services.appinfo.platformVersion, "43.0") < 0) {
-            if (reminder.related == reminder.ALARM_RELATED_ABSOLUTE) {
-                offset.isNegative = !offset.isNegative;
-            }
-        }
-        return offset;
-    }
-
     function checkReminderRange(reminder) {
-        let offset = calculateAlarmOffset(item, reminder);
+        let offset = cal.alarms.calculateAlarmOffset(item, reminder);
         let seconds = offset.inSeconds;
         return (seconds < 1 && seconds >= FOUR_WEEKS_BEFORE);
     }
@@ -76,7 +71,7 @@
      * and Government. hide the menuitem if SMS reminders are not supported
      */
     function hideSMSReminders() {
-        if (!Preferences.get("calendar.google.enableSMSReminders", false)) {
+        if (!Services.prefs.getBoolPref("calendar.google.enableSMSReminders", false)) {
             document.getElementById("reminder-action-SMS").hidden = true;
         }
     }

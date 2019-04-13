@@ -2,15 +2,16 @@
 <!-- This Source Code Form is subject to the terms of the Mozilla Public
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+#ifdef MOZ_THUNDERBIRD
+<?xml-stylesheet href="chrome://messenger/skin/" type="text/css"?>
+#else
 <?xml-stylesheet href="chrome://communicator/skin/" type="text/css"?>
+#endif
 
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/CustomHeaders.dtd">
 <dialog id="customHeadersDialog"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="onLoad();"
-        ondialogaccept="return onOk();"
-        ondialogextra1="onAddHeader();"
-        ondialogextra2="onRemoveHeader();"
         style="width: 30em; height: 25em;"
         persist="width height screenX screenY"
         title="&window.title;"
@@ -38,7 +39,10 @@
 
       <row flex="1">
         <vbox>
-          <listbox id="headerList" flex="1" onselect="updateRemoveButton();" />
+          <richlistbox id="headerList"
+                       class="theme-listbox"
+                       flex="1"
+                       onselect="updateRemoveButton();" />
         </vbox>
 
         <vbox>

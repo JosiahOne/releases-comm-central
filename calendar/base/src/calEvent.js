@@ -2,8 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from calItemModule.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 //
 // constructor
@@ -19,16 +20,16 @@ function calEvent() {
 }
 var calEventClassID = Components.ID("{974339d5-ab86-4491-aaaf-2b2ca177c12b}");
 var calEventInterfaces = [
-    Components.interfaces.calIItemBase,
-    Components.interfaces.calIEvent,
-    Components.interfaces.calIInternalShallowCopy
+    Ci.calIItemBase,
+    Ci.calIEvent,
+    Ci.calIInternalShallowCopy
 ];
 calEvent.prototype = {
     __proto__: calItemBase.prototype,
 
     classID: calEventClassID,
     QueryInterface: cal.generateQI(calEventInterfaces),
-    classInfo: XPCOMUtils.generateCI({
+    classInfo: cal.generateCI({
         classID: calEventClassID,
         contractID: "@mozilla.org/calendar/event;1",
         classDescription: "Calendar Event",
@@ -97,21 +98,18 @@ calEvent.prototype = {
         this.fillIcalComponentFromBase(icalcomp);
         this.mapPropsToICS(icalcomp, this.icsEventPropMap);
 
-        let bagenum = this.propertyEnumerator;
-        while (bagenum.hasMoreElements()) {
-            let iprop = bagenum.getNext()
-                               .QueryInterface(Components.interfaces.nsIProperty);
+        for (let [name, value] of this.properties) {
             try {
-                if (!this.eventPromotedProps[iprop.name]) {
-                    let icalprop = icssvc.createIcalProperty(iprop.name);
-                    icalprop.value = iprop.value;
-                    let propBucket = this.mPropertyParams[iprop.name];
+                if (!this.eventPromotedProps[name]) {
+                    let icalprop = icssvc.createIcalProperty(name);
+                    icalprop.value = value;
+                    let propBucket = this.mPropertyParams[name];
                     if (propBucket) {
                         for (let paramName in propBucket) {
                             try {
                                 icalprop.setParameter(paramName, propBucket[paramName]);
                             } catch (e) {
-                                if (e.result == Components.results.NS_ERROR_ILLEGAL_VALUE) {
+                                if (e.result == Cr.NS_ERROR_ILLEGAL_VALUE) {
                                     // Illegal values should be ignored, but we could log them if
                                     // the user has enabled logging.
                                     cal.LOG("Warning: Invalid event parameter value " + paramName + "=" + propBucket[paramName]);
@@ -124,7 +122,7 @@ calEvent.prototype = {
                     icalcomp.addProperty(icalprop);
                 }
             } catch (e) {
-                cal.ERROR("failed to set " + iprop.name + " to " + iprop.value + ": " + e + "\n");
+                cal.ERROR("failed to set " + name + " to " + value + ": " + e + "\n");
             }
         }
         return icalcomp;
@@ -137,7 +135,7 @@ calEvent.prototype = {
         if (event.componentType != "VEVENT") {
             event = event.getFirstSubcomponent("VEVENT");
             if (!event) {
-                throw Components.results.NS_ERROR_INVALID_ARG;
+                throw Cr.NS_ERROR_INVALID_ARG;
             }
         }
 

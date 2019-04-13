@@ -2,11 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+@namespace url("http://www.w3.org/1999/xhtml");
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 
 /* The defaults are WAY to big! */
 groupbox {
-  margin:         2px 5px /* 4px 5px */;
+  margin:         2px 5px;
   padding-top:    2px;
   padding-bottom: 4px;
 }
@@ -80,8 +81,11 @@ groupbox {
   color: white;
 }
 
-#ColorPicker {
+*|*#ColorPicker {
   -moz-user-focus: normal;
+  margin: 1px 5px 2px;
+  padding: 3px;
+  height: 28px;
 }
 
 #ColorPickerSwatch {
@@ -306,4 +310,17 @@ tree.list {
 
 .progressitem[progress="failed"] {
   list-style-image: url("chrome://editor/skin/icons/progress-failed.gif");
+}
+
+/* ::::: groupbox ::::: */
+
+groupbox {
+  -moz-appearance: groupbox;
+  margin: 5px;
+  padding: 5px;
+}
+
+caption {
+  margin-bottom: 2px;
+  font-weight: bold;
 }

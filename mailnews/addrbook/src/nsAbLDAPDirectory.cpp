@@ -34,6 +34,7 @@
 #include "nsMsgBaseCID.h"
 #include "nsMsgUtils.h"
 #include "mozilla/Services.h"
+#include "nsIWeakReference.h"
 
 #define kDefaultMaxHits 100
 
@@ -305,9 +306,6 @@ NS_IMETHODIMP nsAbLDAPDirectory::StartSearch ()
     // TypeSpecificArgument
     nsCOMPtr<nsIAbLDAPAttributeMap> attrMap;
     rv = GetAttributeMap(getter_AddRefs(attrMap));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    nsCOMPtr<nsISupports> typeSpecificArg = do_QueryInterface(attrMap, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = arguments->SetTypeSpecificArg(attrMap);

@@ -41,7 +41,7 @@ class nsMsgSearchBoolExpression
 public:
 
   // create a leaf node expression
-  nsMsgSearchBoolExpression(nsIMsgSearchTerm * aNewTerm,
+  explicit nsMsgSearchBoolExpression(nsIMsgSearchTerm * aNewTerm,
                               char * aEncodingString = NULL);
 
   // create a non-leaf node expression containing 2 expressions
@@ -65,8 +65,7 @@ public:
     // determine if the end result is true or false.
   bool OfflineEvaluate(nsIMsgDBHdr *msgToMatch,
           const char *defaultCharset, nsIMsgSearchScopeTerm *scope,
-          nsIMsgDatabase *db, const char *headers, uint32_t headerSize,
-          bool Filtering);
+          nsIMsgDatabase *db, const nsACString& headers, bool Filtering);
 
     // assuming the expression is for online
     // searches, determine the length of the

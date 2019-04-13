@@ -10,12 +10,7 @@
 #include "nsIImapUrl.h"
 #include "nsCOMPtr.h"
 #include "nsMsgMailNewsUrl.h"
-#include "nsIImapMockChannel.h" // for the mockChannel attribute from .idl
-#include "nsIImapMailFolderSink.h" // for the imapMailFolderSink attribute from .idl
-#include "nsIImapServerSink.h" // for the imapServerSink attribute from .idl
-#include "nsIImapMessageSink.h" // for the imapMessageSink attribute from .idl
-
-#include "nsWeakPtr.h"
+#include "nsIWeakReferenceUtils.h"
 #include "nsIFile.h"
 #include "mozilla/Mutex.h"
 
@@ -25,12 +20,10 @@ public:
 
   NS_DECL_ISUPPORTS_INHERITED
 
-  // nsIMsgMailNewsUrl override
+  // nsMsgMailNewsUrl overrides
   nsresult SetSpecInternal(const nsACString &aSpec) override;
   nsresult SetQuery(const nsACString &aQuery) override;
-  // nsIURI override
-  NS_IMETHOD CloneInternal(uint32_t aRefHandlingMode,
-                           const nsACString& newRef, nsIURI **_retval) override;
+  nsresult Clone(nsIURI **_retval) override;
 
   //////////////////////////////////////////////////////////////////////////////
   // we support the nsIImapUrl interface

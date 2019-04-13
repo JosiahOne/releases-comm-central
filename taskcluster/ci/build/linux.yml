@@ -13,7 +13,7 @@ linux64/opt:
     run:
         using: mozharness
         comm-checkout: true
-        actions: [build check-test update]
+        actions: [build, check-test]
         config-paths:
             - comm/mozharness
         config:
@@ -22,8 +22,11 @@ linux64/opt:
         script: "mozharness/scripts/fx_desktop_build.py"
         need-xvfb: true
     toolchains:
+        - linux64-binutils
+        - linux64-cbindgen
         - linux64-clang
-        - linux64-gcc
+        - linux64-nasm
+        - linux64-node
         - linux64-rust
         - linux64-sccache
 
@@ -31,6 +34,7 @@ linux64-nightly/opt:
     description: "Linux64 Nightly"
     attributes:
         nightly: true
+        enable-full-crashsymbols: true
     shipping-phase: build
     shipping-product: thunderbird
     index:
@@ -47,7 +51,7 @@ linux64-nightly/opt:
     run:
         using: mozharness
         comm-checkout: true
-        actions: [build check-test update]
+        actions: [build, check-test]
         config-paths:
             - comm/mozharness
         config:
@@ -57,8 +61,11 @@ linux64-nightly/opt:
         script: "mozharness/scripts/fx_desktop_build.py"
         need-xvfb: true
     toolchains:
+        - linux64-binutils
+        - linux64-cbindgen
         - linux64-clang
-        - linux64-gcc
+        - linux64-nasm
+        - linux64-node
         - linux64-rust
 
 linux64/debug:
@@ -76,7 +83,7 @@ linux64/debug:
     run:
         using: mozharness
         comm-checkout: true
-        actions: [build check-test update]
+        actions: [build, check-test]
         config-paths:
             - comm/mozharness
         config:
@@ -84,12 +91,16 @@ linux64/debug:
             - builds/releng_base_linux_64_builds.py
         script: "mozharness/scripts/fx_desktop_build.py"
         custom-build-variant-cfg: debug
+        mozconfig-variant: debug
         need-xvfb: true
     toolchains:
+        - linux64-binutils
+        - linux64-cbindgen
         - linux64-clang
-        - linux64-gcc
-        - linux64-sccache
+        - linux64-nasm
+        - linux64-node
         - linux64-rust
+        - linux64-sccache
 
 linux/opt:
     description: "Linux32 Opt"
@@ -106,7 +117,7 @@ linux/opt:
     run:
         using: mozharness
         comm-checkout: true
-        actions: [build check-test update]
+        actions: [build, check-test]
         config-paths:
             - comm/mozharness
         config:
@@ -115,8 +126,11 @@ linux/opt:
         script: "mozharness/scripts/fx_desktop_build.py"
         need-xvfb: true
     toolchains:
+        - linux64-binutils
+        - linux64-cbindgen
         - linux64-clang
-        - linux64-gcc
+        - linux64-nasm
+        - linux64-node
         - linux64-rust
         - linux64-sccache
 
@@ -124,6 +138,7 @@ linux-nightly/opt:
     description: "Linux32 Nightly"
     attributes:
         nightly: true
+        enable-full-crashsymbols: true
     shipping-phase: build
     shipping-product: thunderbird
     index:
@@ -140,7 +155,7 @@ linux-nightly/opt:
     run:
         using: mozharness
         comm-checkout: true
-        actions: [build check-test update]
+        actions: [build, check-test]
         config-paths:
             - comm/mozharness
         config:
@@ -150,8 +165,11 @@ linux-nightly/opt:
         script: "mozharness/scripts/fx_desktop_build.py"
         need-xvfb: true
     toolchains:
+        - linux64-binutils
+        - linux64-cbindgen
         - linux64-clang
-        - linux64-gcc
+        - linux64-nasm
+        - linux64-node
         - linux64-rust
 
 linux/debug:
@@ -169,7 +187,7 @@ linux/debug:
     run:
         using: mozharness
         comm-checkout: true
-        actions: [build check-test update]
+        actions: [build, check-test]
         config-paths:
             - comm/mozharness
         config:
@@ -177,9 +195,13 @@ linux/debug:
             - builds/releng_base_linux_32_builds.py
         script: "mozharness/scripts/fx_desktop_build.py"
         custom-build-variant-cfg: debug
+        mozconfig-variant: debug
         need-xvfb: true
     toolchains:
+        - linux64-binutils
+        - linux64-cbindgen
         - linux64-clang
-        - linux64-gcc
-        - linux64-sccache
+        - linux64-nasm
+        - linux64-node
         - linux64-rust
+        - linux64-sccache

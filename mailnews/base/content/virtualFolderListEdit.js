@@ -2,17 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+
 var gSelectVirtual = {
   _treeElement: null,
   _selectedList: new Set(),
 
   load: function() {
-    let folderLookup = Cc["@mozilla.org/mail/folder-lookup;1"]
-                         .getService(Ci.nsIFolderLookupService);
     if (window.arguments[0].searchFolderURIs) {
       let srchFolderUriArray = window.arguments[0].searchFolderURIs.split('|');
       for (let uri of srchFolderUriArray) {
-        this._selectedList.add(folderLookup.getFolderForURL(uri));
+        this._selectedList.add(MailUtils.getOrCreateFolder(uri));
       }
     }
 
@@ -73,14 +73,11 @@ var gSelectVirtual = {
     if (aEvent.button != 0)
       return;
 
-    let row = {};
-    let col = {};
-    this._treeElement.treeBoxObject
-                     .getCellAt(aEvent.clientX, aEvent.clientY, row, col, {});
-    if (row.value == -1 || col.value.id != "selectedCol")
+    let treeCellInfo = this._treeElement.getCellAt(aEvent.clientX, aEvent.clientY);
+    if (treeCellInfo.row == -1 || treeCellInfo.col.id != "selectedCol")
       return;
 
-    this._toggle(row.value);
+    this._toggle(treeCellInfo.row);
   },
 
   _toggle: function(aRow) {
@@ -106,3 +103,6 @@ var gSelectVirtual = {
     gFolderTreeView.unload();
   }
 };
+
+document.addEventListener("dialogaccept", gSelectVirtual.onAccept);
+document.addEventListener("dialogcancel", gSelectVirtual.onCancel);

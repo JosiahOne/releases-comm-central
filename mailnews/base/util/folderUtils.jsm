@@ -7,11 +7,10 @@
  */
 
 this.EXPORTED_SYMBOLS = ["getFolderProperties", "getSpecialFolderString",
-                          "getFolderFromUri", "allAccountsSorted",
-                          "getMostRecentFolders", "folderNameCompare"];
+                         "allAccountsSorted", "getMostRecentFolders", "folderNameCompare"];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+const {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+const {fixIterator, toArray} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 /**
  * Returns a string representation of a folder's "special" type.
@@ -19,25 +18,24 @@ ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
  * @param aFolder  the nsIMsgFolder whose special type should be returned
  */
 function getSpecialFolderString(aFolder) {
-  const nsMsgFolderFlags = Ci.nsMsgFolderFlags;
   let flags = aFolder.flags;
-  if (flags & nsMsgFolderFlags.Inbox)
+  if (flags & Ci.nsMsgFolderFlags.Inbox)
     return "Inbox";
-  if (flags & nsMsgFolderFlags.Trash)
+  if (flags & Ci.nsMsgFolderFlags.Trash)
     return "Trash";
-  if (flags & nsMsgFolderFlags.Queue)
+  if (flags & Ci.nsMsgFolderFlags.Queue)
     return "Outbox";
-  if (flags & nsMsgFolderFlags.SentMail)
+  if (flags & Ci.nsMsgFolderFlags.SentMail)
     return "Sent";
-  if (flags & nsMsgFolderFlags.Drafts)
+  if (flags & Ci.nsMsgFolderFlags.Drafts)
     return "Drafts";
-  if (flags & nsMsgFolderFlags.Templates)
+  if (flags & Ci.nsMsgFolderFlags.Templates)
     return "Templates";
-  if (flags & nsMsgFolderFlags.Junk)
+  if (flags & Ci.nsMsgFolderFlags.Junk)
     return "Junk";
-  if (flags & nsMsgFolderFlags.Archive)
+  if (flags & Ci.nsMsgFolderFlags.Archive)
     return "Archive";
-  if (flags & nsMsgFolderFlags.Virtual)
+  if (flags & Ci.nsMsgFolderFlags.Virtual)
     return "Virtual";
   return "none";
 }
@@ -106,16 +104,6 @@ function getFolderProperties(aFolder, aOpen) {
   properties.push("imapShared-" + aFolder.imapShared);
 
   return properties.join(" ");
-}
-
-/**
- * Returns a folder for a particular uri
- *
- * @param aUri  the rdf uri of the folder to return
- */
-function getFolderFromUri(aUri) {
-  return Cc["@mozilla.org/mail/folder-lookup;1"].
-         getService(Ci.nsIFolderLookupService).getFolderById(aUri);
 }
 
 /**

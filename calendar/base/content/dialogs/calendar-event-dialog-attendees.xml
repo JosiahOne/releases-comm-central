@@ -3,6 +3,9 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from ../calendar-ui-utils.js -->
+<!-- import-globals-from calendar-event-dialog-attendees.js -->
+
 <!DOCTYPE dialog [
   <!ENTITY % dtd1 SYSTEM "chrome://calendar/locale/global.dtd" > %dtd1;
   <!ENTITY % dtd2 SYSTEM "chrome://calendar/locale/calendar.dtd" > %dtd2;
@@ -12,64 +15,18 @@
 <bindings xmlns="http://www.mozilla.org/xbl"
           xmlns:xbl="http://www.mozilla.org/xbl"
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
-  <binding id="attendees-list">
-    <content>
-      <xul:listbox anonid="listbox"
-                   seltype="multiple"
-                   class="listbox-noborder"
-                   rows="-1"
-                   flex="1">
-        <xul:listcols>
-          <xul:listcol/>
-          <xul:listcol/>
-          <xul:listcol flex="1"/>
-        </xul:listcols>
-        <xul:listitem anonid="item" class="addressingWidgetItem" allowevents="true">
-          <xul:listcell class="addressingWidgetCell" align="center" pack="center">
-            <xul:image id="attendeeCol1#1" anonid="rolestatus-icon"/>
-          </xul:listcell>
-          <xul:listcell class="addressingWidgetCell">
-              <xul:image id="attendeeCol2#1" anonid="usertype-icon" class="usertype-icon" onclick="this.parentNode.select();"/>
-          </xul:listcell>
-          <xul:listcell class="addressingWidgetCell">
-            <xul:textbox id="attendeeCol3#1"
-                         anonid="input"
-                         class="plain textbox-addressingWidget uri-element"
-                         type="autocomplete"
-                         flex="1"
-                         autocompletesearch="addrbook ldap"
-                         autocompletesearchparam="{}"
-                         timeout="300"
-                         maxrows="4"
-                         completedefaultindex="true"
-                         forcecomplete="true"
-                         completeselectedindex="true"
-                         minresultsforpopup="1"
-                         onblur="if (this.localName == 'textbox') document.getBindingParent(this).returnHit(this, true)"
-                         ignoreblurwhilesearching="true"
-                         oninput="this.setAttribute('dirty', 'true');"
-                         ontextentered="document.getBindingParent(this).returnHit(this);">
-            </xul:textbox>
-          </xul:listcell>
-        </xul:listitem>
-      </xul:listbox>
-    </content>
-
+  <binding id="attendees-list" extends="chrome://messenger/content/richlistbox.xml#xbl-richlistbox">
     <implementation>
       <field name="mMaxAttendees">0</field>
       <field name="mContentHeight">0</field>
       <field name="mRowHeight">0</field>
-      <field name="mNumColumns">0</field>
+      <field name="mNumColumns">3</field>
       <field name="mIsOffline">0</field>
       <field name="mIsReadOnly">false</field>
       <field name="mIsInvitation">false</field>
       <field name="mPopupOpen">false</field>
 
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-          ChromeUtils.import("resource://gre/modules/Services.jsm");
-          ChromeUtils.import("resource:///modules/mailServices.js");
-
           this.mMaxAttendees = 0;
 
           window.addEventListener("load", this.onLoad.bind(this), true);
@@ -79,7 +36,7 @@
         <body><![CDATA[
             this.onInitialize();
 
-            // this trigger the continous update chain, which
+            // this trigger the continuous update chain, which
             // effectively calls this.onModify() on predefined
             // time intervals [each second].
             let self = this;
@@ -106,19 +63,14 @@
                                ? organizer.id
                                : calendar.getProperty("organizerId"));
 
-            calendar = cal.wrapInstance(calendar, Components.interfaces.calISchedulingSupport);
+            calendar = cal.wrapInstance(calendar, Ci.calISchedulingSupport);
             this.mIsInvitation = (calendar && calendar.isInvitation(args.item));
 
-            let listbox =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "listbox");
-            let template =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "item");
+            let template = this.querySelector(".addressingWidgetItem");
             template.focus();
 
             if (this.mIsReadOnly || this.mIsInvitation) {
-                listbox.setAttribute("disabled", "true");
+                this.setAttribute("disabled", "true");
             }
 
             // TODO: the organizer should show up in the attendee list, but this information
@@ -145,18 +97,18 @@
                     organizer.commonName = calendar.getProperty("organizerCN");
                 }
                 organizer.isOrganizer = true;
-                this.appendAttendee(organizer, listbox, template, true);
+                this.appendAttendee(organizer, template, true);
             }
 
             let numRowsAdded = 0;
             if (attendees.length > 0) {
                 for (let attendee of attendees) {
-                    this.appendAttendee(attendee, listbox, template, false);
+                    this.appendAttendee(attendee, template, false);
                     numRowsAdded++;
                 }
             }
             if (numRowsAdded == 0) {
-                this.appendAttendee(null, listbox, template, false);
+                this.appendAttendee(null, template, false);
             }
 
             // detach the template item from the listbox, but hold the reference.
@@ -170,22 +122,17 @@
       <!-- appends a new row using an existing attendee structure -->
       <method name="appendAttendee">
         <parameter name="aAttendee"/>
-        <parameter name="aParentNode"/>
         <parameter name="aTemplateNode"/>
         <parameter name="aDisableIfOrganizer"/>
         <body><![CDATA[
             // create a new listbox item and append it to our parent control.
             let newNode = aTemplateNode.cloneNode(true);
 
-            let input =
-                document.getAnonymousElementByAttribute(
-                    newNode, "anonid", "input");
-            let roleStatusIcon =
-                document.getAnonymousElementByAttribute(
-                    newNode, "anonid", "rolestatus-icon");
-            let userTypeIcon =
-                document.getAnonymousElementByAttribute(
-                    newNode, "anonid", "usertype-icon");
+            this.appendChild(newNode);
+
+            let input = newNode.querySelector(".textbox-addressingWidget");
+            let roleStatusIcon = newNode.querySelector(".status-icon");
+            let userTypeIcon = newNode.querySelector(".usertype-icon");
 
             // We always clone the first row. The problem is that the first row
             // could be focused. When we clone that row, we end up with a cloned
@@ -198,8 +145,6 @@
             if (input.getAttribute("focused") != "") {
                 input.removeAttribute("focused");
             }
-
-            aParentNode.appendChild(newNode);
 
             // the template could have its fields disabled,
             // that's why we need to reset their status.
@@ -220,12 +165,6 @@
             }
 
             this.mMaxAttendees++;
-            let rowNumber = this.mMaxAttendees;
-            if (rowNumber >= 0) {
-                roleStatusIcon.setAttribute("id", "attendeeCol1#" + rowNumber);
-                userTypeIcon.setAttribute("id", "attendeeCol2#" + rowNumber);
-                input.setAttribute("id", "attendeeCol3#" + rowNumber);
-            }
 
             if (!aAttendee) {
                 aAttendee = this.createAttendee();
@@ -279,34 +218,25 @@
         <parameter name="aSetFocus"/>
         <parameter name="aInsertAfter"/>
         <body><![CDATA[
-            let listbox =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "listbox");
             let listitem1 = this.getListItem(1);
             let newNode = null;
 
-            if (listbox && listitem1) {
+            if (listitem1) {
                 let newAttendee = this.createAttendee();
                 let nextDummy = this.getNextDummyRow();
                 newNode = listitem1.cloneNode(true);
 
                 if (aInsertAfter) {
-                    listbox.insertBefore(newNode, aInsertAfter.nextSibling);
+                    this.insertBefore(newNode, aInsertAfter.nextSibling);
                 } else if (nextDummy) {
-                    listbox.replaceChild(newNode, nextDummy);
+                    this.replaceChild(newNode, nextDummy);
                 } else {
-                    listbox.appendChild(newNode);
+                    this.appendChild(newNode);
                 }
 
-                let input =
-                    document.getAnonymousElementByAttribute(
-                        newNode, "anonid", "input");
-                let roleStatusIcon =
-                    document.getAnonymousElementByAttribute(
-                        newNode, "anonid", "rolestatus-icon");
-                let userTypeIcon =
-                    document.getAnonymousElementByAttribute(
-                        newNode, "anonid", "usertype-icon");
+                let input = newNode.querySelector(".textbox-addressingWidget");
+                let roleStatusIcon = newNode.querySelector(".status-icon");
+                let userTypeIcon = newNode.querySelector(".usertype-icon");
 
                 // the template could have its fields disabled,
                 // that's why we need to reset their status.
@@ -321,12 +251,6 @@
                 }
 
                 this.mMaxAttendees++;
-                let rowNumber = this.mMaxAttendees;
-                if (rowNumber >= 0) {
-                    roleStatusIcon.setAttribute("id", "attendeeCol1#" + rowNumber);
-                    userTypeIcon.setAttribute("id", "attendeeCol2#" + rowNumber);
-                    input.setAttribute("id", "attendeeCol3#" + rowNumber);
-                }
 
                 input.value = null;
                 input.removeAttribute("value");
@@ -364,6 +288,8 @@
 
       <property name="attendees">
         <getter><![CDATA[
+            const { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+
             let attendees = [];
 
             for (let i = 1; true; i++) {
@@ -396,22 +322,28 @@
                         attendee = attendee.clone();
                     }
                     attendee.id = cal.email.prependMailTo(aAddress.email);
+                    let commonName = null;
                     if (aAddress.name.length > 0) {
                         // we remove any double quotes within CN due to bug 1209399
-                        attendee.commonName = aAddress.name.replace(/(?:[\\]"|")/, "");
+                        let name = aAddress.name.replace(/(?:(?:[\\]")|(?:"))/g, "");
+                        if (aAddress.email != name) {
+                            commonName = name;
+                        }
                     }
+                    attendee.commonName = commonName;
                     attendees.push(attendee);
                     j++;
                 };
                 parsedInput.forEach(addAttendee);
             }
-
             return attendees;
         ]]></getter>
       </property>
 
       <property name="organizer">
         <getter><![CDATA[
+            const { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+
             for (let i = 1; true; i++) {
                 let inputField = this.getInputElement(i);
                 if (!inputField) {
@@ -434,9 +366,14 @@
                 if (parsedInput[0].email > 0) {
                     attendee.id = cal.email.prependMailTo(parsedInput[0].email);
                 }
+                let commonName = null;
                 if (parsedInput[0].name.length > 0) {
-                    attendee.commonName = parsedInput[0].name;
+                    let name = parsedInput[0].name.replace(/(?:(?:[\\]")|(?:"))/g, "");
+                    if (attendee.email != name) {
+                        commonName = name;
+                    }
                 }
+                attendee.commonName = commonName;
 
                 if (attendee.isOrganizer) {
                     return attendee;
@@ -450,21 +387,25 @@
       <method name="_resolveListByName">
         <parameter name="value"/>
         <body><![CDATA[
-              let entries = MailServices.headerParser.makeFromDisplayAddress(value);
-              return entries.length ? this._findListInAddrBooks(entries[0].name) : null;
-          ]]></body>
-    </method>
+            const { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
-    <method name="_findListInAddrBooks">
+            let entries = MailServices.headerParser.makeFromDisplayAddress(value);
+            return entries.length ? this._findListInAddrBooks(entries[0].name) : null;
+        ]]></body>
+      </method>
+
+      <method name="_findListInAddrBooks">
         <parameter name="entryname"/>
         <body><![CDATA[
+            const { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+
             let allAddressBooks = MailServices.ab.directories;
 
             while (allAddressBooks.hasMoreElements()) {
                 let abDir = null;
                 try {
                     abDir = allAddressBooks.getNext()
-                                           .QueryInterface(Components.interfaces.nsIAbDirectory);
+                                           .QueryInterface(Ci.nsIAbDirectory);
                 } catch (ex) {
                     cal.WARN("[eventDialog] Error Encountered" + ex);
                 }
@@ -474,7 +415,7 @@
                     while (childNodes.hasMoreElements()) {
                         let dir = null;
                         try {
-                            dir = childNodes.getNext().QueryInterface(Components.interfaces.nsIAbDirectory);
+                            dir = childNodes.getNext().QueryInterface(Ci.nsIAbDirectory);
                         } catch (ex) {
                             cal.WARN("[eventDialog] Error Encountered" + ex);
                         }
@@ -487,99 +428,94 @@
             }
             return null;
         ]]></body>
-    </method>
+      </method>
 
-    <method name="_getListEntriesInt">
+      <method name="_getListEntriesInt">
         <parameter name="mailingList"/>
         <parameter name="attendees"/>
         <parameter name="allListsUri"/>
         <body><![CDATA[
-              let addressLists = mailingList.addressLists;
-              for (let i = 0; i < addressLists.length; i++) {
-                  let abCard = addressLists.queryElementAt(i, Components.interfaces.nsIAbCard);
-                  let thisId = abCard.primaryEmail;
-                  if (abCard.displayName.length > 0) {
-                      let rCn = abCard.displayName;
-                      if (rCn.includes(",")) {
-                          rCn = '"' + rCn + '"';
-                      }
-                      thisId = rCn + " <" + thisId + ">";
-                  }
-                  if (attendees.some(att => att == thisId)) {
-                      continue;
-                  }
+            let addressLists = mailingList.addressLists;
+            for (let i = 0; i < addressLists.length; i++) {
+                let abCard = addressLists.queryElementAt(i, Ci.nsIAbCard);
+                let thisId = abCard.primaryEmail;
+                if (abCard.displayName.length > 0) {
+                    let rCn = abCard.displayName;
+                    if (rCn.includes(",")) {
+                        rCn = '"' + rCn + '"';
+                    }
+                    thisId = rCn + " <" + thisId + ">";
+                }
+                if (attendees.some(att => att == thisId)) {
+                    continue;
+                }
 
-                  if (abCard.displayName.length > 0) {
-                      let list = this._findListInAddrBooks(abCard.displayName);
-                      if (list) {
-                          if (allListsUri.some(uri => uri == list.URI)) {
-                              continue;
-                          }
-                          allListsUri.push(list.URI);
+                if (abCard.displayName.length > 0) {
+                    let list = this._findListInAddrBooks(abCard.displayName);
+                    if (list) {
+                        if (allListsUri.some(uri => uri == list.URI)) {
+                            continue;
+                        }
+                        allListsUri.push(list.URI);
 
-                          this._getListEntriesInt(list, attendees, allListsUri);
+                        this._getListEntriesInt(list, attendees, allListsUri);
 
-                          continue;
-                      }
-                  }
+                        continue;
+                    }
+                }
 
-                  attendees.push(thisId);
-              }
+                attendees.push(thisId);
+            }
 
-              return attendees;
-          ]]></body>
-    </method>
+            return attendees;
+        ]]></body>
+      </method>
 
-    <method name="_getListEntries">
+      <method name="_getListEntries">
         <parameter name="mailingList"/>
         <body><![CDATA[
+            let attendees = [];
+            let allListsUri = [];
 
-              let attendees = [];
-              let allListsUri = [];
+            allListsUri.push(mailingList.URI);
 
-              allListsUri.push(mailingList.URI);
+            this._getListEntriesInt(mailingList, attendees, allListsUri);
 
-              this._getListEntriesInt(mailingList, attendees, allListsUri);
+            return attendees;
+        ]]></body>
+      </method>
 
-              return attendees;
-
-          ]]></body>
-    </method>
-
-    <method name="_fillListItemWithEntry">
+      <method name="_fillListItemWithEntry">
         <parameter name="listitem"/>
         <parameter name="entry"/>
         <parameter name="rowNumber"/>
         <body><![CDATA[
-              let newAttendee = this.createAttendee(entry);
-              let input = document.getAnonymousElementByAttribute(listitem, "anonid", "input");
-              input.removeAttribute("disabled");
-              input.setAttribute("id", "attendeeCol3#" + rowNumber);
+            let newAttendee = this.createAttendee(entry);
+            let input = listitem.querySelector(".textbox-addressingWidget");
+            input.removeAttribute("disabled");
 
-              input.attendee = newAttendee;
-              input.value = entry;
-              input.setAttribute("value", entry);
-              input.setAttribute("dirty", "true");
-              if (input.getAttribute("focused") != "") {
-                  input.removeAttribute("focused");
-              }
+            input.attendee = newAttendee;
+            input.value = entry;
+            input.setAttribute("value", entry);
+            input.setAttribute("dirty", "true");
+            if (input.getAttribute("focused") != "") {
+                input.removeAttribute("focused");
+            }
 
-              let roleStatusIcon = document.getAnonymousElementByAttribute(listitem, "anonid", "rolestatus-icon");
-              roleStatusIcon.removeAttribute("disabled");
-              roleStatusIcon.setAttribute("id", "attendeeCol1#" + rowNumber);
-              roleStatusIcon.setAttribute("class", "role-icon");
-              roleStatusIcon.setAttribute("role", newAttendee.role);
+            let roleStatusIcon = listitem.querySelector(".status-icon");
+            roleStatusIcon.removeAttribute("disabled");
+            roleStatusIcon.setAttribute("class", "role-icon");
+            roleStatusIcon.setAttribute("role", newAttendee.role);
 
-              let userTypeIcon = document.getAnonymousElementByAttribute(listitem, "anonid", "usertype-icon");
-              userTypeIcon.removeAttribute("disabled");
-              userTypeIcon.setAttribute("id", "attendeeCol2#" + rowNumber);
-              userTypeIcon.setAttribute("cutype", newAttendee.userType);
-          ]]></body>
-    </method>
+            let userTypeIcon = listitem.querySelector(".usertype-icon");
+            userTypeIcon.removeAttribute("disabled");
+            userTypeIcon.setAttribute("cutype", newAttendee.userType);
+        ]]></body>
+      </method>
 
-    <method name="resolvePotentialList">
-      <parameter name="aInput"/>
-      <body><![CDATA[
+      <method name="resolvePotentialList">
+        <parameter name="aInput"/>
+        <body><![CDATA[
             let fieldValue = aInput.value;
             if (aInput.id.length > 0 && fieldValue.length > 0) {
                 let mailingList = this._resolveListByName(fieldValue);
@@ -587,7 +523,7 @@
                     let entries = this._getListEntries(mailingList);
                     if (entries.length > 0) {
                         let currentIndex = parseInt(aInput.id.substr(13), 10);
-                        let template = document.getAnonymousElementByAttribute(this, "anonid", "item");
+                        let template = this.querySelector(".addressingWidgetItem");
                         let currentNode = template.parentNode.childNodes[currentIndex];
                         this._fillListItemWithEntry(currentNode, entries[0], currentIndex);
                         entries.shift();
@@ -602,14 +538,7 @@
                         this.mMaxAttendees += entries.length;
                         for (let i = currentIndex; i <= this.mMaxAttendees; i++) {
                             let row = template.parentNode.childNodes[i];
-                            let roleStatusIcon = document.getAnonymousElementByAttribute(row, "anonid", "rolestatus-icon");
-                            roleStatusIcon.setAttribute("id", "attendeeCol1#" + i);
-
-                            let userTypeIcon = document.getAnonymousElementByAttribute(row, "anonid", "usertype-icon");
-                            userTypeIcon.setAttribute("id", "attendeeCol2#" + i);
-
-                            let input = document.getAnonymousElementByAttribute(row, "anonid", "input");
-                            input.setAttribute("id", "attendeeCol3#" + i);
+                            let input = row.querySelector(".textbox-addressingWidget");
                             input.setAttribute("dirty", "true");
                         }
                     }
@@ -620,6 +549,8 @@
 
       <method name="onModify">
         <body><![CDATA[
+            const { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+
             let list = [];
             for (let i = 1; i <= this.mMaxAttendees; i++) {
                 // retrieve the string from the appropriate row
@@ -649,43 +580,43 @@
         ]]></body>
       </method>
 
-     <method name="updateTooltip">
-      <parameter name="targetIcon"/>
-      <body><![CDATA[
-          // Function setting the tooltip of attendeeicons based on their role
-          if (targetIcon.className == "role-icon") {
-              let role = targetIcon.getAttribute("role");
-              // Set tooltip for rolenames
+      <method name="updateTooltip">
+        <parameter name="targetIcon"/>
+        <body><![CDATA[
+            // Function setting the tooltip of attendeeicons based on their role
+            if (targetIcon.classList.contains("role-icon")) {
+                let role = targetIcon.getAttribute("role");
+                // Set tooltip for rolenames
 
-              const roleMap = {
-                  "REQ-PARTICIPANT": "required",
-                  "OPT-PARTICIPANT": "optional",
-                  "NON-PARTICIPANT": "nonparticipant",
-                  "CHAIR": "chair"
-              };
+                const roleMap = {
+                    "REQ-PARTICIPANT": "required",
+                    "OPT-PARTICIPANT": "optional",
+                    "NON-PARTICIPANT": "nonparticipant",
+                    "CHAIR": "chair"
+                };
 
-              let roleNameString = "event.attendee.role." + (role in roleMap ? roleMap[role] : "unknown");
-              let tooltip = cal.l10n.getString("calendar-event-dialog-attendees",
-                                               roleNameString,
-                                               role in roleMap ? null : [role]);
-              targetIcon.setAttribute("tooltiptext", tooltip);
-          } else if (targetIcon.className == "usertype-icon") {
-              let cutype = targetIcon.getAttribute("cutype");
-              const cutypeMap = {
-                  INDIVIDUAL: "individual",
-                  GROUP: "group",
-                  RESOURCE: "resource",
-                  ROOM: "room",
-                  // I've decided UNKNOWN will not be handled.
-              };
+                let roleNameString = "event.attendee.role." + (role in roleMap ? roleMap[role] : "unknown");
+                let tooltip = cal.l10n.getString("calendar-event-dialog-attendees",
+                                                 roleNameString,
+                                                 role in roleMap ? []: [role]);
+                targetIcon.setAttribute("tooltiptext", tooltip);
+            } else if (targetIcon.classList.contains("usertype-icon")) {
+                let cutype = targetIcon.getAttribute("cutype");
+                const cutypeMap = {
+                    INDIVIDUAL: "individual",
+                    GROUP: "group",
+                    RESOURCE: "resource",
+                    ROOM: "room",
+                    // I've decided UNKNOWN will not be handled.
+                };
 
-              let cutypeString = "event.attendee.usertype." + (cutype in cutypeMap ? cutypeMap[cutype] : "unknown");
-              let tooltip = cal.l10n.getString("calendar-event-dialog-attendees",
-                                               cutypeString,
-                                               cutype in cutypeMap ? null : [cutype]);
-              targetIcon.setAttribute("tooltiptext", tooltip);
-          }
-      ]]></body>
+                let cutypeString = "event.attendee.usertype." + (cutype in cutypeMap ? cutypeMap[cutype] : "unknown");
+                let tooltip = cal.l10n.getString("calendar-event-dialog-attendees",
+                                                 cutypeString,
+                                                 cutype in cutypeMap ? [] : [cutype]);
+                targetIcon.setAttribute("tooltiptext", tooltip);
+            }
+        ]]></body>
       </method>
 
       <property name="documentSize">
@@ -705,10 +636,7 @@
 
       <method name="calcContentHeight">
         <body><![CDATA[
-            let listbox =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "listbox");
-            let items = listbox.getElementsByTagNameNS("*", "listitem");
+            let items = this.getElementsByTagName("richlistitem");
             this.mContentHeight = 0;
             if (items.length > 0) {
                 let i = 0;
@@ -723,13 +651,10 @@
 
       <method name="createOrRemoveDummyRows">
         <body><![CDATA[
-            let listbox =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "listbox");
-            let listboxHeight = listbox.boxObject.height;
+            let listboxHeight = this.boxObject.height;
 
             // remove rows to remove scrollbar
-            let kids = listbox.childNodes;
+            let kids = this.childNodes;
             for (let i = kids.length - 1; this.mContentHeight > listboxHeight && i >= 0; --i) {
                 if (kids[i].hasAttribute("_isDummyRow")) {
                     this.mContentHeight -= this.mRowHeight;
@@ -740,37 +665,25 @@
             // add rows to fill space
             if (this.mRowHeight) {
                 while (this.mContentHeight + this.mRowHeight < listboxHeight) {
-                    this.createDummyItem(listbox);
+                    this.createDummyItem();
                     this.mContentHeight += this.mRowHeight;
                 }
             }
         ]]></body>
       </method>
 
-      <method name="createDummyCell">
-        <parameter name="aParent"/>
-        <body><![CDATA[
-            let cell = document.createElementNS("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul", "listcell");
-            cell.setAttribute("class", "addressingWidgetCell dummy-row-cell");
-            if (aParent) {
-                aParent.appendChild(cell);
-            }
-            return cell;
-        ]]></body>
-      </method>
-
       <method name="createDummyItem">
-        <parameter name="aParent"/>
         <body><![CDATA[
-            let titem = document.createElementNS("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul", "listitem");
+            let titem = document.createElement("richlistitem");
             titem.setAttribute("_isDummyRow", "true");
             titem.setAttribute("class", "dummy-row");
-            for (let i = this.numColumns; i > 0; i--) {
-                this.createDummyCell(titem);
+            for (let i = this.mNumColumns; i > 0; i--) {
+                let cell = document.createElement("hbox");
+                cell.setAttribute("flex", "1");
+                cell.setAttribute("class", "addressingWidgetCell dummy-row-cell");
+                titem.appendChild(cell);
             }
-            if (aParent) {
-                aParent.appendChild(titem);
-            }
+            this.appendChild(titem);
             return titem;
         ]]></body>
       </method>
@@ -778,10 +691,7 @@
       <!-- gets the next row from the top down -->
       <method name="getNextDummyRow">
         <body><![CDATA[
-            let listbox =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "listbox");
-            let kids = listbox.childNodes;
+            let kids = this.childNodes;
             for (let i = 0; i < kids.length; ++i) {
                 if (kids[i].hasAttribute("_isDummyRow")) {
                     return kids[i];
@@ -791,27 +701,18 @@
         ]]></body>
       </method>
 
-      <!-- This method returns the <xul:listitem> at row numer 'aRow' -->
+      <!-- This method returns the <xul:richlistitem> at row number 'aRow' -->
       <method name="getListItem">
         <parameter name="aRow"/>
         <body><![CDATA[
-            let listbox =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "listbox");
-            if (listbox && aRow > 0) {
-                let listitems = listbox.getElementsByTagNameNS("*", "listitem");
-                if (listitems && listitems.length >= aRow) {
-                    return listitems[aRow - 1];
-                }
-            }
-            return 0;
+            return this.getElementsByTagName("richlistitem")[aRow - 1];
         ]]></body>
       </method>
 
       <method name="getInputFromListitem">
         <parameter name="aListItem"/>
         <body><![CDATA[
-            return aListItem.getElementsByTagNameNS("*", "textbox")[0];
+            return aListItem.getElementsByTagName("textbox")[0];
         ]]></body>
       </method>
 
@@ -819,12 +720,10 @@
         <parameter name="aElement"/>
         <body><![CDATA[
             let row = 0;
-            while (aElement && aElement.localName != "listitem") {
-                aElement = aElement.parentNode;
-            }
+            aElement = aElement.closest("richlistitem");
             if (aElement) {
                 while (aElement) {
-                    if (aElement.localName == "listitem") {
+                    if (aElement.localName == "richlistitem") {
                         ++row;
                     }
                     aElement = aElement.previousSibling;
@@ -839,69 +738,53 @@
       <method name="getInputElement">
         <parameter name="aRow"/>
         <body><![CDATA[
-            return document.getAnonymousElementByAttribute(this, "id", "attendeeCol3#" + aRow);
+            return this.getListItem(aRow).querySelector(".textbox-addressingWidget");
         ]]></body>
       </method>
 
       <method name="getRoleElement">
         <parameter name="aRow"/>
         <body><![CDATA[
-            return document.getAnonymousElementByAttribute(this, "id", "attendeeCol1#" + aRow);
+            return this.getListItem(aRow).querySelector(".role-icon, .status-icon");
         ]]></body>
       </method>
 
       <method name="getStatusElement">
         <parameter name="aRow"/>
         <body><![CDATA[
-            return document.getAnonymousElementByAttribute(this, "id", "attendeeCol1#" + aRow);
+            return this.getListItem(aRow).querySelector(".role-icon, .status-icon");
         ]]></body>
       </method>
 
       <method name="getUserTypeElement">
         <parameter name="aRow"/>
         <body><![CDATA[
-            return document.getAnonymousElementByAttribute(this, "id", "attendeeCol2#" + aRow);
+            return this.getListItem(aRow).querySelector(".usertype-icon");
         ]]></body>
       </method>
 
       <method name="setFocus">
         <parameter name="aRow"/>
         <body><![CDATA[
-            let self = this;
-            let set_focus = function() {
+            setTimeout(() => {
                 let node;
                 if (typeof aRow == "number") {
-                    node = self.getListItem(aRow);
+                    node = this.getListItem(aRow);
                 } else {
                     node = aRow;
                 }
 
-                // do we need to scroll in order to see the selected row?
-                let listbox =
-                    document.getAnonymousElementByAttribute(
-                        self, "anonid", "listbox");
-                let firstVisibleRow = listbox.getIndexOfFirstVisibleRow();
-                let numOfVisibleRows = listbox.getNumberOfVisibleRows();
-                if (aRow <= firstVisibleRow) {
-                    listbox.scrollToIndex(aRow - 1);
-                } else if (aRow - 1 >= (firstVisibleRow + numOfVisibleRows)) {
-                    listbox.scrollToIndex(aRow - numOfVisibleRows);
-                }
-                let input =
-                    document.getAnonymousElementByAttribute(
-                        node, "anonid", "input");
+                this.ensureElementIsVisible(node);
+
+                let input = node.querySelector(".textbox-addressingWidget");
                 input.focus();
-            };
-            setTimeout(set_focus, 0);
+            }, 0);
         ]]></body>
       </method>
 
       <property name="firstVisibleRow">
         <getter><![CDATA[
-            let listbox =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "listbox");
-            return listbox.getIndexOfFirstVisibleRow();
+            return this.getIndexOfFirstVisibleRow();
         ]]></getter>
       </property>
 
@@ -916,29 +799,10 @@
         ]]></body>
       </method>
 
-      <property name="numColumns">
-        <getter><![CDATA[
-            if (!this.mNumColumns) {
-                let listbox =
-                    document.getAnonymousElementByAttribute(
-                        this, "anonid", "listbox");
-                let listCols = listbox.getElementsByTagNameNS("*", "listcol");
-                this.mNumColumns = listCols.length;
-                if (!this.mNumColumns) {
-                    this.mNumColumns = 1;
-                }
-            }
-            return this.mNumColumns;
-        ]]></getter>
-      </property>
-
       <property name="ratio">
         <setter><![CDATA[
-            let listbox =
-                document.getAnonymousElementByAttribute(
-                    this, "anonid", "listbox");
-            let rowcount = listbox.getRowCount();
-            listbox.scrollToIndex(Math.floor(rowcount * val));
+            let rowcount = this.getRowCount();
+            this.scrollToIndex(Math.floor(rowcount * val));
             return val;
         ]]></setter>
       </property>
@@ -947,6 +811,8 @@
         <parameter name="element"/>
         <parameter name="noAdvance"/>
         <body><![CDATA[
+            const { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+
             function parseHeaderValue(aMsgIAddressObject) {
                 if (aMsgIAddressObject.name.match(/[<>@,]/)) {
                     // special handling only needed for a name with a comma which are not already quoted
@@ -1033,19 +899,7 @@
       <method name="deleteRow">
         <parameter name="aRow"/>
         <body><![CDATA[
-            // reset id's in order to not break the sequence
-            let maxAttendees = this.mMaxAttendees;
             this.removeRow(aRow);
-            let numberOfCols = this.numColumns;
-            for (let row = aRow + 1; row <= maxAttendees; row++) {
-                for (let col = 1; col <= numberOfCols; col++) {
-                    let colID = "attendeeCol" + col + "#" + row;
-                    let elem = document.getAnonymousElementByAttribute(this, "id", colID);
-                    if (elem) {
-                        elem.setAttribute("id", "attendeeCol" + col + "#" + (row - 1));
-                    }
-                }
-            }
         ]]></body>
       </method>
 
@@ -1067,7 +921,7 @@
           }
 
           let target = event.originalTarget;
-          if (target.className == "role-icon") {
+          if (target.classList.contains("role-icon")) {
               if (target.getAttribute("disabled") != "true") {
                   const roleCycle = [
                       "REQ-PARTICIPANT", "OPT-PARTICIPANT",
@@ -1078,7 +932,7 @@
                   target.setAttribute("role", nextValue);
                   this.updateTooltip(target);
               }
-          } else if (target.className == "status-icon") {
+          } else if (target.classList.contains("status-icon")) {
               if (target.getAttribute("disabled") != "true") {
                   const statusCycle = ["ACCEPTED", "DECLINED", "TENTATIVE"];
 
@@ -1086,9 +940,9 @@
                   target.setAttribute("status", nextValue);
                   this.updateTooltip(target);
               }
-          } else if (target.className == "usertype-icon") {
-              let fieldNum = target.getAttribute("id").split("#")[1];
-              let inputField = this.getInputElement(fieldNum);
+          } else if (target.classList.contains("usertype-icon")) {
+              let row = target.closest("richlistitem");
+              let inputField = row.querySelector(".textbox-addressingWidget");
               if (target.getAttribute("disabled") != "true" &&
                   !inputField.attendee.isOrganizer) {
                   const cutypeCycle = ["INDIVIDUAL", "GROUP", "RESOURCE", "ROOM"];
@@ -1097,10 +951,7 @@
                   target.setAttribute("cutype", nextValue);
                   this.updateTooltip(target);
               }
-          } else if (this.mIsReadOnly || this.mIsInvitation || target == null ||
-                     (target.localName != "listboxbody" &&
-                      target.localName != "listcell" &&
-                      target.localName != "listitem")) {
+          } else if (this.mIsReadOnly || this.mIsInvitation || target == null || target.closest("richlistitem")) {
               // These are cases where we don't want to append a new row, keep
               // them here so we can put the rest in the else case.
           } else {
@@ -1152,8 +1003,7 @@
 
                           // set cursor to begin or end of focused input box based on deletion direction
                           let cPos = 0;
-                          let input = document.getAnonymousElementByAttribute(this.getListItem(targetRowId),
-                                                                              "anonid", "input");
+                          let input = this.getListItem(targetRowId).querySelector(".textbox-addressingWidget");
                           if (targetRowId != curRowId) {
                               cPos = input.textLength;
                           }
@@ -1262,9 +1112,6 @@
       </property>
 
       <constructor><![CDATA[
-          ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-
           this.initTimeRange();
 
           // The basedate is the date/time from which the display
@@ -1272,9 +1119,7 @@
           // we should be able to show. the start- and enddate
           // is the time the event is scheduled for.
           this.mRange = Number(this.getAttribute("range"));
-          this.mSelectionbar =
-              document.getAnonymousElementByAttribute(
-                  this, "anonid", "selection-bar");
+          this.mSelectionbar = document.getAnonymousElementByAttribute(this, "anonid", "selection-bar");
       ]]></constructor>
 
       <property name="baseDate">
@@ -1454,8 +1299,8 @@
                 this.mStartHour = 0;
                 this.mEndHour = 24;
             } else {
-                this.mStartHour = Preferences.get("calendar.view.daystarthour", 8);
-                this.mEndHour = Preferences.get("calendar.view.dayendhour", 19);
+                this.mStartHour = Services.prefs.getIntPref("calendar.view.daystarthour", 8);
+                this.mEndHour = Services.prefs.getIntPref("calendar.view.dayendhour", 19);
             }
         ]]></body>
       </method>
@@ -1545,7 +1390,7 @@
               let delta = mouseX - this.mMouseX;
               let newStart = this.moveTime(this.mStartDate, delta, false);
               if (newStart.compare(this.mStartDate) != 0) {
-                  newEnd = this.moveTime(this.mEndDate, delta, false);
+                  let newEnd = this.moveTime(this.mEndDate, delta, false);
 
                   // We need to adapt this date in case we're dealing with
                   // an all-day event. This is because setting 'endDate' will

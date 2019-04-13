@@ -6,6 +6,8 @@
 
 var dialog;
 
+document.addEventListener("dialogaccept", onOK);
+
 function onLoad()
 {
   var windowArgs = window.arguments[0];
@@ -31,8 +33,6 @@ function onLoad()
 function onOK()
 {
   dialog.okCallback(dialog.nameField.value, dialog.preselectedFolderURI);
-
-  return true;
 }
 
 function doEnabling()

@@ -15,7 +15,7 @@
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var test = "sendMessageLater";
 var server = null;
@@ -252,6 +252,7 @@ function run_test() {
   account.addIdentity(identity);
   account.defaultIdentity = identity;
   account.incomingServer = incomingServer;
+  MailServices.accounts.defaultAccount = account;
 
   localAccountUtils.rootFolder.createLocalSubfolder("Sent");
 

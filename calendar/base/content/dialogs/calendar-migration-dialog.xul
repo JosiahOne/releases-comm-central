@@ -18,6 +18,7 @@
         title="&migration.title;"
         windowtype="Calendar:MigrationWizard"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         onload="gMigrateWizard.loadMigrators()"
         branded="true"
         persist="screenX screenY">
@@ -30,17 +31,15 @@
                 next="progressPage"
                 label="&migration.welcome;">
         <label id="wizard-desc" control="datasource-list">&migration.list.description;</label>
-        <listbox id="datasource-list" flex="1">
-        </listbox>
+        <vbox id="datasource-list" flex="1"/>
     </wizardpage>
 
     <wizardpage id="wizardPage2"
                 pageid="progressPage"
-                label="&migration.importing;"
-                onpageshow="gMigrateWizard.migrateChecked()">
+                label="&migration.importing;">
         <label control="migrate-progressmeter">&migration.progress.description;</label>
         <vbox flex="1">
-            <progressmeter id="migrate-progressmeter" mode="determined" value="0" />
+            <html:progress id="migrate-progressmeter" value="0" max="100"/>
             <label value="" flex="1" id="progress-label"/>
         </vbox>
     </wizardpage>

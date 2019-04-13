@@ -12,11 +12,18 @@ this.EXPORTED_SYMBOLS = [
   "GenericMessagePrototype",
   "GenericProtocolPrototype",
   "Message",
-  "TooltipInfo"
+  "TooltipInfo",
 ];
 
-ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm");
+const {
+  EmptyEnumerator,
+  initLogModule,
+  XPCOMUtils,
+  nsSimpleEnumerator,
+  l10nHelper,
+} = ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+const {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
+const {ClassInfo} = ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "_", () =>
   l10nHelper("chrome://chat/locale/conversations.properties")
@@ -25,21 +32,21 @@ XPCOMUtils.defineLazyGetter(this, "_", () =>
 var GenericAccountPrototype = {
   __proto__: ClassInfo("prplIAccount", "generic account object"),
   get wrappedJSObject() { return this; },
-  _init: function _init(aProtocol, aImAccount) {
+  _init(aProtocol, aImAccount) {
     this.protocol = aProtocol;
     this.imAccount = aImAccount;
     initLogModule(aProtocol.id, this);
   },
-  observe: function(aSubject, aTopic, aData) {},
-  remove: function() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
-  unInit: function() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
-  connect: function() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
-  disconnect: function() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
-  createConversation: function(aName) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
-  joinChat: function(aComponents) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
-  setBool: function(aName, aVal) {},
-  setInt: function(aName, aVal) {},
-  setString: function(aName, aVal) {},
+  observe(aSubject, aTopic, aData) {},
+  remove() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  unInit() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  connect() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  disconnect() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  createConversation(aName) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  joinChat(aComponents) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  setBool(aName, aVal) {},
+  setInt(aName, aVal) {},
+  setString(aName, aVal) {},
 
   get name() { return this.imAccount.name; },
   get connected() { return this.imAccount.connected; },
@@ -50,35 +57,35 @@ var GenericAccountPrototype = {
   get connectionErrorReason() { return this._connectionErrorReason; },
 
   /*
-   * Convert a socket's nsISSLStatus into a prplIAccount connection error. Store
-   * the nsISSLStatus and the connection location on the account so the
+   * Convert a socket's nsITransportSecurityInfo into a prplIAccount connection error. Store
+   * the nsITransportSecurityInfo and the connection location on the account so the
    * certificate exception dialog can access the information.
    */
-  handleBadCertificate: function(aSocket, aIsSslError) {
+  handleBadCertificate(aSocket, aIsSslError) {
     this._connectionTarget = aSocket.host + ":" + aSocket.port;
 
     if (aIsSslError)
       return Ci.prplIAccount.ERROR_ENCRYPTION_ERROR;
 
-    let sslStatus = this._sslStatus = aSocket.sslStatus;
-    if (!sslStatus)
+    let secInfo = this._secInfo = aSocket.secInfo;
+    if (!secInfo)
       return Ci.prplIAccount.ERROR_CERT_NOT_PROVIDED;
 
-    if (sslStatus.isUntrusted) {
-      if (sslStatus.serverCert &&
-          sslStatus.serverCert.isSelfSigned)
+    if (secInfo.isUntrusted) {
+      if (secInfo.serverCert &&
+          secInfo.serverCert.isSelfSigned)
         return Ci.prplIAccount.ERROR_CERT_SELF_SIGNED;
       return Ci.prplIAccount.ERROR_CERT_UNTRUSTED;
     }
 
-    if (sslStatus.isNotValidAtThisTime) {
-      if (sslStatus.serverCert &&
-          sslStatus.serverCert.validity.notBefore < Date.now() * 1000)
+    if (secInfo.isNotValidAtThisTime) {
+      if (secInfo.serverCert &&
+          secInfo.serverCert.validity.notBefore < Date.now() * 1000)
         return Ci.prplIAccount.ERROR_CERT_NOT_ACTIVATED;
       return Ci.prplIAccount.ERROR_CERT_EXPIRED;
     }
 
-    if (sslStatus.isDomainMismatch)
+    if (secInfo.isDomainMismatch)
       return Ci.prplIAccount.ERROR_CERT_HOSTNAME_MISMATCH;
 
     // XXX ERROR_CERT_FINGERPRINT_MISMATCH
@@ -87,38 +94,38 @@ var GenericAccountPrototype = {
   },
   _connectionTarget: "",
   get connectionTarget() { return this._connectionTarget; },
-  _sslStatus: null,
-  get sslStatus() { return this._sslStatus; },
+  _secInfo: null,
+  get secInfo() { return this._secInfo; },
 
-  reportConnected: function() {
+  reportConnected() {
     this.imAccount.observe(this, "account-connected", null);
   },
-  reportConnecting: function(aConnectionStateMsg) {
+  reportConnecting(aConnectionStateMsg) {
     // Delete any leftover errors from the previous connection.
     delete this._connectionTarget;
-    delete this._sslStatus;
+    delete this._secInfo;
 
     if (!this.connecting)
       this.imAccount.observe(this, "account-connecting", null);
     if (aConnectionStateMsg)
       this.imAccount.observe(this, "account-connect-progress", aConnectionStateMsg);
   },
-  reportDisconnected: function() {
+  reportDisconnected() {
     this.imAccount.observe(this, "account-disconnected", null);
   },
-  reportDisconnecting: function(aConnectionErrorReason, aConnectionErrorMessage) {
+  reportDisconnecting(aConnectionErrorReason, aConnectionErrorMessage) {
     this._connectionErrorReason = aConnectionErrorReason;
     this.imAccount.observe(this, "account-disconnecting", aConnectionErrorMessage);
     this.cancelPendingBuddyRequests();
   },
 
   // Called when the user adds a new buddy from the UI.
-  addBuddy: function(aTag, aName) {
+  addBuddy(aTag, aName) {
     Services.contacts
             .accountBuddyAdded(new AccountBuddy(this, null, aTag, aName));
   },
   // Called during startup for each of the buddies in the local buddy list.
-  loadBuddy: function(aBuddy, aTag) {
+  loadBuddy(aBuddy, aTag) {
    try {
      return new AccountBuddy(this, aBuddy, aTag);
    } catch (x) {
@@ -128,7 +135,7 @@ var GenericAccountPrototype = {
   },
 
   _pendingBuddyRequests: null,
-  addBuddyRequest: function(aUserName, aGrantCallback, aDenyCallback) {
+  addBuddyRequest(aUserName, aGrantCallback, aDenyCallback) {
     if (!this._pendingBuddyRequests)
       this._pendingBuddyRequests = [];
     let buddyRequest = {
@@ -137,35 +144,35 @@ var GenericAccountPrototype = {
       _account: this,
       // Grant and deny callbacks both receive the auth request object as an
       // argument for further use.
-      grant: function() {
+      grant() {
         aGrantCallback(this);
         this._remove();
       },
-      deny: function() {
+      deny() {
         aDenyCallback(this);
         this._remove();
       },
-      cancel: function() {
+      cancel() {
         Services.obs.notifyObservers(this,
                                      "buddy-authorization-request-canceled");
         this._remove();
       },
-      _remove: function() {
+      _remove() {
         this._account.removeBuddyRequest(this);
       },
-      QueryInterface: ChromeUtils.generateQI([Ci.prplIBuddyRequest])
+      QueryInterface: ChromeUtils.generateQI([Ci.prplIBuddyRequest]),
     };
     this._pendingBuddyRequests.push(buddyRequest);
     Services.obs.notifyObservers(buddyRequest, "buddy-authorization-request");
   },
-  removeBuddyRequest: function(aRequest) {
+  removeBuddyRequest(aRequest) {
     if (!this._pendingBuddyRequests)
       return;
 
     this._pendingBuddyRequests =
       this._pendingBuddyRequests.filter(r => r !== aRequest);
   },
-  cancelPendingBuddyRequests: function() {
+  cancelPendingBuddyRequests() {
     if (!this._pendingBuddyRequests)
       return;
 
@@ -174,10 +181,10 @@ var GenericAccountPrototype = {
     delete this._pendingBuddyRequests;
   },
 
-  requestBuddyInfo: function(aBuddyName) {},
+  requestBuddyInfo(aBuddyName) {},
 
   get canJoinChat() { return false; },
-  getChatRoomFields: function() {
+  getChatRoomFields() {
     if (!this.chatRoomFields)
       return EmptyEnumerator;
 
@@ -186,7 +193,7 @@ var GenericAccountPrototype = {
       fields.push(new ChatRoomField(fieldName, this.chatRoomFields[fieldName]));
     return new nsSimpleEnumerator(fields);
   },
-  getChatRoomDefaultFieldValues: function(aDefaultChatName) {
+  getChatRoomDefaultFieldValues(aDefaultChatName) {
     if (!this.chatRoomFields)
       return EmptyEnumerator;
 
@@ -202,18 +209,18 @@ var GenericAccountPrototype = {
 
     return new ChatRoomFieldValues(defaultFieldValues);
   },
-  requestRoomInfo: function(aCallback) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
-  getRoomInfo: function(aName) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  requestRoomInfo(aCallback) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  getRoomInfo(aName) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
   get isRoomInfoStale() { return false; },
 
-  getPref: function (aName, aType) {
+  getPref(aName, aType) {
     return this.prefs.prefHasUserValue(aName) ?
            this.prefs["get" + aType + "Pref"](aName) :
            this.protocol._getOptionDefault(aName);
   },
-  getInt: function(aName) { return this.getPref(aName, "Int"); },
-  getBool: function(aName) { return this.getPref(aName, "Bool"); },
-  getString: function(aName) {
+  getInt(aName) { return this.getPref(aName, "Int"); },
+  getBool(aName) { return this.getPref(aName, "Bool"); },
+  getString(aName) {
     return this.prefs.prefHasUserValue(aName) ?
              this.prefs.getStringPref(aName) :
              this.protocol._getOptionDefault(aName);
@@ -226,7 +233,7 @@ var GenericAccountPrototype = {
   },
 
   get normalizedName() { return this.normalize(this.name); },
-  normalize: function(aName) { return aName.toLowerCase(); },
+  normalize(aName) { return aName.toLowerCase(); },
 
   get HTMLEnabled() { return false; },
   get HTMLEscapePlainText() { return false; },
@@ -235,7 +242,7 @@ var GenericAccountPrototype = {
   get singleFormatting() { return false; },
   get noFontSizes() { return false; },
   get noUrlDesc() { return false; },
-  get noImages() { return true; }
+  get noImages() { return true; },
 };
 
 
@@ -246,9 +253,9 @@ var GenericAccountBuddyPrototype = {
   get WARN() { return this._account.WARN; },
   get ERROR() { return this._account.ERROR; },
 
-  _init: function(aAccount, aBuddy, aTag, aUserName) {
+  _init(aAccount, aBuddy, aTag, aUserName) {
     if (!aBuddy && !aUserName)
-      throw "aUserName is required when aBuddy is null";
+      throw new Error("aUserName is required when aBuddy is null");
 
     this._tag = aTag;
     this._account = aAccount;
@@ -260,7 +267,7 @@ var GenericAccountBuddyPrototype = {
     }
     this._userName = aUserName;
   },
-  unInit: function() {
+  unInit() {
     delete this._tag;
     delete this._account;
     delete this._buddy;
@@ -280,10 +287,10 @@ var GenericAccountBuddyPrototype = {
     Services.contacts.accountBuddyMoved(this, oldTag, aNewTag);
   },
 
-  _notifyObservers: function(aTopic, aData) {
+  _notifyObservers(aTopic, aData) {
     try {
       this._buddy.observe(this, "account-buddy-" + aTopic, aData);
-    } catch(e) {
+    } catch (e) {
       this.ERROR(e);
     }
   },
@@ -300,7 +307,7 @@ var GenericAccountBuddyPrototype = {
       this._notifyObservers("display-name-changed", old);
   },
 
-  remove: function() {
+  remove() {
     Services.contacts.accountBuddyRemoved(this);
   },
 
@@ -325,7 +332,7 @@ var GenericAccountBuddyPrototype = {
   // imIStatusInfo interface.
   // All parameters are optional and will be ignored if they are null
   // or undefined.
-  setStatus: function(aStatusType, aStatusText, aAvailabilityDetails) {
+  setStatus(aStatusType, aStatusText, aAvailabilityDetails) {
     // Ignore omitted parameters.
     if (aStatusType === undefined || aStatusType === null)
       aStatusType = this._statusType;
@@ -361,10 +368,10 @@ var GenericAccountBuddyPrototype = {
   _availabilityDetails: 0,
   get availabilityDetails() { return this._availabilityDetails; },
 
-  get canSendMessage() { return this.online /*|| this.account.canSendOfflineMessage(this) */; },
+  get canSendMessage() { return this.online; },
 
   getTooltipInfo: () => EmptyEnumerator,
-  createConversation: function() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; }
+  createConversation() { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
 };
 
 // aUserName is required only if aBuddy is null, i.e., we are adding a buddy.
@@ -377,7 +384,7 @@ var GenericMessagePrototype = {
   __proto__: ClassInfo("prplIMessage", "generic message object"),
 
   _lastId: 0,
-  _init: function (aWho, aMessage, aObject) {
+  _init(aWho, aMessage, aObject) {
     this.id = ++GenericMessagePrototype._lastId;
     this.time = Math.floor(new Date() / 1000);
     this.who = aWho;
@@ -424,11 +431,11 @@ var GenericMessagePrototype = {
   notification: false,
   noLinkification: false,
 
-  getActions: function(aCount) {
+  getActions(aCount) {
     if (aCount)
       aCount.value = 0;
     return [];
-  }
+  },
 };
 
 function Message(aWho, aMessage, aObject) {
@@ -446,7 +453,7 @@ var GenericConversationPrototype = {
   get WARN() { return this._account.WARN; },
   get ERROR() { return this._account.ERROR; },
 
-  _init: function(aAccount, aName) {
+  _init(aAccount, aName) {
     this._account = aAccount;
     this._name = aName;
     this._observers = [];
@@ -462,45 +469,45 @@ var GenericConversationPrototype = {
     this._id = aId;
   },
 
-  addObserver: function(aObserver) {
+  addObserver(aObserver) {
     if (!this._observers.includes(aObserver))
       this._observers.push(aObserver);
   },
-  removeObserver: function(aObserver) {
+  removeObserver(aObserver) {
     this._observers = this._observers.filter(o => o !== aObserver);
   },
-  notifyObservers: function(aSubject, aTopic, aData) {
+  notifyObservers(aSubject, aTopic, aData) {
     for (let observer of this._observers) {
       try {
         observer.observe(aSubject, aTopic, aData);
-      } catch(e) {
+      } catch (e) {
         this.ERROR(e);
       }
     }
   },
 
   prepareForSending: (aOutgoingMessage, aCount) => null,
-  prepareForDisplaying: function(aImMessage) {
+  prepareForDisplaying(aImMessage) {
     if (aImMessage.displayMessage !== aImMessage.message) {
       this.DEBUG("Preparing:\n" + aImMessage.message + "\nDisplaying:\n" +
                  aImMessage.displayMessage);
     }
   },
-  sendMsg: function(aMsg) {
+  sendMsg(aMsg) {
     throw Cr.NS_ERROR_NOT_IMPLEMENTED;
   },
   sendTyping: aString => Ci.prplIConversation.NO_TYPING_LIMIT,
 
-  close: function() {
+  close() {
     Services.obs.notifyObservers(this, "closing-conversation");
     Services.conversations.removeConversation(this);
   },
-  unInit: function() {
+  unInit() {
     delete this._account;
     delete this._observers;
   },
 
-  writeMessage: function(aWho, aText, aProperties) {
+  writeMessage(aWho, aText, aProperties) {
     (new Message(aWho, aText, aProperties)).conversation = this;
   },
 
@@ -508,7 +515,7 @@ var GenericConversationPrototype = {
   get name() { return this._name; },
   get normalizedName() { return this._account.normalize(this.name); },
   get title() { return this.name; },
-  get startDate() { return this._date; }
+  get startDate() { return this._date; },
 };
 
 var GenericConvIMPrototype = {
@@ -516,7 +523,7 @@ var GenericConvIMPrototype = {
   _interfaces: [Ci.prplIConversation, Ci.prplIConvIM],
   classDescription: "generic ConvIM object",
 
-  updateTyping: function(aState, aName) {
+  updateTyping(aState, aName) {
     if (aState == this.typingState)
       return;
 
@@ -529,7 +536,7 @@ var GenericConvIMPrototype = {
 
   get isChat() { return false; },
   buddy: null,
-  typingState: Ci.prplIConvIM.NOT_TYPING
+  typingState: Ci.prplIConvIM.NOT_TYPING,
 };
 
 var GenericConvChatPrototype = {
@@ -537,7 +544,7 @@ var GenericConvChatPrototype = {
   _interfaces: [Ci.prplIConversation, Ci.prplIConvChat],
   classDescription: "generic ConvChat object",
 
-  _init: function(aAccount, aName, aNick) {
+  _init(aAccount, aName, aNick) {
     this._participants = new Map();
     this.nick = aNick;
     GenericConversationPrototype._init.call(this, aAccount, aName);
@@ -555,7 +562,7 @@ var GenericConvChatPrototype = {
   get topic() { return this._topic; },
   get topicSettable() { return false; },
   get topicSetter() { return this._topicSetter; },
-  setTopic: function(aTopic, aTopicSetter, aQuiet) {
+  setTopic(aTopic, aTopicSetter, aQuiet) {
     // Only change the topic if the topic and/or topic setter has changed.
     if (this._topic == aTopic &&
         (!this._topicSetter || this._topicSetter == aTopicSetter))
@@ -612,10 +619,10 @@ var GenericConvChatPrototype = {
     this.notifyObservers(null, "update-conv-chatjoining");
   },
 
-  getParticipant: function(aName) {
+  getParticipant(aName) {
     return this._participants.has(aName) ? this._participants.get(aName) : null;
   },
-  getParticipants: function() {
+  getParticipants() {
     // Convert the values of the Map into a nsSimpleEnumerator.
     return new nsSimpleEnumerator(
       Array.from(this._participants.values())
@@ -624,7 +631,7 @@ var GenericConvChatPrototype = {
   getNormalizedChatBuddyName: aChatBuddyName => aChatBuddyName,
 
   // Updates the nick of a participant in conversation to a new one.
-  updateNick: function(aOldNick, aNewNick, isOwnNick) {
+  updateNick(aOldNick, aNewNick, isOwnNick) {
     let message;
     let isParticipant = this._participants.has(aOldNick);
     if (isOwnNick) {
@@ -657,7 +664,7 @@ var GenericConvChatPrototype = {
   },
 
   // Removes a participant from conversation.
-  removeParticipant: function(aNick) {
+  removeParticipant(aNick) {
     if (!this._participants.has(aNick))
       return;
 
@@ -670,7 +677,7 @@ var GenericConvChatPrototype = {
   },
 
   // Removes all participant in conversation.
-  removeAllParticipants: function() {
+  removeAllParticipants() {
     let stringNicknames = [];
     this._participants.forEach(function(aParticipant) {
       let stringNickname = Cc["@mozilla.org/supports-string;1"]
@@ -683,11 +690,11 @@ var GenericConvChatPrototype = {
     this._participants.clear();
   },
 
-  writeMessage: function (aWho, aText, aProperties) {
+  writeMessage(aWho, aText, aProperties) {
     aProperties.containsNick =
       "incoming" in aProperties && this._pingRegexp.test(aText);
     GenericConversationPrototype.writeMessage.apply(this, arguments);
-  }
+  },
 };
 
 var GenericConvChatBuddyPrototype = {
@@ -708,7 +715,7 @@ var GenericConvChatBuddyPrototype = {
   halfOp: false,
   op: false,
   founder: false,
-  typing: false
+  typing: false,
 };
 
 function TooltipInfo(aLabel, aValue, aType = Ci.prplITooltipInfo.pair) {
@@ -750,13 +757,13 @@ function purplePref(aName, aOption) {
   this.label = aOption.label; // Text to display
 
   if (aOption.default === undefined || aOption.default === null)
-    throw "A default value for the option is required to determine its type.";
+    throw new Error("A default value for the option is required to determine its type.");
   this._defaultValue = aOption.default;
 
   const kTypes = {boolean: "Bool", string: "String", number: "Int"};
   let type = kTypes[typeof aOption.default];
   if (!type)
-    throw "Invalid option type";
+    throw new Error("Invalid option type");
 
   if (type == "String" && ("listValues" in aOption)) {
     type = "List";
@@ -773,10 +780,10 @@ purplePref.prototype = {
   masked: false,
 
   // Default value
-  getBool: function() { return this._defaultValue; },
-  getInt: function() { return this._defaultValue; },
-  getString: function() { return this._defaultValue; },
-  getList: function() {
+  getBool() { return this._defaultValue; },
+  getInt() { return this._defaultValue; },
+  getString() { return this._defaultValue; },
+  getList() {
     // Convert a JavaScript object map {"value 1": "label 1", ...}
     let keys = Object.keys(this._listValues);
     if (!keys.length)
@@ -786,7 +793,7 @@ purplePref.prototype = {
       keys.map(key => new purpleKeyValuePair(this._listValues[key], key))
     );
   },
-  getListDefault: function() { return this._defaultValue; }
+  getListDefault() { return this._defaultValue; },
 };
 
 function purpleKeyValuePair(aName, aValue) {
@@ -805,7 +812,7 @@ UsernameSplit.prototype = {
   get label() { return this._values.label; },
   get separator() { return this._values.separator; },
   get defaultValue() { return this._values.defaultValue; },
-  get reverse() { return !!this._values.reverse; } // Ensure boolean
+  get reverse() { return !!this._values.reverse; }, // Ensure boolean
 };
 
 function ChatRoomField(aIdentifier, aField) {
@@ -832,12 +839,12 @@ function ChatRoomFieldValues(aMap) {
 ChatRoomFieldValues.prototype = {
   __proto__: ClassInfo("prplIChatRoomFieldValues", "ChatRoomFieldValues"),
 
-  getValue: function(aIdentifier) {
+  getValue(aIdentifier) {
     return this.values.hasOwnProperty(aIdentifier) ? this.values[aIdentifier] : null;
   },
-  setValue: function(aIdentifier, aValue) {
+  setValue(aIdentifier, aValue) {
     this.values[aIdentifier] = aValue;
-  }
+  },
 };
 
 // the name getter and the getAccount method need to be implemented by
@@ -845,9 +852,9 @@ ChatRoomFieldValues.prototype = {
 var GenericProtocolPrototype = {
   __proto__: ClassInfo("prplIProtocol", "Generic protocol object"),
 
-  init: function(aId) {
+  init(aId) {
     if (aId != this.id)
-      throw "Creating an instance of " + aId + " but this object implements " + this.id;
+      throw new Error("Creating an instance of " + aId + " but this object implements " + this.id);
   },
   get id() { return "prpl-" + this.normalizedName; },
   // This is more aggressive than the account normalization of just
@@ -855,14 +862,14 @@ var GenericProtocolPrototype = {
   get normalizedName() { return this.name.replace(/[^a-z0-9]/gi, "").toLowerCase(); },
   get iconBaseURI() { return "chrome://chat/skin/prpl-generic/"; },
 
-  getAccount: function(aImAccount) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
+  getAccount(aImAccount) { throw Cr.NS_ERROR_NOT_IMPLEMENTED; },
 
-  _getOptionDefault: function(aName) {
+  _getOptionDefault(aName) {
     if (this.options && this.options.hasOwnProperty(aName))
       return this.options[aName].default;
-    throw aName + " has no default value in " + this.id + ".";
+    throw new Error(aName + " has no default value in " + this.id + ".");
   },
-  getOptions: function() {
+  getOptions() {
     if (!this.options)
       return EmptyEnumerator;
 
@@ -871,7 +878,7 @@ var GenericProtocolPrototype = {
       purplePrefs.push(new purplePref(name, option));
     return new nsSimpleEnumerator(purplePrefs);
   },
-  getUsernameSplit: function() {
+  getUsernameSplit() {
     if (!this.usernameSplits || !this.usernameSplits.length)
       return EmptyEnumerator;
 
@@ -879,13 +886,13 @@ var GenericProtocolPrototype = {
       this.usernameSplits.map(split => new UsernameSplit(split)));
   },
 
-  registerCommands: function() {
+  registerCommands() {
     if (!this.commands)
       return;
 
     this.commands.forEach(function(command) {
       if (!command.hasOwnProperty("name") || !command.hasOwnProperty("run"))
-        throw "Every command must have a name and a run function.";
+        throw new Error("Every command must have a name and a run function.");
       if (!("QueryInterface" in command))
         command.QueryInterface = ChromeUtils.generateQI([Ci.imICommand]);
       if (!command.hasOwnProperty("usageContext"))
@@ -898,7 +905,7 @@ var GenericProtocolPrototype = {
 
   // NS_ERROR_XPC_JSOBJECT_HAS_NO_FUNCTION_NAMED errors are too noisy
   get usernameEmptyText() { return ""; },
-  accountExists: () => false, //FIXME
+  accountExists: () => false, // FIXME
 
   get uniqueChatName() { return false; },
   get chatHasTopic() { return false; },
@@ -912,5 +919,5 @@ var GenericProtocolPrototype = {
   get usePurpleProxy() { return false; },
 
   get classDescription() { return this.name + " Protocol"; },
-  get contractID() { return "@mozilla.org/chat/" + this.normalizedName + ";1"; }
+  get contractID() { return "@mozilla.org/chat/" + this.normalizedName + ";1"; },
 };

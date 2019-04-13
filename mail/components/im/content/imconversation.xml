@@ -12,6 +12,7 @@
 <bindings id="conversationBindings"
           xmlns="http://www.mozilla.org/xbl"
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+          xmlns:html="http://www.w3.org/1999/xhtml"
           xmlns:xbl="http://www.mozilla.org/xbl">
 
   <binding id="conversation">
@@ -20,19 +21,20 @@
         <xul:hbox class="conv-top" flex="1" anonid="conv-top">
           <xul:notificationbox class="conv-messages" anonid="convNotificationBox" flex="1" xbl:inherits="chat">
             <xul:vbox flex="1">
-              <xul:browser anonid="browser" type="content" browser-type="conversation" flex="1"
+              <xul:browser anonid="browser" is="conversation-browser" type="content" flex="1"
+                           class="chat-conversation-browser"
                            xbl:inherits="tooltip=contenttooltip,contextmenu=contentcontextmenu,autoscrollpopup"/>
-              <xul:progressmeter anonid="browserProgress" hidden="true"/>
+              <html:progress anonid="browserProgress" hidden="hidden"/>
               <xul:findbar anonid="FindToolbar" reversed="true"/>
             </xul:vbox>
           </xul:notificationbox>
         </xul:hbox>
-        <xul:splitter class="splitter" anonid="splitter-bottom"/>
-        <hbox anonid="convStatusContainer" class="conv-status-container" hidden="true">
+        <xul:splitter class="splitter" anonid="splitter-bottom" orient="vertical"/>
+        <hbox anonid="convStatusContainer" class="conv-status-container" hidden="hidden">
           <xul:description anonid="convStatus" class="plain conv-status" crop="end" />
         </hbox>
         <xul:stack anonid="conv-bottom" class="conv-bottom">
-          <xul:textbox anonid="inputBox" class="conv-textbox" multiline="true" flex="1"/>
+          <html:textarea anonid="inputBox" class="conv-textbox" flex="1"/>
           <xul:description anonid="charCounter" class="conv-counter" value="" right="0" bottom="0"/>
         </xul:stack>
       </xul:vbox>
@@ -61,6 +63,16 @@
        browser.addEventListener("keypress", this.browserKeyPress.bind(this));
        browser.addEventListener("dblclick", this.browserDblClick.bind(this));
        Services.obs.addObserver(this, "conversation-loaded");
+
+       // @implements {nsIObserver}
+       this.prefObserver = (subject, topic, data) => {
+         if (Services.prefs.getBoolPref("mail.spellcheck.inline")) {
+           this.editor.setAttribute("spellcheck", "true");
+         } else {
+           this.editor.removeAttribute("spellcheck");
+         }
+       };
+       Services.prefs.addObserver("mail.spellcheck.inline", this.prefObserver);
       ]]>
      </constructor>
 
@@ -81,9 +93,10 @@
 
            if ("MessageFormat" in window) {
              let textbox = this.editor;
+             const {MessageFormat} = ChromeUtils.import("resource:///modules/imTextboxUtils.jsm");
              MessageFormat.unregisterTextbox(textbox);
-             TextboxSpellChecker.unregisterTextbox(textbox);
            }
+           Services.prefs.removeObserver("mail.spellcheck.inline", this.prefObserver);
          ]]>
        </body>
      </method>
@@ -145,7 +158,7 @@
       <body>
       <![CDATA[
         if (!this.loaded)
-          throw "Calling addMsg before the browser is ready?";
+          throw new Error("Calling addMsg before the browser is ready?");
 
         var conv = aMsg.conversation;
         if (!conv) {
@@ -164,15 +177,14 @@
             color = buddy.color;
             buddy.removeAttribute("inactive");
             this._activeBuddies[name] = true;
-          }
-          else {
+          } else {
             // Buddy no longer in the room
             color = this._computeColor(name);
           }
           aMsg.color = "color: hsl(" + color + ", 100%, 40%);";
         }
 
-        // Porting note: In TB, this.tab points at the imconv listitem element.
+        // Porting note: In TB, this.tab points at the imconv richlistitem element.
         let read = this._readCount > 0;
         let isUnreadMessage = !read && aMsg.incoming && !aMsg.system;
         let isTabFocused = this.tab && this.tab.selected && document.hasFocus();
@@ -240,18 +252,16 @@
           if (aMsg.match(/^\/(?:say)? ?$/)) {
             this.resetInput();
             return;
-          }
-          else if (aMsg.match(/^\/(?:say)? .*/))
+          } else if (aMsg.match(/^\/(?:say)? .*/)) {
             aMsg = aMsg.slice(aMsg.indexOf(" ") + 1);
-          else if (Services.cmd.executeCommand(aMsg, this._conv.target,
-                                               convToFocus)) {
+          } else if (Services.cmd.executeCommand(aMsg, this._conv.target,
+                                                 convToFocus)) {
             this._conv.sendTyping("");
             this.resetInput();
             if (convToFocus.value)
               chatHandler.focusConversation(convToFocus.value);
             return;
-          }
-          else if (account.protocol.slashCommandsNative && account.connected) {
+          } else if (account.protocol.slashCommandsNative && account.connected) {
             let cmd = aMsg.match(/^\/[^ ]+/);
             if (cmd && cmd != "/me") {
               this._conv.systemMessage(
@@ -277,9 +287,8 @@
               if ("fontFamily" in style)
                 msg = "<font face=\"" + style.fontFamily + "\">" + msg + "</font>";
               // MSN doesn't support font size info in messages...
-            }
-            else if (proto == "prpl-aim" || proto == "prpl-icq") {
-              let styleAttributes = ""
+            } else if (proto == "prpl-aim" || proto == "prpl-icq") {
+              let styleAttributes = "";
               if ("color" in style)
                 styleAttributes += " color=\"" + style.color + "\"";
               if ("fontFamily" in style)
@@ -291,7 +300,7 @@
                 else if (size < 0)
                   size = 2;
                 else if (size < 3)
-                  size = 3
+                  size = 3;
                 else if (size < 7)
                   size = 4;
                 else if (size < 15)
@@ -305,8 +314,7 @@
               }
               if (styleAttributes)
                 msg = "<font" + styleAttributes + ">" + msg + "</font>";
-            }
-            else {
+            } else {
               let styleProperties = [];
               if ("color" in style)
                 styleProperties.push("color: " + style.color);
@@ -320,17 +328,16 @@
             }
           }
           this._conv.sendMsg(msg);
-        }
-        else {
+        } else {
           msg = account.HTMLEscapePlainText ? msg : aMsg;
 
           if (account.noNewlines) {
             // 'Illegal operation on WrappedNative prototype object' if the this
             // object is not specified (since this._conv implements nsIClassInfo)
             msg.split("\n").forEach(this._conv.sendMsg, this._conv);
-          }
-          else
+          } else {
             this._conv.sendMsg(msg);
+          }
         }
         // reset the textbox to its original size
         this.resetInput();
@@ -365,14 +372,14 @@
      <method name="calculateTextboxDefaultHeight">
       <body>
       <![CDATA[
-        let totalSpace = parseInt(window.getComputedStyle(this, null)
+        let totalSpace = parseInt(window.getComputedStyle(this)
                                         .getPropertyValue("height"));
         let textbox = this.editor;
-        let textboxStyle = window.getComputedStyle(textbox, null);
+        let textboxStyle = window.getComputedStyle(textbox);
         let lineHeight = parseInt(textboxStyle.getPropertyValue("line-height"));
 
         // Compute the overhead size.
-        let textboxHeight = textbox.inputField.clientHeight;
+        let textboxHeight = textbox.clientHeight;
         let deckHeight = textbox.parentNode.boxObject.height;
         this._TEXTBOX_VERTICAL_OVERHEAD = deckHeight - textboxHeight;
 
@@ -403,21 +410,20 @@
       <![CDATA[
         let textbox = this.editor;
 
-        if (!("MessageFormat" in window))
-          ChromeUtils.import("resource:///modules/imTextboxUtils.jsm");
+        const {MessageFormat} = ChromeUtils.import("resource:///modules/imTextboxUtils.jsm");
         MessageFormat.registerTextbox(textbox);
 
         // Init the textbox size
         this.calculateTextboxDefaultHeight();
         textbox.parentNode.height = textbox.defaultHeight +
                                     this._TEXTBOX_VERTICAL_OVERHEAD;
-        textbox.inputField.style.overflowY = "hidden";
+        textbox.style.overflowY = "hidden";
 
-        // Delay the initialization of the spellchecker until after
-        // the checkbox is initialized, otherwise the spellchecker is
-        // broken in conversations added to the window before it is
-        // visible (bug 295).
-        TextboxSpellChecker.registerTextbox(textbox);
+        if (Services.prefs.getBoolPref("mail.spellcheck.inline")) {
+          textbox.setAttribute("spellcheck", "true");
+        } else {
+          textbox.removeAttribute("spellcheck");
+        }
       ]]>
       </body>
      </method>
@@ -474,8 +480,7 @@
           if (text == this._beforeTabComplete) {
             // Nothing to undo, so let backspace act normally.
             delete this._completions;
-          }
-          else {
+          } else {
             event.preventDefault();
 
             // First undo the comma separating multiple nicks or the suffix.
@@ -569,8 +574,7 @@
               if (!completions.includes(name))
                 completions.push(name);
             }
-          }
-          else {
+          } else {
             // If it's not a command, the only thing we can complete is a nick.
             if (!this._conv.isChat)
               return;
@@ -638,9 +642,9 @@
               inputBox.selectionStart += moveCursor;
               let separator = text.substring(inputBox.selectionStart,
                                              inputBox.selectionStart + 2);
-              if (separator == ": " || separator == ", ")
+              if (separator == ": " || separator == ", ") {
                 inputBox.selectionStart += 2;
-              else if (!moveCursor) {
+              } else if (!moveCursor) {
                 // If we're already at the end of a nick, carry on to display
                 // a list of possible alternatives and/or apply punctuation.
                 break;
@@ -696,9 +700,9 @@
               // even if there are alternatives), only show the list of
               // completions on the next <tab> press.
               this._shouldListCompletionsLater = completionsList;
-            }
-            else
+            } else {
               this._conv.systemMessage(completionsList);
+            }
           }
 
           let suffix = (isFirstWord ? firstWordSuffix : "");
@@ -709,17 +713,16 @@
             // Only one possible completion? Apply it! :-)
             completion = this._completions[this._completionsIndex++];
             this._completionsIndex %= this._completions.length;
-          }
-          else {
+          } else {
             // We have several possible completions, attempt to find a common prefix.
             let maxLength = Math.min(firstCompletion.length, lastCompletion.length);
             let i = 0;
             while (i < maxLength && firstCompletion[i] == lastCompletion[i])
               ++i;
 
-            if (i)
+            if (i) {
               completion = firstCompletion.substring(0, i);
-            else {
+            } else {
               // Include this case so that secondNick is applied anyway,
               // in case a completion is added by another tab press.
               completion = word;
@@ -738,9 +741,9 @@
           }
 
           this.addString(completion);
-        }
-        else if (this._completions)
+        } else if (this._completions) {
           delete this._completions;
+        }
 
         if (event.keyCode != 13)
           return;
@@ -750,9 +753,9 @@
           // a line break inserted in the textbox if sendMsg throws.
           event.preventDefault();
           this.sendMsg(text);
-        }
-        else if (!event.shiftKey)
+        } else if (!event.shiftKey) {
           this.addString("\n");
+        }
       ]]>
       </body>
      </method>
@@ -804,8 +807,7 @@
          if (left == Ci.prplIConversation.NO_TYPING_LIMIT || !text.length) {
            charCounter.setAttribute("value", "");
            inputBox.removeAttribute("invalidInput");
-         }
-         else {
+         } else {
            // 200 is a 'magic' constant to avoid showing big numbers.
            charCounter.setAttribute("value", (left < 200 ? left : ""));
 
@@ -830,6 +832,7 @@
         this.displayStatusText();
 
         let overflow = "";
+        const {TextboxSize} = ChromeUtils.import("resource:///modules/imTextboxUtils.jsm");
         if (TextboxSize.autoResize) {
           let currHeight = parseInt(inputBox.parentNode.height);
           if (inputBox.defaultHeight + this._TEXTBOX_VERTICAL_OVERHEAD > currHeight)
@@ -839,7 +842,7 @@
           overflow = "hidden";
         }
 
-        inputBox.inputField.style.overflowY = overflow;
+        inputBox.style.overflowY = overflow;
       ]]>
       </body>
      </method>
@@ -848,11 +851,11 @@
       <parameter name="event"/>
       <body>
       <![CDATA[
-        let textbox = this.editor;
-        let input = textbox.inputField;
+        let input = this.editor;
 
         // This feature has been disabled, or the user is currently dragging
         // the splitter and the textbox has received an overflow event
+        const {TextboxSize} = ChromeUtils.import("resource:///modules/imTextboxUtils.jsm");
         if (!TextboxSize.autoResize ||
             this.getElt("splitter-bottom").getAttribute("state") == "dragging") {
           input.style.overflowY = "";
@@ -862,10 +865,10 @@
         // Check whether we can increase the height without hiding the status bar
         // (ensure the min-height property on the top part of this dialog)
         let topBox = this.getElt("conv-top");
-        let topBoxStyle = window.getComputedStyle(topBox, null);
+        let topBoxStyle = window.getComputedStyle(topBox);
         let topMinSize = parseInt(topBoxStyle.getPropertyValue("min-height"));
         let topSize = parseInt(topBoxStyle.getPropertyValue("height"));
-        let deck = textbox.parentNode;
+        let deck = input.parentNode;
         let oldDeckHeight = parseInt(deck.height);
         let newDeckHeight =
           parseInt(input.scrollHeight) + this._TEXTBOX_VERTICAL_OVERHEAD;
@@ -874,8 +877,7 @@
           // Hide a possible vertical scrollbar.
           input.style.overflowY = "hidden";
           deck.height = newDeckHeight;
-        }
-        else {
+        } else {
           input.style.overflowY = "";
           // Set it to the maximum possible value.
           deck.height = oldDeckHeight + (topSize - topMinSize);
@@ -894,12 +896,11 @@
           this.calculateTextboxDefaultHeight();
           textbox.parentNode.height = textbox.defaultHeight +
                                       this._TEXTBOX_VERTICAL_OVERHEAD;
-        }
-        else {
+        } else {
           // Used in case the browser is already on its min-height, resize the
           // textbox to avoid hiding the status bar.
           let convTop = this.getElt("conv-top");
-          let convTopStyle = window.getComputedStyle(convTop, null);
+          let convTopStyle = window.getComputedStyle(convTop);
           let convTopHeight = parseInt(convTopStyle.getPropertyValue("height"));
           let convTopMinHeight =
             parseInt(convTopStyle.getPropertyValue("min-height"));
@@ -911,7 +912,7 @@
                                         (convTopHeight - convTopMinHeight);
           }
         }
-
+        const {TextboxSize} = ChromeUtils.import("resource:///modules/imTextboxUtils.jsm");
         if (TextboxSize.autoResize)
           this.inputExpand();
       ]]>
@@ -922,8 +923,9 @@
       <parameter name="event"/>
       <body>
       <![CDATA[
+        const {TextboxSize} = ChromeUtils.import("resource:///modules/imTextboxUtils.jsm");
         if (TextboxSize.autoResize)
-          this.inputField.style.overflowY = "hidden";
+          this.style.overflowY = "hidden";
       ]]>
       </body>
      </method>
@@ -932,11 +934,8 @@
      <parameter name="event"/>
       <body>
       <![CDATA[
-#ifndef XP_MACOSX
-        var accelKeyPressed = event.ctrlKey;
-#else
-        var accelKeyPressed = event.metaKey;
-#endif
+        var accelKeyPressed = AppConstants.platform == "macosx" ? event.metaKey : event.ctrlKey;
+
         // 118 is the decimal code for "v" character, 13 keyCode for "return" key
         if (((accelKeyPressed && event.charCode != 118) || event.altKey) &&
             event.keyCode != 13)
@@ -949,8 +948,16 @@
           return;
 
         if (accelKeyPressed ||
-            !Services.prefs.getBoolPref("accessibility.typeaheadfind"))
+            !Services.prefs.getBoolPref("accessibility.typeaheadfind")) {
           this.editor.focus();
+
+          // A common use case is to click somewhere in the conversation and
+          // start typing a command (often /me). If quick find is enabled, it
+          // will pick up the "/" keypress and open the findbar.
+          if (event.charCode == "/".charCodeAt(0)) {
+            event.preventDefault();
+          }
+        }
 
         // Returns for Ctrl+V
         if (accelKeyPressed)
@@ -958,7 +965,7 @@
 
         // resend the event
         let clonedEvent = new KeyboardEvent("keypress", event);
-        this.editor.inputField.dispatchEvent(clonedEvent);
+        this.editor.dispatchEvent(clonedEvent);
       ]]>
       </body>
      </method>
@@ -1050,9 +1057,9 @@
              image = "founder";
          }
          if (image)
-           aItem.setAttribute("image", "chrome://messenger/skin/" + image + ".png");
+           aItem.firstChild.setAttribute("src", "chrome://messenger/skin/" + image + ".png");
          else
-           aItem.removeAttribute("image");
+           aItem.firstChild.removeAttribute("src");
        ]]>
        </body>
      </method>
@@ -1096,54 +1103,65 @@
        </body>
      </method>
 
-     <!-- Add a buddy in the visible list of participants -->
-     <method name="addBuddy">
+     <!-- Create a buddy item to add in the visible list of participants -->
+     <method name="createBuddy">
        <parameter name="aBuddy"/>
        <body>
        <![CDATA[
          var name = aBuddy.name;
          if (!name)
-           throw "The empty string isn't a valid nick.";
+           throw new Error("The empty string isn't a valid nick.");
          if (this.buddies.has(name))
-           throw "Adding chat buddy " + name + " twice?!";
+           throw new Error("Adding chat buddy " + name + " twice?!");
 
          this.trackNick(name);
 
-         var item = document.createElement("listitem");
+         let image = document.createElement("image");
+         let label = document.createElement("label");
+         label.setAttribute("value", name);
+         label.setAttribute("flex", "1");
+         label.setAttribute("crop", "end");
+
+         // Fix insertBuddy below if you change the DOM makeup!
+         var item = document.createElement("richlistitem");
          item.chatBuddy = aBuddy;
-         item.setAttribute("class", "listitem-iconic");
-         item.setAttribute("label", name);
+         item.appendChild(image);
+         item.appendChild(label);
          this.setBuddyAttributes(item);
 
          var color = this._computeColor(name);
          var style = "color: hsl(" + color + ", 100%, 40%);";
          item.colorStyle = style;
          item.setAttribute("style", style);
+         item.setAttribute("align", "center");
          if (!this._isBuddyActive(name))
            item.setAttribute("inactive", "true");
          item.color = color;
          this.buddies.set(name, item);
 
-         // Insert item at the right position
-         this.addNick(item);
+         return item;
        ]]>
        </body>
      </method>
 
-     <method name="addNick">
+     <!-- Insert item at the right position -->
+     <method name="insertBuddy">
        <parameter name="aListItem"/>
        <body>
        <![CDATA[
          var nicklist = document.getElementById("nicklist");
-         var nick = aListItem.getAttribute("label").toLowerCase();
+         var nick = aListItem.querySelector("label").value.toLowerCase();
 
          // Look for the place of the nick in the list
          var start = 0;
          var end = nicklist.itemCount;
          while (start < end) {
            var middle = start + Math.floor((end - start) / 2);
+           // .firstChild.nextSibling gets us to the label. We can't use
+           // .label since the XBL binding might not be attached yet.
            if (nick < nicklist.getItemAtIndex(middle)
-                              .getAttribute("label").toLowerCase())
+                              .firstChild.nextSibling
+                              .getAttribute("value").toLowerCase())
              end = middle;
            else
              start = middle + 1;
@@ -1166,7 +1184,7 @@
        <![CDATA[
          var name = aBuddy.name;
          if (!name)
-           throw "The empty string isn't a valid nick.";
+           throw new Error("The empty string isn't a valid nick.");
 
          if (!aOldName) {
            // If aOldName is null, we are changing the flags of the buddy
@@ -1188,20 +1206,20 @@
 
          // Is aOldName is not null, then we are renaming the buddy
          if (!this.buddies.has(aOldName))
-           throw "Updating a chat buddy that does not exist: " + aOldName;
+           throw new Error("Updating a chat buddy that does not exist: " + aOldName);
 
          if (this.buddies.has(name))
-           throw "Updating a chat buddy to an already existing one: " + name;
+           throw new Error("Updating a chat buddy to an already existing one: " + name);
 
          let item = this.buddies.get(aOldName);
          item.chatBuddy = aBuddy;
          this.buddies.delete(aOldName);
          this.buddies.set(name, item);
-         item.setAttribute("label", name);
+         item.querySelector("label").value = name;
 
          // Move this item to the right position if its name changed
          item.remove();
-         this.addNick(item);
+         this.insertBuddy(item);
        ]]>
        </body>
      </method>
@@ -1211,7 +1229,7 @@
        <body>
        <![CDATA[
          if (!this.buddies.has(aName))
-           throw "Cannot remove a buddy that was not in the room";
+           throw new Error("Cannot remove a buddy that was not in the room");
          this.buddies.get(aName).remove();
          this.buddies.delete(aName);
          if (this._isBuddyActive(aName))
@@ -1236,7 +1254,7 @@
      <method name="getShowNickModifier">
        <body>
        <![CDATA[
-         return (function (aNode) {
+         return (function(aNode) {
            if (!("_showNickRegExp" in this)) {
              if (!("_showNickList" in this)) {
                this._showNickList = {};
@@ -1253,8 +1271,7 @@
                // XXX Ideally we would use unicode word boundaries:
                // http://www.unicode.org/reports/tr29/#Word_Boundaries
                this._showNickRegExp = new RegExp("\\W(?:" + nicks + ")\\W");
-             }
-             else {
+             } else {
                // nobody, disable...
                this._showNickRegExp = {exec: () => null};
                return 0;
@@ -1282,9 +1299,9 @@
                let buddy = this.buddies.get(nick);
                elt.setAttribute("style", buddy.colorStyle);
                elt.setAttribute("data-nickColor", buddy.color);
-             }
-             else
+             } else {
                elt.setAttribute("data-left", "true");
+             }
              nickNode.parentNode.replaceChild(elt, nickNode);
              elt.textContent = nick;
              result += 2;
@@ -1299,7 +1316,6 @@
        <body>
        <![CDATA[
           let cti = document.getElementById("conv-top-info");
-          let statusMessage = this.getElt("statusMessage");
           if (this._conv.topicSettable)
             cti.setAttribute("topicEditable", "true");
           else
@@ -1309,8 +1325,7 @@
           if (topic) {
             cti.setAttribute("statusTooltiptext", topic);
             cti.removeAttribute("noTopic");
-          }
-          else {
+          } else {
             topic = this._conv.noTopicString;
             cti.setAttribute("noTopic", "true");
             cti.setAttribute("statusTooltiptext", topic);
@@ -1346,23 +1361,20 @@
           let typingState = this._conv.typingState;
           let cti = document.getElementById("conv-top-info");
           cti.removeAttribute("typing");
-          cti.removeAttribute("typed");
 
           let name = this._currentTypingName;
           if (!this._currentTypingName)
-            name = this._conv.title;//.replace(/^([a-zA-Z0-9.]+)[@\s].*/, "$1");
+            name = this._conv.title; // .replace(/^([a-zA-Z0-9.]+)[@\s].*/, "$1");
           if (typingState == Ci.prplIConvIM.TYPING) {
-            cti.setAttribute("typing", "true");
+            cti.setAttribute("typing", "active");
             let typingMsg = this.bundle.formatStringFromName("chat.contactIsTyping",
                                                              [name], 1);
             cti.setAttribute("statusTypeTooltiptext", typingMsg);
             cti.setAttribute("statusTooltiptext", typingMsg);
             cti.setAttribute("statusMessage",
                              this.bundle.GetStringFromName("chat.isTyping"));
-          }
-          else if (typingState == Ci.prplIConvIM.TYPED) {
-            cti.setAttribute("typed", "true");
-
+          } else if (typingState == Ci.prplIConvIM.TYPED) {
+            cti.setAttribute("typing", "paused");
             let typedMsg = this.bundle.formatStringFromName("chat.contactHasStoppedTyping",
                                                             [name], 1);
             cti.setAttribute("statusTypeTooltiptext", typedMsg);
@@ -1392,11 +1404,13 @@
           // and reset the unread flag. In IB, this is done by tabbrowser.
           this.tab.update();
         }.bind(this), 1000);
+        this.browser.isActive = true;
       ]]>
       </body>
     </method>
 
     <method name="switchingAwayFromPanel">
+      <parameter name="aHidden"/>
       <body>
         <![CDATA[
           if (this._visibleTimer) {
@@ -1407,6 +1421,9 @@
           // interruptions for sufficiently long.
           if (this._wasVisible)
             this.browser.removeUnreadRuler();
+
+          if (aHidden)
+            this.browser.isActive = false;
         ]]>
       </body>
     </method>
@@ -1431,16 +1448,15 @@
             this.updateTopic();
             cti.setAttribute("status", "chat");
             cti.setAttribute("displayName", this._conv.title);
-          }
-          else {
+          } else {
             let displayName = this._conv.title;
             let statusText = "";
             let statusType = Ci.imIStatusInfo.STATUS_UNKNOWN;
 
             let buddy = this._conv.buddy;
-            if (!buddy || !buddy.account.connected)
+            if (!buddy || !buddy.account.connected) {
               cti.removeAttribute("userIcon");
-            else {
+            } else {
               displayName = buddy.displayName;
               statusText = buddy.statusText;
               statusType = buddy.statusType;
@@ -1473,9 +1489,11 @@
              nicklist.lastChild.remove();
            // Populate the nicklist
            this.buddies = new Map();
-           let nicks = fixIterator(this.conv.getParticipants());
-           for (let n of nicks)
-             this.addBuddy(n);
+           for (let n of this.conv.getParticipants())
+             this.createBuddy(n);
+           nicklist.append(...Array.from(this.buddies.keys())
+                                .sort((a, b) => a.localeCompare(b))
+                                .map(nick => this.buddies.get(nick)));
            this.updateParticipantCount();
          }
        ]]>
@@ -1504,8 +1522,6 @@
 
          this.findbar.browser = this.browser;
 
-         if (!("Status" in window))
-           ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
          this.updateConvStatus();
          this.initTextboxFormat();
        ]]>
@@ -1534,7 +1550,7 @@
            return;
          }
 
-         switch(aTopic) {
+         switch (aTopic) {
          case "new-text":
            if (this.loaded)
              this.addMsg(aSubject);
@@ -1573,7 +1589,7 @@
              break;
            aSubject.QueryInterface(Ci.nsISimpleEnumerator);
            while (aSubject.hasMoreElements())
-             this.addBuddy(aSubject.getNext());
+             this.insertBuddy(this.createBuddy(aSubject.getNext()));
            this.updateParticipantCount();
            break;
 
@@ -1637,7 +1653,7 @@
        <setter>
          <![CDATA[
            if (this._conv && val)
-             throw("Already initialized");
+             throw new Error("imconversation already initialized");
            if (!val) {
              // this conversation has probably been moved to another
              // tab. Forget the prplConversation so that it isn't
@@ -1680,134 +1696,6 @@
          ]]>
        </getter>
      </property>
-    </implementation>
-  </binding>
-
-  <binding id="conv-info-large"
-           extends="chrome://messenger/content/toolbar.xml#toolbar">
-    <resources>
-      <stylesheet src="chrome://messenger/content/chat/chat.css"/>
-    </resources>
-    <content>
-      <xul:stack anonid="statusImageStack" class="statusImageStack">
-        <!-- The box around the user icon is a workaround for bug 955673. -->
-        <xul:box class="userIconHolder" xbl:inherits="userIcon">
-          <xul:image anonid="userIcon" class="userIcon" mousethrough="always"
-                     xbl:inherits="src=userIcon"/>
-        </xul:box>
-        <xul:image anonid="statusTypeIcon" class="statusTypeIcon"
-                   xbl:inherits="status,typing,typed,tooltiptext=statusTypeTooltiptext"/>
-      </xul:stack>
-      <xul:stack class="displayNameAndstatusMessageStack"
-                 mousethrough="always" flex="1">
-        <xul:hbox align="center" flex="1">
-          <xul:description anonid="displayName" class="displayName" flex="1"
-                           crop="end" xbl:inherits="value=displayName"/>
-          <xul:image class="prplIcon" anonid="targetPrplIcon"
-                     xbl:inherits="src=prplIcon"/>
-        </xul:hbox>
-        <xul:description anonid="statusMessage" class="statusMessage"
-                         xbl:inherits="value=statusMessage,tooltiptext=statusTooltiptext,editable=topicEditable,editing,noTopic"
-                         mousethrough="never" crop="end" flex="100000"/>
-      </xul:stack>
-    </content>
-    <implementation>
-     <constructor>
-      <![CDATA[
-        this.topic
-            .addEventListener("click", this.startEditTopic.bind(this));
-        // Cancel any ongoing edit if the binding changes.
-        this.removeAttribute("editing");
-      ]]>
-     </constructor>
-
-     <property name="topic">
-       <getter>
-         <![CDATA[
-           return document.getAnonymousElementByAttribute(this, "anonid",
-                                                          "statusMessage");
-         ]]>
-       </getter>
-     </property>
-
-     <method name="finishEditTopic">
-       <parameter name="aSave"/>
-       <body>
-       <![CDATA[
-         if (!this.hasAttribute("editing"))
-           return;
-
-         let convBinding =
-           document.getElementById("conversationsDeck").selectedPanel;
-
-         let elt = this.topic;
-         if (aSave) {
-           // apply the new topic only if it is different from the current one
-           if (elt.value != elt.getAttribute("value"))
-             convBinding._conv.topic = elt.value;
-         }
-         this.removeAttribute("editing");
-         elt.removeEventListener("keypress", this._topicKeyPress, true);
-         delete this._topicKeyPress;
-         elt.removeEventListener("blur", this._topicBlur);
-         delete this._topicBlur;
-
-         // After removing the "editing" attribute, the focus is on an element
-         // that can't receive keyboard events, so move it to somewhere else.
-         convBinding.editor.focus();
-       ]]>
-       </body>
-     </method>
-
-     <method name="topicKeyPress">
-       <parameter name="aEvent"/>
-       <body>
-       <![CDATA[
-         switch (aEvent.keyCode) {
-           case aEvent.DOM_VK_RETURN:
-             this.finishEditTopic(true);
-             break;
-
-           case aEvent.DOM_VK_ESCAPE:
-             this.finishEditTopic(false);
-             aEvent.stopPropagation();
-             aEvent.preventDefault();
-             break;
-         }
-       ]]>
-       </body>
-     </method>
-
-     <method name="topicBlur">
-       <parameter name="aEvent"/>
-       <body>
-       <![CDATA[
-         if (aEvent.originalTarget == this.topic.inputField)
-           this.finishEditTopic(true);
-       ]]>
-       </body>
-     </method>
-
-     <method name="startEditTopic">
-       <body>
-       <![CDATA[
-          let elt = this.topic;
-          if (!elt.hasAttribute("editable") || this.hasAttribute("editing"))
-            return;
-
-          this.setAttribute("editing", "true");
-          this._topicKeyPress = this.topicKeyPress.bind(this);
-          elt.addEventListener("keypress", this._topicKeyPress);
-          this._topicBlur = this.topicBlur.bind(this);
-          elt.addEventListener("blur", this._topicBlur);
-          // force binding attachmant by forcing layout
-          elt.getBoundingClientRect();
-          if (this.hasAttribute("noTopic"))
-            elt.value = "";
-          elt.select();
-       ]]>
-       </body>
-     </method>
     </implementation>
   </binding>
 </bindings>

@@ -113,9 +113,9 @@ NS_IMETHODIMP JaBaseCppUrl::SetOriginalSpec(const char *aOriginalSpec)
   return NS_OK;
 }
 
-NS_IMETHODIMP JaBaseCppUrl::GetPrincipalSpec(nsACString& aPrincipalSpec)
+NS_IMETHODIMP JaBaseCppUrl::GetNormalizedSpec(nsACString& aPrincipalSpec)
 {
-  // URLs contain a lot of query parts. We want need a normalised form:
+  // URLs contain a lot of query parts. We want need a normalized form:
   // scheme://server/folder?number=123
   nsCOMPtr<nsIMsgMailNewsUrl> mailnewsURL;
   QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(mailnewsURL));
@@ -189,7 +189,7 @@ NS_IMPL_ISUPPORTS(JaCppUrlDelegator::Super,
                   nsIMsgMessageUrl,
                   nsIURI,
                   nsIURL,
-                  nsIURIWithPrincipal,
+                  nsIURIWithSpecialOrigin,
                   nsIMsgMailNewsUrl,
                   msgIJaUrl,
                   nsIInterfaceRequestor,
@@ -215,7 +215,7 @@ NS_IMETHODIMP JaCppUrlDelegator::SetMethodsToDelegate(msgIDelegateList *aDelegat
 NS_IMETHODIMP JaCppUrlDelegator::GetMethodsToDelegate(msgIDelegateList **aDelegateList)
 {
   if (!mDelegateList)
-    mDelegateList = new DelegateList("mozilla::mailnews::JaCppUrlDelegator::");
+    mDelegateList = new DelegateList();
   mMethods = &(mDelegateList->mMethods);
   NS_ADDREF(*aDelegateList = mDelegateList);
   return NS_OK;

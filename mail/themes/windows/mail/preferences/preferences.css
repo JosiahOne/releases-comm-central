@@ -3,45 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 @import url("chrome://messenger/content/bindings.css");
-@import url("chrome://messenger/content/preferences/preferences.css");
 
 /* Global Styles */
-
-prefwindow {
-  -moz-appearance: window;
-  background-color: -moz-Dialog;
-  color: -moz-DialogText;
-  font: message-box;
-  padding: 0;
-}
-
-prefpane {
-  padding-top: 8px;
-  padding-bottom: 10px;
-  padding-inline-start: 8px;
-  padding-inline-end: 10px;
-}
-
-prefwindow[type="child"] {
-  padding-top: 8px;
-  padding-bottom: 10px;
-  padding-inline-start: 8px;
-  padding-inline-end: 10px;
-}
-
-prefwindow[type="child"] > prefpane {
-  padding: 0;
-}
-
-.prefWindow-dlgbuttons {
-  padding-bottom: 10px;
-  padding-inline-start: 8px;
-  padding-inline-end: 10px;
-}
-
-prefwindow[type="child"] .prefWindow-dlgbuttons {
-  padding: 0;
-}
 
 .paneSelector {
   border-bottom: 2px groove ThreeDFace;
@@ -59,11 +22,7 @@ prefwindow[type="child"] .prefWindow-dlgbuttons {
 }
 
 /* Attachments Pane */
-#MailPreferences[animated="true"] #handlersView {
-  height: 25em;
-}
-
-#MailPreferences[animated="false"] #handlersView {
+#handlersView {
   -moz-box-flex: 1;
 }
 
@@ -89,11 +48,6 @@ prefwindow[type="child"] .prefWindow-dlgbuttons {
 
 #tagList:focus > listitem[selected="true"] {
   color: HighlightText !important;
-}
-
-/* Chat */
-#timeBeforeAway {
-  width: 4em;
 }
 
 /* Quota meter in Folder Properties */
@@ -125,7 +79,6 @@ body {
 
 a {
   color: -moz-nativehyperlinktext;
-  text-decoration: underline;
 }
 
 #provider-header {
@@ -140,23 +93,32 @@ a {
   margin-right: 120px;
 }
 
-#provider-name h1 {
-  font-size: large;
-}
-
 #provider-name h2 {
   font: message-box;
 }
 
 #provider-terms {
   float: right;
-  width: 110px;
 }
 
 #provider-terms a {
   display: block;
   margin-bottom: 5px;
   text-align: right;
+}
+
+#upgrade a,
+#provider-terms a,
+#provider-account-settings a {
+  color: #0a8dff;
+  text-decoration: none;
+}
+
+#upgrade a:hover,
+#provider-terms a:hover,
+#provider-account-settings a:hover {
+  color: #0060df;
+  text-decoration: underline;
 }
 
 #provider-space {
@@ -199,10 +161,13 @@ a {
 
 #provider-management {
   margin: 0 10px;
+  font-size: 1.03em;
 }
 
 #provider-name h1 {
   margin: 0;
+  font-size: 1.5em;
+  font-weight: 600;
 }
 
 /* Loading panel */

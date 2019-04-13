@@ -18,6 +18,12 @@
 <!ENTITY password.text                   "Optional, will only be used to validate the username">
 <!ENTITY rememberPassword.label          "Remember password">
 <!ENTITY rememberPassword.accesskey      "m">
+<!ENTITY usernameEx.label                "Your login:">
+<!ENTITY usernameEx.accesskey            "l">
+<!-- LOCALIZATION NOTE(usernameEx.placeholder): YOURDOMAIN refers to the Windows domain in ActiveDirectory. yourusername refers to the user's account name in Windows. -->
+<!ENTITY usernameEx.placeholder          "YOURDOMAIN\yourusername">
+<!-- LOCALIZATION NOTE(usernameEx.text): Domain refers to the Windows domain in ActiveDirectory. We mean the user's login in Windows at the local corporate network. -->
+<!ENTITY usernameEx.text                 "Domain login">
 
 <!ENTITY imapLong.label                  "IMAP (remote folders)">
 <!ENTITY pop3Long.label                  "POP3 (keep mail on your computer)">
@@ -30,7 +36,9 @@
 <!ENTITY ssl.label                       "SSL">
 <!ENTITY auth.label                      "Authentication">
 <!ENTITY imap.label                      "IMAP">
-<!ENTITY pop3.label                       "POP3">
+<!ENTITY pop3.label                      "POP3">
+<!-- LOCALIZATION NOTE(exchange.label): Do not translate Exchange, it is a product name. -->
+<!ENTITY exchange.label                  "Exchange">
 <!ENTITY smtp.label                      "SMTP">
 <!ENTITY autodetect.label                "Autodetect">
 <!-- LOCALIZATION NOTE(noEncryption.label): Neither SSL/TLS nor STARTTLS.
@@ -38,6 +46,9 @@
 <!ENTITY noEncryption.label              "None">
 <!ENTITY starttls.label                  "STARTTLS">
 <!ENTITY sslTls.label                    "SSL/TLS">
+
+<!-- LOCALIZATION NOTE(exchange-hostname.label): Do not translate Exchange, it is a product name. -->
+<!ENTITY exchange-hostname.label         "Exchange server:">
 
 <!ENTITY advancedSetup.label             "Advanced config">
 <!ENTITY advancedSetup.accesskey         "A">

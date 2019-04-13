@@ -2,17 +2,22 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+
 var gInsertNew = true;
 var gAnchorElement = null;
 var gOriginalName = "";
 const kTagName = "anchor";
 
 // dialog initialization code
-function Startup()
-{
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+function Startup() {
   var editor = GetCurrentEditor();
-  if (!editor)
-  {
+  if (!editor) {
     window.close();
     return;
   }
@@ -41,17 +46,16 @@ function Startup()
       // Get 40 characters of the selected text and don't add "...",
       //  replace whitespace with "_" and strip non-word characters
       name = ConvertToCDATAString(TruncateStringAtWordEnd(name, 40, false));
-      //Be sure the name is unique to the document
+      // Be sure the name is unique to the document
       if (AnchorNameExists(name))
-        name += "_"
+        name += "_";
 
       // Make a copy to use for AdvancedEdit
       globalElement = gAnchorElement.cloneNode(false);
-      globalElement.setAttribute("name",name);
+      globalElement.setAttribute("name", name);
     }
   }
-  if(!gAnchorElement)
-  {
+  if (!gAnchorElement) {
     dump("Failed to get selected element or create a new one!\n");
     window.close();
     return;
@@ -64,15 +68,12 @@ function Startup()
   SetWindowLocation();
 }
 
-function InitDialog()
-{
+function InitDialog() {
   gDialog.NameInput.value = globalElement.getAttribute("name");
 }
 
-function ChangeName()
-{
-  if (gDialog.NameInput.value.length > 0)
-  {
+function ChangeName() {
+  if (gDialog.NameInput.value.length > 0) {
     // Replace spaces with "_" and strip other non-URL characters
     // Note: we could use ConvertAndEscape, but then we'd
     //  have to UnEscapeAndConvert beforehand - too messy!
@@ -81,15 +82,13 @@ function ChangeName()
   DoEnabling();
 }
 
-function DoEnabling()
-{
+function DoEnabling() {
   var enable = gDialog.NameInput.value.length > 0;
-  SetElementEnabled(gDialog.OkButton,  enable);
+  SetElementEnabled(gDialog.OkButton, enable);
   SetElementEnabledById("AdvancedEditButton1", enable);
 }
 
-function AnchorNameExists(name)
-{
+function AnchorNameExists(name) {
   var anchorList;
   try {
     anchorList = GetCurrentEditor().document.anchors;
@@ -106,44 +105,37 @@ function AnchorNameExists(name)
 
 // Get and validate data from widgets.
 // Set attributes on globalElement so they can be accessed by AdvancedEdit()
-function ValidateData()
-{
+function ValidateData() {
   var name = TrimString(gDialog.NameInput.value);
-  if (!name)
-  {
+  if (!name) {
       ShowInputErrorMessage(GetString("MissingAnchorNameError"));
       SetTextboxFocus(gDialog.NameInput);
       return false;
-  } else {
+  }
     // Replace spaces with "_" and strip other characters
     // Note: we could use ConvertAndEscape, but then we'd
     //  have to UnConverAndEscape beforehand - too messy!
     name = ConvertToCDATAString(name);
 
-    if (gOriginalName != name && AnchorNameExists(name))
-    {
-      ShowInputErrorMessage(GetString("DuplicateAnchorNameError").replace(/%name%/,name));
+    if (gOriginalName != name && AnchorNameExists(name)) {
+      ShowInputErrorMessage(GetString("DuplicateAnchorNameError").replace(/%name%/, name));
       SetTextboxFocus(gDialog.NameInput);
       return false;
     }
     globalElement.name = name;
-  }
+
   return true;
 }
 
-function onAccept()
-{
-  if (ValidateData())
-  {
-    if (gOriginalName != globalElement.name)
-    {
+function onAccept(event) {
+  if (ValidateData()) {
+    if (gOriginalName != globalElement.name) {
       var editor = GetCurrentEditor();
       editor.beginTransaction();
 
       try {
         // "false" = don't delete selected text when inserting
-        if (gInsertNew)
-        {
+        if (gInsertNew) {
           // We must insert element before copying CSS style attribute,
           //  but we must set the name else it won't insert at all
           gAnchorElement.name = globalElement.name;
@@ -152,13 +144,12 @@ function onAccept()
 
         // Copy attributes to element we are changing or inserting
         editor.cloneAttributes(gAnchorElement, globalElement);
-
       } catch (e) {}
 
       editor.endTransaction();
     }
     SaveWindowLocation();
-    return true;
+    return;
   }
-  return false;
+  event.preventDefault();
 }

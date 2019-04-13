@@ -9,15 +9,13 @@
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/AccountManager.dtd">
 <dialog id="accountManager"
         windowtype="mailnews:accountmanager"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         title="&accountManagerTitle.label;"
         style="&accountManager.size;"
         persist="width height screenX screenY"
         buttons="accept,cancel"
         onload="onLoad(event);"
-        onunload="onUnload();"
-        ondialogcancel="return onNotAccept();"
-        ondialogaccept="return onAccept(true);">
+        onunload="onUnload();">
 <stringbundle id="bundle_brand" src="chrome://branding/locale/brand.properties"/>
 <stringbundle id="bundle_prefs" src="chrome://messenger/locale/prefs.properties"/>
 <script type="application/javascript" src="chrome://messenger/content/accountUtils.js"/>

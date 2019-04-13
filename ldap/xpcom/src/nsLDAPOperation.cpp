@@ -257,7 +257,7 @@ NS_IMETHODIMP
 nsLDAPOperation::SimpleBind(const nsACString& passwd)
 {
     RefPtr<nsLDAPConnection> connection = mConnection;
-    // There is a possibilty that mConnection can be cleared by another
+    // There is a possibility that mConnection can be cleared by another
     // thread. Grabbing a local reference to mConnection may avoid this.
     // See https://bugzilla.mozilla.org/show_bug.cgi?id=557928#c1
     nsresult rv;
@@ -397,6 +397,19 @@ convertControlArray(nsIArray *aXpcomArray, LDAPControl ***aArray)
     }
 
     *aArray = controls;
+    return NS_OK;
+}
+
+  /* attribute unsigned long requestNum; */
+NS_IMETHODIMP nsLDAPOperation::GetRequestNum(uint32_t *aRequestNum)
+{
+    *aRequestNum = mRequestNum;
+    return NS_OK;
+}
+
+NS_IMETHODIMP nsLDAPOperation::SetRequestNum(uint32_t aRequestNum)
+{
+    mRequestNum = aRequestNum;
     return NS_OK;
 }
 

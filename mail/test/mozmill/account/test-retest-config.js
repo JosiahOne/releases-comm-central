@@ -2,15 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "test-retest-config";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                        "keyboard-helpers", "account-manager-helpers"];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var user = {
   name: "test",

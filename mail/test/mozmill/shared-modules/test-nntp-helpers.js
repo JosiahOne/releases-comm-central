@@ -2,13 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "nntp-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULES_REQUIRES = ["folder-display-helpers", "window-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var kSimpleNewsArticle =
   "From: John Doe <john.doe@example.com>\n"+
@@ -33,6 +35,8 @@ var folderDisplayHelper;
 var mc;
 var windowHelper;
 
+var testHelperModule;
+
 function setupModule() {
   folderDisplayHelper = collector.getModule('folder-display-helpers');
   mc = folderDisplayHelper.mc;
@@ -46,8 +50,6 @@ function setupModule() {
     do_throw: function(aMsg) {
       throw new Error(aMsg);
     },
-    do_check_eq: function() {},
-    do_check_neq: function() {},
   };
   folderDisplayHelper.load_via_src_path("fakeserver/nntpd.js", testHelperModule);
   folderDisplayHelper.load_via_src_path("fakeserver/maild.js", testHelperModule);

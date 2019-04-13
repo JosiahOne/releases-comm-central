@@ -2,12 +2,37 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Http.jsm");
-ChromeUtils.import("resource:///modules/ArrayBufferUtils.jsm");
-ChromeUtils.import("resource:///modules/BigInteger.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm");
-ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/jsProtoHelper.jsm");
+var {httpRequest} = ChromeUtils.import("resource://gre/modules/Http.jsm");
+var {
+  copyBytes,
+  ArrayBufferToBytes,
+  BytesToArrayBuffer,
+  StringToBytes,
+  StringToArrayBuffer,
+  ArrayBufferToString,
+  ArrayBufferToHexString,
+} = ChromeUtils.import("resource:///modules/ArrayBufferUtils.jsm");
+var {bigInt} = ChromeUtils.import("resource:///modules/BigInteger.jsm");
+var {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
+var {
+  EmptyEnumerator,
+  XPCOMUtils,
+  clearTimeout,
+  l10nHelper,
+  nsSimpleEnumerator,
+} = ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+var {
+  GenericAccountPrototype,
+  GenericAccountBuddyPrototype,
+  GenericConvIMPrototype,
+  GenericConvChatPrototype,
+  GenericConvChatBuddyPrototype,
+  GenericConversationPrototype,
+  GenericMessagePrototype,
+  GenericProtocolPrototype,
+  Message,
+  TooltipInfo,
+} = ChromeUtils.import("resource:///modules/jsProtoHelper.jsm");
 
 // Constants used by the login process. This emulates a captured session using
 // official means.
@@ -27,7 +52,7 @@ var kStatusMap = {
   "Offline": "OFFLINE",
   "Idle": "IDLE",
   "Away": "AWAY",
-  "Hidden": "INVISIBLE"
+  "Hidden": "INVISIBLE",
 };
 
 XPCOMUtils.defineLazyGetter(this, "_", () =>
@@ -66,7 +91,7 @@ SkypeConversation.prototype = {
   __proto__: GenericConvIMPrototype,
   _account: null,
 
-  sendMsg: function(aMessage) {
+  sendMsg(aMessage) {
     if (!aMessage.length)
       return;
 
@@ -84,16 +109,16 @@ SkypeConversation.prototype = {
     let options = {
       onLoad: (aResponse, aXhr) => {
         this._account.LOG("Message response: " + aResponse);
-        this._account.LOG("Successfully sent message: " + aMessage)
+        this._account.LOG("Successfully sent message: " + aMessage);
       },
       onError: this._account._onHttpFailure("sending message"),
       postData: JSON.stringify(message),
-      logger: this._account.logger
+      logger: this._account.logger,
     };
 
     // TODO Track the messages we sent?
     this._account._messagesRequest(url, options);
-  }
+  },
 };
 
 function SkypeAccountBuddy(aAccount, aBuddy, aTag, aUserName) {
@@ -107,12 +132,11 @@ SkypeAccountBuddy.prototype = {
   mood: null,
 
   // Called when the user wants to chat with the buddy.
-  createConversation:
-    function() {return this._account.createConversation(this.userName); },
+  createConversation() { return this._account.createConversation(this.userName); },
 
   // Returns a list of imITooltipInfo objects to be displayed when the user
   // hovers over the buddy.
-  getTooltipInfo: function() {
+  getTooltipInfo() {
     if (!this._info)
       return EmptyEnumerator;
 
@@ -131,10 +155,10 @@ SkypeAccountBuddy.prototype = {
     return new nsSimpleEnumerator(tooltipInfo);
   },
 
-  remove: function() {
+  remove() {
     this._account.removeBuddy(this);
     GenericAccountBuddyPrototype.remove.call(this);
-  }
+  },
 };
 
 /*
@@ -261,12 +285,12 @@ function getTimezone() {
     let nLen = nStr.length;
 
     if (nLen > aLen) {
-      throw "Can't zero-pad when longer than expected length: " + nStr +
-        ".length > " + aLen;
+      throw new Error("Can't zero-pad when longer than expected length: " + nStr +
+        ".length > " + aLen);
     }
 
     return "0".repeat(aLen - nLen) + nStr;
-  };
+  }
 
   // Invert the sign of the timezone from JavaScript's date object.
   let sign = "+";
@@ -317,7 +341,7 @@ SkypeAccount.prototype = {
   // Logger used for HTTP requests.
   _logger: null,
 
-  mapStatusString: function(aStatus) {
+  mapStatusString(aStatus) {
     if (aStatus in kStatusMap)
       return Ci.imIStatusInfo["STATUS_" + kStatusMap[aStatus]];
 
@@ -326,7 +350,7 @@ SkypeAccount.prototype = {
     return Ci.imIStatusInfo.STATUS_UNKNOWN;
   },
 
-  connect: function() {
+  connect() {
     this.reportConnecting();
 
     this.LOG("STARTING Login");
@@ -336,8 +360,8 @@ SkypeAccount.prototype = {
     let options = {
       onLoad: this._onPieResponse.bind(this),
       onError: this._onHttpFailure("requesting pie"),
-      logger: this.logger
-    }
+      logger: this.logger,
+    };
     httpRequest(loginUrl, options);
   },
 
@@ -345,19 +369,19 @@ SkypeAccount.prototype = {
    * Generates a callback which causes the account to enter an error state with
    * the given error string.
    */
-  _onHttpFailure: function(aErrorStr) {
+  _onHttpFailure(aErrorStr) {
     return (aError, aResponse, aXhr) => {
       this.ERROR("HTTP failure occurred: " + aErrorStr + "\n" + aError);
       this._disconnectWithAuthFailure();
     };
   },
 
-  _onHttpError: function(aError, aResponse, aXhr) {
+  _onHttpError(aError, aResponse, aXhr) {
     this.ERROR("Received error response:\n" + aError);
   },
 
   // Mmmmm...pie.
-  _onPieResponse: function(aResponse, aXhr) {
+  _onPieResponse(aResponse, aXhr) {
     this.reportConnecting(_("connecting.authenticating"));
 
     // Parse the pie/etm and do the actual login.
@@ -374,13 +398,13 @@ SkypeAccount.prototype = {
     // and forms that these values are being pulled from.
     let pie = extractString(aResponse, "=\"pie\" value=\"", "\"");
     if (!pie) {
-      this.ERROR("pie value not found.")
+      this.ERROR("pie value not found.");
       this._disconnectWithAuthFailure();
       return;
     }
     let etm = extractString(aResponse, "=\"etm\" value=\"", "\"");
     if (!etm) {
-      this.ERROR("etm value not found.")
+      this.ERROR("etm value not found.");
       this._disconnectWithAuthFailure();
       return;
     }
@@ -402,17 +426,17 @@ SkypeAccount.prototype = {
                 // there are important headers that need to be plucked before
                 // the redirect happens.
                 ["BehaviorOverride", "redirectAs404"]],
-      logger: this._logger
-    }
+      logger: this._logger,
+    };
     httpRequest(loginUrl, options);
   },
-  _onLoginResponse: function(aResponse, aXhr) {
+  _onLoginResponse(aResponse, aXhr) {
     this.LOG("Received LOGIN response:\n" + aResponse);
 
     let refreshToken =
       extractString(aResponse, "=\"skypetoken\" value=\"", "\"");
     if (!refreshToken) {
-      this.ERROR("skypetoken value not found.")
+      this.ERROR("skypetoken value not found.");
       this._disconnectWithAuthFailure();
       return;
     }
@@ -453,17 +477,17 @@ SkypeAccount.prototype = {
                                "; lockAndKeyResponse=" + response],
                 ["ClientInfo", kClientInfo],
                 ["Authentication", "skypetoken=" + this._skypeToken]],
-      logger: this._logger
-    }
+      logger: this._logger,
+    };
     httpRequest(messagesUrl, options);
   },
-  _onRegistrationTokenReceived: function(aResponse, aXhr) {
+  _onRegistrationTokenReceived(aResponse, aXhr) {
     this.LOG("Registration token received: " + aResponse);
 
     let registrationToken = aXhr.getResponseHeader("Set-RegistrationToken");
     this.LOG("regToken: " + registrationToken);
     if (!registrationToken) {
-      this.ERROR("registraation token value not found.")
+      this.ERROR("registraation token value not found.");
       this._disconnectWithAuthFailure();
       return;
     }
@@ -473,7 +497,7 @@ SkypeAccount.prototype = {
   },
 
   // Subscribe to the events we want to see.
-  _subscribe: function() {
+  _subscribe() {
     this.LOG("Sending subscription.");
 
     // Subscribe to particular events.
@@ -486,18 +510,18 @@ SkypeAccount.prototype = {
                               "/v1/users/ME/contacts/ALL",
                               "/v1/threads/ALL"],
       "template": "raw",
-      "channelType": "httpLongPoll"
+      "channelType": "httpLongPoll",
     };
     let options = {
       onLoad: this._onSubscription.bind(this),
       onError: this._onHttpFailure("subscribing to notifications"),
       postData: JSON.stringify(subscriptions),
-      logger: this._logger
+      logger: this._logger,
     };
     this._messagesRequest(messagesUrl, options);
   },
 
-  _onSubscription: function(aResponse, aXhr) {
+  _onSubscription(aResponse, aXhr) {
     this.LOG("Got subscription response: " + aResponse);
     this.reportConnected();
 
@@ -508,15 +532,15 @@ SkypeAccount.prototype = {
     let options = {
       onLoad: this._onContactsList.bind(this),
       onError: this._onHttpError.bind(this),
-      logger: this._logger
-    }
+      logger: this._logger,
+    };
     this._contactsRequest(contactListUrl, options);
 
     // Poll for messages.
     this._getMessages();
   },
 
-  _onContactsList: function(aResponse, aXhr) {
+  _onContactsList(aResponse, aXhr) {
     this.LOG("Contacts list: " + aResponse);
 
     let buddies = JSON.parse(aResponse);
@@ -564,7 +588,7 @@ SkypeAccount.prototype = {
       postData: buddies.map((b) => ["contacts[]", b.skypename]),
       onLoad: this._onProfiles.bind(this),
       onError: this._onHttpError.bind(this),
-      logger: this._logger
+      logger: this._logger,
     };
     this.LOG(JSON.stringify(options));
     this._contactsRequest(profilesUrl, options);
@@ -579,13 +603,13 @@ SkypeAccount.prototype = {
       onLoad: (aResponse, aXhr) =>
         this.LOG("Successfully subscribed to contacts."),
       onError: this._onHttpError.bind(this),
-      logger: this._logger
+      logger: this._logger,
     };
     this.LOG(JSON.stringify(options));
     this._messagesRequest(contactsUrl, options);
   },
 
-  _onProfiles: function(aResponse, aXhr) {
+  _onProfiles(aResponse, aXhr) {
     this.LOG("Profiles: " + aResponse);
 
     let skypeContacts = JSON.parse(aResponse);
@@ -617,19 +641,19 @@ SkypeAccount.prototype = {
   /*
    * Download the actual messages, this will recurse through its callback.
    */
-  _getMessages: function() {
+  _getMessages() {
     let messagesUrl = "https://" + kMessagesHost +
       "/v1/users/ME/endpoints/SELF/subscriptions/0/poll";
     let options = {
       method: "POST",
       onLoad: this._onMessages.bind(this),
       onError: this._onHttpError.bind(this),
-      logger: this._logger
+      logger: this._logger,
     };
     this._request = this._messagesRequest(messagesUrl, options);
   },
 
-  _onMessages: function(aResponse, aXhr) {
+  _onMessages(aResponse, aXhr) {
     this.LOG("Messages: " + aResponse);
 
     // Poll for new events by performing another XHR in 1 second.
@@ -735,7 +759,7 @@ SkypeAccount.prototype = {
    * Make a request to the Skype contacts API, this is essentially just
    * httpRequest, but auto-adds a bunch of headers that are necessary.
    */
-  _contactsRequest: function(aUrl, aOptions = {}) {
+  _contactsRequest(aUrl, aOptions = {}) {
     let headers = aOptions.headers || [];
 
     // Add some special Skype headers.
@@ -757,7 +781,7 @@ SkypeAccount.prototype = {
    * Make a request to the Skype messages API, this is essentially just
    * httpRequest, but auto-adds a bunch of headers that are necessary.
    */
-  _messagesRequest: function(aUrl, aOptions = {}) {
+  _messagesRequest(aUrl, aOptions = {}) {
     let headers = aOptions.headers || [];
 
     // Add some special Skype headers.
@@ -774,13 +798,13 @@ SkypeAccount.prototype = {
   },
 
   // Helper function to disconnect with authentication failed.
-  _disconnectWithAuthFailure: function(aMessageId="error.auth") {
+  _disconnectWithAuthFailure(aMessageId = "error.auth") {
     this.reportDisconnecting(Ci.prplIAccount.ERROR_AUTHENTICATION_FAILED,
                              _(aMessageId));
     this.reportDisconnected();
   },
 
-  disconnect: function() {
+  disconnect() {
     if (this.disconnected || this.disconnecting)
       return;
 
@@ -799,30 +823,30 @@ SkypeAccount.prototype = {
   },
 
   // TODO?
-  observe: function(aSubject, aTopic, aData) {},
+  observe(aSubject, aTopic, aData) {},
 
-  remove: function() {
+  remove() {
     this._conversations.forEach(conv => conv.close());
     delete this._conversations;
     this.buddies.forEach(aBuddy => aBuddy.remove());
     delete this.buddies;
   },
 
-  unInit: function() {
+  unInit() {
     delete this.imAccount;
     clearTimeout(this._poller);
   },
 
-  createConversation: function(aName) {
+  createConversation(aName) {
     let conv = new SkypeConversation(this, aName);
     this._conversations.set(aName, conv);
     return conv;
   },
 
   // Called when the user adds or authorizes a new contact.
-  addBuddy: function(aTag, aName) {},
+  addBuddy(aTag, aName) {},
 
-  loadBuddy: function(aBuddy, aTag) {
+  loadBuddy(aBuddy, aTag) {
     let buddy = new SkypeAccountBuddy(this, aBuddy, aTag);
     this._buddies.set(buddy.userName, buddy);
 
@@ -832,7 +856,7 @@ SkypeAccount.prototype = {
   // TODO Add support for MUCs.
   get canJoinChat() { return false; },
   chatRoomFields: {},
-  joinChat: function(aComponents) {}
+  joinChat(aComponents) {},
 };
 
 function SkypeProtocol() {}
@@ -844,8 +868,8 @@ SkypeProtocol.prototype = {
 
   get passwordOptional() { return false; },
 
-  getAccount: function(aImAccount) { return new SkypeAccount(this, aImAccount); },
-  classID: Components.ID("{8446c0f6-9f59-4710-844e-eaa6c1f49d35}")
+  getAccount(aImAccount) { return new SkypeAccount(this, aImAccount); },
+  classID: Components.ID("{8446c0f6-9f59-4710-844e-eaa6c1f49d35}"),
 };
 
 var NSGetFactory = XPCOMUtils.generateNSGetFactory([SkypeProtocol]);

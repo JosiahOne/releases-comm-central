@@ -27,6 +27,8 @@
 #include "nsArrayUtils.h"
 #include "nsUnicharUtils.h"
 #include "mozilla/DebugOnly.h"
+#include "nsIObserverService.h"
+#include "mozilla/Services.h"
 
 nsAbMDBDirectory::nsAbMDBDirectory(void):
      nsAbMDBDirProperty(),
@@ -379,7 +381,7 @@ NS_IMETHODIMP nsAbMDBDirectory::GetChildNodes(nsISimpleEnumerator* *aResult)
   if (mIsQueryURI)
     return NS_NewEmptyEnumerator(aResult);
 
-  return NS_NewArrayEnumerator(aResult, mSubDirectories);
+  return NS_NewArrayEnumerator(aResult, mSubDirectories, NS_GET_IID(nsIAbDirectory));
 }
 
 NS_IMETHODIMP nsAbMDBDirectory::GetChildCards(nsISimpleEnumerator* *result)
@@ -398,7 +400,7 @@ NS_IMETHODIMP nsAbMDBDirectory::GetChildCards(nsISimpleEnumerator* *result)
     for (auto iter = mSearchCache.Iter(); !iter.Done(); iter.Next()) {
       array->AppendElement(iter.Data());
     }
-    return NS_NewArrayEnumerator(result, array);
+    return NS_NewArrayEnumerator(result, array, NS_GET_IID(nsIAbCard));
   }
 
   rv = GetAbDatabase();
@@ -560,6 +562,7 @@ NS_IMETHODIMP nsAbMDBDirectory::HasDirectory(nsIAbDirectory *dir, bool *hasDir)
   nsresult rv;
 
   nsCOMPtr<nsIAbMDBDirectory> dbdir(do_QueryInterface(dir, &rv));
+  mozilla::Unused << dbdir;
   NS_ENSURE_SUCCESS(rv, rv);
 
   bool bIsMailingList  = false;
@@ -661,10 +664,17 @@ NS_IMETHODIMP nsAbMDBDirectory::AddCard(nsIAbCard* card, nsIAbCard **addedCard)
   if (NS_FAILED(rv) || !mDatabase)
     return NS_ERROR_FAILURE;
 
-  if (m_IsMailList)
+  if (m_IsMailList) {
     rv = mDatabase->CreateNewListCardAndAddToDB(this, m_dbRowID, card, true /* notify */);
-  else
+  } else {
     rv = mDatabase->CreateNewCardAndAddToDB(card, true, this);
+    nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
+    if (observerService) {
+      nsAutoCString thisUID;
+      this->GetUID(thisUID);
+      observerService->NotifyObservers(card, "addrbook-contact-created", NS_ConvertUTF8toUTF16(thisUID).get());
+    }
+  }
   NS_ENSURE_SUCCESS(rv, rv);
 
   mDatabase->Commit(nsAddrDBCommitType::kLargeCommit);
@@ -686,6 +696,39 @@ NS_IMETHODIMP nsAbMDBDirectory::ModifyCard(nsIAbCard *aModifiedCard)
 
   rv = mDatabase->EditCard(aModifiedCard, true, this);
   NS_ENSURE_SUCCESS(rv, rv);
+
+  // If it's a mailing list's card, ensure the related nsIAbDirectory has the same UID.
+  bool isMailList;
+  rv = aModifiedCard->GetIsMailList(&isMailList);
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (isMailList)
+  {
+    nsCOMPtr<nsIAbManager> abManager = do_GetService(NS_ABMANAGER_CONTRACTID, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsAutoCString uri;
+    rv = aModifiedCard->GetMailListURI(getter_Copies(uri));
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsCOMPtr<nsIAbDirectory> directory;
+    rv = abManager->GetDirectory(uri, getter_AddRefs(directory));
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsAutoCString uid;
+    rv = aModifiedCard->GetUID(uid);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = directory->SetUID(uid);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
+  if (observerService) {
+    nsAutoCString thisUID;
+    this->GetUID(thisUID);
+    observerService->NotifyObservers(aModifiedCard, "addrbook-contact-updated", NS_ConvertUTF8toUTF16(thisUID).get());
+  }
+
   return mDatabase->Commit(nsAddrDBCommitType::kLargeCommit);
 }
 
@@ -730,9 +773,21 @@ NS_IMETHODIMP nsAbMDBDirectory::DropCard(nsIAbCard* aCard, bool needToCopyCard)
     }
     // since we didn't copy the card, we don't have to notify that it was inserted
     mDatabase->CreateNewListCardAndAddToDB(this, m_dbRowID, newCard, false /* notify */);
+    nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
+    if (observerService) {
+      nsAutoCString thisUID;
+      this->GetUID(thisUID);
+      observerService->NotifyObservers(newCard, "addrbook-list-member-added", NS_ConvertUTF8toUTF16(thisUID).get());
+    }
   }
   else {
     mDatabase->CreateNewCardAndAddToDB(newCard, true /* notify */, this);
+    nsCOMPtr<nsIObserverService> observerService = mozilla::services::GetObserverService();
+    if (observerService) {
+      nsAutoCString thisUID;
+      this->GetUID(thisUID);
+      observerService->NotifyObservers(newCard, "addrbook-contact-created", NS_ConvertUTF8toUTF16(thisUID).get());
+    }
   }
   mDatabase->Commit(nsAddrDBCommitType::kLargeCommit);
   return NS_OK;
@@ -852,6 +907,7 @@ NS_IMETHODIMP nsAbMDBDirectory::OnListEntryChange
     NS_ENSURE_SUCCESS(rv,rv);
 
     nsCOMPtr<nsIAbMDBDirectory> dblist(do_QueryInterface(list, &rv));
+    mozilla::Unused << dblist;
     NS_ENSURE_SUCCESS(rv,rv);
 
     if (bIsMailList) {

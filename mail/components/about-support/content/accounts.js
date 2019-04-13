@@ -2,19 +2,26 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* globals CLASS_DATA_PRIVATE, CLASS_DATA_PUBLIC */
+
 "use strict";
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 // Platform-specific includes
-if ("@mozilla.org/windows-registry-key;1" in Cc)
-  ChromeUtils.import("resource:///modules/aboutSupportWin32.js");
-else if ("nsILocalFileMac" in Ci)
-  ChromeUtils.import("resource:///modules/aboutSupportMac.js");
-else
-  ChromeUtils.import("resource:///modules/aboutSupportUnix.js");
+var AboutSupportPlatform;
+if ("@mozilla.org/windows-registry-key;1" in Cc) {
+  let temp = ChromeUtils.import("resource:///modules/aboutSupportWin32.js");
+  AboutSupportPlatform = temp.AboutSupportPlatform;
+} else if ("nsILocalFileMac" in Ci) {
+  let temp = ChromeUtils.import("resource:///modules/aboutSupportMac.js");
+  AboutSupportPlatform = temp.AboutSupportPlatform;
+} else {
+  let temp = ChromeUtils.import("resource:///modules/aboutSupportUnix.js");
+  AboutSupportPlatform = temp.AboutSupportPlatform;
+}
 
 var gMessengerBundle = Services.strings.createBundle(
   "chrome://messenger/locale/messenger.properties");
@@ -28,15 +35,20 @@ for (let [str, index] of Object.entries(Ci.nsMsgAuthMethod))
   gAuthMethods[index] = str;
 
 // l10n properties in messenger.properties corresponding to each auth method
-var gAuthMethodProperties = {
-  "1": "authOld",
-  "2": "authPasswordCleartextInsecurely",
-  "3": "authPasswordCleartextViaSSL",
-  "4": "authPasswordEncrypted",
-  "5": "authKerberos",
-  "6": "authNTLM",
-  "8": "authAnySecure"
-};
+var gAuthMethodProperties = new Map([
+  [ 0,                                    "authNo" ], // Special value defined to be invalid.
+                                                      // Some accounts without auth report this.
+  [ Ci.nsMsgAuthMethod.none,              "authNo" ],
+  [ Ci.nsMsgAuthMethod.old,               "authOld" ],
+  [ Ci.nsMsgAuthMethod.passwordCleartext, "authPasswordCleartextViaSSL" ],
+  [ Ci.nsMsgAuthMethod.passwordEncrypted, "authPasswordEncrypted" ],
+  [ Ci.nsMsgAuthMethod.GSSAPI,            "authKerberos" ],
+  [ Ci.nsMsgAuthMethod.NTLM,              "authNTLM" ],
+  [ Ci.nsMsgAuthMethod.External,          "authExternal" ],
+  [ Ci.nsMsgAuthMethod.secure,            "authAnySecure" ],
+  [ Ci.nsMsgAuthMethod.anything,          "authAny" ],
+  [ Ci.nsMsgAuthMethod.OAuth2,            "authOAuth2" ],
+]);
 
 var AboutSupport = {
   /**
@@ -45,7 +57,7 @@ var AboutSupport = {
    * @returns An array of records, each record containing the name and other details
    *          about one SMTP server.
    */
-  _getSMTPDetails: function AboutSupport__getSMTPDetails(aAccount) {
+  _getSMTPDetails(aAccount) {
     let identities = aAccount.identities;
     let defaultIdentity = aAccount.defaultIdentity;
     let smtpDetails = [];
@@ -58,7 +70,7 @@ var AboutSupport = {
                         name: smtpServer.value.displayname,
                         authMethod: smtpServer.value.authMethod,
                         socketType: smtpServer.value.socketType,
-                        isDefault: isDefault});
+                        isDefault});
     }
 
     return smtpDetails;
@@ -67,7 +79,7 @@ var AboutSupport = {
   /**
    * Returns account details as an array of records.
    */
-  getAccountDetails: function AboutSupport_getAccountDetails() {
+  getAccountDetails() {
     let accountDetails = [];
     let accounts = MailServices.accounts.accounts;
 
@@ -110,15 +122,14 @@ var AboutSupport = {
    * Returns the corresponding text for a given socket type index. The text is
    * returned as a record with "localized" and "neutral" entries.
    */
-  getSocketTypeText: function AboutSupport_getSocketTypeText(aIndex) {
+  getSocketTypeText(aIndex) {
     let plainSocketType = (aIndex in gSocketTypes ?
                            gSocketTypes[aIndex] : aIndex);
     let prettySocketType;
     try {
       prettySocketType = gMessengerBundle.GetStringFromName(
         "smtpServer-ConnectionSecurityType-" + aIndex);
-    }
-    catch (e) {
+    } catch (e) {
       if (e.result == Cr.NS_ERROR_FAILURE) {
         // The string wasn't found in the bundle. Make do without it.
         prettySocketType = plainSocketType;
@@ -133,19 +144,18 @@ var AboutSupport = {
    * Returns the corresponding text for a given authentication method index. The
    * text is returned as a record with "localized" and "neutral" entries.
    */
-  getAuthMethodText: function AboutSupport_getAuthMethodText(aIndex) {
+  getAuthMethodText(aIndex) {
     let prettyAuthMethod;
     let plainAuthMethod = (aIndex in gAuthMethods ?
                            gAuthMethods[aIndex] : aIndex);
-    if (aIndex in gAuthMethodProperties) {
+    if (gAuthMethodProperties.has(parseInt(aIndex))) {
       prettyAuthMethod =
-        gMessengerBundle.GetStringFromName(gAuthMethodProperties[aIndex]);
-    }
-    else {
+        gMessengerBundle.GetStringFromName(gAuthMethodProperties.get(parseInt(aIndex)));
+    } else {
       prettyAuthMethod = plainAuthMethod;
     }
     return {localized: prettyAuthMethod, neutral: plainAuthMethod};
-  }
+  },
 };
 
 function createParentElement(tagName, childElems) {

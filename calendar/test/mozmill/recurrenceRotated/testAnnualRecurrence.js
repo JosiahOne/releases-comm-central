@@ -2,56 +2,55 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+var MODULE_NAME = "testAnnualRecurrenceRotated";
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["calendar-utils"];
 
-var helpersForController, invokeEventDialog, createCalendar, deleteCalendars;
-var switchToView, goToDate, handleOccurrencePrompt;
-var ALLDAY, CALENDARNAME;
+var CALENDARNAME, EVENTPATH, ALLDAY;
+var helpersForController, handleOccurrencePrompt, switchToView, goToDate;
+var invokeEventDialog, closeAllEventDialogs, deleteCalendars, createCalendar, menulistSelect;
 
-var STARTYEAR = 1950;
-var EPOCH = 1970;
+const STARTYEAR = 1950;
+const EPOCH = 1970;
 
 function setupModule(module) {
     controller = mozmill.getMail3PaneController();
     ({
+        CALENDARNAME,
+        EVENTPATH,
+        ALLDAY,
         helpersForController,
-        invokeEventDialog,
-        createCalendar,
-        deleteCalendars,
+        handleOccurrencePrompt,
         switchToView,
         goToDate,
-        handleOccurrencePrompt,
-        ALLDAY,
-        CALENDARNAME
+        invokeEventDialog,
+        closeAllEventDialogs,
+        deleteCalendars,
+        createCalendar,
+        menulistSelect
     } = collector.getModule("calendar-utils"));
-    collector.getModule("calendar-utils").setupModule();
+    collector.getModule("calendar-utils").setupModule(controller);
     Object.assign(module, helpersForController(controller));
 
     createCalendar(controller, CALENDARNAME);
+    // Rotate view.
+    controller.mainMenu.click("#ltnViewRotated");
+    controller.waitFor(() => eid("day-view").getNode().orient == "horizontal");
 }
 
 function testAnnualRecurrence() {
-    let EVENTPATH = `/{"tooltip":"itemTooltip","calendar":"${CALENDARNAME.toLowerCase()}"}`;
-    controller.click(eid("calendar-tab-button"));
-    switchToView(controller, "day");
     goToDate(controller, STARTYEAR, 1, 1);
 
-    // rotate view
-    controller.mainMenu.click("#ltnViewRotated");
-    controller.waitFor(() => eid("day-view").getNode().orient == "horizontal");
-
-    // create yearly recurring all-day event
+    // Create yearly recurring all-day event.
     let eventBox = lookupEventBox("day", ALLDAY, null, 1, null);
     invokeEventDialog(controller, eventBox, (event, iframe) => {
         let { eid: eventid } = helpersForController(event);
 
-        event.select(eventid("item-repeat"), null, null, "yearly");
-        event.click(eventid("button-save"));
+        menulistSelect(eventid("item-repeat"), "yearly", event);
+        event.click(eventid("button-saveandclose"));
     });
 
     let checkYears = [STARTYEAR, STARTYEAR + 1, EPOCH - 1, EPOCH, EPOCH + 1];
-    let box = "";
     for (let year of checkYears) {
         goToDate(controller, year, 1, 1);
         let date = new Date(year, 0, 1);
@@ -59,42 +58,36 @@ function testAnnualRecurrence() {
 
         // day view
         switchToView(controller, "day");
-        controller.assertNode(
-            lookupEventBox("day", ALLDAY, null, 1, null, EVENTPATH)
-        );
+        controller.waitForElement(lookupEventBox("day", ALLDAY, null, 1, null, EVENTPATH));
 
         // week view
         switchToView(controller, "week");
-        controller.assertNode(
-            lookupEventBox("week", ALLDAY, null, column, null, EVENTPATH)
-        );
+        controller.waitForElement(lookupEventBox("week", ALLDAY, null, column, null, EVENTPATH));
 
         // multiweek view
         switchToView(controller, "multiweek");
-        controller.assertNode(
-            lookupEventBox("multiweek", ALLDAY, 1, column, null, EVENTPATH)
-        );
+        controller.waitForElement(lookupEventBox("multiweek", ALLDAY, 1, column, null, EVENTPATH));
 
         // month view
         switchToView(controller, "month");
-        controller.assertNode(
-            lookupEventBox("month", ALLDAY, 1, column, null, EVENTPATH)
-        );
+        controller.waitForElement(lookupEventBox("month", ALLDAY, 1, column, null, EVENTPATH));
     }
 
-    // delete event
+    // Delete event.
     goToDate(controller, checkYears[0], 1, 1);
     switchToView(controller, "day");
-    box = getEventBoxPath("day", ALLDAY, null, 1, null) + EVENTPATH;
+    let box = getEventBoxPath("day", ALLDAY, null, 1, null) + EVENTPATH;
     controller.click(lookup(box));
-    handleOccurrencePrompt(controller, eid("day-view"), "delete", true, false);
+    handleOccurrencePrompt(controller, eid("day-view"), "delete", true);
     controller.waitForElementNotPresent(lookup(box));
-
-    // reset view
-    controller.mainMenu.click("#ltnViewRotated");
-    controller.waitFor(() => eid("day-view").getNode().orient == "vertical");
 }
 
 function teardownTest(module) {
     deleteCalendars(controller, CALENDARNAME);
+    // Reset view.
+    if (eid("day-view").getNode().orient == "horizontal") {
+        controller.mainMenu.click("#ltnViewRotated");
+    }
+    controller.waitFor(() => eid("day-view").getNode().orient == "vertical");
+    closeAllEventDialogs();
 }

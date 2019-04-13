@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 const SCRIPT = Ci.nsIAboutModule.ALLOW_SCRIPT;
 const UNTRUSTED = Ci.nsIAboutModule.URI_SAFE_FOR_UNTRUSTED_CONTENT;
@@ -51,11 +51,11 @@ About.prototype = {
     var newURI = Services.io.newURI(this[module + "URI"]);
     var channel = aLoadInfo ?
                   Services.io.newChannelFromURIWithLoadInfo(newURI, aLoadInfo) :
-                  Services.io.newChannelFromURI2(newURI, null,
-                                                 Services.scriptSecurityManager.getSystemPrincipal(),
-                                                 null,
-                                                 Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                                 Ci.nsIContentPolicy.TYPE_OTHER);
+                  Services.io.newChannelFromURI(newURI, null,
+                                                Services.scriptSecurityManager.getSystemPrincipal(),
+                                                null,
+                                                Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                                Ci.nsIContentPolicy.TYPE_OTHER);
     channel.originalURI = aURI;
     if (this[module + "Flags"] & UNTRUSTED)
       channel.owner = null;

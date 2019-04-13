@@ -14,7 +14,6 @@
 pref("general.skins.selectedSkin", "classic/1.0");
 
 #ifdef XP_MACOSX
-pref("browser.chromeURL", "chrome://messenger/content/messengercompose/messengercompose.xul");
 pref("mail.biff.animate_dock_icon", false);
 #endif
 
@@ -75,20 +74,28 @@ pref("app.update.certs.1.commonName", "aus5.mozilla.org");
 pref("app.update.certs.2.issuerName", "CN=thawte SSL CA - G2,O=\"thawte, Inc.\",C=US");
 pref("app.update.certs.2.commonName", "aus5.mozilla.org");
 
-// Whether or not app updates are enabled
-pref("app.update.enabled", true);
-
 // If set to true, the Update Service will automatically download updates when
-// app updates are enabled per the app.update.enabled preference and if the user
-// can apply updates.
-pref("app.update.auto", true);
+// user can apply updates. This pref is no longer used on Windows, except as the
+// default value to migrate to the new location that this data is now stored
+// (which is in a file in the update directory). Because of this, this pref
+// should no longer be used directly. Instead, getAppUpdateAutoEnabled and
+// getAppUpdateAutoEnabled from UpdateUtils.jsm should be used.
+#ifndef XP_WIN
+ pref("app.update.auto", true);
+#endif
 
 // If set to true, the Update Service will present no UI for any event.
 pref("app.update.silent", false);
 
 // If set to true, the Update Service will apply updates in the background
-// when it finishes downloading them. Disabled in bug 1397862.
+// when it finishes downloading them.
+#if defined(XP_WIN)
+pref("app.update.staging.enabled", true);
+#elif defined(EARLY_BETA_OR_EARLIER)
+pref("app.update.staging.enabled", true);
+#else
 pref("app.update.staging.enabled", false);
+#endif
 
 // Update service URL:
 pref("app.update.url", "https://aus5.mozilla.org/update/6/%PRODUCT%/%VERSION%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%SYSTEM_CAPABILITIES%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/update.xml");
@@ -111,7 +118,7 @@ pref("app.update.service.enabled", true);
 #endif
 
 // Release notes URL
-pref("app.releaseNotesURL", "https://live.thunderbird.net/%APP%/releasenotes?locale=%LOCALE%&version=%VERSION%&os=%OS%&buildid=%APPBUILDID%");
+pref("app.releaseNotesURL", "https://live.thunderbird.net/%APP%/releasenotes?locale=%LOCALE%&version=%VERSION%&channel=%CHANNEL%&os=%OS%&buildid=%APPBUILDID%");
 
 // URL for "Learn More" for Crash Reporter.
 pref("toolkit.crashreporter.infoURL",
@@ -125,6 +132,7 @@ pref("javascript.options.showInConsole", true);
 
 // Controls enabling of the extension system logging (can reduce performance)
 pref("extensions.logging.enabled", false);
+pref("extensions.overlayloader.loglevel", "warn");
 
 // Strict compatibility makes add-ons incompatible by default.
 #ifndef RELEASE_OR_BETA
@@ -150,6 +158,9 @@ pref("extensions.autoDisableScopes", 15);
 // Enable add-ons installed and owned by the application, like the default theme.
 pref("extensions.startupScanScopes", 4);
 
+// Gecko Profiler
+pref("extensions.geckoProfiler.acceptedExtensionIds", "geckoprofiler@mozilla.com,quantum-foxfooding@mozilla.com,raptor@mozilla.org");
+
 // Add-on content security policies.
 pref("extensions.webextensions.base-content-security-policy", "script-src 'self' https://* moz-extension: blob: filesystem: 'unsafe-eval' 'unsafe-inline'; object-src 'self' https://* moz-extension: blob: filesystem:;");
 pref("extensions.webextensions.default-content-security-policy", "script-src 'self'; object-src 'self';");
@@ -161,19 +172,22 @@ pref("extensions.legacy.enabled", true);
 // Preferences for AMO integration
 pref("extensions.getAddons.cache.enabled", true);
 pref("extensions.getAddons.maxResults", 15);
-pref("extensions.getAddons.get.url", "https://live.thunderbird.net/services.addons/api/v3/addons/search/?guid=%IDS%&lang=%LOCALE%");
-pref("extensions.getAddons.compatOverides.url", "https://live.thunderbird.net/services.addons/api/v3/addons/compat-override/?guid=%IDS%&lang=%LOCALE%");
-pref("extensions.getAddons.link.url", "https://addons.mozilla.org/%LOCALE%/%APP%/");
-pref("extensions.getAddons.recommended.url", "https://services.addons.mozilla.org/%LOCALE%/%APP%/api/%API_VERSION%/list/recommended/all/%MAX_RESULTS%/%OS%/%VERSION%?src=thunderbird");
-pref("extensions.getAddons.search.browseURL", "https://addons.mozilla.org/%LOCALE%/%APP%/search/?q=%TERMS%");
-pref("extensions.getAddons.search.url", "https://services.addons.mozilla.org/%LOCALE%/%APP%/api/%API_VERSION%/search/%TERMS%/all/%MAX_RESULTS%/%OS%/%VERSION%/%COMPATIBILITY_MODE%?src=thunderbird");
-pref("extensions.webservice.discoverURL", "https://services.addons.mozilla.org/%LOCALE%/%APP%/discovery/pane/%VERSION%/%OS%");
-pref("extensions.getAddons.themes.browseURL", "https://addons.mozilla.org/%LOCALE%/thunderbird/themes/?src=thunderbird");
+pref("extensions.getAddons.get.url", "https://services.addons.thunderbird.net/api/v3/addons/search/?guid=%IDS%&lang=%LOCALE%");
+pref("extensions.getAddons.compatOverides.url", "https://services.addons.thunderbird.net/api/v3/addons/compat-override/?guid=%IDS%&lang=%LOCALE%");
+pref("extensions.getAddons.link.url", "https://addons.thunderbird.net/%LOCALE%/%APP%/");
+pref("extensions.getAddons.recommended.url", "https://services.addons.thunderbird.net/%LOCALE%/%APP%/api/%API_VERSION%/list/recommended/all/%MAX_RESULTS%/%OS%/%VERSION%?src=thunderbird");
+pref("extensions.getAddons.search.browseURL", "https://addons.thunderbird.net/%LOCALE%/%APP%/search/?q=%TERMS%");
+pref("extensions.getAddons.search.url", "https://services.addons.thunderbird.net/%LOCALE%/%APP%/api/%API_VERSION%/search/%TERMS%/all/%MAX_RESULTS%/%OS%/%VERSION%/%COMPATIBILITY_MODE%?src=thunderbird");
+pref("extensions.webservice.discoverURL", "https://services.addons.thunderbird.net/%LOCALE%/%APP%/discovery/pane/%VERSION%/%OS%");
+pref("extensions.getAddons.siteRegExp", "^https://.*addons\\.thunderbird\\.net");
 
 // Blocklist preferences
-pref("extensions.blocklist.url", "https://live.thunderbird.net/blocklists.settings/v1/blocklist/3/%APP_ID%/%APP_VERSION%/%PRODUCT%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/%PING_COUNT%/%TOTAL_PING_COUNT%/%DAYS_SINCE_LAST_PING%/");
-pref("extensions.blocklist.detailsURL", "https://live.thunderbird.net/blocked.cdn/");
-pref("extensions.blocklist.itemURL", "https://live.thunderbird.net/blocked.cdn/%blockID%.html");
+pref("extensions.blocklist.url", "https://blocklists.settings.services.mozilla.com/v1/blocklist/3/%APP_ID%/%APP_VERSION%/%PRODUCT%/%BUILD_ID%/%BUILD_TARGET%/%LOCALE%/%CHANNEL%/%OS_VERSION%/%DISTRIBUTION%/%DISTRIBUTION_VERSION%/%PING_COUNT%/%TOTAL_PING_COUNT%/%DAYS_SINCE_LAST_PING%/");
+pref("extensions.blocklist.detailsURL", "https://blocked.cdn.mozilla.net/");
+pref("extensions.blocklist.itemURL", "https://blocked.cdn.mozilla.net/%blockID%.html");
+
+// Show new install UI with permission lists
+pref("extensions.webextPermissionPrompts", true);
 
 // 1 = allow "Man In The Middle" (local proxy, web filter, etc.) for certificate
 //     pinning checks.
@@ -187,9 +201,9 @@ pref("security.cert_pinning.enforcement_level", 1);
 //  .. etc ..
 //
 pref("extensions.update.enabled", true);
-pref("extensions.update.url", "https://versioncheck.addons.mozilla.org/update/VersionCheck.php?reqVersion=%REQ_VERSION%&id=%ITEM_ID%&version=%ITEM_VERSION%&maxAppVersion=%ITEM_MAXAPPVERSION%&status=%ITEM_STATUS%&appID=%APP_ID%&appVersion=%APP_VERSION%&appOS=%APP_OS%&appABI=%APP_ABI%&locale=%APP_LOCALE%&currentAppVersion=%CURRENT_APP_VERSION%&updateType=%UPDATE_TYPE%&compatMode=%COMPATIBILITY_MODE%");
+pref("extensions.update.url", "https://versioncheck.addons.thunderbird.net/update/VersionCheck.php?reqVersion=%REQ_VERSION%&id=%ITEM_ID%&version=%ITEM_VERSION%&maxAppVersion=%ITEM_MAXAPPVERSION%&status=%ITEM_STATUS%&appID=%APP_ID%&appVersion=%APP_VERSION%&appOS=%APP_OS%&appABI=%APP_ABI%&locale=%APP_LOCALE%&currentAppVersion=%CURRENT_APP_VERSION%&updateType=%UPDATE_TYPE%&compatMode=%COMPATIBILITY_MODE%");
 
-pref("extensions.update.background.url", "https://versioncheck-bg.addons.mozilla.org/update/VersionCheck.php?reqVersion=%REQ_VERSION%&id=%ITEM_ID%&version=%ITEM_VERSION%&maxAppVersion=%ITEM_MAXAPPVERSION%&status=%ITEM_STATUS%&appID=%APP_ID%&appVersion=%APP_VERSION%&appOS=%APP_OS%&appABI=%APP_ABI%&locale=%APP_LOCALE%&currentAppVersion=%CURRENT_APP_VERSION%&updateType=%UPDATE_TYPE%&compatMode=%COMPATIBILITY_MODE%");
+pref("extensions.update.background.url", "https://versioncheck-bg.addons.thunderbird.net/update/VersionCheck.php?reqVersion=%REQ_VERSION%&id=%ITEM_ID%&version=%ITEM_VERSION%&maxAppVersion=%ITEM_MAXAPPVERSION%&status=%ITEM_STATUS%&appID=%APP_ID%&appVersion=%APP_VERSION%&appOS=%APP_OS%&appABI=%APP_ABI%&locale=%APP_LOCALE%&currentAppVersion=%CURRENT_APP_VERSION%&updateType=%UPDATE_TYPE%&compatMode=%COMPATIBILITY_MODE%");
 
 pref("extensions.update.interval", 86400);  // Check for updates to Extensions and
                                             // Themes every day
@@ -199,11 +213,10 @@ pref("extensions.dss.switchPending", false);    // Non-dynamic switch pending af
 pref("extensions.webextensions.themes.icons.buttons", "getmsg,newmsg,address,reply,replyall,replylist,forwarding,delete,junk,print,stop,file,nextUnread,prevUnread,mark,tag,back,forward,compact,archive,chat,nextMsg,prevMsg,QFB,conversation,app_menu,newcard,newlist,editcard,newim,send,spelling,attach,security,save,quote,cut,copy,paste,buddy,join_chat,chat_accounts,calendar,tasks,synchronize,newevent,newtask,editevent,today,find,category,complete,priority,saveandclose,attendees,privacy,status,freebusy,timezones");
 pref("extensions.webextensions.themes.enabled", true);
 
-pref("lightweightThemes.selectedThemeID", "default-theme@mozilla.org", sticky);
-
 pref("lightweightThemes.update.enabled", true);
 
-pref("xpinstall.whitelist.add", "addons.mozilla.org");
+// Built-in default permissions.
+pref("permissions.manager.defaultsUrl", "resource://app/defaults/permissions");
 
 pref("general.smoothScroll", true);
 #ifdef UNIX_BUT_NOT_MAC
@@ -233,19 +246,12 @@ pref("mail.last_msg_movecopy_was_move", true);
 //Set the font color for links to something lighter
 pref("browser.anchor_color", "#0B6CDA");
 
-#ifdef XP_WIN
-pref("browser.preferences.instantApply", false);
-#else
 pref("browser.preferences.instantApply", true);
-#endif
 #ifdef XP_MACOSX
 pref("browser.preferences.animateFadeIn", true);
 #else
 pref("browser.preferences.animateFadeIn", false);
 #endif
-
-pref("browser.download.show_plugins_in_list", false);
-pref("browser.download.hide_plugins_without_extensions", true);
 
 pref("accessibility.typeaheadfind", false);
 pref("accessibility.typeaheadfind.timeout", 5000);
@@ -261,6 +267,8 @@ pref("mailnews.headers.show_n_lines_before_more", 1);
 // We want to keep track of what items are appropriate in
 // XULStore.json. We use versioning to scrub out the things
 // that have become obsolete.
+// The value will always be set by startup code and must not be changed
+// here. A value of 0 means a new profile.
 pref("mail.ui-rdf.version", 0);
 
 /////////////////////////////////////////////////////////////////
@@ -373,6 +381,10 @@ pref("network.protocol-handler.warn-external.ftp", false);
 pref("network.hosts.smtp_server",           "mail");
 pref("network.hosts.pop_server",            "mail");
 
+// Temporarily add 'preferences' and 'newserror' to the list of about: pages that do not have a CSP specified.
+// The list should be kept in sync with the one in m-c/modules/libpref/init/all.js. See bug 1495983.
+pref("csp.about_uris_without_csp", "preferences,newserror,blank,printpreview,srcdoc,about,addons,cache-entry,config,crashes,debugging,devtools,downloads,home,memory,networking,newtab,performance,policies,profiles,restartrequired,searchreset,serviceworkers,sessionrestore,support,sync-log,telemetry,url-classifier,webrtc,welcomeback");
+
 pref("security.warn_entering_secure", false);
 pref("security.warn_entering_weak", false);
 pref("security.warn_leaving_secure", false);
@@ -416,7 +428,7 @@ pref("browser.helperApps.deleteTempFileOnExit", true);
 
 pref("spellchecker.dictionary", "");
 // Dictionary download preference
-pref("spellchecker.dictionaries.download.url", "https://addons.mozilla.org/%LOCALE%/%APP%/dictionaries/");
+pref("spellchecker.dictionaries.download.url", "https://addons.thunderbird.net/%LOCALE%/%APP%/dictionaries/");
 
 // profile.force.migration can be used to bypass the migration wizard, forcing migration from a particular
 // mail application without any user intervention. Possible values are:
@@ -471,6 +483,10 @@ pref("mail.tabs.drawInTitlebar", false);
 #else
 pref("mail.tabs.drawInTitlebar", true);
 #endif
+
+// Offer additional drag space to the user. The drag space
+// will only be shown if browser.tabs.drawInTitlebar is true.
+pref("mail.tabs.extraDragSpace", false);
 
 // The breakpad report server to link to in about:crashes
 pref("breakpad.reportURL", "https://crash-stats.mozilla.com/report/index/");
@@ -574,32 +590,32 @@ pref("font.name.monospace.x-unicode", "Menlo");
 pref("font.name-list.sans-serif.x-unicode", "Lucida Grande");
 pref("font.name-list.monospace.x-unicode", "Menlo, Monaco");
 pref("font.size.variable.x-unicode", 15);
-pref("font.size.fixed.x-unicode", 12);
+pref("font.size.monospace.x-unicode", 12);
 
 pref("font.name.sans-serif.x-western", "Lucida Grande");
 pref("font.name.monospace.x-western", "Menlo");
 pref("font.name-list.sans-serif.x-western", "Lucida Grande");
 pref("font.name-list.monospace.x-western", "Menlo, Monaco");
 pref("font.size.variable.x-western", 15);
-pref("font.size.fixed.x-western", 12);
+pref("font.size.monospace.x-western", 12);
 
 pref("font.name.sans-serif.x-cyrillic", "Lucida Grande");
 pref("font.name.monospace.x-cyrillic", "Menlo");
 pref("font.name-list.sans-serif.x-cyrillic", "Lucida Grande");
 pref("font.name-list.monospace.x-cyrillic", "Menlo, Monaco");
 pref("font.size.variable.x-cyrillic", 15);
-pref("font.size.fixed.x-cyrillic", 12);
+pref("font.size.monospace.x-cyrillic", 12);
 
 pref("font.name.sans-serif.el", "Lucida Grande");
 pref("font.name.monospace.el", "Menlo");
 pref("font.name-list.sans-serif.el", "Lucida Grande");
 pref("font.name-list.monospace.el", "Menlo, Monaco");
 pref("font.size.variable.el", 15);
-pref("font.size.fixed.el", 12);
+pref("font.size.monospace.el", 12);
 #endif
 
 // Since different versions of Windows need different settings, we'll handle
-// this in mailMigrator.js.
+// this in MailMigrator.jsm.
 
 // Linux, in other words.  Other OSes may wish to override.
 #ifdef UNIX_BUT_NOT_MAC
@@ -695,63 +711,6 @@ pref("places.frecency.defaultVisitBonus", 0);
 pref("places.frecency.unvisitedBookmarkBonus", 140);
 pref("places.frecency.unvisitedTypedBonus", 200);
 
-// The default for this pref reflects whether the build is capable of IPC.
-// (Turning it on in a no-IPC build will have no effect.)
-#ifdef XP_MACOSX
-// i386 ipc preferences
-pref("dom.ipc.plugins.enabled.i386", false);
-pref("dom.ipc.plugins.enabled.i386.flash player.plugin", true);
-pref("dom.ipc.plugins.enabled.i386.javaplugin2_npapi.plugin", true);
-pref("dom.ipc.plugins.enabled.i386.javaappletplugin.plugin", true);
-// x86_64 ipc preferences
-pref("dom.ipc.plugins.enabled.x86_64", true);
-#else
-pref("dom.ipc.plugins.enabled", true);
-#endif
-
-// This pref governs whether we attempt to work around problems caused by
-// plugins using OS calls to manipulate the cursor while running out-of-
-// process.  These workarounds all involve intercepting (hooking) certain
-// OS calls in the plugin process, then arranging to make certain OS calls
-// in the browser process.  Eventually plugins will be required to use the
-// NPAPI to manipulate the cursor, and these workarounds will be removed.
-// See bug 621117.
-#ifdef XP_MACOSX
-pref("dom.ipc.plugins.nativeCursorSupport", true);
-#endif
-
-// plugin finder service url
-pref("pfs.datasource.url", "https://pfs.mozilla.org/plugins/PluginFinderService.
-php?mimetype=%PLUGIN_MIMETYPE%&appID=%APP_ID%&appVersion=%APP_VERSION%&clientOS=
-%CLIENT_OS%&chromeLocale=%CHROME_LOCALE%&appRelease=%APP_RELEASE%");
-
-// By default we show an infobar message when pages require plugins that are
-// outdated.
-pref("plugins.hide_infobar_for_outdated_plugin", false);
-
-#ifdef XP_MACOSX
-pref("plugins.use_layers", false);
-pref("plugins.hide_infobar_for_carbon_failure_plugin", false);
-#endif
-
-pref("plugins.update.url", "https://www.mozilla.org/%LOCALE%/plugincheck/");
-pref("plugins.update.notifyUser", false);
-pref("plugins.crash.supportUrl", "https://live.thunderbird.net/%APP%/plugin-crashed?locale=%LOCALE%&version=%VERSION%&os=%OS%&buildid=%APPBUILDID%");
-
-// Click-to-play has not been ported for TB yet, see bug 814168.
-// The default plugin state should be changed to "ask to activate" when this
-// has been done.
-pref("plugins.click_to_play", false);
-// Disable by default.
-pref("plugin.default.state", 0);
-
-// Plugins bundled in XPIs are enabled by default.
-pref("plugin.defaultXpi.state", 2);
-
-// Flash is enabled and Java is disabled by default.
-pref("plugin.state.flash", 2);
-pref("plugin.state.java", 0);
-
 // Windows taskbar support
 #ifdef XP_WIN
 pref("mail.taskbar.lists.enabled", true);
@@ -815,7 +774,7 @@ pref("privacy.sanitize.timeSpan", 1);
 pref("privacy.userContext.enabled", false);
 
 // PgpMime Proxy
-pref("mail.pgpmime.addon_url", "https://addons.mozilla.org/thunderbird/addon/enigmail/");
+pref("mail.pgpmime.addon_url", "https://addons.thunderbird.net/thunderbird/addon/enigmail/");
 
 // If set to true, Thunderbird will collapse the main menu for new profiles
 // (or, more precisely, profiles that start with no accounts created).
@@ -825,10 +784,7 @@ pref("mail.main_menu.collapse_by_default", true);
 // instead of space in the file name.
 pref("mail.save_msg_filename_underscores_for_space", false);
 
-// calendar promotion status
-pref("mail.calendar-integration.opt-out", false);
-
-#ifdef MOZ_CONTENT_SANDBOX
+#ifdef MOZ_SANDBOX
 // This controls the strength of the Windows content process sandbox for testing
 // purposes. This will require a restart.
 // On windows these levels are:
@@ -837,5 +793,26 @@ pref("mail.calendar-integration.opt-out", false);
 pref("security.sandbox.content.level", 0);
 #endif
 
+#if defined(NIGHTLY_BUILD) && defined(XP_MACOSX) && defined(MOZ_SANDBOX)
+// Start the Mac sandbox immediately during child process startup instead
+// of when messaged by the parent after the message loop is running.
+pref("security.sandbox.content.mac.earlyinit", false);
+#endif
+
 // Enable FIDO U2F
 pref("security.webauth.u2f", true);
+
+#if defined(DEBUG)
+// Allow eval in these files, see bug 1522608.
+pref("security.allow_eval_with_system_principal", false);
+pref("security.uris_using_eval_with_system_principal", "ajv-4.1.1.js,autocomplete.xml,box.jsm,calDavCalendar.js,chrometask_chromescript,content-task.js,dialog.xml,gdataSession.jsm,jsol.js,jszip.js,lodash.js,parent_utils.js,preferencesbindings.js,react-redux.js,redux.js,setup,sinon-7.2.7.js,tree.xml,updates.js");
+#endif
+
+// Use OS date and time settings by default.
+pref("intl.regional_prefs.use_os_locales", true);
+
+// Multi-lingual preferences
+pref("intl.multilingual.enabled", false);
+
+// We don't support yet language pack download from ATN
+pref("intl.multilingual.downloadEnabled", false);

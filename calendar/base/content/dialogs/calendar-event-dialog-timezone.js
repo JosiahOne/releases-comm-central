@@ -2,9 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* exported onLoad, onAccept, onCancel */
+/* exported onLoad */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from ../calendar-ui-utils.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+
+document.addEventListener("dialogaccept", onAccept);
 
 /**
  * Sets up the timezone dialog from the window arguments, also setting up all
@@ -127,12 +131,4 @@ function onAccept() {
     let timezone = window.tzProvider.getTimezone(timezoneString);
     let datetime = window.time.getInTimezone(timezone);
     window.onAcceptCallback(datetime);
-    return true;
-}
-
-/**
- * Handler function to be called when the cancel button is pressed.
- *
- */
-function onCancel() {
 }

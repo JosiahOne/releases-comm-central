@@ -10,7 +10,6 @@
 #include "nsCOMPtr.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsICMSMessage.h"
-#include "nsICMSMessage2.h"
 #include "nsICMSEncoder.h"
 #include "nsICMSDecoder.h"
 #include "sechash.h"
@@ -19,16 +18,14 @@
 #define NS_CMSMESSAGE_CID \
   { 0xa4557478, 0xae16, 0x11d5, { 0xba,0x4b,0x00,0x10,0x83,0x03,0xb1,0x17 } }
 
-class nsCMSMessage : public nsICMSMessage,
-                     public nsICMSMessage2
+class nsCMSMessage : public nsICMSMessage
 {
 public:
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSICMSMESSAGE
-  NS_DECL_NSICMSMESSAGE2
 
   nsCMSMessage();
-  nsCMSMessage(NSSCMSMessage* aCMSMsg);
+  explicit nsCMSMessage(NSSCMSMessage* aCMSMsg);
   nsresult Init();
 
   void referenceContext(nsIInterfaceRequestor* aContext) {m_ctx = aContext;}
@@ -38,10 +35,13 @@ private:
   nsCOMPtr<nsIInterfaceRequestor> m_ctx;
   NSSCMSMessage * m_cmsMsg;
   NSSCMSSignerInfo* GetTopLevelSignerInfo();
-  nsresult CommonVerifySignature(unsigned char* aDigestData, uint32_t aDigestDataLen);
+  nsresult CommonVerifySignature(unsigned char* aDigestData, uint32_t aDigestDataLen,
+                                 int16_t aDigestType);
 
   nsresult CommonAsyncVerifySignature(nsISMimeVerificationListener *aListener,
-                                      unsigned char* aDigestData, uint32_t aDigestDataLen);
+                                      unsigned char* aDigestData, uint32_t aDigestDataLen,
+                                      int16_t aDigestType);
+  bool IsAllowedHash(const int16_t aCryptoHashInt);
 
   void destructorSafeDestroyNSSReference();
 

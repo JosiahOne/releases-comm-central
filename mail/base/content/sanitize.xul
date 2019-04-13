@@ -5,46 +5,32 @@
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
 <?xml-stylesheet href="chrome://global/skin/"?>
-<?xml-stylesheet href="chrome://messenger/skin/preferences/preferences.css"?>
 <?xml-stylesheet href="chrome://messenger/skin/sanitizeDialog.css"?>
 <?xml-stylesheet href="chrome://messenger/content/sanitizeDialog.css"?>
 
-<!DOCTYPE prefwindow [
+<!DOCTYPE dialog [
   <!ENTITY % brandDTD SYSTEM "chrome://branding/locale/brand.dtd">
   <!ENTITY % sanitizeDTD SYSTEM "chrome://messenger/locale/sanitize.dtd">
   %brandDTD;
   %sanitizeDTD;
 ]>
 
-<prefwindow id="SanitizeDialog" type="child"
-            xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-            dlgbuttons="accept,cancel"
-            title="&sanitizeDialog2.title;"
-            noneverythingtitle="&sanitizeDialog2.title;"
-            style="width: &dialog.width;"
-            ondialogaccept="gSanitizePromptDialog.sanitize();">
+<dialog id="SanitizeDialog" type="child"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
+        dlgbuttons="accept,cancel"
+        title="&sanitizeDialog2.title;"
+        noneverythingtitle="&sanitizeDialog2.title;"
+        style="width: &dialog.width;"
+        onload="gSanitizePromptDialog.init();">
 
-  <prefpane id="SanitizeDialogPane" onpaneload="gSanitizePromptDialog.init();">
+  <vbox id="SanitizeDialogPane">
     <stringbundle id="bundleBrowser"
             src="chrome://messenger/locale/messenger.properties"/>
 
     <script type="application/javascript"
             src="chrome://messenger/content/sanitize.js"/>
-
     <script type="application/javascript"
             src="chrome://messenger/content/sanitizeDialog.js"/>
-
-    <preferences id="sanitizePreferences">
-      <preference id="privacy.cpd.history" name="privacy.cpd.history" type="bool"/>
-      <preference id="privacy.cpd.cookies" name="privacy.cpd.cookies" type="bool"/>
-      <preference id="privacy.cpd.cache"   name="privacy.cpd.cache"   type="bool"/>
-    </preferences>
-
-    <preferences id="nonItemPreferences">
-      <preference id="privacy.sanitize.timeSpan"
-                  name="privacy.sanitize.timeSpan"
-                  type="int"/>
-    </preferences>
 
     <hbox id="SanitizeDurationBox" align="center">
       <label value="&clearTimeDuration.label;"
@@ -52,7 +38,6 @@
              control="sanitizeDurationChoice"
              id="sanitizeDurationLabel"/>
       <menulist id="sanitizeDurationChoice"
-                preference="privacy.sanitize.timeSpan"
                 onselect="gSanitizePromptDialog.selectByTimespan();"
                 flex="1">
         <menupopup id="sanitizeDurationPopup">
@@ -95,23 +80,20 @@
              accesskey="&detailsProgressiveDisclosure.accesskey;"
              control="detailsExpander"/>
     </hbox>
-    <listbox id="itemList" rows="3" collapsed="true" persist="collapsed">
-      <listitem label="&itemHistory.label;"
-                type="checkbox"
+    <vbox id="itemList" collapsed="true" persist="collapsed">
+      <checkbox label="&itemHistory.label;"
                 accesskey="&itemHistory.accesskey;"
                 preference="privacy.cpd.history"
-                onsyncfrompreference="return gSanitizePromptDialog.onReadGeneric();"/>
-      <listitem label="&itemCookies.label;"
-                type="checkbox"
+                oncommand="gSanitizePromptDialog.onReadGeneric();"/>
+      <checkbox label="&itemCookies.label;"
                 accesskey="&itemCookies.accesskey;"
                 preference="privacy.cpd.cookies"
-                onsyncfrompreference="return gSanitizePromptDialog.onReadGeneric();"/>
-      <listitem label="&itemCache.label;"
-                type="checkbox"
+                oncommand="gSanitizePromptDialog.onReadGeneric();"/>
+      <checkbox label="&itemCache.label;"
                 accesskey="&itemCache.accesskey;"
                 preference="privacy.cpd.cache"
-                onsyncfrompreference="return gSanitizePromptDialog.onReadGeneric();"/>
-    </listbox>
+                oncommand="gSanitizePromptDialog.onReadGeneric();"/>
+    </vbox>
 
-  </prefpane>
-</prefwindow>
+  </vbox>
+</dialog>

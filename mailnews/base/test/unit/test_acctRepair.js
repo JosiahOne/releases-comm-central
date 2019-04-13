@@ -7,10 +7,9 @@
  * without having an account that points at it.
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
-function run_test()
-{
+function run_test() {
   // Create account prefs with both kinds of duplication.
 
   Services.prefs.setCharPref("mail.account.account2.identities", "id2");

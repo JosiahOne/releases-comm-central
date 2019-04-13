@@ -3,13 +3,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
 var gSynchronizeTree = null;
 var gParentMsgWindow;
 var gMsgWindow;
 
 var gInitialFolderStates = {};
+
+document.addEventListener("dialogaccept", syncOkButton);
 
 function OnLoad()
 {
@@ -49,8 +52,6 @@ function syncOkButton()
         if(offlineManager)
             offlineManager.synchronizeForOffline(syncNews, syncMail, sendMessage, workOffline, gParentMsgWindow)
     }
-
-    return true;
 }
 
 function OnSelect()
@@ -69,11 +70,8 @@ function selectOkButton()
 
 function selectCancelButton()
 {
-    var RDF = Cc["@mozilla.org/rdf/rdf-service;1"]
-                .getService(Ci.nsIRDFService);
     for (var resourceValue in gInitialFolderStates) {
-      var resource = RDF.GetResource(resourceValue);
-      var folder = resource.QueryInterface(Ci.nsIMsgFolder);
+      let folder = MailUtils.getExistingFolder(resourceValue);
       if (gInitialFolderStates[resourceValue])
         folder.setFlag(Ci.nsMsgFolderFlags.Offline);
       else
@@ -130,19 +128,15 @@ function onSynchronizeClick(event)
     if (event.button != 0)
       return;
 
-    var row = {}
-    var col = {}
-    var elt = {}
-
-    gSynchronizeTree.treeBoxObject.getCellAt(event.clientX, event.clientY, row, col, elt);
-    if (row.value == -1)
+    let treeCellInfo = gSynchronizeTree.getCellAt(event.clientX, event.clientY);
+    if (treeCellInfo.row == -1)
       return;
 
-    if (elt.value == "twisty") {
-        var folderResource = GetFolderResource(gSynchronizeTree, row.value);
+    if (treeCellInfo.childElt == "twisty") {
+        var folderResource = GetFolderResource(gSynchronizeTree, treeCellInfo.row);
         var folder = folderResource.QueryInterface(Ci.nsIMsgFolder);
 
-        if (!(gSynchronizeTree.treeBoxObject.view.isContainerOpen(row.value))) {
+        if (!(gSynchronizeTree.view.isContainerOpen(treeCellInfo.row))) {
             var serverType = folder.server.type;
             // imap is the only server type that does folder discovery
             if (serverType != "imap") return;
@@ -160,8 +154,8 @@ function onSynchronizeClick(event)
         }
     }
     else {
-      if (col.value.id == "syncCol") {
-        UpdateNode(GetFolderResource(gSynchronizeTree, row.value), row.value);
+      if (treeCellInfo.col.id == "syncCol") {
+        UpdateNode(GetFolderResource(gSynchronizeTree, treeCellInfo.row), treeCellInfo.row);
       }
     }
 }
@@ -196,5 +190,5 @@ function UpdateNode(resource, row)
 }
 
 function GetFolderResource(aTree, aIndex) {
-  return aTree.builderView.getResourceAtIndex(aIndex);
+  return aTree.view.getResourceAtIndex(aIndex);
 }

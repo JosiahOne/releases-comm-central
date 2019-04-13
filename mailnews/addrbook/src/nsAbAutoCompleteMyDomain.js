@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function nsAbAutoCompleteMyDomain() {}
 
@@ -17,7 +17,7 @@ nsAbAutoCompleteMyDomain.prototype = {
 
   applicableHeaders: new Set(["addr_to", "addr_cc", "addr_bcc", "addr_reply"]),
 
-  startSearch: function(aString, aSearchParam, aResult, aListener) {
+  startSearch(aString, aSearchParam, aResult, aListener) {
     let params = aSearchParam ? JSON.parse(aSearchParam) : {};
     let applicable = ("type" in params) && this.applicableHeaders.has(params.type);
     const ACR = Ci.nsIAutoCompleteResult;
@@ -38,20 +38,20 @@ nsAbAutoCompleteMyDomain.prototype = {
       defaultIndex: -1,
       errorDescription: null,
       matchCount: address ? 1 : 0,
-      getValueAt: function() { return address; },
-      getLabelAt: function() { return this.getValueAt(); },
-      getCommentAt: function() { return null; },
-      getStyleAt: function() { return "default-match"; },
-      getImageAt: function() { return null; },
-      getFinalCompleteValueAt: function(aIndex) {
+      getValueAt() { return address; },
+      getLabelAt() { return this.getValueAt(); },
+      getCommentAt() { return null; },
+      getStyleAt() { return "default-match"; },
+      getImageAt() { return null; },
+      getFinalCompleteValueAt(aIndex) {
         return this.getValueAt(aIndex);
       },
-      removeValueAt: function() {}
+      removeValueAt() {},
     };
     aListener.onSearchResult(this, result);
   },
 
-  stopSearch: function() {}
+  stopSearch() {},
 };
 
 var components = [nsAbAutoCompleteMyDomain];

@@ -4,12 +4,11 @@
 
 this.EXPORTED_SYMBOLS = ['MimeType', 'MimeTypeNoun'];
 
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
-ChromeUtils.import("resource:///modules/StringBundle.js");
-
+const {StringBundle} = ChromeUtils.import("resource:///modules/StringBundle.js");
+const {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 var LOG = Log4Moz.repository.getLogger("gloda.noun.mimetype");
 
-ChromeUtils.import("resource:///modules/gloda/gloda.js");
+const {Gloda} = ChromeUtils.import("resource:///modules/gloda/gloda.js");
 
 var CategoryStringMap = {};
 
@@ -318,7 +317,7 @@ var MimeTypeNoun = {
       let rangePairs = [];
       // If there are no arguments then we want to fall back to the 'in'
       //  constraint which matches on any attachment.
-      if (aArguments.length == 0)
+      if (!aArguments || aArguments.length == 0)
         return this._inConstraintHelper(aAttrDef, []);
 
       for (let iArg = 0; iArg < aArguments.length; iArg++) {

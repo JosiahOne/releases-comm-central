@@ -9,7 +9,6 @@
 #include "nsMsgFolderFlags.h"
 #include "nsIPrefBranch.h"
 #include "nsIPrefService.h"
-#include "nsRDFCID.h"
 #include "nsNetUtil.h"
 #include "nsIMsgFolderCache.h"
 #include "nsIMsgFolderCacheElement.h"
@@ -34,7 +33,6 @@
 #include "nsISpamSettings.h"
 #include "nsIMsgFilterPlugin.h"
 #include "nsIMsgMailSession.h"
-#include "nsIRDFService.h"
 #include "nsTextFormatter.h"
 #include "nsMsgDBCID.h"
 #include "nsReadLine.h"
@@ -68,7 +66,6 @@
 #include "mozilla/Services.h"
 #include "nsMimeTypes.h"
 #include "nsIMsgFilter.h"
-#include "nsIConsoleService.h"
 #include "nsIScriptError.h"
 #include "mozilla/intl/LocaleService.h"
 #include "nsIURIMutator.h"
@@ -83,8 +80,6 @@ static PRTime gtimeOfLastPurgeCheck;  // variable to know when to check for purg
 #define PREF_MAIL_WARN_FILTER_CHANGED "mail.warn_filter_changed"
 
 const char *kUseServerRetentionProp = "useServerRetention";
-
-static NS_DEFINE_CID(kRDFServiceCID, NS_RDFSERVICE_CID);
 
 nsICollation * nsMsgDBFolder::gCollationKeyGenerator = nullptr;
 
@@ -2999,35 +2994,19 @@ typedef bool
 NS_IMETHODIMP
 nsMsgDBFolder::GetSubFolders(nsISimpleEnumerator **aResult)
 {
-  return aResult ? NS_NewArrayEnumerator(aResult, mSubFolders) : NS_ERROR_NULL_POINTER;
+  return aResult ? NS_NewArrayEnumerator(aResult, mSubFolders, NS_GET_IID(nsIMsgFolder)) : NS_ERROR_NULL_POINTER;
 }
 
 NS_IMETHODIMP
 nsMsgDBFolder::FindSubFolder(const nsACString& aEscapedSubFolderName, nsIMsgFolder **aFolder)
 {
-  nsresult rv = NS_OK;
-  nsCOMPtr<nsIRDFService> rdf(do_GetService(kRDFServiceCID, &rv));
-
-  if (NS_FAILED(rv))
-    return rv;
-
   // XXX use necko here
   nsAutoCString uri;
   uri.Append(mURI);
   uri.Append('/');
   uri.Append(aEscapedSubFolderName);
 
-  nsCOMPtr<nsIRDFResource> res;
-  rv = rdf->GetResource(uri, getter_AddRefs(res));
-  if (NS_FAILED(rv))
-    return rv;
-
-  nsCOMPtr<nsIMsgFolder> folder(do_QueryInterface(res, &rv));
-  if (NS_FAILED(rv))
-    return rv;
-
-  folder.forget(aFolder);
-  return NS_OK;
+  return GetOrCreateFolder(uri, aFolder);
 }
 
 NS_IMETHODIMP
@@ -3048,11 +3027,14 @@ nsMsgDBFolder::GetNumSubFolders(uint32_t *aResult)
 
 NS_IMETHODIMP nsMsgDBFolder::AddFolderListener(nsIFolderListener * listener)
 {
-  return mListeners.AppendElement(listener) ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
+  NS_ENSURE_ARG_POINTER(listener);
+  mListeners.AppendElement(listener);
+  return NS_OK;
 }
 
 NS_IMETHODIMP nsMsgDBFolder::RemoveFolderListener(nsIFolderListener * listener)
 {
+  NS_ENSURE_ARG_POINTER(listener);
   mListeners.RemoveElement(listener);
   return NS_OK;
 }
@@ -3063,19 +3045,15 @@ NS_IMETHODIMP nsMsgDBFolder::SetParent(nsIMsgFolder *aParent)
   if (aParent)
   {
     nsresult rv;
-    nsCOMPtr<nsIMsgFolder> parentMsgFolder = do_QueryInterface(aParent, &rv);
-    if (NS_SUCCEEDED(rv))
-    {
-      // servers do not have parents, so we must not be a server
-      mIsServer = false;
-      mIsServerIsValid = true;
+    // servers do not have parents, so we must not be a server
+    mIsServer = false;
+    mIsServerIsValid = true;
 
-      // also set the server itself while we're here.
-      nsCOMPtr<nsIMsgIncomingServer> server;
-      rv = parentMsgFolder->GetServer(getter_AddRefs(server));
-      if (NS_SUCCEEDED(rv) && server)
-        mServer = do_GetWeakReference(server);
-    }
+    // also set the server itself while we're here.
+    nsCOMPtr<nsIMsgIncomingServer> server;
+    rv = aParent->GetServer(getter_AddRefs(server));
+    if (NS_SUCCEEDED(rv) && server)
+      mServer = do_GetWeakReference(server);
   }
   return NS_OK;
 }
@@ -3402,14 +3380,19 @@ NS_IMETHODIMP nsMsgDBFolder::GetPrettyName(nsAString& name)
   return GetName(name);
 }
 
+// -1: not retrieved yet, 1: English, 0: non-English.
+static int isEnglish = -1;
+
 static bool
 nonEnglishApp()
 {
-  nsAutoCString locale;
-  mozilla::intl::LocaleService::GetInstance()->GetAppLocaleAsLangTag(locale);
-
-  return !(locale.EqualsLiteral("en") ||
-           StringBeginsWith(locale, NS_LITERAL_CSTRING("en-")));
+  if (isEnglish == -1) {
+    nsAutoCString locale;
+    mozilla::intl::LocaleService::GetInstance()->GetAppLocaleAsLangTag(locale);
+    isEnglish = (locale.EqualsLiteral("en") ||
+                 StringBeginsWith(locale, NS_LITERAL_CSTRING("en-"))) ? 1 : 0;
+  }
+  return isEnglish ? false : true;
 }
 
 static bool
@@ -3421,6 +3404,26 @@ hasTrashName(const nsAString& name)
          (name.LowerCaseEqualsLiteral("deleted") && nonEnglishApp());
 }
 
+static bool
+hasDraftsName(const nsAString& name)
+{
+  // Some IMAP providers call the folder "Draft". If the application is non-English,
+  // we want to use the localised name instead.
+  return name.LowerCaseEqualsLiteral("drafts") ||
+         (name.LowerCaseEqualsLiteral("draft") && nonEnglishApp());
+}
+
+static bool
+hasSentName(const nsAString& name)
+{
+  // Some IMAP providers call the folder for sent messages "Outbox". That IMAP
+  // folder is not related to Thunderbird's local folder for queued messages.
+  // If we find such a folder with the 'SentMail' flag, we can safely localize
+  // its name if the application is non-English.
+  return name.LowerCaseEqualsLiteral("sent") ||
+         (name.LowerCaseEqualsLiteral("outbox") && nonEnglishApp());
+}
+
 NS_IMETHODIMP nsMsgDBFolder::SetPrettyName(const nsAString& name)
 {
   nsresult rv;
@@ -3428,9 +3431,9 @@ NS_IMETHODIMP nsMsgDBFolder::SetPrettyName(const nsAString& name)
   //Set pretty name only if special flag is set and if it the default folder name
   if (mFlags & nsMsgFolderFlags::Inbox && name.LowerCaseEqualsLiteral("inbox"))
     rv = SetName(kLocalizedInboxName);
-  else if (mFlags & nsMsgFolderFlags::SentMail && name.LowerCaseEqualsLiteral("sent"))
+  else if (mFlags & nsMsgFolderFlags::SentMail && hasSentName(name))
     rv = SetName(kLocalizedSentName);
-  else if (mFlags & nsMsgFolderFlags::Drafts && name.LowerCaseEqualsLiteral("drafts"))
+  else if (mFlags & nsMsgFolderFlags::Drafts && hasDraftsName(name))
     rv = SetName(kLocalizedDraftsName);
   else if (mFlags & nsMsgFolderFlags::Templates && name.LowerCaseEqualsLiteral("templates"))
     rv = SetName(kLocalizedTemplatesName);
@@ -3558,32 +3561,6 @@ NS_IMETHODIMP nsMsgDBFolder::GetChildWithURI(const nsACString& uri, bool deep, b
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMsgDBFolder::GetPrettiestName(nsAString& name)
-{
-  if (NS_IsMainThread()) {
-    nsCOMPtr<nsIConsoleService> cs = do_GetService(NS_CONSOLESERVICE_CONTRACTID);
-
-    if (cs) {
-      nsCString msg(__FUNCTION__);
-      msg.AppendLiteral(" is deprecated and will be removed soon.");
-
-      nsCOMPtr<nsIScriptError> e = do_CreateInstance(NS_SCRIPTERROR_CONTRACTID);
-      if (e && NS_SUCCEEDED(e->Init(NS_ConvertUTF8toUTF16(msg), EmptyString(),
-                                    EmptyString(), 0, 0,
-                                    nsIScriptError::warningFlag, "mailnews",
-                                    false))) {
-        cs->LogMessage(e);
-      }
-    }
-  }
-  NS_WARNING("You are trying to use the deprecated attribute 'prettiestName'.");
-
-  if (NS_SUCCEEDED(GetPrettyName(name)))
-    return NS_OK;
-  return GetName(name);
-}
-
-
 NS_IMETHODIMP nsMsgDBFolder::GetShowDeletedMessages(bool *showDeletedMessages)
 {
   NS_ENSURE_ARG_POINTER(showDeletedMessages);
@@ -3593,7 +3570,31 @@ NS_IMETHODIMP nsMsgDBFolder::GetShowDeletedMessages(bool *showDeletedMessages)
 
 NS_IMETHODIMP nsMsgDBFolder::Delete()
 {
-  return NS_OK;
+  ForceDBClosed();
+
+  // Delete the .msf file.
+  // NOTE: this doesn't remove .msf files in subfolders, but
+  // both nsMsgBrkMBoxStore::DeleteFolder() and
+  // nsMsgMaildirStore::DeleteFolder() will remove those .msf files
+  // as a side-effect of deleting the .sbd directory.
+  nsCOMPtr<nsIFile> summaryFile;
+  nsresult rv = GetSummaryFile(getter_AddRefs(summaryFile));
+  NS_ENSURE_SUCCESS(rv, rv);
+  bool exists = false;
+  summaryFile->Exists(&exists);
+  if (exists) {
+    rv = summaryFile->Remove(false);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  // Ask the msgStore to delete the actual storage (mbox, maildir or whatever
+  // else may be supported in future).
+  nsCOMPtr<nsIMsgPluggableStore> msgStore;
+  rv = GetMsgStore(getter_AddRefs(msgStore));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = msgStore->DeleteFolder(this);
+
+  return rv;
 }
 
 NS_IMETHODIMP nsMsgDBFolder::DeleteSubFolders(nsIArray *folders,
@@ -3722,8 +3723,6 @@ NS_IMETHODIMP nsMsgDBFolder::AddSubfolder(const nsAString& name,
 
   int32_t flags = 0;
   nsresult rv;
-  nsCOMPtr<nsIRDFService> rdf = do_GetService("@mozilla.org/rdf/rdf-service;1", &rv);
-  NS_ENSURE_SUCCESS(rv,rv);
 
   nsAutoCString uri(mURI);
   uri.Append('/');
@@ -3769,14 +3768,9 @@ NS_IMETHODIMP nsMsgDBFolder::AddSubfolder(const nsAString& name,
   if (NS_SUCCEEDED(rv) && msgFolder)
     return NS_MSG_FOLDER_EXISTS;
 
-  nsCOMPtr<nsIRDFResource> res;
-  rv = rdf->GetResource(uri, getter_AddRefs(res));
-  if (NS_FAILED(rv))
-    return rv;
-
-  nsCOMPtr<nsIMsgFolder> folder(do_QueryInterface(res, &rv));
-  if (NS_FAILED(rv))
-    return rv;
+  nsCOMPtr<nsIMsgFolder> folder;
+  rv = GetOrCreateFolder(uri, getter_AddRefs(folder));
+  NS_ENSURE_SUCCESS(rv, rv);
 
   folder->GetFlags((uint32_t *)&flags);
   flags |= nsMsgFolderFlags::Mail;
@@ -4103,7 +4097,7 @@ NS_IMETHODIMP nsMsgDBFolder::Rename(const nsAString& aNewName, nsIMsgWindow *msg
       newFolder->SetPrettyName(aNewName);
       newFolder->SetFlags(mFlags);
       bool changed = false;
-      MatchOrChangeFilterDestination(newFolder, true /*caseInsenstive*/, &changed);
+      MatchOrChangeFilterDestination(newFolder, true /*case-insensitive*/, &changed);
       if (changed)
         AlertFilterChanged(msgWindow);
 
@@ -4469,7 +4463,7 @@ NS_IMETHODIMP nsMsgDBFolder::ListFoldersWithFlags(uint32_t aFlags, nsIMutableArr
 {
   NS_ENSURE_ARG_POINTER(aFolders);
   if ((mFlags & aFlags) == aFlags)
-    aFolders->AppendElement(static_cast<nsRDFResource*>(this));
+    aFolders->AppendElement(static_cast<nsIMsgFolder*>(this));
 
   nsCOMPtr<nsISimpleEnumerator> dummy;
   GetSubFolders(getter_AddRefs(dummy)); // initialize mSubFolders
@@ -4929,16 +4923,25 @@ NS_IMETHODIMP nsMsgDBFolder::CopyDataDone()
   return NS_OK;
 }
 
+#define NOTIFY_LISTENERS(propertyfunc_, params_) \
+  PR_BEGIN_MACRO \
+  nsTObserverArray<nsCOMPtr<nsIFolderListener>>::ForwardIterator iter(mListeners); \
+  nsCOMPtr<nsIFolderListener> listener; \
+  while (iter.HasMore()) { \
+    listener = iter.GetNext(); \
+    listener->propertyfunc_ params_; \
+  } \
+  PR_END_MACRO
+
 NS_IMETHODIMP
 nsMsgDBFolder::NotifyPropertyChanged(const nsACString &aProperty,
                                      const nsACString& aOldValue,
                                      const nsACString& aNewValue)
 {
-  NS_OBSERVER_ARRAY_NOTIFY_OBSERVERS(mListeners, nsIFolderListener,
-                                     OnItemPropertyChanged,
-                                     (this, aProperty,
-                                      nsCString(aOldValue).get(),
-                                      nsCString(aNewValue).get()));
+  NOTIFY_LISTENERS(OnItemPropertyChanged,
+                   (this, aProperty,
+                    nsCString(aOldValue).get(),
+                    nsCString(aNewValue).get()));
 
   // Notify listeners who listen to every folder
   nsresult rv;
@@ -4955,11 +4958,10 @@ nsMsgDBFolder::NotifyUnicharPropertyChanged(const nsACString &aProperty,
                                           const nsAString& aOldValue,
                                           const nsAString& aNewValue)
 {
-  NS_OBSERVER_ARRAY_NOTIFY_OBSERVERS(mListeners, nsIFolderListener,
-                                     OnItemUnicharPropertyChanged,
-                                     (this, aProperty,
-                                      nsString(aOldValue).get(),
-                                      nsString(aNewValue).get()));
+  NOTIFY_LISTENERS(OnItemUnicharPropertyChanged,
+                   (this, aProperty,
+                    nsString(aOldValue).get(),
+                    nsString(aNewValue).get()));
 
   // Notify listeners who listen to every folder
   nsresult rv;
@@ -4982,9 +4984,8 @@ nsMsgDBFolder::NotifyIntPropertyChanged(const nsACString &aProperty, int64_t aOl
        aProperty.Equals(kTotalUnreadMessages)))
     return NS_OK;
 
-  NS_OBSERVER_ARRAY_NOTIFY_OBSERVERS(mListeners, nsIFolderListener,
-                                     OnItemIntPropertyChanged,
-                                     (this, aProperty, aOldValue, aNewValue));
+  NOTIFY_LISTENERS(OnItemIntPropertyChanged,
+                   (this, aProperty, aOldValue, aNewValue));
 
   // Notify listeners who listen to every folder
   nsresult rv;
@@ -4999,9 +5000,8 @@ NS_IMETHODIMP
 nsMsgDBFolder::NotifyBoolPropertyChanged(const nsACString &aProperty,
                                          bool aOldValue, bool aNewValue)
 {
-  NS_OBSERVER_ARRAY_NOTIFY_OBSERVERS(mListeners, nsIFolderListener,
-                                     OnItemBoolPropertyChanged,
-                                     (this, aProperty, aOldValue, aNewValue));
+  NOTIFY_LISTENERS(OnItemBoolPropertyChanged,
+                   (this, aProperty, aOldValue, aNewValue));
 
   // Notify listeners who listen to every folder
   nsresult rv;
@@ -5016,9 +5016,8 @@ NS_IMETHODIMP
 nsMsgDBFolder::NotifyPropertyFlagChanged(nsIMsgDBHdr *aItem, const nsACString &aProperty,
                                          uint32_t aOldValue, uint32_t aNewValue)
 {
-  NS_OBSERVER_ARRAY_NOTIFY_OBSERVERS(mListeners, nsIFolderListener,
-                                     OnItemPropertyFlagChanged,
-                                     (aItem, aProperty, aOldValue, aNewValue));
+  NOTIFY_LISTENERS(OnItemPropertyFlagChanged,
+                   (aItem, aProperty, aOldValue, aNewValue));
 
   // Notify listeners who listen to every folder
   nsresult rv;
@@ -5036,9 +5035,8 @@ NS_IMETHODIMP nsMsgDBFolder::NotifyItemAdded(nsISupports *aItem)
   if (!notify)
     return NS_OK;
 
-  NS_OBSERVER_ARRAY_NOTIFY_OBSERVERS(mListeners, nsIFolderListener,
-                                     OnItemAdded,
-                                     (this, aItem));
+  NOTIFY_LISTENERS(OnItemAdded,
+                   (this, aItem));
 
   // Notify listeners who listen to every folder
   nsresult rv;
@@ -5050,9 +5048,8 @@ NS_IMETHODIMP nsMsgDBFolder::NotifyItemAdded(nsISupports *aItem)
 
 nsresult nsMsgDBFolder::NotifyItemRemoved(nsISupports *aItem)
 {
-  NS_OBSERVER_ARRAY_NOTIFY_OBSERVERS(mListeners, nsIFolderListener,
-                                     OnItemRemoved,
-                                     (this, aItem));
+  NOTIFY_LISTENERS(OnItemRemoved,
+                   (this, aItem));
 
   // Notify listeners who listen to every folder
   nsresult rv;
@@ -5064,9 +5061,8 @@ nsresult nsMsgDBFolder::NotifyItemRemoved(nsISupports *aItem)
 
 nsresult nsMsgDBFolder::NotifyFolderEvent(const nsACString &aEvent)
 {
-  NS_OBSERVER_ARRAY_NOTIFY_OBSERVERS(mListeners, nsIFolderListener,
-                                     OnItemEvent,
-                                     (this, aEvent));
+  NOTIFY_LISTENERS(OnItemEvent,
+                   (this, aEvent));
 
   //Notify listeners who listen to every folder
   nsresult rv;

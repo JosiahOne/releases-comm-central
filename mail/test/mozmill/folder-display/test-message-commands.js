@@ -7,14 +7,17 @@
  * that can't be tested with xpcshell tests because they're handling in the
  * front end - which is why Archive is the only command currently tested.
  */
+
+"use strict";
+
 var MODULE_NAME = 'test-message-commands';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['folder-display-helpers', 'content-tab-helpers',
                        'window-helpers'];
 
-ChromeUtils.import("resource:///modules/MailUtils.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
 var unreadFolder, shiftDeleteFolder, threadDeleteFolder;
 var archiveSrcFolder = null;
@@ -373,8 +376,8 @@ function yearly_archive(keep_structure) {
     firstArchiveUri += "/ArchiveSrc";
     lastArchiveUri += "/ArchiveSrc";
   }
-  let firstArchiveFolder =  MailUtils.getFolderForURI(firstArchiveUri);
-  let lastArchiveFolder = MailUtils.getFolderForURI(lastArchiveUri);
+  let firstArchiveFolder =  MailUtils.getOrCreateFolder(firstArchiveUri);
+  let lastArchiveFolder = MailUtils.getOrCreateFolder(lastArchiveUri);
   be_in_folder(firstArchiveFolder);
   assert_true(mc.dbView.getMsgHdrAt(0).messageId == firstMsgHdrMsgId,
               "Message should have been archived to " + firstArchiveUri + ", but it isn't present there");
@@ -421,8 +424,8 @@ function monthly_archive(keep_structure) {
     firstArchiveUri += "/ArchiveSrc";
     lastArchiveUri += "/ArchiveSrc";
   }
-  let firstArchiveFolder =  MailUtils.getFolderForURI(firstArchiveUri);
-  let lastArchiveFolder = MailUtils.getFolderForURI(lastArchiveUri);
+  let firstArchiveFolder = MailUtils.getOrCreateFolder(firstArchiveUri);
+  let lastArchiveFolder = MailUtils.getOrCreateFolder(lastArchiveUri);
   be_in_folder(firstArchiveFolder);
   assert_true(mc.dbView.getMsgHdrAt(0).messageId == firstMsgHdrMsgId,
               "Message should have been archived to Local Folders/" +

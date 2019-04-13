@@ -15,6 +15,7 @@
 #include "nsIMsgLocalMailFolder.h"
 #include "nsCOMArray.h"
 #include "nsIFile.h"
+#include "nsIDirectoryEnumerator.h"
 #include "nsIMsgHdr.h"
 #include "nsNetUtil.h"
 #include "nsIMsgDatabase.h"
@@ -299,26 +300,30 @@ NS_IMETHODIMP nsMsgBrkMBoxStore::SetSummaryFileValid(nsIMsgFolder *aFolder,
 NS_IMETHODIMP nsMsgBrkMBoxStore::DeleteFolder(nsIMsgFolder *aFolder)
 {
   NS_ENSURE_ARG_POINTER(aFolder);
-  //Delete mailbox
+  bool exists;
+
+  // Delete mbox file.
   nsCOMPtr<nsIFile> pathFile;
   nsresult rv = aFolder->GetFilePath(getter_AddRefs(pathFile));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  pathFile->Remove(false);
-
-  bool isDirectory = false;
-  pathFile->IsDirectory(&isDirectory);
-  if (!isDirectory)
-  {
-    nsAutoString leafName;
-    pathFile->GetLeafName(leafName);
-    leafName.AppendLiteral(FOLDER_SUFFIX);
-    pathFile->SetLeafName(leafName);
+  exists = false;
+  pathFile->Exists(&exists);
+  if (exists) {
+    rv = pathFile->Remove(false);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
-  isDirectory = false;
-  pathFile->IsDirectory(&isDirectory);
-  //If this is a directory, then remove it.
-  return isDirectory ? pathFile->Remove(true) : NS_OK;
+
+  // Delete any subfolders (.sbd-suffixed directories).
+  AddDirectorySeparator(pathFile);
+  exists = false;
+  pathFile->Exists(&exists);
+  if (exists) {
+    rv = pathFile->Remove(true);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+
+  return NS_OK;
 }
 
 NS_IMETHODIMP nsMsgBrkMBoxStore::RenameFolder(nsIMsgFolder *aFolder,
@@ -342,8 +347,6 @@ NS_IMETHODIMP nsMsgBrkMBoxStore::RenameFolder(nsIMsgFolder *aFolder,
   rv = aFolder->GetParent(getter_AddRefs(parentFolder));
   if (!parentFolder)
     return NS_ERROR_NULL_POINTER;
-
-  nsCOMPtr<nsISupports> parentSupport = do_QueryInterface(parentFolder);
 
   nsCOMPtr<nsIFile> oldSummaryFile;
   rv = aFolder->GetSummaryFile(getter_AddRefs(oldSummaryFile));
@@ -571,7 +574,7 @@ NS_IMETHODIMP nsMsgBrkMBoxStore::CopyFolder(nsIMsgFolder *aSrcFolder,
       NS_ENSURE_SUCCESS(rv,rv);
 
       AddDirectorySeparator(parentPath);
-      nsCOMPtr<nsISimpleEnumerator> children;
+      nsCOMPtr<nsIDirectoryEnumerator> children;
       parentPath->GetDirectoryEntries(getter_AddRefs(children));
       bool more;
       // checks if the directory is empty or not
@@ -1033,7 +1036,7 @@ nsMsgBrkMBoxStore::AddSubFolders(nsIMsgFolder *parent, nsCOMPtr<nsIFile> &path,
   // while creating new subfolders; we don't want to modify and iterate the same
   // directory at once.
   nsCOMArray<nsIFile> currentDirEntries;
-  nsCOMPtr<nsISimpleEnumerator> directoryEnumerator;
+  nsCOMPtr<nsIDirectoryEnumerator> directoryEnumerator;
   rv = path->GetDirectoryEntries(getter_AddRefs(directoryEnumerator));
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -1041,9 +1044,8 @@ nsMsgBrkMBoxStore::AddSubFolders(nsIMsgFolder *parent, nsCOMPtr<nsIFile> &path,
   while (NS_SUCCEEDED(directoryEnumerator->HasMoreElements(&hasMore)) &&
          hasMore)
   {
-    nsCOMPtr<nsISupports> aSupport;
-    directoryEnumerator->GetNext(getter_AddRefs(aSupport));
-    nsCOMPtr<nsIFile> currentFile(do_QueryInterface(aSupport, &rv));
+    nsCOMPtr<nsIFile> currentFile;
+    directoryEnumerator->GetNextFile(getter_AddRefs(currentFile));
     if (currentFile)
       currentDirEntries.AppendObject(currentFile);
   }

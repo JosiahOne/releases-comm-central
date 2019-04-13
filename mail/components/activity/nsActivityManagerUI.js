@@ -2,28 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
-////////////////////////////////////////////////////////////////////////////////
-//// Constants
+const ACTIVITY_MANAGER_URL = "chrome://messenger/content/activity.xul";
+const PREF_FLASH_COUNT = "messenger.activity.manager.flashCount";
 
-var ACTIVITY_MANAGER_URL = "chrome://messenger/content/activity.xul";
-var PREF_FLASH_COUNT = "messenger.activity.manager.flashCount";
-
-////////////////////////////////////////////////////////////////////////////////
-//// nsActivityManagerUI class
-
-function nsActivityManagerUI()
-{}
+function nsActivityManagerUI() {}
 
 nsActivityManagerUI.prototype = {
   classID: Components.ID("5fa5974e-09cb-40cc-9696-643f8a8d9a06"),
 
-  //////////////////////////////////////////////////////////////////////////////
-  //// nsIActivityManagerUI
-
-  show: function show(aWindowContext, aID) {
+  show(aWindowContext, aID) {
     // First we see if it is already visible
     let window = this.recentWindow;
     if (window) {
@@ -34,7 +24,7 @@ nsActivityManagerUI.prototype = {
     let parent = null;
     try {
       if (aWindowContext)
-        parent = aWindowContext.getInterface(Ci.nsIDOMWindow);
+        parent = aWindowContext.docShell.domWindow;
     } catch (e) { /* it's OK to not have a parent window */ }
 
     Services.ww.openWindow(parent,
@@ -48,21 +38,12 @@ nsActivityManagerUI.prototype = {
     return (null != this.recentWindow);
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  //// nsActivityManagerUI
-
   get recentWindow() {
     return Services.wm.getMostRecentWindow("Activity:Manager");
   },
 
-  //////////////////////////////////////////////////////////////////////////////
-  //// nsISupports
-
-  QueryInterface: ChromeUtils.generateQI([Ci.nsIActivityManagerUI])
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIActivityManagerUI]),
 };
-
-////////////////////////////////////////////////////////////////////////////////
-//// Module
 
 var components = [nsActivityManagerUI];
 var NSGetFactory = XPCOMUtils.generateNSGetFactory(components);

@@ -7,38 +7,35 @@
  * Test suite for the attachmentChecker class
  *
  * Currently tested:
- * - GetAttachmentKeywords function.
+ * - getAttachmentKeywords function.
  */
 
 // make xpcshell-tests TEST_PATH=mail/base/test/unit/test_attachmentChecker.js
 
 // Globals
 
-ChromeUtils.import("resource:///modules/attachmentChecker.js");
+var {AttachmentChecker} = ChromeUtils.import("resource:///modules/AttachmentChecker.jsm");
 
 /*
  * UTILITIES
  */
 
-function assert(aBeTrue, aWhy)
-{
+function assert(aBeTrue, aWhy) {
   if (!aBeTrue)
     do_throw(aWhy);
-};
+}
 
-function assert_equal(aA, aB, aWhy)
-{
+function assert_equal(aA, aB, aWhy) {
   assert(aA == aB, aWhy + " (" + unescape(encodeURIComponent(aA)) + " != " +
                                  unescape(encodeURIComponent(aB)) + ").");
-};
+}
 
 /*
  * TESTS
  */
 
-function test_GetAttachmentKeywords(desc, mailData, keywords, expected)
-{
-  let result = GetAttachmentKeywords(mailData, keywords);
+function test_getAttachmentKeywords(desc, mailData, keywords, expected) {
+  let result = AttachmentChecker.getAttachmentKeywords(mailData, keywords);
   assert_equal(result, expected, desc + " not equal!");
 }
 
@@ -74,15 +71,14 @@ var tests = [
   ["Should match CV and attachment", "got my CV as attachment", "CV,attachment", "CV,attachment"],
 ];
 
-function run_test()
-{
+function run_test() {
   do_test_pending();
 
   for (var i in tests)
     if (typeof(tests[i]) == "function")
       tests[i]();
     else
-      test_GetAttachmentKeywords.apply(null, tests[i]);
+      test_getAttachmentKeywords.apply(null, tests[i]);
 
   do_test_finished();
-};
+}

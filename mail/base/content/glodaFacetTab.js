@@ -2,24 +2,25 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/StringBundle.js");
+var {StringBundle} = ChromeUtils.import("resource:///modules/StringBundle.js");
 
-ChromeUtils.import("resource:///modules/gloda/facet.js");
+var { FacetDriver } = ChromeUtils.import("resource:///modules/gloda/facet.js");
 // needed by search.xml to use us
-ChromeUtils.import("resource:///modules/gloda/msg_search.js");
+var { GlodaMsgSearcher } = ChromeUtils.import("resource:///modules/gloda/msg_search.js");
 
 var glodaFacetTabType = {
   name: "glodaFacet",
   perTabPanel: "vbox",
+  lastTabId: 0,
   strings:
     new StringBundle("chrome://messenger/locale/glodaFacetView.properties"),
   modes: {
     glodaFacet: {
       // this is what get exposed on the tab for icon purposes
-      type: "glodaSearch"
-    }
+      type: "glodaSearch",
+    },
   },
-  openTab: function glodaFacetTabType_openTab(aTab, aArgs) {
+  openTab(aTab, aArgs) {
     // we have no browser until our XUL document loads
     aTab.browser = null;
 
@@ -28,6 +29,7 @@ var glodaFacetTabType = {
                         .firstChild
                         .cloneNode(true);
 
+    aTab.panel.setAttribute("id", "glodaTab" + this.lastTabId);
     aTab.panel.appendChild(clone);
     aTab.iframe = aTab.panel.querySelector("iframe");
 
@@ -41,8 +43,7 @@ var glodaFacetTabType = {
 
       aTab.title = this.strings.get("glodaFacetView.tab.query.label");
       aTab.searchString = null;
-    }
-    else if ("searcher" in aArgs) {
+    } else if ("searcher" in aArgs) {
       aTab.searcher = aArgs.searcher;
       aTab.collection = aTab.searcher.getCollection();
       aTab.query = aTab.searcher.query;
@@ -56,8 +57,7 @@ var glodaFacetTabType = {
       aTab.searchInputValue = aTab.searchString = searchString;
       aTab.title = searchString ? searchString
                    : this.strings.get("glodaFacetView.tab.search.label");
-    }
-    else if ("collection" in aArgs) {
+    } else if ("collection" in aArgs) {
       aTab.collection = aArgs.collection;
 
       aTab.title = this.strings.get("glodaFacetView.tab.query.label");
@@ -74,17 +74,19 @@ var glodaFacetTabType = {
     aTab.iframe.contentWindow.addEventListener("load", xulLoadHandler, {capture: false, once: true});
     aTab.iframe.setAttribute("src",
       "chrome://messenger/content/glodaFacetViewWrapper.xul");
+
+    this.lastTabId++;
   },
-  closeTab: function glodaFacetTabType_closeTab(aTab) {
+  closeTab(aTab) {
   },
-  saveTabState: function glodaFacetTabType_saveTabState(aTab) {
+  saveTabState(aTab) {
     // nothing to do; we are not multiplexed
   },
-  showTab: function glodaFacetTabType_showTab(aTab) {
+  showTab(aTab) {
     // nothing to do; we are not multiplexed
   },
-  getBrowser: function(aTab) {
+  getBrowser(aTab) {
     return aTab.browser;
-  }
+  },
 };
 

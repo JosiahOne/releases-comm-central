@@ -11,7 +11,7 @@
 /* ::::: for the entire area ::::: */
 .main-header-area {
   color: #2E3436; /* Aluminium 6 */
-  border-bottom:1px solid #BFBFBF;
+  border-bottom:1px solid var(--splitter-color);
   padding: 0.6ex;
 }
 
@@ -38,7 +38,7 @@
 /* ::::: attachment view ::::: */
 
 #attachmentList {
-  margin: 0px;
+  margin: 0;
   background-color: -moz-Field;
   color: -moz-FieldText;
 }
@@ -91,12 +91,6 @@
   color: -moz-dialogtext;
 }
 
-#attachment-splitter {
-  min-height: 7px;
-  border-top: 1px solid #C8C8C8;
-  background-color: #E6E6E6;
-}
-
 /* ::::: attachment list ::::: */
 
 .attachmentcell-name,
@@ -108,30 +102,30 @@
   color: GrayText;
 }
 
-attachmentlist:focus > attachmentitem[selected="true"][current="true"] {
+.attachmentList:focus > .attachmentItem[selected="true"][current="true"] {
   outline: 1px dotted #F3D982;
 }
 
-attachmentlist:focus > attachmentitem[current="true"] {
+.attachmentList:focus > .attachmentItem[current="true"] {
   outline: 1px dotted;
   outline-offset: -1px;
 }
 
-attachmentitem[selected="true"] {
+.attachmentItem[selected="true"] {
   background-color: -moz-CellHighlight;
   color: -moz-CellHighlightText;
 }
 
-attachmentlist:focus > attachmentitem[selected="true"] {
+.attachmentList:focus > .attachmentItem[selected="true"] {
   background-color: Highlight;
   color: HighlightText;
 }
 
-attachmentitem[selected="true"] .attachmentcell-size {
+.attachmentItem[selected="true"] .attachmentcell-size {
   color: -moz-CellHighlightText;
 }
 
-attachmentlist:focus >attachmentitem[selected="true"] .attachmentcell-size {
+.attachmentList:focus > .attachmentItem[selected="true"] .attachmentcell-size {
   color: HighlightText;
 }
 
@@ -301,12 +295,6 @@ toolbar[mode="icons"] > #otherActionsButton > .toolbarbutton-menu-dropmarker >
   margin-inline-end: 3px;
 }
 
-.headerValueBox {
-  overflow: visible;
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
 .headerValue {
   min-width: 50px;
   white-space: normal;
@@ -343,16 +331,14 @@ toolbar[mode="icons"] > #otherActionsButton > .toolbarbutton-menu-dropmarker >
   padding-top: 0px !important;
   padding-bottom: 0px !important;
   padding-inline-start: 0px !important;
-  padding-inline-end: 10px !important;
+  padding-inline-end: 0px !important;
   background-color: transparent !important;
-  background: url("chrome://messenger/skin/icons/arrow-dn-grey.png") no-repeat center right;
 }
 
 .messageIdDisplayButton:hover {
   cursor: pointer;
   text-decoration: underline;
   color: -moz-hyperlinktext;
-  background: url("chrome://messenger/skin/icons/arrow-dn-black.png") no-repeat center right;
 }
 
 /* ::::: msg header email addresses ::::: */
@@ -405,6 +391,11 @@ mail-emailaddress[selected="true"] > .emailDisplayButton {
   max-height: 7px; /* the height of the image */
   margin: 0.2em 2px 0; /* 0.2em just to move it off the top of the text */
   list-style-image: url("chrome://messenger/skin/icons/arrow-dn-7.png");
+}
+
+.emailToggleHeaderfield {
+  margin-inline-end: 3px;
+  margin-inline-start: 1px;
 }
 
 /* ::::: collapsed view styles ::::: */

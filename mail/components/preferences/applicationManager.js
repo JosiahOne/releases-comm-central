@@ -2,16 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+// applications.js
+/* globals gApplicationsPane */
+
 var gAppManagerDialog = {
   _removed: [],
 
-  init: function appManager_init() {
+  init() {
     this.handlerInfo = window.arguments[0];
-
     var bundle = document.getElementById("appManagerBundle");
     gApplicationsPane._prefsBundle = document.getElementById("bundlePreferences");
-
-    var description = gApplicationsPane._describeType(this.handlerInfo);
+    var description = this.handlerInfo.typeDescription;
     var key = (this.handlerInfo.wrappedHandlerInfo instanceof Ci.nsIMIMEInfo) ?
                 "handleFile" : "handleProtocol";
     var contentText = bundle.getFormattedString(key, [description]);
@@ -26,16 +27,26 @@ var gAppManagerDialog = {
         continue;
 
       app.QueryInterface(Ci.nsIHandlerApp);
-      var item = list.appendItem(app.name);
-      item.setAttribute("image", gApplicationsPane._getIconURLForHandlerApp(app));
-      item.className = "listitem-iconic";
+
+      // Ensure the XBL binding is created eagerly.
+      // eslint-disable-next-line no-undef
+      list.appendChild(MozXULElement.parseXULToFragment("<richlistitem/>"));
+      let item = list.lastChild;
       item.app = app;
+
+      let image = document.createElement("image");
+      image.setAttribute("src", gApplicationsPane._getIconURLForHandlerApp(app));
+      item.appendChild(image);
+
+      let label = document.createElement("label");
+      label.setAttribute("value", app.name);
+      item.appendChild(label);
     }
 
     list.selectedIndex = 0;
   },
 
-  onOK: function appManager_onOK() {
+  onOK() {
     if (!this._removed.length) {
       // return early to avoid calling the |store| method.
       return;
@@ -47,11 +58,7 @@ var gAppManagerDialog = {
     this.handlerInfo.store();
   },
 
-  onCancel: function appManager_onCancel() {
-    // do nothing
-  },
-
-  remove: function appManager_remove() {
+  remove() {
     var list = document.getElementById("appList");
     this._removed.push(list.selectedItem.app);
     var index = list.selectedIndex;
@@ -59,8 +66,7 @@ var gAppManagerDialog = {
     if (list.getRowCount() == 0) {
       // The list is now empty, make the bottom part disappear
       document.getElementById("appDetails").hidden = true;
-    }
-    else {
+    } else {
       // Select the item at the same index, if we removed the last
       // item of the list, select the previous item
       if (index == list.getRowCount())
@@ -69,7 +75,7 @@ var gAppManagerDialog = {
     }
   },
 
-  onSelect: function appManager_onSelect() {
+  onSelect() {
     var list = document.getElementById("appList");
     if (!list.selectedItem) {
       document.getElementById("remove").disabled = true;
@@ -89,5 +95,7 @@ var gAppManagerDialog = {
     var appType = (app instanceof Ci.nsILocalHandlerApp) ?
                     "descriptionLocalApp" : "descriptionWebApp";
     document.getElementById("appType").value = bundle.getString(appType);
-  }
+  },
 };
+
+document.addEventListener("dialogaccept", gAppManagerDialog.onOK);

@@ -14,13 +14,15 @@
 /* exported onMouseOverItem, showToolTip, getPreviewForItem,
              getEventStatusString, getToDoStatusString */
 
+/* import-globals-from ../../base/content/calendar-ui-utils.js */
+
 /**
  * PUBLIC: This changes the mouseover preview based on the start and end dates
  * of an occurrence of a (one-time or recurring) calEvent or calToDo.
  * Used by all grid views.
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * PUBLIC: Displays a tooltip with details when hovering over an item in the views
@@ -418,7 +420,7 @@ function createTooltipHeaderDescription(text) {
  *
  * @param   {calIEvent}  calendarEvent   The text to display in the node
  * @returns {mixed}                      Returns a calIDateTime for the detected
- *                                        occurence or calIEvent, if this is a
+ *                                        occurrence or calIEvent, if this is a
  *                                        non-recurring event
  */
 function getCurrentNextOrPreviousRecurrence(calendarEvent) {

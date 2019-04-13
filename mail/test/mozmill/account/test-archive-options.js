@@ -2,18 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "test-archive-options";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                        "account-manager-helpers"];
 
-var mozmill = {};
-ChromeUtils.import("chrome://mozmill/content/modules/mozmill.js", mozmill);
-var controller = {};
-ChromeUtils.import("chrome://mozmill/content/modules/controller.js", controller);
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+var mozmill = ChromeUtils.import("chrome://mozmill/content/modules/mozmill.jsm");
+var controller = ChromeUtils.import("chrome://mozmill/content/modules/controller.jsm");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 
 var defaultIdentity;
 
@@ -158,12 +157,20 @@ function subtest_disable_archive(amc) {
   let iframe = amc.window.document.getElementById("contentFrame");
   let checkbox = iframe.contentDocument.getElementById("identity.archiveEnabled");
 
+  assert_true(checkbox.checked);
+  assert_false(checkbox.disabled);
   amc.click(new elib.Elem(checkbox));
+  utils.waitFor(() => !checkbox.checked, "Archive checkbox didn't toggle to unchecked");
+  plan_for_window_close(amc);
   amc.window.document.getElementById("accountManager").acceptDialog();
+  wait_for_window_close();
 
-  assert_equals(defaultIdentity.archiveEnabled, false);
+  assert_false(defaultIdentity.archiveEnabled);
 }
 
 function test_disable_archive() {
   open_advanced_settings(subtest_disable_archive);
 }
+// Disable test on Windows since for some yet unknown reason clicking the checkbox
+// doesn't have the desired result. See bug 1461173 for details.
+test_disable_archive.EXCLUDED_PLATFORMS = ['winnt'];

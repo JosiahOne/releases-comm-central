@@ -525,13 +525,14 @@ BuildAttachmentList(MimeObject *anObject, nsMsgAttachmentData *aAttachData, cons
         skip = false;
     if (skip && child->headers)
     {
-      char * disp = MimeHeaders_get (child->headers,
-                                     HEADER_CONTENT_DISPOSITION,
-                                     true, false);
-      if (MimeHeaders_get_name(child->headers, nullptr) &&
-          (!disp || PL_strcasecmp(disp, "attachment")))
-        // it has a filename and isn't being displayed inline
+      // If it has a filename, we don't skip it regardless of the
+      // content disposition which can be "inline" or "attachment".
+      // Inline parts are not shown when attachments aren't displayed
+      // inline, so the only chance to see the part is as attachment.
+      char * name = MimeHeaders_get_name(child->headers, nullptr);
+      if (name)
         skip = false;
+      PR_FREEIF(name);
     }
 
     found_output = true;
@@ -810,7 +811,16 @@ int ConvertToUTF8(const char *stringToUse, int32_t inLength,
 {
   nsresult rv = NS_OK;
 
-  if (PL_strcasecmp(input_charset, "UTF-7") == 0) {
+  // Look up Thunderbird's special aliases from charsetalias.properties.
+  nsCOMPtr<nsICharsetConverterManager> ccm =
+    do_GetService(NS_CHARSETCONVERTERMANAGER_CONTRACTID, &rv);
+  NS_ENSURE_SUCCESS(rv, -1);
+
+  nsCString newCharset;
+  rv = ccm->GetCharsetAlias(input_charset, newCharset);
+  NS_ENSURE_SUCCESS(rv, -1);
+
+  if (newCharset.Equals("UTF-7", nsCaseInsensitiveCStringComparator())) {
     nsAutoString utf16;
     rv = CopyUTF7toUTF16(nsDependentCString(stringToUse, inLength), utf16);
     if (NS_FAILED(rv))
@@ -819,11 +829,8 @@ int ConvertToUTF8(const char *stringToUse, int32_t inLength,
     return 0;
   }
 
-  auto encoding = mozilla::Encoding::ForLabel(nsDependentCString(input_charset));
-  if (!encoding) {
-    // Assume input is UTF-8.
-    encoding = UTF_8_ENCODING;
-  }
+  auto encoding = mozilla::Encoding::ForLabel(newCharset);
+  NS_ENSURE_TRUE(encoding, -1);  // Impossible since GetCharsetAlias() already checked.
 
   rv = encoding->DecodeWithoutBOMHandling(nsDependentCSubstring(stringToUse, inLength), outString);
   return NS_SUCCEEDED(rv) ? 0 : -1;
@@ -1352,6 +1359,7 @@ MimeDisplayOptions::MimeDisplayOptions()
 
   missing_parts = false;
   show_attachment_inline_p = false;
+  show_attachment_inline_text = false;
   quote_attachment_inline_p = false;
   notify_nested_bodies = false;
   write_pure_bodies = false;
@@ -1503,6 +1511,7 @@ mime_bridge_create_display_stream(
       //
     msd->options->m_prefBranch->GetBoolPref("mail.force_user_charset", &(msd->options->force_user_charset));
     msd->options->m_prefBranch->GetBoolPref("mail.inline_attachments", &(msd->options->show_attachment_inline_p));
+    msd->options->m_prefBranch->GetBoolPref("mail.inline_attachments.text", &(msd->options->show_attachment_inline_text));
     msd->options->m_prefBranch->GetBoolPref("mail.reply_quote_inline", &(msd->options->quote_attachment_inline_p));
     msd->options->m_prefBranch->GetIntPref("mailnews.display.html_as", &(msd->options->html_as_p));
   }
@@ -2030,7 +2039,7 @@ nsresult GetMailNewsFont(MimeObject *obj, bool styleFixed,  int32_t *fontPixelSi
       return rv;
 
     // get a font size from pref
-    prefStr.Assign(!styleFixed ? "font.size.variable." : "font.size.fixed.");
+    prefStr.Assign(!styleFixed ? "font.size.variable." : "font.size.monospace.");
     prefStr.Append(fontLang);
     rv = prefBranch->GetIntPref(prefStr.get(), fontPixelSize);
     if (NS_FAILED(rv))

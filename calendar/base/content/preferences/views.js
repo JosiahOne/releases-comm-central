@@ -4,6 +4,26 @@
 
 /* exported gViewsPane */
 
+/* import-globals-from ../../../lightning/content/messenger-overlay-preferences.js */
+
+Preferences.addAll([
+    { id: "calendar.week.start", type: "int" },
+    { id: "calendar.view-minimonth.showWeekNumber", type: "bool" },
+    { id: "calendar.week.d0sundaysoff", type: "bool", inverted: "true" },
+    { id: "calendar.week.d1mondaysoff", type: "bool", inverted: "true" },
+    { id: "calendar.week.d2tuesdaysoff", type: "bool", inverted: "true" },
+    { id: "calendar.week.d3wednesdaysoff", type: "bool", inverted: "true" },
+    { id: "calendar.week.d4thursdaysoff", type: "bool", inverted: "true" },
+    { id: "calendar.week.d5fridaysoff", type: "bool", inverted: "true" },
+    { id: "calendar.week.d6saturdaysoff", type: "bool", inverted: "true" },
+    { id: "calendar.view.daystarthour", type: "int" },
+    { id: "calendar.view.dayendhour", type: "int" },
+    { id: "calendar.view.visiblehours", type: "int" },
+    { id: "calendar.weeks.inview", type: "int" },
+    { id: "calendar.previousweeks.inview", type: "int" },
+    { id: "calendar.view.showLocation", type: "bool" },
+]);
+
 /**
  * Global Object to hold methods for the views pref pane
  */
@@ -13,9 +33,9 @@ var gViewsPane = {
      * values set in prefs.
      */
     init: function() {
-        this.updateViewEndMenu(document.getElementById("daystarthour").value);
-        this.updateViewStartMenu(document.getElementById("dayendhour").value);
-        this.updateViewWorkDayCheckboxes(document.getElementById("weekstarts").value);
+        this.updateViewEndMenu(Preferences.get("calendar.view.daystarthour").value);
+        this.updateViewStartMenu(Preferences.get("calendar.view.dayendhour").value);
+        this.updateViewWorkDayCheckboxes(Preferences.get("calendar.week.start").value);
         this.initializeViewStartEndMenus();
     },
 
@@ -24,7 +44,7 @@ var gViewsPane = {
      * menulists. This is needed to respect locales that use AM/PM.
      */
     initializeViewStartEndMenus: function() {
-        ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+        const { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
         let labelIdStart;
         let labelIdEnd;
 

@@ -26,12 +26,6 @@ function EditorGetHTML()
   } catch (e) {}
 }
 
-function EditorDumpContent()
-{
-  dump("==============  Content Tree: ================\n");
-  GetCurrentEditor().dumpContentTree();
-}
-
 function EditorInsertText(textToInsert)
 {
   GetCurrentEditor().insertText(textToInsert);
@@ -213,26 +207,6 @@ function EditorTestTableLayout()
   rowCount = editor.getTableRowCount(table);
   maxColCount = editor.getTableColumnCount(table);
   dump("From nsITableLayout: Number of rows="+rowCount+" Number of Columns="+maxColCount+"\n****** End of Table Layout Test *****\n\n");
-}
-
-function EditorShowEmbeddedObjects()
-{
-  dump("\nEmbedded Objects:\n");
-  try {
-    var objectArray = GetCurrentEditor().getEmbeddedObjects();
-    dump(objectArray.length + " embedded objects\n");
-    // FIXME nsIDOMNode has been removed.
-    // for (let i = 0; i < objectArray.length; ++i)
-    //   dump(objectArray.queryElementAt(i, Ci.nsIDOMNode) + "\n");
-  } catch(e) {}
-}
-
-function EditorUnitTests()
-{
-  dump("Running Unit Tests\n");
-  var numTests       = { value:0 };
-  var numTestsFailed = { value:0 };
-  GetCurrentEditor().debugUnitTests(numTests, numTestsFailed);
 }
 
 function EditorTestDocument()

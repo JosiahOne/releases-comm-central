@@ -23,45 +23,43 @@ job-defaults:
               path: /builds/worker/checkouts/gecko/update-verify.cfg
               type: file
     run:
-        using: run-task
         sparse-profile: mozharness
     extra:
         app-name: mail
         branch-prefix: comm
         archive-prefix:
-            by-project:
-                try-comm-central: "http://ftp.stage.mozaws.net/pub"
-                default: "https://archive.mozilla.org/pub"
+            by-release-level:
+                staging: "http://ftp.stage.mozaws.net/pub"
+                production: "https://archive.mozilla.org/pub"
         previous-archive-prefix:
-            by-project:
-                try-comm-central: "https://archive.mozilla.org/pub"
-                default: null
+            by-release-level:
+                staging: "https://archive.mozilla.org/pub"
+                production: null
         aus-server:
-            by-project:
-                try-comm-central: "https://aus5.stage.mozaws.net"
-                default: "https://aus5.mozilla.org"
+            by-release-level:
+                staging: "https://aus5.stage.mozaws.net"
+                production: "https://aus5.mozilla.org"
         # This is overridden for devedition to exclude 58.0b1
         # because of the special case added by
         # https://bugzilla.mozilla.org/show_bug.cgi?id=1419189
         # The devedition override can be removed after 58.0b1
         # is behind a watershed
         include-version:
-            by-project:
-                try-comm-central: beta
-                comm-beta: beta
+            by-release-type:
+                beta: beta
+                release: nonbeta
                 default: beta
         last-watershed:
-            by-project:
-                comm-beta:
+            by-release-type:
+                beta:
                     by-platform:
                         win64.*: "60.0b7"
                         default: "56.0b3"
-                comm-esr60: "60.0esr"
-                try-comm-central:
+                release:
                     by-platform:
-                        win64.*: "60.0b7"
-                        default: "56.0b3"
-                default: null
+                        win64.*: "60.0"
+                        default: "52.0"
+                default: "default"
 
 jobs:
     thunderbird-linux:
@@ -78,13 +76,13 @@ jobs:
             platform: linux-i686
             updater-platform: linux-x86_64
             channel:
-                by-project:
-                    comm-beta: "beta-localtest"
+                by-release-type:
+                    beta: "beta-localtest"
+                    release: "release-localtest"
                     default: "default"
             mar-channel-id-override:
-                by-project:
-                    comm-beta: beta
-                    try-comm-central: beta
+                by-release-type:
+                    beta: beta
                     default: null
 
     thunderbird-linux64:
@@ -101,13 +99,13 @@ jobs:
             platform: linux-x86_64
             updater-platform: linux-x86_64
             channel:
-                by-project:
-                    comm-beta: "beta-localtest"
+                by-release-type:
+                    beta: "beta-localtest"
+                    release: "release-localtest"
                     default: "default"
             mar-channel-id-override:
-                by-project:
-                    comm-beta: beta
-                    try-comm-central: beta
+                by-release-type:
+                    beta: beta
                     default: null
 
     thunderbird-macosx64:
@@ -124,13 +122,13 @@ jobs:
             platform: mac
             updater-platform: linux-x86_64
             channel:
-                by-project:
-                    comm-beta: "beta-localtest"
+                by-release-type:
+                    beta: "beta-localtest"
+                    release: "release-localtest"
                     default: "default"
             mar-channel-id-override:
-                by-project:
-                    comm-beta: beta
-                    try-comm-central: beta
+                by-release-type:
+                    beta: beta
                     default: null
 
     thunderbird-win32:
@@ -147,13 +145,13 @@ jobs:
             platform: win32
             updater-platform: linux-x86_64
             channel:
-                by-project:
-                    comm-beta: "beta-localtest"
+                by-release-type:
+                    beta: "beta-localtest"
+                    release: "release-localtest"
                     default: "default"
             mar-channel-id-override:
-                by-project:
-                    comm-beta: beta
-                    try-comm-central: beta
+                by-release-type:
+                    beta: beta
                     default: null
 
     thunderbird-win64:
@@ -170,11 +168,11 @@ jobs:
             platform: win64
             updater-platform: linux-x86_64
             channel:
-                by-project:
-                    comm-beta: "beta-localtest"
+                by-release-type:
+                    beta: "beta-localtest"
+                    release: "release-localtest"
                     default: "default"
             mar-channel-id-override:
-                by-project:
-                    comm-beta: beta
-                    try-comm-central: beta
+                by-release-type:
+                    beta: beta
                     default: null

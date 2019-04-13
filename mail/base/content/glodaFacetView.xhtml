@@ -13,63 +13,60 @@
 %facetViewDTD;
 ]>
 <html xmlns="http://www.w3.org/1999/xhtml"
-    xmlns:html="http://www.w3.org/1999/xhtml"
-    xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-    version="-//W3C//DTD XHTML 1.1//EN" xml:lang="en"
-    dir="&locale.dir;">
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+      version="-//W3C//DTD XHTML 1.1//EN"
+      dir="&locale.dir;">
 <head>
-  <!-- XBL bindings CSS -->
-  <link rel="stylesheet"
-      href="chrome://messenger/content/glodaFacetBindings.css"
-      type="text/css"></link>
-  <link rel="stylesheet" media="screen" type="text/css"
-        href="chrome://messenger/skin/tagColors.css"/>
   <!-- Themes -->
   <link rel="stylesheet"
-      href="chrome://messenger/skin/glodaFacetView.css"
-      type="text/css"></link>
+        href="chrome://messenger/skin/glodaFacetView.css"
+        type="text/css"/>
+  <!-- Custom elements -->
+  <script type="application/javascript"
+          src="chrome://messenger/content/glodaFacet.js"></script>
   <!-- Global Context -->
   <script type="application/javascript"
-      src="chrome://messenger/content/glodaFacetView.js"></script>
+          src="chrome://messenger/content/glodaFacetView.js"></script>
   <!-- Libs -->
   <script type="application/javascript"
-      src="chrome://messenger/content/protovis-r2.6-modded.js"></script>
+          src="chrome://messenger/content/protovis-r2.6-modded.js"></script>
   <!-- Facet Binding Stuff that doesn't belong in XBL -->
   <script type="application/javascript"
-      src="chrome://messenger/content/glodaFacetVis.js"></script>
+          src="chrome://messenger/content/glodaFacetVis.js"></script>
 </head>
 <body id="body" onload="reachOutAndTouchFrame()"
-      onkeypress="if (event.keyCode == event.DOM_VK_ESCAPE) document.getElementById('popup-menu').hide();"
       onmouseup="return clickOnBody(event)">
-  <div id="popup-menu" class="popup-menu" variety="invisible"/>
+  <facet-popup-menu class="popup-menu" variety="invisible"/>
   <div id="table">
     <div>
         <div class="facets facets-sidebar" id="facets">
           <h1 id="filter-header-label">&glodaFacetView.filters.label;</h1>
           <div>
-            <div id="facet-fromMe" class="facetious" type="boolean" attr="fromMe"
-                 uninitialized="true" />
-            <div id="facet-toMe" class="facetious" type="boolean" attr="toMe"
-                 uninitialized="true" />
-            <div id="facet-star" class="facetious" type="boolean" attr="star"
-                 uninitialized="true"/><br />
-            <div id="facet-attachmentTypes" class="facetious" type="boolean-filtered"
-                 attr="attachmentTypes"
-                 groupDisplayProperty="categoryLabel"
-                 uninitialized="true"/>
+            <facet-boolean id="facet-fromMe" type="boolean" attr="fromMe" uninitialized="true"/>
+            <facet-boolean id="facet-toMe" type="boolean" attr="toMe" uninitialized="true"/>
+            <facet-boolean id="facet-star" type="boolean" attr="star" uninitialized="true"/><br/>
+            <facet-boolean-filtered id="facet-attachmentTypes"
+                                    type="boolean-filtered"
+                                    attr="attachmentTypes"
+                                    groupDisplayProperty="categoryLabel"
+                                    uninitialized="true"/>
           </div>
         </div>
         <div id="main-column">
           <div id="header">
             <div id="date-toggle" class="date-toggle" tabindex="0" role="button"
-               onclick="FacetContext.toggleTimeline()"
-               onkeypress="if (event.charCode == KeyEvent.DOM_VK_SPACE) { FacetContext.toggleTimeline(); event.preventDefault() }"/>
+                 onclick="FacetContext.toggleTimeline()"
+                 onkeypress="if (event.charCode == KeyEvent.DOM_VK_SPACE) { FacetContext.toggleTimeline(); event.preventDefault() }"/>
             <div id="search-value"/>
             <div id="query-explanation"/>
           </div>
           <div id="data-column">
-            <div id="facet-date" class="facetious" type="date" />
-            <div class="results" id="results" type="message" />
+            <!-- facet-results-message is put before facet-date here so that it gets upgraded first.
+            facet-date uses width of facet-results-message for the visualization. Using order property
+            we can show facet-date before facet-results-message -->
+            <facet-results-message id="results" class="results"/>
+            <facet-date id="facet-date" class="facetious" type="date"/>
             <div class="loading" id="showLoading">
               <span class="loading">
                 <img class="loading"

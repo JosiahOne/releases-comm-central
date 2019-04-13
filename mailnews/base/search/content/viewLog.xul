@@ -9,14 +9,13 @@
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/viewLog.dtd">
 
 <dialog id="viewLogWindow"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="onLoad();"
         title="&viewLog.title;"
         windowtype="mailnews:filterlog"
         buttons="accept"
         buttonlabelaccept="&closeLog.label;"
         buttonaccesskeyaccept="&closeLog.accesskey;"
-        ondialogaccept="window.close();"
         persist="screenX screenY width height"
         style="width: 40em; height: 25em;">
 

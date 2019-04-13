@@ -1,7 +1,7 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 var irc = {};
 Services.scriptloader.loadSubScript("resource:///components/irc.js", irc);
 
@@ -21,7 +21,7 @@ var input = [
   "te\x01st",
   "test\x01",
   "\\\\\x01test",
-  "\\\\atest"
+  "\\\\atest",
 ];
 
 var expectedOutputParams = [
@@ -40,7 +40,7 @@ var expectedOutputParams = [
   "ACTION te\\ast",
   "ACTION test\\a",
   "ACTION \\\\\\\\\\atest",
-  "ACTION \\\\\\\\atest"
+  "ACTION \\\\\\\\atest",
 ];
 
 var outputParams = [];

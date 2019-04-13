@@ -29,11 +29,15 @@
 #include "nsMemory.h"
 #include "nsCRTGlue.h"
 #include <ctype.h>
+#include "mozilla/dom/Element.h"
 #include "mozilla/mailnews/Services.h"
 #include "mozilla/Services.h"
 #include "mozilla/Unused.h"
+#include "mozilla/ContentIterator.h"
+#include "mozilla/dom/Document.h"
 #include "nsIMIMEInfo.h"
 #include "nsIMsgHeaderParser.h"
+#include "nsIMutableArray.h"
 #include "nsIRandomGenerator.h"
 #include "nsID.h"
 
@@ -385,7 +389,7 @@ nsresult mime_generate_headers(nsIMsgCompFields *fields,
 
   // If we are saving the message as a draft, don't bother inserting the undisclosed recipients field. We'll take care of that when we
   // really send the message.
-  if (!hasDisclosedRecipient && !isDraft)
+  if (!hasDisclosedRecipient && (!isDraft || deliver_mode == nsIMsgSend::nsMsgQueueForLater))
   {
     bool bAddUndisclosedRecipients = true;
     prefs->GetBoolPref("mail.compose.add_undisclosed_recipients", &bAddUndisclosedRecipients);
@@ -942,7 +946,7 @@ RFC2231ParmFolding(const char *parmName, const nsCString& charset,
   bool needEscape;
   nsCString dupParm;
 
-  if (!NS_IsAscii(parmValue.get()) || is7bitCharset(charset)) {
+  if (!mozilla::IsAsciiNullTerminated(static_cast<const char16_t*>(parmValue.get())) || is7bitCharset(charset)) {
     needEscape = true;
     nsAutoCString nativeParmValue;
     nsMsgI18NConvertFromUnicode(charset, parmValue, nativeParmValue);
@@ -1767,4 +1771,38 @@ void GetSerialiserFlags(const char* charset, bool* flowed, bool* delsp, bool* fo
     if (*flowed)
       *delsp = true;
   }
+}
+
+already_AddRefed<nsIArray>
+GetEmbeddedObjects(mozilla::dom::Document* aDocument)
+{
+  nsCOMPtr<nsIMutableArray> nodes = do_CreateInstance(NS_ARRAY_CONTRACTID);
+  if (NS_WARN_IF(!nodes)) {
+    return nullptr;
+  }
+
+  mozilla::PostContentIterator iter;
+  nsresult rv = iter.Init(aDocument->GetRootElement());
+  if (NS_WARN_IF(NS_FAILED(rv))) {
+    return nullptr;
+  }
+
+  // Loop through the content iterator for each content node.
+  while (!iter.IsDone()) {
+    nsINode* node = iter.GetCurrentNode();
+    if (node->IsElement()) {
+      mozilla::dom::Element* element = node->AsElement();
+
+      // See if it's an image or also include all links.
+      // Let mail decide which link to send or not
+      if (element->IsAnyOfHTMLElements(nsGkAtoms::img, nsGkAtoms::a) ||
+          (element->IsHTMLElement(nsGkAtoms::body) &&
+           element->HasAttr(kNameSpaceID_None, nsGkAtoms::background))) {
+        nodes->AppendElement(node);
+      }
+    }
+    iter.Next();
+  }
+
+  return nodes.forget();
 }

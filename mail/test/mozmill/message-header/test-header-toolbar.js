@@ -5,6 +5,9 @@
 /*
  * Test that we can add a tag to a message without messing up the header.
  */
+
+"use strict";
+
 var MODULE_NAME = 'test-header-toolbar';
 
 var RELATIVE_ROOT = '../shared-modules';
@@ -12,9 +15,8 @@ var MODULE_REQUIRES = ['folder-display-helpers', 'window-helpers',
                        'address-book-helpers', 'mouse-event-helpers',
                        'customization-helpers'];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var folder;
 var gCDHelper ;
@@ -145,7 +147,7 @@ function test_customize_header_toolbar_check_default()
 /**
  *  Test header pane toolbar customization: Reorder buttons
  */
-function test_customize_header_toolbar_reorder_buttons()
+function disabled_test_customize_header_toolbar_reorder_buttons()
 {
   // To avoid undrawn buttons on the toolbar, change pane layout to wide view.
   setWideView();
@@ -201,7 +203,7 @@ function test_customize_header_toolbar_reorder_buttons()
  *  Test header pane toolbar customization: Change buttons in
  *  separate mail window
  */
-function test_customize_header_toolbar_separate_window()
+function disabled_test_customize_header_toolbar_separate_window()
 {
   Services.prefs.setBoolPref("toolkit.customization.unsafe_drag_events", true);
   let curMessage = select_message_in_folder(0);
@@ -274,7 +276,7 @@ function test_customize_header_toolbar_separate_window()
 /**
  *  Test header pane toolbar customization: Remove buttons
  */
-function test_customize_header_toolbar_remove_buttons()
+function disabled_test_customize_header_toolbar_remove_buttons()
 {
   Services.prefs.setBoolPref("toolkit.customization.unsafe_drag_events", true);
   // Save currentset of toolbar for adding the buttons back

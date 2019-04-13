@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/imServices.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
+const {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyGetter(this, "gTextDecoder", () => {
   return new TextDecoder();
@@ -17,11 +17,11 @@ this.EXPORTED_SYMBOLS = [
   "smileTextNode", // used to add smile:// img tags to the content of a textnode
   "smileString", // used to add smile:// img tags into a string without parsing it as HTML. Be sure the string doesn't contain HTML tags.
   "getSmileRealURI", // used to retrieve the chrome URI for a smile:// URI
-  "getSmileyList" // used to display a list of smileys in the UI
+  "getSmileyList", // used to display a list of smileys in the UI
 ];
 
 var kEmoticonsThemePref = "messenger.options.emoticonsTheme";
-var kThemeFile = "theme.js";
+var kThemeFile = "theme.json";
 
 Object.defineProperty(this, "gTheme", {
   configurable: true,
@@ -31,31 +31,29 @@ Object.defineProperty(this, "gTheme", {
     delete this.gTheme;
     gPrefObserver.init();
     return this.gTheme = getTheme();
-  }
+  },
 });
 
 var gPrefObserver = {
-  init: function po_init() {
+  init() {
     Services.prefs.addObserver(kEmoticonsThemePref, gPrefObserver);
   },
 
-  observe: function so_observe(aObject, aTopic, aMsg) {
+  observe(aObject, aTopic, aMsg) {
     if (aTopic != "nsPref:changed" || aMsg != kEmoticonsThemePref)
-      throw "bad notification";
+      throw new Error("bad notification");
 
     gTheme = getTheme();
-  }
+  },
 };
 
 function getSmileRealURI(aSmile)
 {
-  aSmile = Cc["@mozilla.org/intl/texttosuburi;1"]
-             .getService(Ci.nsITextToSubURI)
-             .unEscapeURIForUI("UTF-8", aSmile);
+  aSmile = Services.textToSubURI.unEscapeURIForUI("UTF-8", aSmile);
   if (aSmile in gTheme.iconsHash)
     return gTheme.baseUri + gTheme.iconsHash[aSmile].filename;
 
-  throw "Invalid smile!";
+  throw new Error("Invalid smile!");
 }
 
 function getSmileyList(aThemeName)
@@ -77,10 +75,10 @@ function getTheme(aName)
   let name = aName || Services.prefs.getCharPref(kEmoticonsThemePref);
 
   let theme = {
-    name: name,
+    name,
     iconsHash: null,
     json: null,
-    regExp: null
+    regExp: null,
   };
 
   if (name == "none")
@@ -91,11 +89,11 @@ function getTheme(aName)
   else
     theme.baseUri = "chrome://" + theme.name + "/skin/";
   try {
-    let channel = Services.io.newChannel2(theme.baseUri + kThemeFile, null, null, null,
-                                          Services.scriptSecurityManager.getSystemPrincipal(),
-                                          null,
-                                          Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                          Ci.nsIContentPolicy.TYPE_IMAGE);
+    let channel = Services.io.newChannel(theme.baseUri + kThemeFile, null, null, null,
+                                         Services.scriptSecurityManager.getSystemPrincipal(),
+                                         null,
+                                         Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                         Ci.nsIContentPolicy.TYPE_IMAGE);
     let stream = channel.open();
     let bytes = NetUtil.readInputStream(stream, stream.available());
     theme.json = JSON.parse(gTextDecoder.decode(bytes));
@@ -105,7 +103,7 @@ function getTheme(aName)
       for (let textCode of smiley.textCodes)
         theme.iconsHash[textCode] = smiley;
     }
-  } catch(e) {
+  } catch (e) {
     Cu.reportError(e);
   }
   return theme;
@@ -145,7 +143,7 @@ function getRegexp()
     return null;
   }
 
-  gTheme.regExp = new RegExp(emoticonList.join('|'), 'g');
+  gTheme.regExp = new RegExp(emoticonList.join("|"), "g");
   return gTheme.regExp;
 }
 
@@ -221,13 +219,14 @@ function smileNode(aNode)
 function smileImMarkup(aDocument, aText)
 {
   if (!aDocument)
-    throw "providing an HTML document is required";
+    throw new Error("providing an HTML document is required");
 
   // return early if smileys are disabled
   if (!gTheme.iconsHash)
     return aText;
 
   let div = aDocument.createElement("div");
+  // eslint-disable-next-line no-unsanitized/property
   div.innerHTML = aText;
   smileNode(div);
   return div.innerHTML;

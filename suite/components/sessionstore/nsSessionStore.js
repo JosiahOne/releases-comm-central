@@ -81,11 +81,11 @@ const TAB_EVENTS = ["TabOpen", "TabClose", "TabSelect", "TabShow", "TabHide"];
 #define BROKEN_WM_Z_ORDER
 #endif
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {NetUtil} = ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
 // debug.js adds NS_ASSERT. cf. bug 669196
-ChromeUtils.import("resource://gre/modules/debug.js");
+const {debug} = ChromeUtils.import("resource://gre/modules/debug.js");
 
 #ifdef MOZ_CRASH_REPORTER
 XPCOMUtils.defineLazyServiceGetter(this, "CrashReporter",
@@ -496,7 +496,6 @@ SessionStoreService.prototype = {
       case "pageshow":
         this.onTabLoad(win, aEvent.currentTarget, aEvent);
         break;
-      case "change":
       case "input":
       case "DOMAutoComplete":
         this.onTabInput(win, aEvent.currentTarget);
@@ -753,7 +752,6 @@ SessionStoreService.prototype = {
     let browser = aTab.linkedBrowser;
     browser.addEventListener("load", this, true);
     browser.addEventListener("pageshow", this, true);
-    browser.addEventListener("change", this, true);
     browser.addEventListener("input", this, true);
     browser.addEventListener("DOMAutoComplete", this, true);
 
@@ -1468,7 +1466,7 @@ SessionStoreService.prototype = {
     else if (history && history.count > 0) {
       try {
         for (var j = 0; j < history.count; j++) {
-          let entry = this._serializeHistoryEntry(history.getEntryAtIndex(j, false),
+          let entry = this._serializeHistoryEntry(history.getEntryAtIndex(j),
                                                   aFullData, aTab.pinned);
           tabData.entries.push(entry);
         }
@@ -1699,7 +1697,7 @@ SessionStoreService.prototype = {
     for (let i = 0; i < aHistory.count; i++) {
       let principal;
       try {
-        let uri = aHistory.getEntryAtIndex(i, false).URI;
+        let uri = aHistory.getEntryAtIndex(i).URI;
         principal = SecMan.getDocShellCodebasePrincipal(uri, aDocShell);
       }
       catch (ex) {
@@ -1709,11 +1707,18 @@ SessionStoreService.prototype = {
       }
 
       // sessionStorage is saved per principal (cf. nsGlobalWindow::GetSessionStorage)
-      let origin = principal.origin;
+      let origin;
+      try {
+        origin = principal.origin;
+      }
+      catch (ex) {
+        origin = principal.URI.spec;
+      }
+
       if (storageData[origin])
         continue;
 
-      let isHTTPS = principal.uri && principal.url.schemeIs("https");
+      let isHTTPS = principal.URI && principal.URI.schemeIs("https");
       if (!(aFullData || this._checkPrivacyLevel(isHTTPS, aIsPinned)))
         continue;
 
@@ -1906,7 +1911,7 @@ SessionStoreService.prototype = {
       if (!nId && generatedCount > MAX_GENERATED_XPATHS)
         continue;
 
-      if (node instanceof Ci.nsIDOMHTMLInputElement ||
+      if (ChromeUtils.getClassName(node) === "HTMLInputElement" ||
           ChromeUtils.getClassName(node) === "HTMLTextAreaElement") {
         switch (node.type) {
           case "checkbox":
@@ -2501,7 +2506,13 @@ SessionStoreService.prototype = {
       let browser = tabbrowser.getBrowserForTab(tab);
       let tabData = aTabData[t];
 
-      tab.hidden = tabData.hidden;
+      if (tabData.hidden) {
+        tab.setAttribute("hidden", true);
+      } else {
+        if (tab.hidden) {
+          tab.removeAttribute("hidden");
+        }
+      }
 
       for (let name in tabData.attributes)
         this.xulAttributes[name] = true;
@@ -2599,7 +2610,6 @@ SessionStoreService.prototype = {
     if (history.count > 0) {
       history.PurgeHistory(history.count);
     }
-    history.QueryInterface(Ci.nsISHistoryInternal);
 
     browser.__SS_shistoryListener = new SessionStoreSHistoryListener(this, tab);
     history.addSHistoryListener(browser.__SS_shistoryListener);
@@ -2616,11 +2626,34 @@ SessionStoreService.prototype = {
       delete tab.__SS_extdata;
 
     for (var i = 0; i < tabData.entries.length; i++) {
+      let cloneEntry = false;
       //XXXzpao Wallpaper patch for bug 509315
       if (!tabData.entries[i].url)
         continue;
-      history.addEntry(this._deserializeHistoryEntry(tabData.entries[i],
-                                                     aIdMap, aDocIdentMap), true);
+
+      let shEntry = this._deserializeHistoryEntry(tabData.entries[i],
+                                                  aIdMap, aDocIdentMap);
+      try {
+        history.addEntry(shEntry, true);
+      }
+      catch (ex) {
+        cloneEntry = true;
+      }
+
+      // Workaround for bug 1466911.
+      // FIXME Remove this after the issue which caused the exception above
+      // to be thrown has been fixed.
+      if (cloneEntry) {
+        shEntry = shEntry.clone();
+        shEntry.abandonBFCacheEntry();
+
+        try {
+          history.addEntry(shEntry, true);
+        }
+        catch (ex) {
+          Cu.reportError(ex);
+        }
+      }
     }
 
     // make sure to reset the capabilities and attributes, in case this tab gets reused
@@ -2730,10 +2763,6 @@ SessionStoreService.prototype = {
 
     // Attach data that will be restored on "load" event, after tab is restored.
     if (activeIndex > -1) {
-      let curSHEntry = browser.webNavigation.sessionHistory
-                              .getEntryAtIndex(activeIndex, false)
-                              .QueryInterface(Ci.nsISHEntry);
-
       // restore those aspects of the currently active documents which are not
       // preserved in the plain history entries (mainly scroll state and text data)
       browser.__SS_restore_data = tabData.entries[activeIndex] || {};
@@ -2746,7 +2775,7 @@ SessionStoreService.prototype = {
         // force session history to update its internal index and call reload
         // instead of gotoIndex. See bug 597315.
         var sessionHistory = browser.webNavigation.sessionHistory;
-        sessionHistory.getEntryAtIndex(activeIndex, true);
+        sessionHistory.index = activeIndex;
         sessionHistory.reloadCurrentEntry();
       }
       catch (ex) {
@@ -2760,17 +2789,19 @@ SessionStoreService.prototype = {
     // as needed. Calling loadURI will cancel form filling in restoreDocument
     if (tabData.userTypedValue) {
       browser.userTypedValue = tabData.userTypedValue;
+
       if (tabData.userTypedClear) {
         // Make it so that we'll enter restoreDocument on page load. We will
-        // fire SSTabRestored from there. We don't have any form data to restore
-        // so we can just set the URL to null.
+        // fire SSTabRestored from there. We don't have any form data to
+        // restore so we can just set the URL to null.
         browser.__SS_restore_data = { url: null };
         browser.__SS_restore_tab = aTab;
         didStartLoad = true;
-        browser.loadURI(tabData.userTypedValue,
+        browser.webNavigation
+               .loadURI(tabData.userTypedValue,
                         Ci.nsIWebNavigation.LOAD_FLAGS_ALLOW_THIRD_PARTY_FIXUP,
-                        null, null, null);
-
+                        null, null, null,
+                        Services.scriptSecurityManager.getSystemPrincipal());
       }
     }
 
@@ -2836,10 +2867,10 @@ SessionStoreService.prototype = {
     var shEntry = Cc["@mozilla.org/browser/session-history-entry;1"]
                     .createInstance(Ci.nsISHEntry);
 
-    shEntry.setURI(this._getURIFromString(aEntry.url));
-    shEntry.setTitle(aEntry.title || aEntry.url);
+    shEntry.URI = this._getURIFromString(aEntry.url);
+    shEntry.title = aEntry.title || aEntry.url;
     if (aEntry.subframe)
-      shEntry.setIsSubFrame(aEntry.subframe || false);
+      shEntry.isSubFrame = aEntry.subframe || false;
     shEntry.loadType = Ci.nsIDocShellLoadInfo.loadHistory;
     if (aEntry.contentType)
       shEntry.contentType = aEntry.contentType;
@@ -2941,29 +2972,16 @@ SessionStoreService.prototype = {
     // FF55 will remove the triggeringPrincipal_b64, see Bug 1301666.
     if (aEntry.triggeringPrincipal_base64 || aEntry.principalToInherit_base64) {
       if (aEntry.triggeringPrincipal_base64) {
-        try {
-          shEntry.triggeringPrincipal =
-            Utils.deserializePrincipal(aEntry.triggeringPrincipal_base64);
-        } catch (e) {
-          debug(e);
-        }
+        shEntry.triggeringPrincipal =
+          Utils.deserializePrincipal(aEntry.triggeringPrincipal_base64);
       }
       if (aEntry.principalToInherit_base64) {
-        try {
-          shEntry.principalToInherit =
-            Utils.deserializePrincipal(aEntry.principalToInherit_base64);
-        } catch (e) {
-          debug(e);
-        }
+        shEntry.principalToInherit =
+          Utils.deserializePrincipal(aEntry.principalToInherit_base64);
       }
     } else if (aEntry.triggeringPrincipal_b64) {
-      try {
-        shEntry.triggeringPrincipal = Utils.deserializePrincipal(aEntry.triggeringPrincipal_b64);
-        shEntry.principalToInherit = shEntry.triggeringPrincipal;
-      }
-      catch (e) {
-        debug(e);
-      }
+      shEntry.triggeringPrincipal = Utils.deserializePrincipal(aEntry.triggeringPrincipal_b64);
+      shEntry.principalToInherit = shEntry.triggeringPrincipal;
     }
 
     if (aEntry.children && shEntry instanceof Ci.nsISHContainer) {
@@ -4191,10 +4209,8 @@ SessionStoreSHistoryListener.prototype = {
   ss: null,
   tab: null,
   OnHistoryNewEntry: function(aNewURI) { },
-  OnHistoryGoBack: function(aBackURI) { return true; },
-  OnHistoryGoForward: function(aForwardURI) { return true; },
-  OnHistoryGotoIndex: function(aIndex, aGotoURI) { return true; },
-  OnHistoryPurge: function(aNumEntries) { return true; },
+  OnHistoryGotoIndex: function(aIndex, aGotoURI) { },
+  OnHistoryPurge: function(aNumEntries) { },
   OnHistoryReload: function(aReloadURI, aReloadFlags) {
     // On reload, we want to make sure that session history loads the right
     // URI. In order to do that, we will just call restoreTab. That will remove
@@ -4203,12 +4219,7 @@ SessionStoreSHistoryListener.prototype = {
     // Returning false will stop the load that docshell is attempting.
     return false;
   },
-  OnLengthChanged(aCount) {
-    // Ignore, the method is implemented so that XPConnect doesn't throw!
-  },
-  OnIndexChanged(aIndex) {
-    // Ignore, the method is implemented so that XPConnect doesn't throw!
-  },
+  OnHistoryReplaceEntry: function(aIndex) { },
 }
 
 

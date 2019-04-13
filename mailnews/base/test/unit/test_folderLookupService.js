@@ -5,8 +5,6 @@
 /**
  * This tests that nsIFolderLookupService works according to specification.
  */
-ChromeUtils.import("resource:///modules/mailServices.js");
-
 var kRootURI = "mailbox://nobody@Local%20Folders";
 
 function run_test() {

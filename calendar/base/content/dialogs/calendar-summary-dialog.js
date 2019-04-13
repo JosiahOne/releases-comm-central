@@ -2,12 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* exported onLoad, onUnload, onAccept, onCancel, updatePartStat, browseDocument,
+/* exported onLoad, onUnload, updatePartStat, browseDocument,
  *          sendMailToOrganizer, openAttachment, reply
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+/* import-globals-from ../../src/calApplicationUtils.js */
+/* import-globals-from calendar-dialog-utils.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { recurrenceRule2String } = ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
 
 /**
  * Sets up the summary dialog, setting all needed fields on the dialog from the
@@ -54,7 +60,7 @@ function onLoad() {
                         (cal.acl.userCanModifyItem(item) ||
                          (calendar &&
                           item.calendar.isInvitation(item) &&
-                          cal.userCanRespondToInvitation(item))));
+                          cal.acl.userCanRespondToInvitation(item))));
     if (!window.readOnly && calendar) {
         let attendee = calendar.getInvitedAttendee(item);
         if (attendee) {
@@ -78,9 +84,25 @@ function onLoad() {
     document.getElementById("item-title").value = item.title;
 
     document.getElementById("item-calendar").value = calendar.name;
-    document.getElementById("item-start-row").Item = item;
-    document.getElementById("item-end-row").Item = item;
+    document.getElementById("item-date-row-start-date").item = item;
+    document.getElementById("item-date-row-end-date").item = item;
 
+    let isToDoItem = cal.item.isToDo(item);
+    let itemStartRowLabel = document.getElementById("item-start-row-label");
+    let itemStartDate = item[cal.dtz.startDateProp(item)];
+    itemStartRowLabel.style.visibility = itemStartDate ? "visible" : "collapse";
+    let itemStartLabelValue = itemStartRowLabel.getAttribute(isToDoItem ? "taskStartLabel" : "eventStartLabel");
+    if (itemStartDate) {
+        itemStartRowLabel.setAttribute("value", itemStartLabelValue);
+    }
+
+    let itemDueRowLabel = document.getElementById("item-due-row-label");
+    let itemDueDate = item[cal.dtz.endDateProp(item)];
+    itemDueRowLabel.style.visibility = itemDueDate ? "visible" : "collapse";
+    let itemDueLabelValue = itemDueRowLabel.getAttribute(isToDoItem ? "taskDueLabel" : "eventEndLabel");
+    if (itemDueDate) {
+        itemDueRowLabel.setAttribute("value", itemDueLabelValue);
+    }
     // show reminder if this item is *not* readonly.
     // this case happens for example if this is an invitation.
     let argCalendar = window.arguments[0].calendarEvent.calendar;
@@ -191,6 +213,18 @@ function onLoad() {
 
                 let icon = attachment.getElementsByTagName("image")[0];
                 let iconSrc = aAttachment.uri.spec.length ? aAttachment.uri.spec : "dummy.html";
+                if (aAttachment.uri && !aAttachment.uri.schemeIs("file")) {
+                    // using an uri directly with e.g. a http scheme wouldn't render any icon
+                    if (aAttachment.formatType) {
+                        iconSrc = "goat?contentType=" + aAttachment.formatType;
+                    } else {
+                        // let's try to auto-detect
+                        let parts = iconSrc.substr(aAttachment.uri.scheme.length + 2).split("/");
+                        if (parts.length) {
+                            iconSrc = parts[parts.length - 1];
+                        }
+                    }
+                }
                 icon.setAttribute("src", "moz-icon://" + iconSrc);
 
                 document.getElementById("item-attachment-cell").appendChild(attachment);
@@ -208,7 +242,7 @@ function onLoad() {
         document.documentElement.getButton("accept").focus();
     }
 
-    // disbale default controls
+    // disable default controls
     let accept = document.documentElement.getButton("accept");
     let cancel = document.documentElement.getButton("cancel");
     accept.setAttribute("collapsed", "true");
@@ -217,8 +251,8 @@ function onLoad() {
 
     updateToolbar();
 
-    if (typeof ToolbarIconColor !== "undefined") {
-        ToolbarIconColor.init();
+    if (typeof window.ToolbarIconColor !== "undefined") {
+        window.ToolbarIconColor.init();
     }
 
     window.focus();
@@ -226,20 +260,18 @@ function onLoad() {
 }
 
 function onUnload() {
-    if (typeof ToolbarIconColor !== "undefined") {
-        ToolbarIconColor.uninit();
+    if (typeof window.ToolbarIconColor !== "undefined") {
+        window.ToolbarIconColor.uninit();
     }
 }
 
 /**
  * Saves any changed information to the item.
- *
- * @return      Returns true if the dialog
  */
 function onAccept() {
     dispose();
     if (window.readOnly) {
-        return true;
+        return;
     }
     // let's make sure we have a response mode defined
     let resp = window.responseMode || "USER";
@@ -253,7 +285,6 @@ function onAccept() {
     adaptScheduleAgent(newItem);
     args.onOk(newItem, calendar, oldItem, null, respMode);
     window.calendarItem = newItem;
-    return true;
 }
 
 /**
@@ -261,7 +292,6 @@ function onAccept() {
  */
 function onCancel() {
     dispose();
-    return true;
 }
 
 /**
@@ -468,8 +498,8 @@ function openAttachment(aAttachmentId) {
     let attachments = item.getAttachments({})
                           .filter(aAttachment => aAttachment.hashId == aAttachmentId);
     if (attachments.length && attachments[0].uri && attachments[0].uri.spec != "about:blank") {
-        let externalLoader = Cc["@mozilla.org/uriloader/external-protocol-service;1"]
-                             .getService(Ci.nsIExternalProtocolService);
-        externalLoader.loadURI(attachments[0].uri);
+        Cc["@mozilla.org/uriloader/external-protocol-service;1"]
+          .getService(Ci.nsIExternalProtocolService)
+          .loadURI(attachments[0].uri);
     }
 }

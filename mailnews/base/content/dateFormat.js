@@ -3,7 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+/* Utilities to show and parse user-entered date values used in filter and search rules. */
+
+"use strict";
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gSearchDateFormat = 0;
 var gSearchDateSeparator;
@@ -16,24 +20,19 @@ var gSearchDateLeadingZeros;
  */
 function initLocaleShortDateFormat()
 {
-  // default to mm/dd/yyyy
-  gSearchDateFormat = 3;
-  gSearchDateSeparator = "/";
-  gSearchDateLeadingZeros = true;
-
   try {
     const dateFormatter = new Services.intl.DateTimeFormat(undefined,
       { dateStyle: "short" });
     var aDate = new Date(1999, 11, 1);
-    var dateString = dateFormatter.format(aDate);
+    var dateString = dateFormatter.format(aDate).replace(/ /g,"");
 
     // find out the separator
     var possibleSeparators = "/-.";
     var arrayOfStrings;
-    for ( var i = 0; i < possibleSeparators.length; ++i )
+    for (let i = 0; i < possibleSeparators.length; ++i)
     {
-      arrayOfStrings = dateString.split( possibleSeparators[i] );
-      if ( arrayOfStrings.length == 3 )
+      arrayOfStrings = dateString.split(possibleSeparators[i]);
+      if (arrayOfStrings.length == 3)
       {
         gSearchDateSeparator = possibleSeparators[i];
         break;
@@ -41,22 +40,22 @@ function initLocaleShortDateFormat()
     }
 
     // check the format option
-    if ( arrayOfStrings.length != 3 )       // no successful split
+    if (arrayOfStrings.length != 3)  // no successful split
     {
-      dump("getLocaleShortDateFormat: could not analyze the date format, defaulting to mm/dd/yyyy\n");
+      Cu.reportError("initLocaleShortDateFormat: could not analyze the date format, defaulting to mm/dd/yyyy");
     }
     else
     {
-      // the date will contain a zero if that system settings include leading zeros
+      // The date will contain a zero if the system settings include leading zeros.
       gSearchDateLeadingZeros = dateString.includes("0");
 
       // match 1 as number, since that will match both "1" and "01"
-      if ( arrayOfStrings[0] == 1 )
+      if (arrayOfStrings[0] == 1)
       {
         // 01.12.1999 or 01.1999.12
         gSearchDateFormat = arrayOfStrings[1] == "12" ? 5 : 6;
       }
-      else if ( arrayOfStrings[1] == 1 )
+      else if (arrayOfStrings[1] == 1)
       {
         // 12.01.1999 or 1999.01.12
         gSearchDateFormat = arrayOfStrings[0] == "12" ? 3 : 2;
@@ -70,20 +69,22 @@ function initLocaleShortDateFormat()
   }
   catch (e)
   {
-    dump("getLocaleShortDateFormat: caught an exception!\n");
+    Cu.reportError("initLocaleShortDateFormat: caught an exception: " + e);
+    gSearchDateFormat = 0;
   }
 }
 
 function initializeSearchDateFormat()
 {
-  if (gSearchDateFormat)
+  if (gSearchDateFormat > 0)
     return;
 
   // get a search date format option and a separator
   try {
     gSearchDateFormat =
       Services.prefs.getComplexValue("mailnews.search_date_format",
-                                     Ci.nsIPrefLocalizedString);
+                                     Ci.nsIPrefLocalizedString).data;
+
     gSearchDateFormat = parseInt(gSearchDateFormat);
 
     // if the option is 0 then try to use the format of the current locale
@@ -92,12 +93,12 @@ function initializeSearchDateFormat()
     else
     {
       // initialize the search date format based on preferences
-      if ( gSearchDateFormat < 1 || gSearchDateFormat > 6 )
+      if (gSearchDateFormat < 1 || gSearchDateFormat > 6)
         gSearchDateFormat = 3;
 
       gSearchDateSeparator =
         Services.prefs.getComplexValue("mailnews.search_date_separator",
-                                       Ci.nsIPrefLocalizedString);
+                                       Ci.nsIPrefLocalizedString).data;
 
       gSearchDateLeadingZeros =
         (Services.prefs.getComplexValue(
@@ -108,7 +109,12 @@ function initializeSearchDateFormat()
   catch (e)
   {
     Cu.reportError("initializeSearchDateFormat: caught an exception: " + e);
-    // set to mm/dd/yyyy in case of error
+    gSearchDateFormat = 0;
+  }
+
+  if (gSearchDateFormat == 0)
+  {
+    // Set to mm/dd/yyyy in case we couldn't determine in any way.
     gSearchDateFormat = 3;
     gSearchDateSeparator = "/";
     gSearchDateLeadingZeros = true;
@@ -131,10 +137,10 @@ function convertDateToString(time)
 
   var year = time.getFullYear();
   var month = time.getMonth() + 1;  // since js month is 0-11
-  if ( gSearchDateLeadingZeros && month < 10 )
+  if (gSearchDateLeadingZeros && month < 10)
     month = "0" + month;
-  var date = time.getDate();
-  if ( gSearchDateLeadingZeros && date < 10 )
+  var date = time.getDate();  // day
+  if (gSearchDateLeadingZeros && date < 10)
     date = "0" + date;
 
   var dateStr;
@@ -219,4 +225,3 @@ function convertStringToPRTime(str)
   // so multiply by 1000 when converting
   return (time.getTime() * 1000);
 }
-

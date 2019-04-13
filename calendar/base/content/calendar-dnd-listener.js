@@ -2,11 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+/* import-globals-from ../../../mail/base/content/nsDragAndDrop.js */
+/* import-globals-from calendar-item-editing.js */
+/* import-globals-from calendar-management.js */
+/* import-globals-from import-export.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { AppConstants } = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 /* exported invokeEventDragSession, calendarViewDNDObserver,
  *          calendarMailButtonDNDObserver, calendarCalendarButtonDNDObserver,
@@ -32,9 +35,9 @@ var itemConversion = {
         cal.alarms.setDefaultValues(aItem);
 
         let messenger = Cc["@mozilla.org/messenger;1"]
-                        .createInstance(Ci.nsIMessenger);
+                          .createInstance(Ci.nsIMessenger);
         let streamListener = Cc["@mozilla.org/network/sync-stream-listener;1"]
-                             .createInstance(Ci.nsISyncStreamListener);
+                               .createInstance(Ci.nsISyncStreamListener);
         messenger.messageServiceFromURI(msgUri).streamMessage(msgUri,
                                                               streamListener,
                                                               null,
@@ -151,7 +154,7 @@ var itemConversion = {
         if (!item.startDate) {
             if (aTask.dueDate) {
                 item.startDate = aTask.dueDate.clone();
-                item.startDate.minute -= Preferences.get("calendar.event.defaultlength", 60);
+                item.startDate.minute -= Services.prefs.getIntPref("calendar.event.defaultlength", 60);
             } else {
                 item.startDate = cal.dtz.getDefaultStartDate();
             }
@@ -162,7 +165,7 @@ var itemConversion = {
             // Make the event be the default event length if no due date was
             // specified.
             item.endDate = item.startDate.clone();
-            item.endDate.minute += Preferences.get("calendar.event.defaultlength", 60);
+            item.endDate.minute += Services.prefs.getIntPref("calendar.event.defaultlength", 60);
         }
 
         // Alarms
@@ -216,7 +219,7 @@ calDNDBaseObserver.prototype = {
 
     onDrop: function(aEvent, aTransferData, aDragSession) {
         let transferable = Cc["@mozilla.org/widget/transferable;1"]
-                           .createInstance(Ci.nsITransferable);
+                             .createInstance(Ci.nsITransferable);
         transferable.init(null);
         transferable.addDataFlavor("text/calendar");
         transferable.addDataFlavor("text/x-moz-url");
@@ -292,9 +295,8 @@ calDNDBaseObserver.prototype = {
             case "application/x-moz-file-promise":
             case "text/x-moz-url": {
                 let uri = Services.io.newURI(data.toString());
-                let loader = Cc["@mozilla.org/network/unichar-stream-loader;1"]
-                             .createInstance(Ci.nsIUnicharStreamLoader);
-                let channel = Services.io.newChannelFromURI2(
+                let loader = cal.provider.createStreamLoader();
+                let channel = Services.io.newChannelFromURI(
                     uri,
                     null,
                     Services.scriptSecurityManager.getSystemPrincipal(),
@@ -307,37 +309,31 @@ calDNDBaseObserver.prototype = {
                 let self = this;
 
                 let listener = {
-                    // nsIUnicharStreamLoaderObserver:
-                    onDetermineCharset: function(aLoader, context, firstSegment, aLength) {
-                        let charset = null;
-                        if (aLoader && aLoader.channel) {
-                            charset = channel.contentCharset;
-                        }
-                        if (!charset || charset.length == 0) {
-                            charset = "UTF-8";
-                        }
-                        return charset;
-                    },
-
-                    onStreamComplete: function(aLoader, context, status, unicharString) {
+                    onStreamComplete: function(aLoader, aContext, aStatus, aResultLength, aResult) {
                         let parser = Cc["@mozilla.org/calendar/ics-parser;1"]
                                      .createInstance(Ci.calIIcsParser);
-                        parser.parseString(unicharString);
+                        let encoding = channel.contentCharset || "utf-8";
+                        let result = aResultLength
+                                   ? new TextDecoder(encoding).decode(Uint8Array.from(aResult))
+                                   : "";
+                        parser.parseString(result);
                         self.onDropItems(parser.getItems({}).concat(parser.getParentlessItems({})));
                     }
                 };
 
                 try {
-                    loader.init(listener, Ci.nsIUnicharStreamLoader.DEFAULT_SEGMENT_SIZE);
-                    channel.asyncOpen(loader, null);
+                    loader.init(listener);
+                    channel.asyncOpen(loader);
                 } catch (e) {
                     cal.ERROR(e);
                 }
                 break;
             }
-            case "text/x-moz-message":
+            case "text/x-moz-message": {
+                let messenger = Cc["@mozilla.org/messenger;1"].createInstance(Ci.nsIMessenger);
                 this.onDropMessage(messenger.msgHdrFromURI(data));
                 break;
+            }
             default:
                 cal.ASSERT(false, "unknown data flavour:" + bestFlavor.value+"\n");
                 break;
@@ -394,8 +390,8 @@ calViewDNDObserver.prototype = {
     onDropItems: function(aItems) {
         let destCal = getSelectedCalendar();
         startBatchTransaction();
-        // we fall back explicitely to the popup to ask whether to send a
-        // notification to partticipants if required
+        // we fall back explicitly to the popup to ask whether to send a
+        // notification to participants if required
         let extResp = { responseMode: Ci.calIItipItem.USER };
         try {
             for (let item of aItems) {
@@ -432,8 +428,21 @@ calMailButtonDNDObserver.prototype = {
     onDropItems: function(aItems) {
         if (aItems && aItems.length > 0) {
             let item = aItems[0];
-            let recipients = cal.email.createRecipientList(item.getAttendees({}));
             let identity = item.calendar.getProperty("imip.identity");
+            let parties = item.getAttendees({});
+            if (item.organizer) {
+                parties.push(item.organizer);
+            }
+            if (identity) {
+                // if no identity is defined, the composer will fall back to
+                // whatever seems suitable - in this case we don't try to remove
+                // the sender from the recipient list
+                identity = identity.QueryInterface(Ci.nsIMsgIdentity);
+                parties = parties.filter(aParty => {
+                    return identity.email != cal.email.getAttendeeEmail(aParty, false);
+                });
+            }
+            let recipients = cal.email.createRecipientList(parties);
             cal.email.sendTo(recipients, item.title, item.getProperty("DESCRIPTION"), identity);
         }
     },
@@ -555,7 +564,7 @@ calTaskButtonDNDObserver.prototype = {
  */
 function invokeEventDragSession(aItem, aXULBox) {
     let transfer = Cc["@mozilla.org/widget/transferable;1"]
-                   .createInstance(Ci.nsITransferable);
+                     .createInstance(Ci.nsITransferable);
     transfer.init(null);
     transfer.addDataFlavor("text/calendar");
 
@@ -584,24 +593,23 @@ function invokeEventDragSession(aItem, aXULBox) {
 
     // Also set some normal data-types, in case we drag into another app
     let serializer = Cc["@mozilla.org/calendar/ics-serializer;1"]
-                     .createInstance(Ci.calIIcsSerializer);
+                       .createInstance(Ci.calIIcsSerializer);
     serializer.addItems([aItem], 1);
 
     let supportsString = Cc["@mozilla.org/supports-string;1"]
-                         .createInstance(Ci.nsISupportsString);
+                           .createInstance(Ci.nsISupportsString);
     supportsString.data = serializer.serializeToString();
     transfer.setTransferData("text/calendar", supportsString, supportsString.data.length * 2);
     transfer.setTransferData("text/unicode", supportsString, supportsString.data.length * 2);
 
     let action = Ci.nsIDragService.DRAGDROP_ACTION_MOVE;
-    let mutArray = Cc["@mozilla.org/array;1"]
-                   .createInstance(Ci.nsIMutableArray);
+    let mutArray = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
     mutArray.appendElement(transfer);
     aXULBox.sourceObject = aItem;
     try {
-        cal.getDragService().invokeDragSession(aXULBox, "", mutArray, null, action);
+        cal.getDragService().invokeDragSession(aXULBox, "", mutArray, action);
     } catch (e) {
-        if (e.result != Components.results.NS_ERROR_FAILURE) {
+        if (e.result != Cr.NS_ERROR_FAILURE) {
             // Pressing Escape on some platforms results in NS_ERROR_FAILURE
             // being thrown. Catch this exception, but throw anything else.
             throw e;

@@ -2,6 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+
 var gActiveEditor;
 var anchorElement = null;
 var imageElement = null;
@@ -16,18 +19,19 @@ var gHaveNamedAnchors = false;
 var gHaveHeadings = false;
 var gCanChangeHeadingSelected = true;
 var gCanChangeAnchorSelected = true;
-var gHaveDocumentUrl = false;
 
 // NOTE: Use "href" instead of "a" to distinguish from Named Anchor
 // The returned node is has an "a" tagName
 var tagName = "href";
 
 // dialog initialization code
-function Startup()
-{
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+function Startup() {
   gActiveEditor = GetCurrentEditor();
-  if (!gActiveEditor)
-  {
+  if (!gActiveEditor) {
     dump("Failed to get active editor!\n");
     window.close();
     return;
@@ -43,36 +47,28 @@ function Startup()
   // See if we have a single selected image
   imageElement = gActiveEditor.getSelectedElement("img");
 
-  if (imageElement)
-  {
+  if (imageElement) {
     // Get the parent link if it exists -- more efficient than GetSelectedElement()
     anchorElement = gActiveEditor.getElementOrParentByTagName("href", imageElement);
-    if (anchorElement)
-    {
-      if (anchorElement.childNodes.length > 1)
-      {
+    if (anchorElement) {
+      if (anchorElement.childNodes.length > 1) {
         // If there are other children, then we want to break
         //  this image away by inserting a new link around it,
         //  so make a new node and copy existing attributes
         anchorElement = anchorElement.cloneNode(false);
-        //insertNew = true;
+        // insertNew = true;
         replaceExistingLink = true;
       }
     }
-  }
-  else
-  {
+  } else {
     // Get an anchor element if caret or
     //   entire selection is within the link.
     anchorElement = gActiveEditor.getSelectedElement(tagName);
 
-    if (anchorElement)
-    {
+    if (anchorElement) {
       // Select the entire link
       gActiveEditor.selectElement(anchorElement);
-    }
-    else
-    {
+    } else {
       // If selection starts in a link, but extends beyond it,
       //   the user probably wants to extend existing link to new selection,
       //   so check if either end of selection is within a link
@@ -84,27 +80,24 @@ function Startup()
       if (!anchorElement)
         anchorElement = gActiveEditor.getElementOrParentByTagName("href", gActiveEditor.selection.focusNode);
 
-      if (anchorElement)
-      {
+      if (anchorElement) {
         // But clone it for reinserting/merging around existing
         //   link that only partially overlaps the selection
         anchorElement = anchorElement.cloneNode(false);
-        //insertNew = true;
+        // insertNew = true;
         replaceExistingLink = true;
       }
     }
   }
 
-  if(!anchorElement)
-  {
+  if (!anchorElement) {
     // No existing link -- create a new one
     anchorElement = gActiveEditor.createElementWithDefaults(tagName);
     insertNew = true;
     // Hide message about removing existing link
-    //document.getElementById("RemoveLinkMsg").hidden = true;
+    // document.getElementById("RemoveLinkMsg").hidden = true;
   }
-  if(!anchorElement)
-  {
+  if (!anchorElement) {
     dump("Failed to get selected element or create a new one!\n");
     window.close();
     return;
@@ -114,33 +107,25 @@ function Startup()
   insertLinkAtCaret = gActiveEditor.selection.isCollapsed;
 
   var selectedText;
-  if (insertLinkAtCaret)
-  {
+  if (insertLinkAtCaret) {
     // Groupbox caption:
     gDialog.linkTextCaption.setAttribute("label", GetString("LinkText"));
 
     // Message above input field:
     gDialog.linkTextMessage.setAttribute("value", GetString("EnterLinkText"));
     gDialog.linkTextMessage.setAttribute("accesskey", GetString("EnterLinkTextAccessKey"));
-  }
-  else
-  {
-    if (!imageElement)
-    {
+  } else {
+    if (!imageElement) {
       // We get here if selection is exactly around a link node
       // Check if selection has some text - use that first
       selectedText = GetSelectionAsText();
-      if (!selectedText)
-      {
+      if (!selectedText) {
         // No text, look for first image in the selection
         var children = anchorElement.childNodes;
-        if (children)
-        {
-          for(var i=0; i < children.length; i++)
-          {
+        if (children) {
+          for (var i = 0; i < children.length; i++) {
             var nodeName = children.item(i).nodeName.toLowerCase();
-            if (nodeName == "img")
-            {
+            if (nodeName == "img") {
               imageElement = children.item(i);
               break;
             }
@@ -149,16 +134,14 @@ function Startup()
       }
     }
     // Set "caption" for link source and the source text or image URL
-    if (imageElement)
-    {
+    if (imageElement) {
       gDialog.linkTextCaption.setAttribute("label", GetString("LinkImage"));
       // Link source string is the source URL of image
       // TODO: THIS DOESN'T HANDLE MULTIPLE SELECTED IMAGES!
       gDialog.linkTextMessage.setAttribute("value", imageElement.src);
     } else {
       gDialog.linkTextCaption.setAttribute("label", GetString("LinkText"));
-      if (selectedText)
-      {
+      if (selectedText) {
         // Use just the first 60 characters and add "..."
         gDialog.linkTextMessage.setAttribute("value", TruncateStringAtWordEnd(ReplaceWhitespace(selectedText, " "), 60, true));
       } else {
@@ -206,8 +189,7 @@ function Startup()
 // Set dialog widgets with attribute data
 // We get them from globalElement copy so this can be used
 //   by AdvancedEdit(), which is shared by all property dialogs
-function InitDialog()
-{
+function InitDialog() {
   // Must use getAttribute, not "globalElement.href",
   //  or foreign chars aren't converted correctly!
   gDialog.hrefInput.value = globalElement.getAttribute("href");
@@ -216,8 +198,7 @@ function InitDialog()
   SetRelativeCheckbox(gDialog.makeRelativeLink);
 }
 
-function doEnabling()
-{
+function doEnabling() {
   // We disable Ok button when there's no href text only if inserting a new link
   var enable = insertNew ? (TrimString(gDialog.hrefInput.value).length > 0) : true;
 
@@ -225,11 +206,10 @@ function doEnabling()
   var dialogNode = document.getElementById("linkDlg");
   dialogNode.getButton("accept").disabled = !enable;
 
-  SetElementEnabledById( "AdvancedEditButton1", enable);
+  SetElementEnabledById("AdvancedEditButton1", enable);
 }
 
-function ChangeLinkLocation()
-{
+function ChangeLinkLocation() {
   SetRelativeCheckbox(gDialog.makeRelativeLink);
   // Set OK button enable state
   doEnabling();
@@ -237,33 +217,26 @@ function ChangeLinkLocation()
 
 // Get and validate data from widgets.
 // Set attributes on globalElement so they can be accessed by AdvancedEdit()
-function ValidateData()
-{
+function ValidateData() {
   href = TrimString(gDialog.hrefInput.value);
-  if (href)
-  {
+  if (href) {
     // Set the HREF directly on the editor document's anchor node
     //  or on the newly-created node if insertNew is true
-    globalElement.setAttribute("href",href);
-  }
-  else if (insertNew)
-  {
+    globalElement.setAttribute("href", href);
+  } else if (insertNew) {
     // We must have a URL to insert a new link
-    //NOTE: We accept an empty HREF on existing link to indicate removing the link
+    // NOTE: We accept an empty HREF on existing link to indicate removing the link
     ShowInputErrorMessage(GetString("EmptyHREFError"));
     return false;
   }
-  if (gDialog.linkTextInput)
-  {
+  if (gDialog.linkTextInput) {
     // The text we will insert isn't really an attribute,
     //  but it makes sense to validate it
     newLinkText = TrimString(gDialog.linkTextInput.value);
-    if (!newLinkText)
-    {
-      if (href)
-        newLinkText = href
-      else
-      {
+    if (!newLinkText) {
+      if (href) {
+        newLinkText = href;
+      } else {
         ShowInputErrorMessage(GetString("EmptyLinkTextError"));
         SetTextboxFocus(gDialog.linkTextInput);
         return false;
@@ -273,12 +246,9 @@ function ValidateData()
   return true;
 }
 
-function onAccept()
-{
-  if (ValidateData())
-  {
-    if (href.length > 0)
-    {
+function onAccept(event) {
+  if (ValidateData()) {
+    if (href.length > 0) {
       // Copy attributes to element we are changing or inserting
       gActiveEditor.cloneAttributes(anchorElement, globalElement);
 
@@ -286,8 +256,7 @@ function onAccept()
       gActiveEditor.beginTransaction();
 
       // Get text to use for a new link
-      if (insertLinkAtCaret)
-      {
+      if (insertLinkAtCaret) {
         // Append the link text as the last child node
         //   of the anchor node
         var textNode = gActiveEditor.document.createTextNode(newLinkText);
@@ -297,10 +266,9 @@ function onAccept()
           gActiveEditor.insertElementAtSelection(anchorElement, false);
         } catch (e) {
           dump("Exception occurred in InsertElementAtSelection\n");
-          return true;
+          return;
         }
-      } else if (insertNew || replaceExistingLink)
-      {
+      } else if (insertNew || replaceExistingLink) {
         //  Link source was supplied by the selection,
         //  so insert a link node as parent of this
         //  (may be text, image, or other inline content)
@@ -308,15 +276,13 @@ function onAccept()
           gActiveEditor.insertLinkAroundSelection(anchorElement);
         } catch (e) {
           dump("Exception occurred in InsertElementAtSelection\n");
-          return true;
+          return;
         }
       }
       // Check if the link was to a heading
-      if (href in gHNodeArray)
-      {
+      if (href in gHNodeArray) {
         var anchorNode = gActiveEditor.createElementWithDefaults("a");
-        if (anchorNode)
-        {
+        if (anchorNode) {
           anchorNode.name = href.substr(1);
 
           // Insert the anchor into the document,
@@ -327,14 +293,12 @@ function onAccept()
         }
       }
       gActiveEditor.endTransaction();
-    }
-    else if (!insertNew)
-    {
+    } else if (!insertNew) {
       // We already had a link, but empty HREF means remove it
       EditorRemoveTextProperty("href", "");
     }
     SaveWindowLocation();
-    return true;
+    return;
   }
-  return false;
+  event.preventDefault();
 }

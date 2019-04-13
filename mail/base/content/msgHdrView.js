@@ -7,15 +7,21 @@
  * message pane.
  */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/displayNameUtils.js");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/gloda/utils.js");
-var {Status: statusUtils} =
-  ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
+/* import-globals-from editContactPanel.js */
+/* import-globals-from folderDisplay.js */
+/* import-globals-from mailWindow.js */
+/* import-globals-from messageDisplay.js */
+/* import-globals-from nsDragAndDrop.js */
 
-////////////////////////////////////////////////////////////////////////////////////
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {DisplayNameUtils} = ChromeUtils.import("resource:///modules/DisplayNameUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var { GlodaUtils } = ChromeUtils.import("resource:///modules/gloda/utils.js");
+var {
+  Status: statusUtils,
+} = ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
+
 // Warning: It's critical that the code in here for displaying the message
 // headers for a selected message remain as fast as possible. In particular,
 // right now, we only introduce one reflow per message. i.e. if you click on
@@ -23,7 +29,6 @@ var {Status: statusUtils} =
 // the header pane (to, cc, attachements button, etc.) and we make a single
 // pass to display them. It's critical that we maintain this one reflow per
 // message view in the message header pane.
-////////////////////////////////////////////////////////////////////////////////////
 
 var gViewAllHeaders = false;
 var gMinNumberOfHeaders = 0;
@@ -49,7 +54,7 @@ var gShowCondensedEmailAddresses;
  * chance to examine and modify the currentHeaderData array before it gets
  * displayed.
  */
-var gMessageListeners = new Array();
+var gMessageListeners = [];
 
 /**
  * This expanded header view shows many of the more common (and useful) headers.
@@ -76,11 +81,11 @@ var gMessageListeners = new Array();
  */
 var gExpandedHeaderList = [
   { name: "subject" },
-  { name: "from", useToggle:true, outputFunction: OutputEmailAddresses },
-  { name: "reply-to", useToggle:true, outputFunction: OutputEmailAddresses },
-  { name: "to", useToggle:true, outputFunction: OutputEmailAddresses },
-  { name: "cc", useToggle:true, outputFunction: OutputEmailAddresses },
-  { name: "bcc", useToggle:true, outputFunction: OutputEmailAddresses },
+  { name: "from", useToggle: true, outputFunction: OutputEmailAddresses },
+  { name: "reply-to", useToggle: true, outputFunction: OutputEmailAddresses },
+  { name: "to", useToggle: true, outputFunction: OutputEmailAddresses },
+  { name: "cc", useToggle: true, outputFunction: OutputEmailAddresses },
+  { name: "bcc", useToggle: true, outputFunction: OutputEmailAddresses },
   { name: "newsgroups", outputFunction: OutputNewsgroups },
   { name: "references", outputFunction: OutputMessageIds },
   { name: "followup-to", outputFunction: OutputNewsgroups },
@@ -88,7 +93,7 @@ var gExpandedHeaderList = [
   { name: "tags" } ];
 
 /**
- * These are all the items that use a mail-multi-emailHeaderField widget and
+ * These are all the items that use a mail-multi-emailheaderfield widget and
  * therefore may require updating if the address book changes.
  */
 var gEmailAddressHeaderNames = ["from", "reply-to",
@@ -115,7 +120,7 @@ var currentHeaderData = {};
 /**
  * CurrentAttachments is an array of AttachmentInfo objects.
  */
-var currentAttachments = new Array();
+var currentAttachments = [];
 
 var nsIAbDirectory = Ci.nsIAbDirectory;
 var nsIAbListener = Ci.nsIAbListener;
@@ -131,8 +136,7 @@ var nsIAbCard = Ci.nsIAbCard;
  * @param prefix  the name of the view (e.g. "expanded")
  * @param headerListInfo  entry from a header list.
  */
-function createHeaderEntry(prefix, headerListInfo)
-{
+function createHeaderEntry(prefix, headerListInfo) {
   var partialIDName = prefix + headerListInfo.name;
   this.enclosingBox = document.getElementById(partialIDName + "Box");
   this.enclosingRow = document.getElementById(partialIDName + "Row");
@@ -148,9 +152,9 @@ function createHeaderEntry(prefix, headerListInfo)
       this.longTextNode = this.enclosingBox.longEmailAddresses;
       this.textNode = this.enclosingBox.emailAddresses;
     }
-  }
-  else
+  } else {
    this.useToggle = false;
+  }
 
   if ("outputFunction" in headerListInfo)
     this.outputFunction = headerListInfo.outputFunction;
@@ -161,27 +165,28 @@ function createHeaderEntry(prefix, headerListInfo)
   // later attach it to any <mail-emailaddress> tags it creates for later
   // extraction and use by UpdateEmailNodeDetails.
   this.enclosingBox.headerName = headerListInfo.name;
-
+  // Set the headerName attribute for the value nodes too.
+  this.enclosingBox.querySelectorAll(".headerValue").forEach(e => {
+    e.setAttribute("headerName", headerListInfo.name);
+  });
 }
 
-function initializeHeaderViewTables()
-{
+function initializeHeaderViewTables() {
   // Iterate over each header in our header list arrays and create header entries
   // for each one. These header entries are then stored in the appropriate header
   // table.
-  var index;
-  for (index = 0; index < gExpandedHeaderList.length; index++) {
-    var headerName = gExpandedHeaderList[index].name;
-    gExpandedHeaderView[headerName] =
-      new createHeaderEntry("expanded", gExpandedHeaderList[index]);
+  for (let header of gExpandedHeaderList) {
+    gExpandedHeaderView[header.name] = new createHeaderEntry("expanded", header);
   }
 
-  var extraHeaders =
+  let extraHeaders =
     Services.prefs.getCharPref("mailnews.headers.extraExpandedHeaders").split(" ");
-  for (index = 0; index < extraHeaders.length; index++) {
-    var extraHeader = extraHeaders[index];
-    gExpandedHeaderView[extraHeader.toLowerCase()] =
-      new HeaderView(extraHeader, extraHeader);
+  for (let extraHeaderName of extraHeaders) {
+    if (!extraHeaderName.trim()) {
+      continue;
+    }
+    gExpandedHeaderView[extraHeaderName.toLowerCase()] =
+      new HeaderView(extraHeaderName, extraHeaderName);
   }
 
   if (Services.prefs.getBoolPref("mailnews.headers.showOrganization")) {
@@ -210,8 +215,7 @@ function initializeHeaderViewTables()
   }
 }
 
-function OnLoadMsgHeaderPane()
-{
+function OnLoadMsgHeaderPane() {
   // Load any preferences that at are global with regards to
   // displaying a message...
   gMinNumberOfHeaders = Services.prefs.getIntPref("mailnews.headers.minNumHeaders");
@@ -233,7 +237,7 @@ function OnLoadMsgHeaderPane()
   // is if a value of 1 was persisted to localStore.rdf by Tb2 (when there were
   // two panels), and then the user upgraded to Tb3, which only has one.
   // Presumably this can also catch cases of extension uninstalls as well.
-  let deckElement = document.getElementById("msgHeaderViewDeck")
+  let deckElement = document.getElementById("msgHeaderViewDeck");
 
   // If the selectedIndex was 0, then we were using the compact header, (if we
   // were coming from TB2, but we'll check that in the feature configurator).
@@ -244,19 +248,19 @@ function OnLoadMsgHeaderPane()
     deckElement.selectedIndex = 0;
   }
 
-  initToolbarMenu();
-
-  // Only offer openInTab and openInNewWindow if this window supports tabs...
-  // (i.e. is not a standalone message window), since those actions are likely
-  // to be significantly less common in that case.
-  if (document.getElementById("otherActionsOpenIn")) {
-    let opensAreHidden = document.getElementById("tabmail") ? false : true;
-    document.getElementById("otherActionsOpenIn").hidden = opensAreHidden;
+  // Only offer openInTab and openInNewWindow if this window supports tabs.
+  let opensAreHidden = !document.getElementById("tabmail");
+  for (let id of ["otherActionsOpenInNewWindow", "otherActionsOpenInNewTab"]) {
+    let menu = document.getElementById(id);
+    if (menu) {  // May not be available yet.
+      menu.hidden = opensAreHidden;
+    }
   }
 
   // Dispatch an event letting any listeners know that we have loaded
   // the message pane.
   var headerViewElement = document.getElementById("msgHeaderView");
+  headerViewElement.loaded = true;
   headerViewElement.dispatchEvent(new Event("messagepane-loaded",
     { bubbles: false, cancelable: true }));
 
@@ -266,7 +270,7 @@ function OnLoadMsgHeaderPane()
                       UpdateReplyButtons();
                     });
   initInlineToolbox("attachment-view-toolbox", "attachment-view-toolbar",
-                    "CustomizeAttachmentToolbar", function () {
+                    "CustomizeAttachmentToolbar", function() {
                       updateSaveAllAttachmentsButton();
                     });
 
@@ -299,7 +303,6 @@ function initInlineToolbox(toolboxId, toolbarId, popupId, customizeChange) {
   let toolbar = document.getElementById(toolbarId);
   if (toolbox && toolbar) {
     if (!toolbox.getAttribute("mode")) {
-
       /* set toolbox attributes to default values */
       let mode = toolbox.getAttribute("defaultmode");
       let align = toolbox.getAttribute("defaultlabelalign");
@@ -307,28 +310,19 @@ function initInlineToolbox(toolboxId, toolbarId, popupId, customizeChange) {
       toolbox.setAttribute("mode", mode);
       toolbox.setAttribute("labelalign", align);
       toolbox.setAttribute("iconsize", iconsize);
-      toolbox.ownerDocument.persist(toolbox.id, "mode");
-      toolbox.ownerDocument.persist(toolbox.id, "iconsize");
-      toolbox.ownerDocument.persist(toolbox.id, "labelalign");
+      Services.xulStore.persist(toolbox, "mode");
+      Services.xulStore.persist(toolbox, "iconsize");
+      Services.xulStore.persist(toolbox, "labelalign");
 
       /* set toolbar attributes to default values */
       iconsize = toolbar.getAttribute("defaulticonsize");
       toolbar.setAttribute("iconsize", iconsize);
-      toolbar.ownerDocument.persist(toolbar.id, "iconsize");
+      Services.xulStore.persist(toolbar, "iconsize");
     }
   }
 }
 
-function initToolbarMenu() {
-  // Get the mode as persisted on the toolbar itself.
-  let mode = document.getElementById("header-view-toolbar")
-                     .getAttribute("mode");
-
-  return;
-}
-
-function OnUnloadMsgHeaderPane()
-{
+function OnUnloadMsgHeaderPane() {
   Services.prefs.removeObserver("mail.showCondensedAddresses", MsgHdrViewObserver);
   Services.prefs.removeObserver("mailnews.headers.showReferences", MsgHdrViewObserver);
 
@@ -341,48 +335,44 @@ function OnUnloadMsgHeaderPane()
     { bubbles: false, cancelable: true }));
 }
 
-var MsgHdrViewObserver =
-{
-  observe: function(subject, topic, prefName)
-  {
+var MsgHdrViewObserver = {
+  observe(subject, topic, prefName) {
     // verify that we're changing the mail pane config pref
     if (topic == "nsPref:changed") {
       if (prefName == "mail.showCondensedAddresses") {
         gShowCondensedEmailAddresses =
           Services.prefs.getBoolPref("mail.showCondensedAddresses");
         ReloadMessage();
-      }
-      else if (prefName == "mailnews.headers.showReferences") {
+      } else if (prefName == "mailnews.headers.showReferences") {
         gHeadersShowReferences =
           Services.prefs.getBoolPref("mailnews.headers.showReferences");
         ReloadMessage();
       }
     }
-  }
+  },
 };
 
-var AddressBookListener =
-{
-  onItemAdded: function(aParentDir, aItem) {
+var AddressBookListener = {
+  onItemAdded(aParentDir, aItem) {
     OnAddressBookDataChanged(nsIAbListener.itemAdded,
                              aParentDir, aItem);
   },
-  onItemRemoved: function(aParentDir, aItem) {
+  onItemRemoved(aParentDir, aItem) {
     OnAddressBookDataChanged(aItem instanceof nsIAbCard ?
                                nsIAbListener.directoryItemRemoved :
                                nsIAbListener.directoryRemoved,
                              aParentDir, aItem);
   },
-  onItemPropertyChanged: function(aItem, aProperty, aOldValue, aNewValue) {
+  onItemPropertyChanged(aItem, aProperty, aOldValue, aNewValue) {
     // We only need updates for card changes, address book and mailing list
     // ones don't affect us here.
     if (aItem instanceof Ci.nsIAbCard)
       OnAddressBookDataChanged(nsIAbListener.itemChanged, null, aItem);
-  }
+  },
 };
 
 function OnAddressBookDataChanged(aAction, aParentDir, aItem) {
-  gEmailAddressHeaderNames.forEach(function (headerName) {
+  gEmailAddressHeaderNames.forEach(function(headerName) {
     let headerEntry = null;
 
     if (headerName in gExpandedHeaderView) {
@@ -400,390 +390,360 @@ function OnAddressBookDataChanged(aAction, aParentDir, aItem) {
  * as we display the message through our mime converter.
  */
 var messageHeaderSink = {
-    QueryInterface: ChromeUtils.generateQI(
-      [Ci.nsIMsgHeaderSink]),
-    onStartHeaders: function()
-    {
-      this.mSaveHdr = null;
-      // Every time we start to redisplay a message, check the view all headers
-      // pref...
-      var showAllHeadersPref = Services.prefs.getIntPref("mail.show_headers");
-      if (showAllHeadersPref == 2) {
-        gViewAllHeaders = true;
-      } else {
-        if (gViewAllHeaders) {
-          // If we currently are in view all header mode, rebuild our header
-          // view so we remove most of the header data.
-          hideHeaderView(gExpandedHeaderView);
-          RemoveNewHeaderViews(gExpandedHeaderView);
-          gDummyHeaderIdIndex = 0;
-          gExpandedHeaderView = {};
-          initializeHeaderViewTables();
-        }
-
-        gViewAllHeaders = false;
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIMsgHeaderSink]),
+  onStartHeaders() {
+    this.mSaveHdr = null;
+    // Every time we start to redisplay a message, check the view all headers
+    // pref...
+    var showAllHeadersPref = Services.prefs.getIntPref("mail.show_headers");
+    if (showAllHeadersPref == 2) {
+      gViewAllHeaders = true;
+    } else {
+      if (gViewAllHeaders) {
+        // If we currently are in view all header mode, rebuild our header
+        // view so we remove most of the header data.
+        hideHeaderView(gExpandedHeaderView);
+        RemoveNewHeaderViews(gExpandedHeaderView);
+        gDummyHeaderIdIndex = 0;
+        gExpandedHeaderView = {};
+        initializeHeaderViewTables();
       }
 
-      ClearCurrentHeaders();
-      gBuiltExpandedView = false;
-      gBuildAttachmentsForCurrentMsg = false;
-      ClearAttachmentList();
-      gMessageNotificationBar.clearMsgNotifications();
-
-      for (let index in gMessageListeners)
-        gMessageListeners[index].onStartHeaders();
-    },
-
-    onEndHeaders: function()
-    {
-      // Give add-ons a chance to modify currentHeaderData before it actually
-      // gets displayed.
-      for (let index in gMessageListeners)
-        if ("onBeforeShowHeaderPane" in gMessageListeners[index])
-          gMessageListeners[index].onBeforeShowHeaderPane();
-
-      // Load feed web page if so configured. This entry point works for
-      // messagepane loads in 3pane folder tab, 3pane message tab, and the
-      // standalone message window.
-      if (!FeedMessageHandler.shouldShowSummary(gMessageDisplay.displayedMessage, false))
-        FeedMessageHandler.setContent(gMessageDisplay.displayedMessage, false);
-
-      ShowMessageHeaderPane();
-      // WARNING: This is the ONLY routine inside of the message Header Sink
-      // that should trigger a reflow!
-      ClearHeaderView(gExpandedHeaderView);
-
-      // Make sure there is a subject even if it's empty so we'll show the
-      // subject and the twisty.
-      EnsureSubjectValue();
-
-      // Only update the expanded view if it's actually selected (an
-      // extension-provided panel could be visible instead) and needs updating.
-      if (document.getElementById("msgHeaderViewDeck").selectedIndex == 0 &&
-          !gBuiltExpandedView) {
-        UpdateExpandedMessageHeaders();
-      }
-
-      gMessageNotificationBar.setDraftEditMessage();
-      UpdateJunkButton();
-
-      for (let index in gMessageListeners)
-        gMessageListeners[index].onEndHeaders();
-    },
-
-    processHeaders: function(headerNameEnumerator, headerValueEnumerator,
-                             dontCollectAddress)
-    {
-      this.onStartHeaders();
-
-      const kMailboxSeparator = ", ";
-      var index = 0;
-      while (headerNameEnumerator.hasMore()) {
-        var header = new Object;
-        header.headerValue = headerValueEnumerator.getNext();
-        header.headerName = headerNameEnumerator.getNext();
-
-        // For consistency's sake, let us force all header names to be lower
-        // case so we don't have to worry about looking for: Cc and CC, etc.
-        var lowerCaseHeaderName = header.headerName.toLowerCase();
-
-        // If we have an x-mailer, x-mimeole, or x-newsreader string,
-        // put it in the user-agent slot which we know how to handle already.
-        if (/^x-(mailer|mimeole|newsreader)$/.test(lowerCaseHeaderName))
-          lowerCaseHeaderName = "user-agent";
-
-        if (this.mDummyMsgHeader) {
-          if (lowerCaseHeaderName == "from")
-            this.mDummyMsgHeader.author = header.headerValue;
-          else if (lowerCaseHeaderName == "to")
-            this.mDummyMsgHeader.recipients = header.headerValue;
-          else if (lowerCaseHeaderName == "cc")
-            this.mDummyMsgHeader.ccList = header.headerValue;
-          else if (lowerCaseHeaderName == "subject")
-            this.mDummyMsgHeader.subject = header.headerValue;
-          else if (lowerCaseHeaderName == "reply-to")
-            this.mDummyMsgHeader.replyTo = header.headerValue;
-          else if (lowerCaseHeaderName == "message-id")
-            this.mDummyMsgHeader.messageId = header.headerValue;
-          else if (lowerCaseHeaderName == "list-post")
-            this.mDummyMsgHeader.listPost = header.headerValue;
-          else if (lowerCaseHeaderName == "delivered-to")
-            this.mDummyMsgHeader.deliveredTo = header.headerValue;
-          else if (lowerCaseHeaderName == "date")
-            this.mDummyMsgHeader.date = Date.parse(header.headerValue) * 1000;
-        }
-        // according to RFC 2822, certain headers
-        // can occur "unlimited" times
-        if (lowerCaseHeaderName in currentHeaderData) {
-          // Sometimes, you can have multiple To or Cc lines....
-          // In this case, we want to append these headers into one.
-          if (lowerCaseHeaderName == "to" || lowerCaseHeaderName == "cc") {
-            currentHeaderData[lowerCaseHeaderName].headerValue =
-              currentHeaderData[lowerCaseHeaderName].headerValue + "," +
-                header.headerValue;
-          } else {
-            // Use the index to create a unique header name like:
-            // received5, received6, etc
-            currentHeaderData[lowerCaseHeaderName + index++] = header;
-          }
-        }
-        else
-         currentHeaderData[lowerCaseHeaderName] = header;
-      } // while we have more headers to parse
-
-      // Process message tags as if they were headers in the message.
-      SetTagHeader();
-
-      if (("from" in currentHeaderData) && ("sender" in currentHeaderData)) {
-        var senderMailbox = kMailboxSeparator +
-          MailServices.headerParser.extractHeaderAddressMailboxes(
-            currentHeaderData.sender.headerValue) + kMailboxSeparator;
-        var fromMailboxes = kMailboxSeparator +
-          MailServices.headerParser.extractHeaderAddressMailboxes(
-            currentHeaderData.from.headerValue) + kMailboxSeparator;
-        if (fromMailboxes.includes(senderMailbox))
-          delete currentHeaderData.sender;
-      }
-
-      // We don't need to show the reply-to header if its value is either
-      // the From field (totally pointless) or the To field (common for
-      // mailing lists, but not that useful).
-      if (("from" in currentHeaderData) &&
-          ("to" in currentHeaderData) &&
-          ("reply-to" in currentHeaderData)) {
-        var replyToMailbox = MailServices.headerParser.extractHeaderAddressMailboxes(
-            currentHeaderData["reply-to"].headerValue);
-        var fromMailboxes = MailServices.headerParser.extractHeaderAddressMailboxes(
-            currentHeaderData.from.headerValue);
-        var toMailboxes = MailServices.headerParser.extractHeaderAddressMailboxes(
-            currentHeaderData.to.headerValue);
-
-        if (replyToMailbox == fromMailboxes || replyToMailbox == toMailboxes)
-          delete currentHeaderData["reply-to"];
-      }
-
-      // For content-base urls stored uri encoded, we want to decode for
-      // display (and encode for external link open).
-      if ("content-base" in currentHeaderData) {
-        currentHeaderData["content-base"].headerValue =
-          decodeURI(currentHeaderData["content-base"].headerValue);
-      }
-
-      let expandedfromLabel = document.getElementById("expandedfromLabel");
-      if (gFolderDisplay.selectedMessageIsFeed)
-        expandedfromLabel.value = expandedfromLabel.getAttribute("valueAuthor");
-      else
-        expandedfromLabel.value = expandedfromLabel.getAttribute("valueFrom");
-
-      this.onEndHeaders();
-    },
-
-    handleAttachment: function(contentType, url, displayName, uri,
-                               isExternalAttachment)
-    {
-      this.skipAttachment = true;
-
-      // Don't show vcards as external attachments in the UI. libmime already
-      // renders them inline.
-      if (!this.mSaveHdr)
-        this.mSaveHdr = messenger.messageServiceFromURI(uri)
-                                 .messageURIToMsgHdr(uri);
-      if (contentType == "text/x-vcard") {
-        var inlineAttachments = Services.prefs.getBoolPref("mail.inline_attachments");
-        var displayHtmlAs = Services.prefs.getIntPref("mailnews.display.html_as");
-        if (inlineAttachments && !displayHtmlAs)
-          return;
-      }
-
-      var size = null;
-      if (isExternalAttachment && url.startsWith("file:")) {
-        let fileHandler = Services.io.getProtocolHandler("file")
-          .QueryInterface(Ci.nsIFileProtocolHandler);
-        try {
-          let file = fileHandler.getFileFromURLSpec(url);
-          // Can't get size for detached attachments which are no longer
-          // available on the specified location.
-          if (file.exists())
-            size = file.fileSize;
-        }
-        catch(e) {
-          Cu.reportError("Couldn't open external attachment; " +
-                         "url=" + url + "; " + e);
-        }
-      }
-
-      currentAttachments.push(new AttachmentInfo(contentType, url, displayName,
-                                                 uri, isExternalAttachment,
-                                                 size));
-      this.skipAttachment = false;
-
-      // If we have an attachment, set the nsMsgMessageFlags.Attachment flag
-      // on the hdr to cause the "message with attachment" icon to show up
-      // in the thread pane.
-      // We only need to do this on the first attachment.
-      var numAttachments = currentAttachments.length;
-      if (numAttachments == 1) {
-        // We also have to enable the Message/Attachments menuitem.
-        var node = document.getElementById("msgAttachmentMenu");
-        if (node)
-          node.removeAttribute("disabled");
-
-        // convert the uri into a hdr
-        this.mSaveHdr.markHasAttachments(true);
-        // we also do the same on appmenu
-        let appmenunode = document.getElementById("appmenu_msgAttachmentMenu");
-        if (appmenunode)
-          appmenunode.removeAttribute("disabled");
-
-        // convert the uri into a hdr
-        this.mSaveHdr.markHasAttachments(true);
-      }
-    },
-
-    addAttachmentField: function(field, value)
-    {
-      if (this.skipAttachment)
-        return;
-
-      let last = currentAttachments[currentAttachments.length - 1];
-      if (field == "X-Mozilla-PartSize" && !last.url.startsWith("file") &&
-          !last.isDeleted) {
-        let size = parseInt(value);
-
-        if (last.isExternalAttachment && last.url.startsWith("http")) {
-          // Check if an external link attachment's reported size is sane.
-          // A size of < 2 isn't sensical so ignore such placeholder values.
-          // Don't accept a size with any non numerics. Also cap the number.
-          if (isNaN(size) || size.toString().length != value.length || size < 2)
-            size = -1;
-          if (size > Number.MAX_SAFE_INTEGER)
-            size = Number.MAX_SAFE_INTEGER;
-        }
-
-        // libmime returns -1 if it never managed to figure out the size.
-        if (size != -1)
-          last.size = size;
-      }
-      else if (field == "X-Mozilla-PartDownloaded" && value == "0") {
-        // We haven't downloaded the attachment, so any size we get from
-        // libmime is almost certainly inaccurate. Just get rid of it. (Note:
-        // this relies on the fact that PartDownloaded comes after PartSize from
-        // the MIME emitter.)
-        last.size = null;
-      }
-    },
-
-    onEndAllAttachments: function()
-    {
-      displayAttachmentsForExpandedView();
-
-      for (let listener of gMessageListeners) {
-        if ("onEndAttachments" in listener)
-          listener.onEndAttachments();
-      }
-    },
-
-    /**
-     * This event is generated by nsMsgStatusFeedback when it gets an
-     * OnStateChange event for STATE_STOP.  This is the same event that
-     * generates the "msgLoaded" property flag change event.  This best
-     * corresponds to the end of the streaming process.
-     */
-    onEndMsgDownload: function(url)
-    {
-      gMessageDisplay.onLoadCompleted();
-
-      let expanded = Services.prefs.getBoolPref(
-        "mailnews.attachments.display.start_expanded");
-
-      if (expanded)
-        toggleAttachmentList(true);
-
-      // if we don't have any attachments, turn off the attachments flag
-      if (!this.mSaveHdr) {
-        var messageUrl = url.QueryInterface(Ci.nsIMsgMessageUrl);
-        this.mSaveHdr = messenger.msgHdrFromURI(messageUrl.uri);
-      }
-      if (!currentAttachments.length && this.mSaveHdr)
-        this.mSaveHdr.markHasAttachments(false);
-
-      let browser = getBrowser();
-      if (currentAttachments.length &&
-          Services.prefs.getBoolPref("mail.inline_attachments") &&
-          this.mSaveHdr && gFolderDisplay.selectedMessageIsFeed &&
-          browser && browser.contentDocument && browser.contentDocument.body) {
-        for (let img of browser.contentDocument.body.getElementsByClassName("moz-attached-image")) {
-          for (let attachment of currentAttachments) {
-            let partID = img.src.split("&part=")[1];
-            partID = partID ? partID.split("&")[0] : null;
-            if (attachment.partID && partID == attachment.partID) {
-              img.src = attachment.url;
-              break;
-            }
-          }
-
-          img.addEventListener("load", function(event) {
-            if (this.clientWidth > this.parentNode.clientWidth) {
-              img.setAttribute("overflowing", "true");
-              img.setAttribute("shrinktofit", "true");
-            }
-          });
-        }
-      }
-
-      OnMsgParsed(url);
-    },
-
-    onEndMsgHeaders: function(url)
-    {
-      OnMsgLoaded(url);
-    },
-
-    onMsgHasRemoteContent: function(aMsgHdr, aContentURI, aCanOverride)
-    {
-      gMessageNotificationBar.setRemoteContentMsg(aMsgHdr, aContentURI, aCanOverride);
-    },
-
-    mSecurityInfo  : null,
-    mSaveHdr: null,
-    get securityInfo()
-    {
-      return this.mSecurityInfo;
-    },
-    set securityInfo(aSecurityInfo)
-    {
-      this.mSecurityInfo = aSecurityInfo;
-    },
-
-    mDummyMsgHeader: null,
-
-    get dummyMsgHeader()
-    {
-      if (!this.mDummyMsgHeader)
-        this.mDummyMsgHeader = new nsDummyMsgHeader();
-      // The URI resolution will never work on the dummy header;
-      // save it now... we know it will be needed eventually.
-      // (And save it every time we come through here, not just when
-      // we create it; the onStartHeaders might come after creation!)
-      this.mSaveHdr = this.mDummyMsgHeader;
-      return this.mDummyMsgHeader;
-    },
-    mProperties: null,
-    get properties()
-    {
-      if (!this.mProperties)
-        this.mProperties = Cc["@mozilla.org/hash-property-bag;1"].
-          createInstance(Ci.nsIWritablePropertyBag2);
-      return this.mProperties;
-    },
-
-    resetProperties: function() {
-      this.mProperties = null;
+      gViewAllHeaders = false;
     }
+
+    ClearCurrentHeaders();
+    gBuiltExpandedView = false;
+    gBuildAttachmentsForCurrentMsg = false;
+    ClearAttachmentList();
+    gMessageNotificationBar.clearMsgNotifications();
+
+    for (let index in gMessageListeners)
+      gMessageListeners[index].onStartHeaders();
+  },
+
+  onEndHeaders() {
+    // Give add-ons a chance to modify currentHeaderData before it actually
+    // gets displayed.
+    for (let index in gMessageListeners)
+      if ("onBeforeShowHeaderPane" in gMessageListeners[index])
+        gMessageListeners[index].onBeforeShowHeaderPane();
+
+    // Load feed web page if so configured. This entry point works for
+    // messagepane loads in 3pane folder tab, 3pane message tab, and the
+    // standalone message window.
+    if (!FeedMessageHandler.shouldShowSummary(gMessageDisplay.displayedMessage, false))
+      FeedMessageHandler.setContent(gMessageDisplay.displayedMessage, false);
+
+    ShowMessageHeaderPane();
+    // WARNING: This is the ONLY routine inside of the message Header Sink
+    // that should trigger a reflow!
+    ClearHeaderView(gExpandedHeaderView);
+
+    // Make sure there is a subject even if it's empty so we'll show the
+    // subject and the twisty.
+    EnsureSubjectValue();
+
+    // Only update the expanded view if it's actually selected (an
+    // extension-provided panel could be visible instead) and needs updating.
+    if (document.getElementById("msgHeaderViewDeck").selectedIndex == 0 &&
+        !gBuiltExpandedView) {
+      UpdateExpandedMessageHeaders();
+    }
+
+    gMessageNotificationBar.setDraftEditMessage();
+    UpdateJunkButton();
+
+    for (let index in gMessageListeners)
+      gMessageListeners[index].onEndHeaders();
+  },
+
+  processHeaders(headerNameEnumerator, headerValueEnumerator, dontCollectAddress) {
+    this.onStartHeaders();
+
+    const kMailboxSeparator = ", ";
+    var index = 0;
+    while (headerNameEnumerator.hasMore()) {
+      var header = {};
+      header.headerValue = headerValueEnumerator.getNext();
+      header.headerName = headerNameEnumerator.getNext();
+
+      // For consistency's sake, let us force all header names to be lower
+      // case so we don't have to worry about looking for: Cc and CC, etc.
+      var lowerCaseHeaderName = header.headerName.toLowerCase();
+
+      // If we have an x-mailer, x-mimeole, or x-newsreader string,
+      // put it in the user-agent slot which we know how to handle already.
+      if (/^x-(mailer|mimeole|newsreader)$/.test(lowerCaseHeaderName))
+        lowerCaseHeaderName = "user-agent";
+
+      if (this.mDummyMsgHeader) {
+        if (lowerCaseHeaderName == "from")
+          this.mDummyMsgHeader.author = header.headerValue;
+        else if (lowerCaseHeaderName == "to")
+          this.mDummyMsgHeader.recipients = header.headerValue;
+        else if (lowerCaseHeaderName == "cc")
+          this.mDummyMsgHeader.ccList = header.headerValue;
+        else if (lowerCaseHeaderName == "subject")
+          this.mDummyMsgHeader.subject = header.headerValue;
+        else if (lowerCaseHeaderName == "reply-to")
+          this.mDummyMsgHeader.replyTo = header.headerValue;
+        else if (lowerCaseHeaderName == "message-id")
+          this.mDummyMsgHeader.messageId = header.headerValue;
+        else if (lowerCaseHeaderName == "list-post")
+          this.mDummyMsgHeader.listPost = header.headerValue;
+        else if (lowerCaseHeaderName == "delivered-to")
+          this.mDummyMsgHeader.deliveredTo = header.headerValue;
+        else if (lowerCaseHeaderName == "date")
+          this.mDummyMsgHeader.date = Date.parse(header.headerValue) * 1000;
+      }
+      // according to RFC 2822, certain headers
+      // can occur "unlimited" times
+      if (lowerCaseHeaderName in currentHeaderData) {
+        // Sometimes, you can have multiple To or Cc lines....
+        // In this case, we want to append these headers into one.
+        if (lowerCaseHeaderName == "to" || lowerCaseHeaderName == "cc") {
+          currentHeaderData[lowerCaseHeaderName].headerValue =
+            currentHeaderData[lowerCaseHeaderName].headerValue + "," +
+              header.headerValue;
+        } else {
+          // Use the index to create a unique header name like:
+          // received5, received6, etc
+          currentHeaderData[lowerCaseHeaderName + index++] = header;
+        }
+      } else {
+       currentHeaderData[lowerCaseHeaderName] = header;
+      }
+    } // while we have more headers to parse
+
+    // Process message tags as if they were headers in the message.
+    SetTagHeader();
+
+    if (("from" in currentHeaderData) && ("sender" in currentHeaderData)) {
+      let senderMailbox = kMailboxSeparator +
+        MailServices.headerParser.extractHeaderAddressMailboxes(
+          currentHeaderData.sender.headerValue) + kMailboxSeparator;
+      let fromMailboxes = kMailboxSeparator +
+        MailServices.headerParser.extractHeaderAddressMailboxes(
+          currentHeaderData.from.headerValue) + kMailboxSeparator;
+      if (fromMailboxes.includes(senderMailbox))
+        delete currentHeaderData.sender;
+    }
+
+    // We don't need to show the reply-to header if its value is either
+    // the From field (totally pointless) or the To field (common for
+    // mailing lists, but not that useful).
+    if (("from" in currentHeaderData) &&
+        ("to" in currentHeaderData) &&
+        ("reply-to" in currentHeaderData)) {
+      let replyToMailbox = MailServices.headerParser.extractHeaderAddressMailboxes(
+          currentHeaderData["reply-to"].headerValue);
+      let fromMailboxes = MailServices.headerParser.extractHeaderAddressMailboxes(
+          currentHeaderData.from.headerValue);
+      let toMailboxes = MailServices.headerParser.extractHeaderAddressMailboxes(
+          currentHeaderData.to.headerValue);
+
+      if (replyToMailbox == fromMailboxes || replyToMailbox == toMailboxes)
+        delete currentHeaderData["reply-to"];
+    }
+
+    // For content-base urls stored uri encoded, we want to decode for
+    // display (and encode for external link open).
+    if ("content-base" in currentHeaderData) {
+      currentHeaderData["content-base"].headerValue =
+        decodeURI(currentHeaderData["content-base"].headerValue);
+    }
+
+    let expandedfromLabel = document.getElementById("expandedfromLabel");
+    if (gFolderDisplay.selectedMessageIsFeed)
+      expandedfromLabel.value = expandedfromLabel.getAttribute("valueAuthor");
+    else
+      expandedfromLabel.value = expandedfromLabel.getAttribute("valueFrom");
+
+    this.onEndHeaders();
+  },
+
+  handleAttachment(contentType, url, displayName, uri, isExternalAttachment) {
+    this.skipAttachment = true;
+
+    // Don't show vcards as external attachments in the UI. libmime already
+    // renders them inline.
+    if (!this.mSaveHdr)
+      this.mSaveHdr = messenger.messageServiceFromURI(uri)
+                               .messageURIToMsgHdr(uri);
+    if (contentType == "text/x-vcard") {
+      var inlineAttachments = Services.prefs.getBoolPref("mail.inline_attachments");
+      var displayHtmlAs = Services.prefs.getIntPref("mailnews.display.html_as");
+      if (inlineAttachments && !displayHtmlAs)
+        return;
+    }
+
+    currentAttachments.push(new AttachmentInfo(contentType, url, displayName,
+                                               uri, isExternalAttachment));
+    this.skipAttachment = false;
+
+    // If we have an attachment, set the nsMsgMessageFlags.Attachment flag
+    // on the hdr to cause the "message with attachment" icon to show up
+    // in the thread pane.
+    // We only need to do this on the first attachment.
+    var numAttachments = currentAttachments.length;
+    if (numAttachments == 1) {
+      // We also have to enable the Message/Attachments menuitem.
+      var node = document.getElementById("msgAttachmentMenu");
+      if (node)
+        node.removeAttribute("disabled");
+
+      // convert the uri into a hdr
+      this.mSaveHdr.markHasAttachments(true);
+      // we also do the same on appmenu
+      let appmenunode = document.getElementById("appmenu_msgAttachmentMenu");
+      if (appmenunode)
+        appmenunode.removeAttribute("disabled");
+
+      // convert the uri into a hdr
+      this.mSaveHdr.markHasAttachments(true);
+    }
+  },
+
+  addAttachmentField(field, value) {
+    if (this.skipAttachment)
+      return;
+
+    let last = currentAttachments[currentAttachments.length - 1];
+    if (field == "X-Mozilla-PartSize" && !last.isFileAttachment &&
+        !last.isDeleted) {
+      let size = parseInt(value);
+
+      if (last.isLinkAttachment) {
+        // Check if an external link attachment's reported size is sane.
+        // A size of < 2 isn't sensical so ignore such placeholder values.
+        // Don't accept a size with any non numerics. Also cap the number.
+        // We want the size to be checked again, upon user action, to make
+        // sure size is updated with an accurate value, so |sizeResolved|
+        // remains false.
+        if (isNaN(size) || size.toString().length != value.length || size < 2) {
+          last.size = -1;
+        } else if (size > Number.MAX_SAFE_INTEGER) {
+          last.size = Number.MAX_SAFE_INTEGER;
+        } else {
+          last.size = size;
+        }
+      } else if (size == -1) {
+        // libmime returns -1 if it never managed to figure out the size. We
+        // want fetch() to check again for internal attachments in this case,
+        // otherwise we accept libmime's value and set |sizeResolved|.
+        // A fetch() for a resolved size can still be requested if
+        // |ALWAYSFETCHSIZE| is true.
+        last.size = -1;
+      } else {
+        last.size = size;
+        last.sizeResolved = true;
+      }
+    } else if (field == "X-Mozilla-PartDownloaded" && value == "0") {
+      // We haven't downloaded the attachment, so any size we get from
+      // libmime is almost certainly inaccurate. Just get rid of it. (Note:
+      // this relies on the fact that PartDownloaded comes after PartSize from
+      // the MIME emitter.)
+      last.size = -1;
+    }
+  },
+
+  onEndAllAttachments() {
+    displayAttachmentsForExpandedView();
+
+    for (let listener of gMessageListeners) {
+      if ("onEndAttachments" in listener)
+        listener.onEndAttachments();
+    }
+  },
+
+  /**
+   * This event is generated by nsMsgStatusFeedback when it gets an
+   * OnStateChange event for STATE_STOP.  This is the same event that
+   * generates the "msgLoaded" property flag change event.  This best
+   * corresponds to the end of the streaming process.
+   */
+  onEndMsgDownload(url) {
+    gMessageDisplay.onLoadCompleted();
+
+    // if we don't have any attachments, turn off the attachments flag
+    if (!this.mSaveHdr) {
+      var messageUrl = url.QueryInterface(Ci.nsIMsgMessageUrl);
+      this.mSaveHdr = messenger.msgHdrFromURI(messageUrl.uri);
+    }
+    if (!currentAttachments.length && this.mSaveHdr)
+      this.mSaveHdr.markHasAttachments(false);
+
+    let browser = getBrowser();
+    if (currentAttachments.length &&
+        Services.prefs.getBoolPref("mail.inline_attachments") &&
+        this.mSaveHdr && gFolderDisplay.selectedMessageIsFeed &&
+        browser && browser.contentDocument && browser.contentDocument.body) {
+      for (let img of browser.contentDocument.body.getElementsByClassName("moz-attached-image")) {
+        for (let attachment of currentAttachments) {
+          let partID = img.src.split("&part=")[1];
+          partID = partID ? partID.split("&")[0] : null;
+          if (attachment.partID && partID == attachment.partID) {
+            img.src = attachment.url;
+            break;
+          }
+        }
+
+        img.addEventListener("load", function(event) {
+          if (this.clientWidth > this.parentNode.clientWidth) {
+            img.setAttribute("overflowing", "true");
+            img.setAttribute("shrinktofit", "true");
+          }
+        });
+      }
+    }
+
+    OnMsgParsed(url);
+  },
+
+  onEndMsgHeaders(url) {
+    OnMsgLoaded(url);
+  },
+
+  onMsgHasRemoteContent(aMsgHdr, aContentURI, aCanOverride) {
+    gMessageNotificationBar.setRemoteContentMsg(aMsgHdr, aContentURI, aCanOverride);
+  },
+
+  mSecurityInfo: null,
+  mSaveHdr: null,
+  get securityInfo() {
+    return this.mSecurityInfo;
+  },
+  set securityInfo(aSecurityInfo) {
+    this.mSecurityInfo = aSecurityInfo;
+  },
+
+  mDummyMsgHeader: null,
+
+  get dummyMsgHeader() {
+    if (!this.mDummyMsgHeader)
+      this.mDummyMsgHeader = new nsDummyMsgHeader();
+    // The URI resolution will never work on the dummy header;
+    // save it now... we know it will be needed eventually.
+    // (And save it every time we come through here, not just when
+    // we create it; the onStartHeaders might come after creation!)
+    this.mSaveHdr = this.mDummyMsgHeader;
+    return this.mDummyMsgHeader;
+  },
+  mProperties: null,
+  get properties() {
+    if (!this.mProperties)
+      this.mProperties = Cc["@mozilla.org/hash-property-bag;1"].
+        createInstance(Ci.nsIWritablePropertyBag2);
+    return this.mProperties;
+  },
+
+  resetProperties() {
+    this.mProperties = null;
+  },
 };
 
-function SetTagHeader()
-{
+function SetTagHeader() {
   // It would be nice if we passed in the msgHdr from the back end.
   var msgHdr = gFolderDisplay.selectedMessage;
   if (!msgHdr)
@@ -821,18 +781,16 @@ function SetTagHeader()
     delete currentHeaderData.tags;
 }
 
-function EnsureSubjectValue()
-{
+function EnsureSubjectValue() {
   if (!("subject" in currentHeaderData)) {
-    let foo = new Object;
+    let foo = {};
     foo.headerValue = "";
     foo.headerName = "subject";
     currentHeaderData[foo.headerName] = foo;
   }
 }
 
-function OnTagsChange()
-{
+function OnTagsChange() {
   // rebuild the tag headers
   SetTagHeader();
 
@@ -859,8 +817,7 @@ function OnTagsChange()
  *
  * @param aHeaderTable Table of header entries
  */
-function ClearHeaderView(aHeaderTable)
-{
+function ClearHeaderView(aHeaderTable) {
   for (let name in aHeaderTable) {
     let headerEntry = aHeaderTable[name];
     if (headerEntry.enclosingBox.clearHeaderValues)
@@ -875,8 +832,7 @@ function ClearHeaderView(aHeaderTable)
  *
  * @param aHeaderTable Table of header entries
  */
-function hideHeaderView(aHeaderTable)
-{
+function hideHeaderView(aHeaderTable) {
   for (let name in aHeaderTable) {
     let headerEntry = aHeaderTable[name];
     headerEntry.enclosingRow.collapsed = true;
@@ -888,8 +844,7 @@ function hideHeaderView(aHeaderTable)
  *
  * @param aHeaderTable Table of header entries
  */
-function showHeaderView(aHeaderTable)
-{
+function showHeaderView(aHeaderTable) {
   for (let name in aHeaderTable) {
     let headerEntry = aHeaderTable[name];
     if (headerEntry.valid) {
@@ -905,8 +860,7 @@ function showHeaderView(aHeaderTable)
  * Enumerate through the list of headers and find the number that are visible
  * add empty entries if we don't have the minimum number of rows.
  */
-function EnsureMinimumNumberOfHeaders (headerTable)
-{
+function EnsureMinimumNumberOfHeaders(headerTable) {
   // 0 means we don't have a minimum... do nothing special
   if (!gMinNumberOfHeaders)
     return;
@@ -915,7 +869,7 @@ function EnsureMinimumNumberOfHeaders (headerTable)
   for (let name in headerTable) {
     let headerEntry = headerTable[name];
     if (headerEntry.valid)
-      numVisibleHeaders ++;
+      numVisibleHeaders++;
   }
 
   if (numVisibleHeaders < gMinNumberOfHeaders) {
@@ -942,7 +896,6 @@ function EnsureMinimumNumberOfHeaders (headerTable)
       gDummyHeaderIdIndex++;
       numEmptyHeaders--;
     }
-
   }
 }
 
@@ -950,8 +903,7 @@ function EnsureMinimumNumberOfHeaders (headerTable)
  * Make sure the appropriate fields in the expanded header view are collapsed
  * or visible...
  */
-function updateExpandedView()
-{
+function updateExpandedView() {
   // If the expanded view isn't selected, don't bother updating it.
   if (document.getElementById("msgHeaderViewDeck").selectedIndex != 0)
     return;
@@ -970,7 +922,9 @@ function updateExpandedView()
 
   try {
     AdjustHeaderView(Services.prefs.getIntPref("mail.show_headers"));
-  } catch (e) { logException(e); }
+  } catch (e) {
+    logException(e);
+  }
 }
 
 /**
@@ -978,8 +932,7 @@ function updateExpandedView()
  * reason that we're using two grids at all is to workaround the XUL box
  * model's inability to float elements.
  */
-function syncGridColumnWidths()
-{
+function syncGridColumnWidths() {
   let nameColumn = document.getElementById("expandedHeadersNameColumn");
   let nameColumn2 = document.getElementById("expandedHeaders2NameColumn");
 
@@ -1002,8 +955,7 @@ function syncGridColumnWidths()
  * @param aHeaderEntry  A single header from currentHeaderData
  * @param aHeaderValue  The new value for headerEntry
  */
-function updateHeaderValue(aHeaderEntry, aHeaderValue)
-{
+function updateHeaderValue(aHeaderEntry, aHeaderValue) {
   aHeaderEntry.enclosingBox.headerValue = aHeaderValue;
 }
 
@@ -1011,12 +963,12 @@ function updateHeaderValue(aHeaderEntry, aHeaderValue)
  * Create the DOM nodes (aka "View") for a non-standard header and insert them
  * into the grid.  Create and return the corresponding headerEntry object.
  *
- * @param {String} headerName  name of the header we're adding, all lower-case;
- *                             used to construct element ids
+ * @param {String} headerName  name of the header we're adding, used to
+ *                             construct the element IDs (in lower case)
  * @param {String} label       name of the header as displayed in the UI
  */
-function HeaderView(headerName, label)
-{
+function HeaderView(headerName, label) {
+  headerName = headerName.toLowerCase();
   let rowId = "expanded" + headerName + "Row";
   let idName = "expanded" + headerName + "Box";
   let newHeaderNode;
@@ -1064,8 +1016,7 @@ function HeaderView(headerName, label)
  *
  * @param aHeaderTable  Table of header entries.
  */
-function RemoveNewHeaderViews(aHeaderTable)
-{
+function RemoveNewHeaderViews(aHeaderTable) {
   for (let name in aHeaderTable) {
     let headerEntry = aHeaderTable[name];
     if (headerEntry.isNewHeader)
@@ -1107,14 +1058,13 @@ function UpdateExpandedMessageHeaders() {
       if (headerName == "message-id" || headerName == "in-reply-to") {
         var messageIdEntry = {
           name: headerName,
-          outputFunction: OutputMessageIds
+          outputFunction: OutputMessageIds,
         };
         gExpandedHeaderView[headerName] = new createHeaderEntry("expanded",
                                                                 messageIdEntry);
-      }
-      // Don't bother showing X-Mozilla-LocalizedDate, since that value is
-      // displayed below the message header toolbar.
-      else if (headerName != "x-mozilla-localizeddate") {
+      } else if (headerName != "x-mozilla-localizeddate") {
+        // Don't bother showing X-Mozilla-LocalizedDate, since that value is
+        // displayed below the message header toolbar.
         gExpandedHeaderView[headerName] =
           new HeaderView(headerName, currentHeaderData[headerName].headerName);
       }
@@ -1152,19 +1102,16 @@ function UpdateExpandedMessageHeaders() {
   updateExpandedView();
 }
 
-function ClearCurrentHeaders()
-{
+function ClearCurrentHeaders() {
   currentHeaderData = {};
-  currentAttachments = new Array();
+  currentAttachments = [];
 }
 
-function ShowMessageHeaderPane()
-{
+function ShowMessageHeaderPane() {
   document.getElementById("msgHeaderView").collapsed = false;
 }
 
-function HideMessageHeaderPane()
-{
+function HideMessageHeaderPane() {
   document.getElementById("msgHeaderView").collapsed = true;
 
   // Disable the Message/Attachments menuitem.
@@ -1191,8 +1138,7 @@ function HideMessageHeaderPane()
  * @param headerEntry  the entry data structure for this header
  * @param headerValue  the string value for the header from the message
  */
-function OutputNewsgroups(headerEntry, headerValue)
-{
+function OutputNewsgroups(headerEntry, headerValue) {
   headerValue.split(",").forEach(
     newsgroup => headerEntry.enclosingBox.addNewsgroupView(newsgroup));
 
@@ -1204,8 +1150,7 @@ function OutputNewsgroups(headerEntry, headerValue)
  * into message-ids and send them together with the index number
  * to the corresponding mail-messageids-headerfield element.
  */
-function OutputMessageIds(headerEntry, headerValue)
-{
+function OutputMessageIds(headerEntry, headerValue) {
   let messageIdArray = headerValue.split(/\s+/);
 
   headerEntry.enclosingBox.clearHeaderValues();
@@ -1225,23 +1170,17 @@ function OutputMessageIds(headerEntry, headerValue)
  * @param emailAddresses  comma separated list of the addresses for this
  *                        header field
  */
-function OutputEmailAddresses(headerEntry, emailAddresses)
-{
+function OutputEmailAddresses(headerEntry, emailAddresses) {
   if (!emailAddresses)
     return;
 
-  var addresses = {};
-  var fullNames = {};
-  var names = {};
-  var numAddresses =  0;
+  // The email addresses are still RFC2047 encoded but libmime has already converted from
+  // "raw UTF-8" to "wide" (UTF-16) characters.
+  var addresses = MailServices.headerParser.parseEncodedHeaderW(emailAddresses);
 
-  numAddresses = MailServices.headerParser
-                             .parseHeadersWithArray(emailAddresses, addresses,
-                                                    names, fullNames);
-  var index = 0;
   if (headerEntry.useToggle)
     headerEntry.enclosingBox.resetAddressView(); // make sure we start clean
-  if (numAddresses == 0 && emailAddresses.includes(":")) {
+  if (addresses.length == 0 && emailAddresses.includes(":")) {
     // No addresses and a colon, so an empty group like "undisclosed-recipients: ;".
     // Add group name so at least something displays.
     let address = { displayName: emailAddresses };
@@ -1250,29 +1189,26 @@ function OutputEmailAddresses(headerEntry, emailAddresses)
     else
       updateEmailAddressNode(headerEntry.enclosingBox.emailAddressNode, address);
   }
-  while (index < numAddresses) {
+  for (let addr of addresses) {
     // If we want to include short/long toggle views and we have a long view,
     // always add it. If we aren't including a short/long view OR if we are and
     // we haven't parsed enough addresses to reach the cutoff valve yet then add
     // it to the default (short) div.
     let address = {};
-    address.emailAddress = addresses.value[index];
-    address.fullAddress = fullNames.value[index];
-    address.displayName = names.value[index];
+    address.emailAddress = addr.email;
+    address.fullAddress = addr.toString();
+    address.displayName = addr.name;
     if (headerEntry.useToggle)
       headerEntry.enclosingBox.addAddressView(address);
     else
       updateEmailAddressNode(headerEntry.enclosingBox.emailAddressNode, address);
-
-    index++;
   }
 
   if (headerEntry.useToggle)
     headerEntry.enclosingBox.buildViews();
 }
 
-function updateEmailAddressNode(emailAddressNode, address)
-{
+function updateEmailAddressNode(emailAddressNode, address) {
   emailAddressNode.setAttribute("emailAddress", address.emailAddress || "");
   emailAddressNode.setAttribute("fullAddress", address.fullAddress || "");
   emailAddressNode.setAttribute("displayName", address.displayName || "");
@@ -1283,7 +1219,7 @@ function updateEmailAddressNode(emailAddressNode, address)
 
 function UpdateEmailNodeDetails(aEmailAddress, aDocumentNode, aCardDetails) {
   // If we haven't been given specific details, search for a card.
-  var cardDetails = aCardDetails || GetCardForEmail(aEmailAddress);
+  var cardDetails = aCardDetails || DisplayNameUtils.getCardForEmail(aEmailAddress);
   aDocumentNode.cardDetails = cardDetails;
 
   if (!cardDetails.card) {
@@ -1306,12 +1242,8 @@ function UpdateEmailNodeDetails(aEmailAddress, aDocumentNode, aCardDetails) {
     if (jid)
       chatAddresses.push(jid);
   }
+  let {onlineContacts} = ChromeUtils.import("resource:///modules/chatHandler.jsm");
   let chatContact;
-  if (!("chatHandler" in window)) {
-    window.chatHandler = {};
-    ChromeUtils.import("resource:///modules/chatHandler.jsm", chatHandler);
-  }
-  let onlineContacts = chatHandler.onlineContacts;
   for (let chatAddress of chatAddresses) {
     if (Object.prototype.hasOwnProperty.call(onlineContacts, chatAddresses)) {
       chatContact = onlineContacts[chatAddress];
@@ -1332,8 +1264,7 @@ function UpdateEmailNodeDetails(aEmailAddress, aDocumentNode, aCardDetails) {
         delete this.chatContactObserver;
         this.removeAttribute("chatStatus");
         this.removeAttribute("presenceTooltip");
-      }
-      else if (aTopic == "contact-status-changed") {
+      } else if (aTopic == "contact-status-changed") {
         UpdateEmailPresenceDetails(this, this.chatContact);
       }
     }.bind(aDocumentNode);
@@ -1347,10 +1278,12 @@ function UpdateEmailNodeDetails(aEmailAddress, aDocumentNode, aCardDetails) {
   if (aDocumentNode.hasAttribute("updatingUI"))
     return;
 
-  var displayName = FormatDisplayName(aEmailAddress,
-                                      aDocumentNode.getAttribute("displayName"),
-                                      aDocumentNode.getAttribute("headerName"),
-                                      aDocumentNode.cardDetails.card);
+  var displayName = DisplayNameUtils.formatDisplayName(
+    aEmailAddress,
+    aDocumentNode.getAttribute("displayName"),
+    aDocumentNode.getAttribute("headerName"),
+    aDocumentNode.cardDetails.card
+  );
 
   if (gShowCondensedEmailAddresses && displayName) {
     aDocumentNode.setAttribute("tooltiptext", aEmailAddress);
@@ -1386,18 +1319,19 @@ function UpdateEmailPresenceDetails(aDocumentNode, aChatContact) {
 }
 
 function UpdateExtraAddressProcessing(aAddressData, aDocumentNode, aAction,
-                                      aParentDir, aItem)
-{
+                                      aParentDir, aItem) {
   switch (aAction) {
   case nsIAbListener.itemChanged:
     if (aAddressData &&
         aDocumentNode.cardDetails.card &&
         aItem.hasEmailAddress(aAddressData.emailAddress)) {
       aDocumentNode.cardDetails.card = aItem;
-      var displayName = FormatDisplayName(aAddressData.emailAddress,
-                                          aDocumentNode.getAttribute("displayName"),
-                                          aDocumentNode.getAttribute("headerName"),
-                                          aDocumentNode.cardDetails.card);
+      var displayName = DisplayNameUtils.formatDisplayName(
+        aAddressData.emailAddress,
+        aDocumentNode.getAttribute("displayName"),
+        aDocumentNode.getAttribute("headerName"),
+        aDocumentNode.cardDetails.card
+      );
 
       if (gShowCondensedEmailAddresses && displayName) {
         aDocumentNode.setAttribute("label", displayName);
@@ -1415,8 +1349,7 @@ function UpdateExtraAddressProcessing(aAddressData, aDocumentNode, aAction,
       // to an existing book may just have been added).
       if (!aDocumentNode.cardDetails.card)
         UpdateEmailNodeDetails(aAddressData.emailAddress, aDocumentNode);
-    }
-    else if (aItem instanceof nsIAbCard) {
+    } else if (aItem instanceof nsIAbCard) {
       // If we don't have a card, does this new one match?
       if (aDocumentNode.cardDetails && !aDocumentNode.cardDetails.card &&
           aItem.hasEmailAddress(aAddressData.emailAddress)) {
@@ -1447,8 +1380,7 @@ function UpdateExtraAddressProcessing(aAddressData, aDocumentNode, aAction,
   }
 }
 
-function findEmailNodeFromPopupNode(elt, popup)
-{
+function findEmailNodeFromPopupNode(elt, popup) {
   // This annoying little function is needed because in the binding for
   // mail-emailaddress, we set the context on the <description>, but that if
   // the user clicks on the label, then popupNode is set to it, rather than
@@ -1463,18 +1395,19 @@ function findEmailNodeFromPopupNode(elt, popup)
   return elt.parentNode;
 }
 
-function hideEmailNewsPopup(addressNode)
-{
+function hideEmailNewsPopup(addressNode) {
+  addressNode = addressNode.hasAttribute("newsgroup") ?
+                  addressNode.closest("mail-newsgroup") :
+                  addressNode.closest("mail-emailaddress");
   // highlight the emailBox/newsgroupBox
   addressNode.removeAttribute("selected");
 }
 
-function setupEmailAddressPopup(emailAddressNode)
-{
-  var emailAddressPlaceHolder = document.getElementById("emailAddressPlaceHolder");
-  var emailAddress = emailAddressNode.getPart("emaillabel").value;
+function setupEmailAddressPopup(emailAddressNode) {
+  emailAddressNode = emailAddressNode.closest("mail-emailaddress");
   emailAddressNode.setAttribute("selected", "true");
-  emailAddressPlaceHolder.setAttribute("label", emailAddress);
+  var emailAddressPlaceHolder = document.getElementById("emailAddressPlaceHolder");
+  emailAddressPlaceHolder.setAttribute("label", emailAddressNode.getAttribute("label"));
 
   if (emailAddressNode.cardDetails && emailAddressNode.cardDetails.card) {
     document.getElementById("addToAddressBookItem").setAttribute("hidden", true);
@@ -1492,42 +1425,7 @@ function setupEmailAddressPopup(emailAddressNode)
   }
 }
 
-/**
- * Returns an object with two properties, book and card. If the email address
- * is found in the address books, then the book will contain an nsIAbDirectory,
- * and card will contain an nsIAbCard. If the email address is not found, both
- * items will contain null.
- *
- * @param emailAddress  address to look for
- * @return              an object with two properties, .book and .card
- */
-function getCardForEmail(emailAddress)
-{
-  // Email address is searched for in any of the address books that support
-  // the cardForEmailAddress function.
-  // Future expansion could be to domain matches
-
-  var books = MailServices.ab.directories;
-
-  var result = { book: null, card: null };
-
-  while (!result.card && books.hasMoreElements()) {
-    var ab = books.getNext().QueryInterface(nsIAbDirectory);
-    try {
-      var card = ab.cardForEmailAddress(emailAddress);
-      if (card) {
-        result.book = ab;
-        result.card = card;
-      }
-    }
-    catch (ex) { }
-  }
-
-  return result;
-}
-
-function onClickEmailStar(event, emailAddressNode)
-{
+function onClickEmailStar(event, emailAddressNode) {
   // Only care about left-click events
   if (event.button != 0)
     return;
@@ -1540,8 +1438,7 @@ function onClickEmailStar(event, emailAddressNode)
   }
 }
 
-function onClickEmailPresence(event, emailAddressNode)
-{
+function onClickEmailPresence(event, emailAddressNode) {
   // Only care about left-click events
   if (event.button != 0)
     return;
@@ -1552,9 +1449,9 @@ function onClickEmailPresence(event, emailAddressNode)
   let win = window;
   if (!("focusConversation" in chatHandler)) {
     win = Services.wm.getMostRecentWindow("mail:3pane");
-    if (win)
+    if (win) {
       win.focus();
-    else {
+    } else {
       window.openDialog("chrome://messenger/content/", "_blank",
                         "chrome,extrachrome,menubar,resizable,scrollbars,status,toolbar", null,
                         {tabType: "chat",
@@ -1573,8 +1470,8 @@ function onClickEmailPresence(event, emailAddressNode)
  *
  * @param emailAddressNode  a node with displayName and emailAddress attributes
  */
-function AddContact(emailAddressNode)
-{
+function AddContact(emailAddressNode) {
+  emailAddressNode = emailAddressNode.closest("mail-emailaddress");
   // When we collect an address, it updates the AB which sends out
   // notifications to update the UI. In the add case we don't want to update
   // the UI so that accidentally double-clicking on the star doesn't lead
@@ -1596,8 +1493,8 @@ function AddContact(emailAddressNode)
   emailAddressNode.removeAttribute("updatingUI");
 }
 
-function EditContact(emailAddressNode)
-{
+function EditContact(emailAddressNode) {
+  emailAddressNode = emailAddressNode.closest("mail-emailaddress");
   if (emailAddressNode.cardDetails.card)
     editContactInlineUI.showEditContactPanel(emailAddressNode.cardDetails,
                                              emailAddressNode);
@@ -1610,8 +1507,10 @@ function EditContact(emailAddressNode)
  * @param addressNode  a node which has a "fullAddress" or "newsgroup" attribute
  * @param aEvent       the event object when user triggers the menuitem
  */
-function SendMailToNode(addressNode, aEvent)
-{
+function SendMailToNode(addressNode, aEvent) {
+  addressNode = addressNode.hasAttribute("newsgroup") ?
+                  addressNode.closest("mail-newsgroup") :
+                  addressNode.closest("mail-emailaddress");
   let fields = Cc["@mozilla.org/messengercompose/composefields;1"]
                  .createInstance(Ci.nsIMsgCompFields);
   let params = Cc["@mozilla.org/messengercompose/composeparams;1"]
@@ -1650,8 +1549,10 @@ function SendMailToNode(addressNode, aEvent)
  * @param aIncludeName when true, also copy the name onto the clipboard,
  *                     otherwise only the email address
  */
-function CopyEmailNewsAddress(addressNode, aIncludeName = false)
-{
+function CopyEmailNewsAddress(addressNode, aIncludeName = false) {
+  addressNode = addressNode.hasAttribute("newsgroup") ?
+                  addressNode.closest("mail-newsgroup") :
+                  addressNode.closest("mail-emailaddress");
   let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"]
                     .getService(Ci.nsIClipboardHelper);
   let address = addressNode.getAttribute(aIncludeName ? "fullAddress"
@@ -1664,19 +1565,26 @@ function CopyEmailNewsAddress(addressNode, aIncludeName = false)
  * Causes the filter dialog to pop up, prefilled for the specified e-mail
  * address or header value.
  *
- * @param aHeaderNode  A node which has an "emailAddress" attribute
- *                     or a "headerName" attribute.
+ * @param aHeaderNode  Node for which to create the filter. This can be a node
+ *                     in an mail-emailaddress element, or a node with just
+ *                     textual data, like Subject or Date.
  * @param aMessage     Optional nsIMsgHdr of the message from which the values
  *                     are taken. Will be used to preselect its folder in the
  *                     filter list.
  */
-function CreateFilter(aHeaderNode, aMessage)
-{
-  let nodeIsAddress = aHeaderNode.hasAttribute("emailAddress");
-  let nodeValue = nodeIsAddress ? aHeaderNode.getAttribute("emailAddress") :
-                                  document.getAnonymousNodes(aHeaderNode)[0].textContent;
+function CreateFilter(aHeaderNode, aMessage) {
+  let addressNode = aHeaderNode.closest("mail-emailaddress");
+  let value;
+  let name;
+  if (addressNode) {
+    name = addressNode.getAttribute("headerName");
+    value = addressNode.getAttribute("emailAddress");
+  } else {
+    name = aHeaderNode.getAttribute("headerName");
+    value = aHeaderNode.textContent;
+  }
   let folder = aMessage ? aMessage.folder : null;
-  top.MsgFilters(nodeValue, folder, aHeaderNode.getAttribute("headerName"));
+  top.MsgFilters(value, folder, name);
 }
 
 /**
@@ -1684,8 +1592,7 @@ function CreateFilter(aHeaderNode, aMessage)
  *
  * @return nsISubscribableServer for the newsgroup, or null
  */
-function GetNewsgroupServer()
-{
+function GetNewsgroupServer() {
   if (gFolderDisplay.selectedMessageIsNews) {
     let server = gFolderDisplay.selectedMessage.folder.server;
     if (server)
@@ -1699,8 +1606,7 @@ function GetNewsgroupServer()
  *
  * @param newsgroupNode  a node which has a "newsgroup" attribute
  */
-function setupNewsgroupPopup(newsgroupNode)
-{
+function setupNewsgroupPopup(newsgroupNode) {
   let newsgroupPlaceHolder = document.getElementById("newsgroupPlaceHolder");
   let newsgroup = newsgroupNode.getAttribute("newsgroup");
   newsgroupNode.setAttribute("selected", "true");
@@ -1730,8 +1636,7 @@ function setupNewsgroupPopup(newsgroupNode)
  *
  * @param newsgroupNode  a node which has a "newsgroup" attribute
  */
-function SubscribeToNewsgroup(newsgroupNode)
-{
+function SubscribeToNewsgroup(newsgroupNode) {
   let server = GetNewsgroupServer();
   if (server) {
     let newsgroup = newsgroupNode.getAttribute("newsgroup");
@@ -1746,8 +1651,7 @@ function SubscribeToNewsgroup(newsgroupNode)
  *
  * @param newsgroupNode  a node which has a "newsgroup" attribute
  */
-function CopyNewsgroupName(newsgroupNode)
-{
+function CopyNewsgroupName(newsgroupNode) {
   let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"]
                     .getService(Ci.nsIClipboardHelper);
   clipboard.copyString(newsgroupNode.getAttribute("newsgroup"));
@@ -1759,8 +1663,7 @@ function CopyNewsgroupName(newsgroupNode)
  *
  * @param newsgroupNode  a node which has a "newsgroup" attribute
  */
-function CopyNewsgroupURL(newsgroupNode)
-{
+function CopyNewsgroupURL(newsgroupNode) {
   let server = GetNewsgroupServer();
   if (!server)
     return;
@@ -1785,8 +1688,8 @@ function CopyNewsgroupURL(newsgroupNode)
     let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"]
                       .getService(Ci.nsIClipboardHelper);
     clipboard.copyString(decodeURI(uri.spec));
-  } catch(e) {
-     Cu.reportError("Invalid URL: "+ url);
+  } catch (e) {
+     Cu.reportError("Invalid URL: " + url);
   }
 }
 
@@ -1794,60 +1697,62 @@ function CopyNewsgroupURL(newsgroupNode)
  * Create a new attachment object which goes into the data attachment array.
  * This method checks whether the passed attachment is empty or not.
  *
- * @param contentType  The attachment's mimetype
- * @param url  The URL for the attachment
- * @param name  The name to be displayed for this attachment (usually the
- *              filename)
- * @param uri  The URI for the message containing the attachment
- * @param isExternalAttachment  True if the attachment has been detached
- * @param size  The size in bytes of the attachment
+ * @param {String} contentType - The attachment's mimetype.
+ * @param {String} url         - The URL for the attachment.
+ * @param {String} name        - The name to be displayed for this attachment
+ *                               (usually the filename).
+ * @param {String} uri         - The URI for the message containing the attachment.
+ * @param {Boolean} isExternalAttachment - True if the attachment has been
+ *                                         detached to file or is a link
+ *                                         attachment.
  */
-function AttachmentInfo(contentType, url, name, uri,
-                        isExternalAttachment, size)
-{
+function AttachmentInfo(contentType, url, name, uri, isExternalAttachment) {
+  this.message = gFolderDisplay.selectedMessage;
   this.contentType = contentType;
   this.name = name;
+  this.url = url;
   this.uri = uri;
   this.isExternalAttachment = isExternalAttachment;
-  this.size = size;
-  let match;
+  // A |size| value of -1 means we don't have a valid size. Check again if
+  // |sizeResolved| is false or ALWAYSFETCHSIZE is true. For internal attachments
+  // and link attachments with a reported size, libmime streams values to
+  // addAttachmentField() which updates this object. For external file
+  // attachments and unresolved -1 size internal attachments, |size| is updated
+  // in the isEmpty() function when the list is built. Deleted attachments
+  // are resolved to -1.
+  this.size = -1;
+  this.sizeResolved = this.isDeleted;
+  // Fetch the size for internal attachments even though libmime gave a size.
+  this.ALWAYSFETCHSIZE = false;
 
   // Remove [?&]part= from remote urls, after getting the partID.
   // Remote urls, unlike non external mail part urls, may also contain query
   // strings starting with ?; PART_RE does not handle this.
-  if (url.startsWith("http") || url.startsWith("file")) {
-    match = url.match(/[?&]part=[^&]+$/);
+  if (this.isLinkAttachment || this.isFileAttachment) {
+    let match = url.match(/[?&]part=[^&]+$/);
     match = match && match[0];
     this.partID = match && match.split("part=")[1];
-    url = url.replace(match, "");
-  }
-  else {
-    match = GlodaUtils.PART_RE.exec(url);
+    this.url = url.replace(match, "");
+  } else {
+    let match = GlodaUtils.PART_RE.exec(url);
     this.partID = match && match[1];
   }
-
-  // Make sure to communicate it if it's an external http attachment and not a
-  // local attachment. For feeds attachments (enclosures) are always remote,
-  // so there is nothing to communicate.
-  if (isExternalAttachment && url.startsWith("http") &&
-      !gFolderDisplay.selectedMessageIsFeed) {
-    if (this.name) {
-      this.name = url + " - " + this.name;
-    }
-    else {
-      this.name = url;
-    }
-  }
-
-  this.url = url;
 }
 
 AttachmentInfo.prototype = {
   /**
    * Save this attachment to a file.
    */
-  save: function AttachmentInfo_save()
-  {
+  async save() {
+    if (!this.hasFile || this.message != gFolderDisplay.selectedMessage) {
+      return;
+    }
+
+    let empty = await this.isEmpty();
+    if (empty) {
+      return;
+    }
+
     messenger.saveAttachment(this.contentType, this.url,
                              encodeURIComponent(this.name),
                              this.uri, this.isExternalAttachment);
@@ -1856,14 +1761,17 @@ AttachmentInfo.prototype = {
   /**
    * Open this attachment.
    */
-  open: function AttachmentInfo_open()
-  {
-    if (!this.hasFile)
+  async open() {
+    if (!this.hasFile || this.message != gFolderDisplay.selectedMessage) {
       return;
+    }
 
-    if (this.isEmpty) {
-      var prompt = document.getElementById("bundle_messenger")
-                           .getString("emptyAttachment");
+    let empty = await this.isEmpty();
+    if (empty) {
+      let bundleMessenger = document.getElementById("bundle_messenger");
+      let prompt = bundleMessenger.getString(this.isExternalAttachment ?
+                                             "externalAttachmentNotFound" :
+                                             "emptyAttachment");
       msgWindow.promptDialog.alert(null, prompt);
     } else {
       messenger.openAttachment(this.contentType, this.url,
@@ -1875,11 +1783,10 @@ AttachmentInfo.prototype = {
   /**
    * Detach this attachment from the message.
    *
-   * @param aSaveFirst  true if the attachment should be saved before detaching,
-   *                    false otherwise
+   * @param {Boolean} aSaveFirst - true if the attachment should be saved
+   *                               before detaching, false otherwise.
    */
-  detach: function AttachmentInfo_detach(aSaveFirst)
-  {
+  detach(aSaveFirst) {
     messenger.detachAttachment(this.contentType, this.url,
                                encodeURIComponent(this.name),
                                this.uri, aSaveFirst);
@@ -1888,11 +1795,28 @@ AttachmentInfo.prototype = {
   /**
    * This method checks whether the attachment has been deleted or not.
    *
-   * @return true if the attachment has been deleted, false otherwise
+   * @returns true if the attachment has been deleted, false otherwise.
    */
-  get isDeleted()
-  {
+  get isDeleted() {
     return this.contentType == "text/x-moz-deleted";
+  },
+
+  /**
+   * This method checks whether the attachment is a detached file.
+   *
+   * @returns true if the attachment is a detached file, false otherwise.
+   */
+  get isFileAttachment() {
+    return this.isExternalAttachment && this.url.startsWith("file:");
+  },
+
+  /**
+   * This method checks whether the attachment is an http link.
+   *
+   * @returns true if the attachment is an http link, false otherwise.
+   */
+  get isLinkAttachment() {
+    return this.isExternalAttachment && /^https?:/.test(this.url);
   },
 
   /**
@@ -1900,67 +1824,144 @@ AttachmentInfo.prototype = {
    * Deleted attachments or detached attachments with missing external files
    * do *not* have a file.
    *
-   * @return true if the attachment has an associated file, false otherwise
+   * @returns true if the attachment has an associated file, false otherwise.
    */
-  get hasFile()
-  {
-    if (this.isDeleted)
+  get hasFile() {
+    if (this.sizeResolved && this.size == -1) {
       return false;
-    if (this.isExternalAttachment && this.url.startsWith("file:") &&
-        this.size === null)
-      return false;
+    }
 
     return true;
   },
 
   /**
-   * This method checks whether the attachment is empty or not.
+   * Return display url, decoded and converted to utf8 from IDN punycode ascii,
+   * if the attachment is external (http or file schemes).
    *
-   * @return  true if the attachment is empty, false otherwise
+   * @returns {String} url.
    */
-  get isEmpty()
-  {
-    // Create an input stream on the attachment url.
-    let url = Services.io.newURI(this.url);
-    let channel = Services.io.newChannelFromURI2(url,
-                                                 null,
-                                                 Services.scriptSecurityManager.getSystemPrincipal(),
-                                                 null,
-                                                 Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                                 Ci.nsIContentPolicy.TYPE_OTHER);
-    let stream = channel.open();
-
-    let inputStream = Cc["@mozilla.org/binaryinputstream;1"]
-                        .createInstance(Ci.nsIBinaryInputStream);
-    inputStream.setInputStream(stream);
-
-    let bytesAvailable = 0;
-
-    if (inputStream.isNonBlocking()) {
-      // If the stream does not block, test on two conditions:
-      //   - attachment is empty     -> 0 bytes will be returned on readBytes()
-      //   - attachment is not empty -> NS_BASE_STREAM_WOULD_BLOCK exception is
-      //                                thrown
-      let chunk = null;
-
-      try {
-        chunk = inputStream.readBytes(1);
-      } catch (ex) {
-        if (ex.result == Cr.NS_BASE_STREAM_WOULD_BLOCK) {
-          bytesAvailable = 1;
-        } else {
-          throw ex;
-        }
-      }
-      if (chunk)
-        bytesAvailable = chunk.length;
-    } else {
-      // If the stream blocks, we can rely on available() to return the correct
-      // number.
-      bytesAvailable = inputStream.available();
+  get displayUrl() {
+    if (this.isExternalAttachment) {
+      // For status bar url display purposes, we want the displaySpec.
+      // The ?part= has already been removed.
+      return decodeURI(makeURI(this.url).displaySpec);
     }
 
-    return (bytesAvailable == 0);
+    return this.url;
+  },
+
+  /**
+   * This method checks whether the attachment url location exists and
+   * is accessible. For http and file urls, fetch() will have the size
+   * in the content-length header.
+   *
+   * @returns true if the attachment is empty or error, false otherwise.
+   */
+  async isEmpty() {
+    if (this.isDeleted)
+      return true;
+
+    // We have a resolved size.
+    if (this.sizeResolved && !this.ALWAYSFETCHSIZE) {
+      if (this.size > 0) {
+        return false;
+      }
+      return true;
+    }
+
+    let url = this.url;
+    let empty = true;
+    let size = 0;
+    let options = { method: "HEAD" };
+
+   // NOTE: For internal mailbox, imap, news urls the response body must get
+   // the content length with getReader().read() but we don't need to do this
+   // here as libmime streams it already in addAttachmentField(). For imap or
+   // news urls with credentials (username, userPass), we must remove them
+   // as Request fails such urls with a MSG_URL_HAS_CREDENTIALS error.
+    if (url.startsWith("imap://") || url.startsWith("news://")) {
+      let uri = makeURI(url);
+      if (uri.username)
+        url = url.replace(uri.username + "@", "");
+      if (uri.userPass)
+        url = url.replace(uri.userPass + "@", "");
+    }
+
+    let request = new Request(url, options);
+
+    if (this.isExternalAttachment || !this.sizeResolved || this.ALWAYSFETCHSIZE) {
+      updateAttachmentsDisplay(this, true);
+    }
+
+    await fetch(request)
+      .then((response) => {
+        if (!response.ok) {
+          console.warn("AttachmentInfo.isEmpty: fetch response error - " +
+                       response.statusText + ", response.url - " + response.url);
+          return null;
+        }
+
+        if (this.isLinkAttachment) {
+          if (response.status < 200 || response.status > 304) {
+            console.warn("AttachmentInfo.isEmpty: link fetch response status - " +
+                         response.status + ", response.url - " + response.url);
+            return null;
+          }
+        }
+
+        return response;
+      })
+      .then(async (response) => {
+        if (this.isExternalAttachment) {
+          size = response ? response.headers.get("content-length") : 0;
+        } else if (!this.sizeResolved || this.ALWAYSFETCHSIZE) {
+          // Check the attachment again if addAttachmentField() sets a
+          // libmime -1 return value for size in this object.
+          let data = await response.body.getReader().read();
+          size = data.value.length;
+        } else {
+          // Accept the libmime streamed size for internal attachments.
+          size = this.size;
+        }
+
+        if (size > 0)
+          empty = false;
+      })
+      .catch((error) => {
+        console.warn("AttachmentInfo.isEmpty: error - " + error.message);
+      });
+
+    if (this.isExternalAttachment || !this.sizeResolved || this.ALWAYSFETCHSIZE) {
+      // For link attachments, we may have had a published value or -1
+      // indicating unknown value. We now know the real size, so set it and
+      // update the ui. For detached file attachments, get the size here
+      // instead of the old xpcom way. Finally, also update libmime unknown
+      // internal attachment size.
+      this.size = empty ? -1 : size;
+      this.sizeResolved = true;
+      updateAttachmentsDisplay(this, false);
+    }
+
+    return empty;
+  },
+
+  /**
+   * Open a file attachment's containing folder.
+   */
+  openFolder() {
+    if (!this.isFileAttachment || !this.hasFile) {
+      return;
+    }
+
+    // The file url is stored in the attachment info part with unix path and
+    // needs to be converted to os path for nsIFile.
+    let fileHandler = Services.io.getProtocolHandler("file")
+                                 .QueryInterface(Ci.nsIFileProtocolHandler);
+    try {
+      fileHandler.getFileFromURLSpec(this.displayUrl).reveal();
+    } catch (ex) {
+      console.error("AttachmentInfo.openFolder: file - " + this.displayUrl + ", " + ex);
+    }
   },
 };
 
@@ -1968,28 +1969,26 @@ AttachmentInfo.prototype = {
  * Return true if possible attachments in the currently loaded message can be
  * deleted/detached.
  */
-function CanDetachAttachments()
-{
+function CanDetachAttachments() {
   var canDetach = !gFolderDisplay.selectedMessageIsNews &&
                   (!gFolderDisplay.selectedMessageIsImap ||
                    MailOfflineMgr.isOnline());
   if (canDetach && ("content-type" in currentHeaderData))
     canDetach = !ContentTypeIsSMIME(currentHeaderData["content-type"].headerValue);
+
   return canDetach;
 }
 
 /**
  * Return true if the content type is an S/MIME one.
  */
-function ContentTypeIsSMIME(contentType)
-{
+function ContentTypeIsSMIME(contentType) {
   // S/MIME is application/pkcs7-mime and application/pkcs7-signature
   // - also match application/x-pkcs7-mime and application/x-pkcs7-signature.
   return /application\/(x-)?pkcs7-(mime|signature)/.test(contentType);
 }
 
-function onShowAttachmentToolbarContextMenu()
-{
+function onShowAttachmentToolbarContextMenu() {
   let expandBar = document.getElementById("context-expandAttachmentBar");
   let expanded = Services.prefs.getBoolPref(
     "mailnews.attachments.display.start_expanded");
@@ -2000,8 +1999,7 @@ function onShowAttachmentToolbarContextMenu()
  * Set up the attachment item context menu, showing or hiding the appropriate
  * menu items.
  */
-function onShowAttachmentItemContextMenu()
-{
+function onShowAttachmentItemContextMenu() {
   let attachmentList = document.getElementById("attachmentList");
   let attachmentInfo = document.getElementById("attachmentInfo");
   let attachmentName = document.getElementById("attachmentName");
@@ -2012,6 +2010,7 @@ function onShowAttachmentItemContextMenu()
   let deleteMenu     = document.getElementById("context-deleteAttachment");
   let copyUrlMenuSep = document.getElementById("context-menu-copyurl-separator");
   let copyUrlMenu    = document.getElementById("context-copyAttachmentUrl");
+  let openFolderMenu = document.getElementById("context-openFolder");
 
   // If we opened the context menu from the attachment info area (the paperclip,
   // "1 attachment" label, filename, or file size, just grab the first (and
@@ -2022,8 +2021,7 @@ function onShowAttachmentItemContextMenu()
     selectedAttachments = [attachmentList.getItemAtIndex(0).attachment];
     if (contextMenu.triggerNode == attachmentName)
       attachmentName.setAttribute("selected", true);
-  }
-  else {
+  } else {
     selectedAttachments =
       [...attachmentList.selectedItems].map(item => item.attachment);
   }
@@ -2038,21 +2036,25 @@ function onShowAttachmentItemContextMenu()
   var canDetachSelected = CanDetachAttachments() && !allSelectedDetached &&
                           !allSelectedDeleted;
   let allSelectedHttp = selectedAttachments.every(function(attachment) {
-    return attachment.url.startsWith("http");
+    return attachment.isLinkAttachment;
+  });
+  let allSelectedFile = selectedAttachments.every(function(attachment) {
+    return attachment.isFileAttachment;
   });
 
   openMenu.disabled = allSelectedDeleted;
   saveMenu.disabled = allSelectedDeleted;
   detachMenu.disabled = !canDetachSelected;
   deleteMenu.disabled = !canDetachSelected;
-  copyUrlMenuSep.hidden = copyUrlMenu.hidden = !allSelectedHttp;
+  copyUrlMenuSep.hidden = copyUrlMenu.hidden = !(allSelectedHttp || allSelectedFile);
+  openFolderMenu.hidden = !allSelectedFile;
+  openFolderMenu.disabled = allSelectedDeleted;
 }
 
 /**
  * Close the attachment item context menu, performing any cleanup as necessary.
  */
-function onHideAttachmentItemContextMenu()
-{
+function onHideAttachmentItemContextMenu() {
   let attachmentName = document.getElementById("attachmentName");
   let contextMenu = document.getElementById("attachmentItemContext");
 
@@ -2066,12 +2068,11 @@ function onHideAttachmentItemContextMenu()
  * Enable/disable menu items as appropriate for the single-attachment save all
  * toolbar button.
  */
-function onShowSaveAttachmentMenuSingle()
-{
-  let openItem   = document.getElementById('button-openAttachment');
-  let saveItem   = document.getElementById('button-saveAttachment');
-  let detachItem = document.getElementById('button-detachAttachment');
-  let deleteItem = document.getElementById('button-deleteAttachment');
+function onShowSaveAttachmentMenuSingle() {
+  let openItem   = document.getElementById("button-openAttachment");
+  let saveItem   = document.getElementById("button-saveAttachment");
+  let detachItem = document.getElementById("button-detachAttachment");
+  let deleteItem = document.getElementById("button-deleteAttachment");
 
   let detached = currentAttachments[0].isExternalAttachment;
   let deleted  = !currentAttachments[0].hasFile;
@@ -2087,12 +2088,11 @@ function onShowSaveAttachmentMenuSingle()
  * Enable/disable menu items as appropriate for the multiple-attachment save all
  * toolbar button.
  */
-function onShowSaveAttachmentMenuMultiple()
-{
-  let openAllItem   = document.getElementById('button-openAllAttachments');
-  let saveAllItem   = document.getElementById('button-saveAllAttachments');
-  let detachAllItem = document.getElementById('button-detachAllAttachments');
-  let deleteAllItem = document.getElementById('button-deleteAllAttachments');
+function onShowSaveAttachmentMenuMultiple() {
+  let openAllItem   = document.getElementById("button-openAllAttachments");
+  let saveAllItem   = document.getElementById("button-saveAllAttachments");
+  let detachAllItem = document.getElementById("button-detachAllAttachments");
+  let deleteAllItem = document.getElementById("button-deleteAllAttachments");
 
   let allDetached = currentAttachments.every(function(attachment) {
     return attachment.isExternalAttachment;
@@ -2108,8 +2108,7 @@ function onShowSaveAttachmentMenuMultiple()
   deleteAllItem.disabled = !canDetach;
 }
 
-function MessageIdClick(node, event)
-{
+function MessageIdClick(node, event) {
   if (event.button == 0) {
     var messageId = GetMessageIdFromNode(node, true);
     OpenMessageForMessageId(messageId);
@@ -2122,15 +2121,12 @@ function MessageIdClick(node, event)
  *
  * @param event  the event object
  */
-function attachmentItemCommand(event)
-{
+function attachmentItemCommand(event) {
   HandleSelectedAttachments("open");
 }
 
-var AttachmentListController =
-{
-  supportsCommand: function(command)
-  {
+var AttachmentListController = {
+  supportsCommand(command) {
     switch (command) {
       case "cmd_selectAll":
       case "cmd_delete":
@@ -2142,8 +2138,7 @@ var AttachmentListController =
     }
   },
 
-  isCommandEnabled: function(command)
-  {
+  isCommandEnabled(command) {
     switch (command) {
       case "cmd_selectAll":
       case "cmd_delete":
@@ -2155,8 +2150,7 @@ var AttachmentListController =
     }
   },
 
-  doCommand: function(command)
-  {
+  doCommand(command) {
     // If the user invoked a key short cut then it is possible that we got here
     // for a command which is really disabled. kick out if the command should
     // be disabled.
@@ -2175,58 +2169,56 @@ var AttachmentListController =
         return;
       case "cmd_saveAsFile":
         HandleSelectedAttachments("saveAs");
-        return;
     }
   },
 
-  onEvent: function(event)
-  {}
+  onEvent(event) {},
 };
 
 var AttachmentMenuController = {
   commands: {
     cmd_openAllAttachments: {
-      isEnabled: function() {
+      isEnabled() {
         return AttachmentMenuController._someFilesAvailable();
       },
 
-      doCommand: function() {
+      doCommand() {
         HandleAllAttachments("open");
       },
     },
 
     cmd_saveAllAttachments: {
-      isEnabled: function() {
+      isEnabled() {
         return AttachmentMenuController._someFilesAvailable();
       },
 
-      doCommand: function() {
+      doCommand() {
         HandleAllAttachments("save");
       },
     },
 
     cmd_detachAllAttachments: {
-      isEnabled: function() {
+      isEnabled() {
         return AttachmentMenuController._canDetachFiles();
       },
 
-      doCommand: function() {
+      doCommand() {
         HandleAllAttachments("detach");
       },
     },
 
     cmd_deleteAllAttachments: {
-      isEnabled: function() {
+      isEnabled() {
         return AttachmentMenuController._canDetachFiles();
       },
 
-      doCommand: function() {
+      doCommand() {
         HandleAllAttachments("delete");
       },
     },
   },
 
-  _canDetachFiles: function() {
+  _canDetachFiles() {
     let someNotDetached = currentAttachments.some(function(aAttachment) {
       return !aAttachment.isExternalAttachment;
     });
@@ -2236,24 +2228,24 @@ var AttachmentMenuController = {
            this._someFilesAvailable();
   },
 
-  _someFilesAvailable: function() {
+  _someFilesAvailable() {
     return currentAttachments.some(function(aAttachment) {
       return aAttachment.hasFile;
     });
   },
 
-  supportsCommand: function(aCommand) {
+  supportsCommand(aCommand) {
     return (aCommand in this.commands);
   },
 
-  isCommandEnabled: function(aCommand) {
+  isCommandEnabled(aCommand) {
     if (!this.supportsCommand(aCommand))
       return false;
 
     return this.commands[aCommand].isEnabled();
   },
 
-  doCommand: function(aCommand) {
+  doCommand(aCommand) {
     if (!this.supportsCommand(aCommand))
       return;
     let cmd = this.commands[aCommand];
@@ -2262,29 +2254,27 @@ var AttachmentMenuController = {
     cmd.doCommand();
   },
 
-  onEvent: function(aEvent) {}
+  onEvent(aEvent) {},
 };
 
 function goUpdateAttachmentCommands() {
-  goUpdateCommand('cmd_openAllAttachments');
-  goUpdateCommand('cmd_saveAllAttachments');
-  goUpdateCommand('cmd_detachAllAttachments');
-  goUpdateCommand('cmd_deleteAllAttachments');
+  goUpdateCommand("cmd_openAllAttachments");
+  goUpdateCommand("cmd_saveAllAttachments");
+  goUpdateCommand("cmd_detachAllAttachments");
+  goUpdateCommand("cmd_deleteAllAttachments");
 }
 
-function displayAttachmentsForExpandedView()
-{
+async function displayAttachmentsForExpandedView() {
   var bundle = document.getElementById("bundle_messenger");
   var numAttachments = currentAttachments.length;
-  var totalSize = 0;
   var attachmentView = document.getElementById("attachmentView");
   var attachmentSplitter = document.getElementById("attachment-splitter");
+  document.getElementById("attachmentIcon").removeAttribute("src");
 
   if (numAttachments <= 0) {
     attachmentView.collapsed = true;
     attachmentSplitter.collapsed = true;
-  }
-  else if (!gBuildAttachmentsForCurrentMsg) {
+  } else if (!gBuildAttachmentsForCurrentMsg) {
     attachmentView.collapsed = false;
 
     var attachmentList = document.getElementById("attachmentList");
@@ -2296,8 +2286,6 @@ function displayAttachmentsForExpandedView()
 
     toggleAttachmentList(false);
 
-    var lastPartID;
-    var unknownSize = false;
     for (let attachment of currentAttachments) {
       // Create a new attachment widget
       var displayName = SanitizeAttachmentDisplayName(attachment);
@@ -2305,21 +2293,18 @@ function displayAttachmentsForExpandedView()
       item.setAttribute("tooltiptext", attachment.name);
       item.addEventListener("command", attachmentItemCommand);
 
-      // Check if this attachment's part ID is a child of the last attachment
-      // we counted. If so, skip it, since we already accounted for its size
-      // from its parent.
-      if (!lastPartID || attachment.partID.indexOf(lastPartID) != 0) {
-        lastPartID = attachment.partID;
-        if (attachment.size !== null)
-          totalSize += attachment.size;
-        else if (!attachment.isDeleted)
-          unknownSize = true;
+      // Get a detached file's size or an internal attachment size that is not
+      // yet resolved, or if |ALWAYSFETCHSIZE| is true. For link attachments,
+      // the user must always initiate the fetch for privacy reasons.
+      if (!attachment.isLinkAttachment &&
+          (!attachment.sizeResolved || attachment.ALWAYSFETCHSIZE)) {
+        await attachment.isEmpty();
       }
     }
 
-    // Show the appropriate toolbar button and label based on the number of
-    // attachments.
-    updateSaveAllAttachmentsButton();
+    if (Services.prefs.getBoolPref("mailnews.attachments.display.start_expanded")) {
+      toggleAttachmentList(true);
+    }
 
     let attachmentInfo = document.getElementById("attachmentInfo");
     let attachmentCount = document.getElementById("attachmentCount");
@@ -2344,16 +2329,97 @@ function displayAttachmentsForExpandedView()
       attachmentName.hidden = true;
     }
 
-    let sizeStr = messenger.formatFileSize(totalSize);
-    if (unknownSize) {
-      if (totalSize == 0)
-        sizeStr = bundle.getString("attachmentSizeUnknown");
-      else
-        sizeStr = bundle.getFormattedString("attachmentSizeAtLeast", [sizeStr]);
-    }
-    attachmentSize.setAttribute("value", sizeStr);
+    attachmentSize.value = getAttachmentsTotalSizeStr();
+
+    // Extra candy for external attachments.
+    displayAttachmentsForExpandedViewExternal();
+
+    // Show the appropriate toolbar button and label based on the number of
+    // attachments.
+    updateSaveAllAttachmentsButton();
 
     gBuildAttachmentsForCurrentMsg = true;
+  }
+}
+
+function displayAttachmentsForExpandedViewExternal() {
+  let bundleMessenger = document.getElementById("bundle_messenger");
+  let attachmentName = document.getElementById("attachmentName");
+  let attachmentList = document.getElementById("attachmentList");
+
+  // Attachment bar single.
+  let firstAttachment = attachmentList.firstElementChild.attachment;
+  let isExternalAttachment = firstAttachment.isExternalAttachment;
+  let displayUrl = isExternalAttachment ? firstAttachment.displayUrl : "";
+  let tooltiptext = isExternalAttachment || firstAttachment.isDeleted ?
+    "" : attachmentName.getAttribute("tooltiptextopen");
+  let externalAttachmentNotFound = bundleMessenger.getString("externalAttachmentNotFound");
+
+  attachmentName.textContent = displayUrl;
+  attachmentName.tooltipText = tooltiptext;
+  attachmentName.setAttribute("tooltiptextexternalnotfound", externalAttachmentNotFound);
+  attachmentName.setAttribute("onmouseover",
+                              `MsgStatusFeedback.setOverLink("${displayUrl}")`);
+  attachmentName.setAttribute("onmouseout",
+                              "MsgStatusFeedback.setOverLink('')");
+  attachmentName.setAttribute("onfocus",
+                              `MsgStatusFeedback.setOverLink("${displayUrl}")`);
+  attachmentName.setAttribute("onblur",
+                              "MsgStatusFeedback.setOverLink('')");
+  attachmentName.classList.remove("text-link");
+  attachmentName.classList.remove("notfound");
+
+  if (firstAttachment.isDeleted) {
+    attachmentName.classList.add("notfound");
+  }
+
+  if (isExternalAttachment) {
+    attachmentName.classList.add("text-link");
+
+    if (!firstAttachment.hasFile) {
+      attachmentName.setAttribute("tooltiptext", externalAttachmentNotFound);
+      attachmentName.classList.add("notfound");
+    }
+  }
+
+  // Expanded attachment list.
+  let index = 0;
+  for (let attachmentitem of attachmentList.children) {
+    let attachment = attachmentitem.attachment;
+    if (attachment.isDeleted) {
+      attachmentitem.classList.add("notfound");
+    }
+
+    if (attachment.isExternalAttachment) {
+      displayUrl = attachment.displayUrl;
+      attachmentitem.textContent = displayUrl;
+      attachmentitem.setAttribute("tooltiptext", "");
+      attachmentitem.setAttribute("onmouseover",
+                                  `MsgStatusFeedback.setOverLink("${displayUrl}")`);
+      attachmentitem.setAttribute("onmouseout",
+                                  "MsgStatusFeedback.setOverLink('')");
+      attachmentitem.setAttribute("onfocus",
+                                  `MsgStatusFeedback.setOverLink("${displayUrl}")`);
+      attachmentitem.setAttribute("onblur",
+                                  "MsgStatusFeedback.setOverLink('')");
+
+      let name = attachmentitem.boxObject.firstChild
+                               .getElementsByClassName("attachmentcell-name");
+      name[0].classList.add("text-link");
+
+      if (attachment.isLinkAttachment) {
+        if (index == 0) {
+          attachment.size = currentAttachments[index].size;
+        }
+      }
+
+      if (!attachment.hasFile) {
+        attachmentitem.setAttribute("tooltiptext", externalAttachmentNotFound);
+        attachmentitem.classList.add("notfound");
+      }
+    }
+
+    index++;
   }
 }
 
@@ -2361,8 +2427,7 @@ function displayAttachmentsForExpandedView()
  * Update the "save all attachments" button in the attachment pane, showing
  * the proper button and enabling/disabling it as appropriate.
  */
-function updateSaveAllAttachmentsButton()
-{
+function updateSaveAllAttachmentsButton() {
   let saveAllSingle   = document.getElementById("attachmentSaveAllSingle");
   let saveAllMultiple = document.getElementById("attachmentSaveAllMultiple");
 
@@ -2381,6 +2446,129 @@ function updateSaveAllAttachmentsButton()
 }
 
 /**
+ * Update the attachments display info after a particular attachment's
+ * existence has been verified.
+ *
+ * @param {AttachmentInfo} attachmentInfo
+ * @param {Boolean} isFetching
+ */
+function updateAttachmentsDisplay(attachmentInfo, isFetching) {
+  if (attachmentInfo.isExternalAttachment || attachmentInfo.ALWAYSFETCHSIZE) {
+    let attachmentList = document.getElementById("attachmentList");
+    let attachmentIcon = document.getElementById("attachmentIcon");
+    let attachmentName = document.getElementById("attachmentName");
+    let attachmentSize = document.getElementById("attachmentSize");
+    let attachmentItem = attachmentList.findItemForAttachment(attachmentInfo);
+    let index = attachmentList.getIndexOfItem(attachmentItem);
+
+    if (isFetching) {
+      // Set elements busy to show the user this is potentially a long network
+      // fetch for the link attachment.
+      attachmentIcon.setAttribute("src", "chrome://global/skin/icons/loading.png");
+      attachmentItem.classList.add("busy");
+      attachmentItem.setAttribute("image", "chrome://global/skin/icons/loading.png");
+      return;
+    }
+
+    if (attachmentInfo.message != gFolderDisplay.selectedMessage) {
+      // The user changed messages while fetching, reset the bar and exit;
+      // the listitems are torn down/rebuilt on each message load.
+      attachmentIcon.removeAttribute("src");
+      return;
+    }
+
+    if (index == -1) {
+      // The user changed messages while fetching, then came back to the same
+      // message. The reset of busy state has already happened and anyway the
+      // item has already been torn down so the index will be invalid; exit.
+      return;
+    }
+
+    currentAttachments[index].size = attachmentInfo.size;
+    let tooltiptextExternalNotFound = attachmentName.getAttribute("tooltiptextexternalnotfound");
+
+    let sizeStr;
+    let bundle = document.getElementById("bundle_messenger");
+    if (attachmentInfo.size < 1) {
+      sizeStr = bundle.getString("attachmentSizeUnknown");
+    } else {
+      sizeStr = messenger.formatFileSize(attachmentInfo.size);
+    }
+
+    // The attachment listitem.
+    attachmentItem.classList.remove("busy");
+    attachmentItem.removeAttribute("image");
+    attachmentItem._updateImage();
+    if (attachmentInfo.hasFile) {
+      attachmentItem.setAttribute("size", sizeStr);
+      attachmentItem.removeAttribute("tooltiptext");
+      attachmentItem.classList.remove("notfound");
+    } else {
+      attachmentItem.removeAttribute("size");
+      attachmentItem.setAttribute("tooltiptext", tooltiptextExternalNotFound);
+      attachmentItem.classList.add("notfound");
+    }
+
+    // The attachmentbar.
+    updateSaveAllAttachmentsButton();
+    attachmentSize.value = getAttachmentsTotalSizeStr();
+    let attachemtsBusy = attachmentList.querySelectorAll(".attachmentItem.busy");
+    if (attachemtsBusy.length == 0)
+      attachmentIcon.removeAttribute("src");
+
+    // If it's the first one (and there's only one).
+    if (index == 0) {
+      if (attachmentInfo.hasFile) {
+        attachmentName.removeAttribute("tooltiptext");
+        attachmentName.classList.remove("notfound");
+      } else {
+        attachmentName.setAttribute("tooltiptext", tooltiptextExternalNotFound);
+        attachmentName.classList.add("notfound");
+      }
+    }
+
+    // Reset widths since size may have changed; ensure no false cropping of
+    // the attachment item name.
+    attachmentList.setOptimumWidth();
+  }
+}
+
+/**
+ * Calculate the total size of all attachments in the message as emitted to
+ * |currentAttachments| and return a pretty string.
+ *
+ * @returns {String} - Description of the attachment size (e.g. 123 KB or 3.1MB)
+ */
+function getAttachmentsTotalSizeStr() {
+  let bundle = document.getElementById("bundle_messenger");
+  let totalSize = 0;
+  let lastPartID;
+  let unknownSize = false;
+  for (let attachment of currentAttachments) {
+    // Check if this attachment's part ID is a child of the last attachment
+    // we counted. If so, skip it, since we already accounted for its size
+    // from its parent.
+    if (!lastPartID || attachment.partID.indexOf(lastPartID) != 0) {
+      lastPartID = attachment.partID;
+      if (attachment.size != -1)
+        totalSize += Number(attachment.size);
+      else if (!attachment.isDeleted)
+        unknownSize = true;
+    }
+  }
+
+  let sizeStr = messenger.formatFileSize(totalSize);
+  if (unknownSize) {
+    if (totalSize == 0)
+      sizeStr = bundle.getString("attachmentSizeUnknown");
+    else
+      sizeStr = bundle.getFormattedString("attachmentSizeAtLeast", [sizeStr]);
+  }
+
+  return sizeStr;
+}
+
+/**
  * Expand/collapse the attachment list. When expanding it, automatically resize
  * it to an appropriate height (1/4 the message pane or smaller).
  *
@@ -2391,8 +2579,7 @@ function updateSaveAllAttachmentsButton()
  *                     when collapsing (but only when the attachmentList was
  *                     originally focused).
  */
-function toggleAttachmentList(expanded, updateFocus)
-{
+function toggleAttachmentList(expanded, updateFocus) {
   var attachmentView = document.getElementById("attachmentView");
   var attachmentBar = document.getElementById("attachmentBar");
   var attachmentToggle = document.getElementById("attachmentToggle");
@@ -2444,21 +2631,17 @@ function toggleAttachmentList(expanded, updateFocus)
  * Pick out a nice icon for the attachment.
  * @param attachment  the nsIMsgAttachment object to show icon for
  */
-function getIconForAttachment(attachment)
-{
+function getIconForAttachment(attachment) {
   if (attachment.isDeleted) {
-    return "chrome://messenger/skin/icon/attachment-deleted.png";
-  } else {
-    return "moz-icon://" + attachment.name + "?size=16&amp;contentType=" +
-           attachment.contentType;
+    return "chrome://messenger/skin/icons/attachment-deleted.png";
   }
+  return `moz-icon://${attachment.name}?size=16&amp;contentType=${attachment.contentType}`;
 }
 
 /**
  * Public method called when we create the attachments file menu
  */
-function FillAttachmentListPopup(aEvent, aPopup)
-{
+function FillAttachmentListPopup(aEvent, aPopup) {
   // First clear out the old view...
   ClearAttachmentMenu(aPopup);
 
@@ -2469,8 +2652,7 @@ function FillAttachmentListPopup(aEvent, aPopup)
 }
 
 // Public method used to clear the file attachment menu
-function ClearAttachmentMenu(popup)
-{
+function ClearAttachmentMenu(popup) {
   if (popup) {
     while (popup.firstChild.localName == "menu")
       popup.firstChild.remove();
@@ -2484,8 +2666,7 @@ function ClearAttachmentMenu(popup)
  * @param attachment  the AttachmentInfo object to add
  * @param attachmentIndex  the index (starting at 0) of this attachment
  */
-function addAttachmentToPopup(popup, attachment, attachmentIndex)
-{
+function addAttachmentToPopup(popup, attachment, attachmentIndex) {
   if (!popup)
     return;
 
@@ -2502,7 +2683,6 @@ function addAttachmentToPopup(popup, attachment, attachmentIndex)
   item.setAttribute("class", "menu-iconic");
   item.setAttribute("image", getIconForAttachment(attachment));
 
-  var numItemsInPopup = popup.childNodes.length;
   // find the separator
   var indexOfSeparator = 0;
   while (popup.childNodes[indexOfSeparator].localName != "menuseparator")
@@ -2531,6 +2711,22 @@ function addAttachmentToPopup(popup, attachment, attachmentIndex)
   // menu item before we inserting the attachment menu into the popup. If we
   // don't, our attachment menu items will not show up.
   item = popup.insertBefore(item, popup.childNodes[indexOfSeparator]);
+
+  if (attachment.isExternalAttachment) {
+    if (!attachment.hasFile) {
+      item.classList.add("notfound");
+    } else {
+      // The text-link class must be added to the <label> and have a <menu>
+      // hover rule. Adding to <menu> makes hover overflow the underline to
+      // the popup items.
+      let label = item.boxObject.firstChild.nextSibling;
+      label.classList.add("text-link");
+    }
+  }
+
+  if (attachment.isDeleted) {
+    item.classList.add("notfound");
+  }
 
   var detached = attachment.isExternalAttachment;
   var deleted  = !attachment.hasFile;
@@ -2581,6 +2777,19 @@ function addAttachmentToPopup(popup, attachment, attachmentIndex)
   menuitementry.setAttribute("accesskey", getString("deleteLabelAccesskey"));
   menuitementry.setAttribute("disabled", !canDetach);
   menuitementry = openpopup.appendChild(menuitementry);
+
+  // Create the "open containing folder" menu item, for existing detached only.
+  if (attachment.isFileAttachment) {
+    let menuseparator = document.createElement("menuseparator");
+    openpopup.appendChild(menuseparator);
+    menuitementry = document.createElement("menuitem");
+    menuitementry.attachment = attachment;
+    menuitementry.setAttribute("oncommand", "this.attachment.openFolder();");
+    menuitementry.setAttribute("label", getString("openFolderLabel"));
+    menuitementry.setAttribute("accesskey", getString("openFolderLabelAccesskey"));
+    menuitementry.setAttribute("disabled", !attachment.hasFile);
+    menuitementry = openpopup.appendChild(menuitementry);
+  }
 }
 
 /**
@@ -2588,13 +2797,12 @@ function addAttachmentToPopup(popup, attachment, attachmentIndex)
  *
  * @param event the event that triggered this action
  */
-function OpenAttachmentFromBar(event)
-{
+function OpenAttachmentFromBar(event) {
   if (event.button == 0) {
     // Only open on the first click; ignore double-clicks so that the user
     // doesn't end up with the attachment opened multiple times.
     if (event.detail == 1)
-      TryHandleAllAttachments('open');
+      TryHandleAllAttachments("open");
     RestoreFocusAfterHdrButton();
     event.stopPropagation();
   }
@@ -2605,8 +2813,7 @@ function OpenAttachmentFromBar(event)
  *
  * @param action one of "open", "save", "saveAs", "detach", or "delete"
  */
-function HandleAllAttachments(action)
-{
+function HandleAllAttachments(action) {
   HandleMultipleAttachments(currentAttachments, action);
 }
 
@@ -2616,12 +2823,10 @@ function HandleAllAttachments(action)
  *
  * @param action  one of "open", "save", "saveAs", "detach", or "delete"
  */
-function TryHandleAllAttachments(action)
-{
+function TryHandleAllAttachments(action) {
   try {
-    HandleAllAttachments(action)
-  }
-  catch (e) {
+    HandleAllAttachments(action);
+  } catch (e) {
     Cu.reportError(e);
   }
 }
@@ -2632,8 +2837,7 @@ function TryHandleAllAttachments(action)
  *
  * @param action  one of "open", "save", "saveAs", "detach", or "delete"
  */
-function HandleSelectedAttachments(action)
-{
+function HandleSelectedAttachments(action) {
   let attachmentList = document.getElementById("attachmentList");
   let selectedAttachments = [];
   for (let item of attachmentList.selectedItems) {
@@ -2649,11 +2853,18 @@ function HandleSelectedAttachments(action)
  * @param attachments  an array of AttachmentInfo objects to work with
  * @param action  one of "open", "save", "saveAs", "detach", or "delete"
  */
-function HandleMultipleAttachments(attachments, action)
-{
+function HandleMultipleAttachments(attachments, action) {
+  // Feed message link attachments save handling.
+  if (gFolderDisplay.selectedMessageIsFeed &&
+      (action == "save" || action == "saveAs")) {
+    saveLinkAttachmentsToFile(attachments);
+    return;
+  }
+
   // convert our attachment data into some c++ friendly structs
   var attachmentContentTypeArray = [];
   var attachmentUrlArray = [];
+  var attachmentDisplayUrlArray = [];
   var attachmentDisplayNameArray = [];
   var attachmentMessageUriArray = [];
 
@@ -2661,12 +2872,14 @@ function HandleMultipleAttachments(attachments, action)
   var actionIndex = 0;
   for (let attachment of attachments) {
     // Exclude attachment which are 1) deleted, or 2) detached with missing
-    // external files.
-    if (!attachment.hasFile)
+    // external files, unless copying urls.
+    if (!attachment.hasFile && action != "copyUrl") {
       continue;
+    }
 
     attachmentContentTypeArray[actionIndex] = attachment.contentType;
     attachmentUrlArray[actionIndex] = attachment.url;
+    attachmentDisplayUrlArray[actionIndex] = attachment.displayUrl;
     attachmentDisplayNameArray[actionIndex] = encodeURI(attachment.name);
     attachmentMessageUriArray[actionIndex] = attachment.uri;
     ++actionIndex;
@@ -2732,15 +2945,51 @@ function HandleMultipleAttachments(attachments, action)
       // all selected attachment urls are http.
       let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"]
                         .getService(Ci.nsIClipboardHelper);
-      clipboard.copyString(attachmentUrlArray.join("\n"));
+      clipboard.copyString(attachmentDisplayUrlArray.join("\n"));
+      return;
+    case "openFolder":
+      for (let attachment of attachments) {
+        setTimeout(() => attachment.openFolder());
+      }
       return;
     default:
       throw new Error("unknown HandleMultipleAttachments action: " + action);
   }
 }
 
-function ClearAttachmentList()
-{
+/**
+ * Link attachments are passed as an array of AttachmentInfo objects. This
+ * is meant to download http link content using the browser method.
+ *
+ * @param {AttachmentInfo[]} aAttachmentInfoArray - Array of attachmentInfo.
+ */
+async function saveLinkAttachmentsToFile(aAttachmentInfoArray) {
+  let aURL, aDocument, aDefaultFileName, aContentDisposition,
+      aContentType, aShouldBypassCache, aFilePickerTitleKey,
+      aChosenData, aReferrer, aInitiatingDocument, aSkipPrompt,
+      aCacheKey, aIsContentWindowPrivate;
+  // Required for privacy context.
+  aInitiatingDocument = document;
+  for (let attachment of aAttachmentInfoArray) {
+    if (!attachment.hasFile || attachment.message != gFolderDisplay.selectedMessage) {
+      continue;
+    }
+
+    let empty = await attachment.isEmpty();
+    if (empty) {
+      continue;
+    }
+
+    aURL = attachment.url;
+    aDefaultFileName = attachment.name;
+    internalSave(aURL, aDocument, aDefaultFileName, aContentDisposition,
+                 aContentType, aShouldBypassCache, aFilePickerTitleKey,
+                 aChosenData, aReferrer, aInitiatingDocument, aSkipPrompt,
+                 aCacheKey, aIsContentWindowPrivate);
+  }
+}
+
+function ClearAttachmentList() {
   // We also have to disable the Message/Attachments menuitem.
   var node = document.getElementById("msgAttachmentMenu");
   if (node)
@@ -2759,11 +3008,10 @@ function ClearAttachmentList()
 }
 
 var attachmentListDNDObserver = {
-  onDragStart: function (aEvent, aAttachmentData, aDragAction)
-  {
+  onDragStart(aEvent, aAttachmentData, aDragAction) {
     let target = aEvent.target;
 
-    if (target.localName == "attachmentitem") {
+    if (target.localName == "richlistitem") {
       let selection = target.parentNode.selectedItems;
       aAttachmentData.data = new TransferDataSet();
       for (let item of selection) {
@@ -2772,24 +3020,22 @@ var attachmentListDNDObserver = {
           aAttachmentData.data.push(transferData);
       }
     }
-  }
+  },
 };
 
 var attachmentNameDNDObserver = {
-  onDragStart: function (aEvent, aAttachmentData, aDragAction)
-  {
+  onDragStart(aEvent, aAttachmentData, aDragAction) {
     var attachmentList = document.getElementById("attachmentList");
     aAttachmentData.data = CreateAttachmentTransferData(
       attachmentList.getItemAtIndex(0).attachment);
-  }
+  },
 };
 
 /**
  * CopyWebsiteAddress takes the website address title button, extracts
  * the website address we stored in there and copies it to the clipboard
  */
-function CopyWebsiteAddress(websiteAddressNode)
-{
+function CopyWebsiteAddress(websiteAddressNode) {
   if (websiteAddressNode) {
     var websiteAddress = websiteAddressNode.textContent;
 
@@ -2800,48 +3046,45 @@ function CopyWebsiteAddress(websiteAddressNode)
   }
 }
 
-function nsDummyMsgHeader()
-{
+function nsDummyMsgHeader() {
 }
 
-nsDummyMsgHeader.prototype =
-{
-  mProperties : new Array,
-  getStringProperty : function(aProperty) {
+nsDummyMsgHeader.prototype = {
+  mProperties: [],
+  getStringProperty(aProperty) {
     if (aProperty in this.mProperties)
       return this.mProperties[aProperty];
     return "";
   },
-  setStringProperty : function(aProperty, aVal) {
+  setStringProperty(aProperty, aVal) {
     this.mProperties[aProperty] = aVal;
   },
-  getUint32Property : function(aProperty) {
+  getUint32Property(aProperty) {
     if (aProperty in this.mProperties)
       return parseInt(this.mProperties[aProperty]);
     return 0;
   },
-  setUint32Property: function(aProperty, aVal) {
+  setUint32Property(aProperty, aVal) {
     this.mProperties[aProperty] = aVal.toString();
   },
-  markHasAttachments : function(hasAttachments) {},
-  messageSize : 0,
-  recipients : null,
+  markHasAttachments(hasAttachments) {},
+  messageSize: 0,
+  recipients: null,
   author: null,
-  subject : "",
+  subject: "",
   get mime2DecodedSubject() { return this.subject; },
-  ccList : null,
-  listPost : null,
-  messageId : null,
-  date : 0,
-  accountKey : "",
-  flags : 0,
+  ccList: null,
+  listPost: null,
+  messageId: null,
+  date: 0,
+  accountKey: "",
+  flags: 0,
   // If you change us to return a fake folder, please update
   // folderDisplay.js's FolderDisplayWidget's selectedMessageIsExternal getter.
-  folder : null
+  folder: null,
 };
 
-function onShowOtherActionsPopup()
-{
+function onShowOtherActionsPopup() {
   // Enable/disable the Open Conversation button.
   let glodaEnabled = Services.prefs.getBoolPref("mailnews.database.global.indexer.enabled");
 
@@ -2863,12 +3106,11 @@ function onShowOtherActionsPopup()
   }
 }
 
-function ConversationOpener()
-{
+function ConversationOpener() {
 }
 
 ConversationOpener.prototype = {
-  openConversationForMessages: function(messages) {
+  openConversationForMessages(messages) {
     if (messages.length < 1)
       return;
     try {
@@ -2879,7 +3121,7 @@ ConversationOpener.prototype = {
       logException(e);
     }
   },
-  isSelectedMessageIndexed: function() {
+  isSelectedMessageIndexed() {
     let glodaEnabled = Services.prefs
       .getBoolPref("mailnews.database.global.indexer.enabled");
 
@@ -2889,13 +3131,13 @@ ConversationOpener.prototype = {
     }
     return false;
   },
-  onItemsAdded: function(aItems) {
+  onItemsAdded(aItems) {
   },
-  onItemsModified: function(aItems) {
+  onItemsModified(aItems) {
   },
-  onItemsRemoved: function(aItems) {
+  onItemsRemoved(aItems) {
   },
-  onQueryCompleted: function(aCollection) {
+  onQueryCompleted(aCollection) {
     try {
       if (!aCollection.items.length) {
         Cu.reportError("Couldn't find a collection for msg: " +
@@ -2907,13 +3149,13 @@ ConversationOpener.prototype = {
           conversation: aMessage.conversation,
           message: aMessage,
           title: aMessage.conversation.subject,
-          background: false
+          background: false,
         });
       }
     } catch (e) {
       logException(e);
     }
-  }
-}
+  },
+};
 
 var gConversationOpener = new ConversationOpener();

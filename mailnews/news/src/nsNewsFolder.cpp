@@ -21,8 +21,6 @@
 #include "nsINntpService.h"
 #include "nsIMsgFilterService.h"
 #include "nsCOMPtr.h"
-#include "nsIRDFService.h"
-#include "nsRDFCID.h"
 #include "nsMsgDBCID.h"
 #include "nsMsgNewsCID.h"
 #include "nsMsgUtils.h"
@@ -36,7 +34,6 @@
 #include "nsILineInputStream.h"
 
 #include "nsIMsgWindow.h"
-#include "nsIPrompt.h"
 #include "nsIWindowWatcher.h"
 
 #include "nsNetUtil.h"
@@ -45,7 +42,6 @@
 #include "nsNetCID.h"
 #include "nsINntpUrl.h"
 
-#include "nsIInterfaceRequestor.h"
 #include "nsArrayEnumerator.h"
 #include "nsNewsDownloader.h"
 #include "nsIStringBundle.h"
@@ -63,12 +59,6 @@
 #include "nsMemory.h"
 #include "nsIURIMutator.h"
 
-static NS_DEFINE_CID(kRDFServiceCID, NS_RDFSERVICE_CID);
-
-// ###tw  This really ought to be the most
-// efficient file reading size for the current
-// operating system.
-#define NEWSRC_FILE_BUFFER_SIZE 1024
 
 #define kNewsSortOffset 9000
 
@@ -143,8 +133,6 @@ nsMsgNewsFolder::AddNewsgroup(const nsACString &name, const nsACString& setStr,
 {
   NS_ENSURE_ARG_POINTER(child);
   nsresult rv;
-  nsCOMPtr <nsIRDFService> rdf = do_GetService(kRDFServiceCID, &rv);
-  NS_ENSURE_SUCCESS(rv, rv);
 
   nsCOMPtr <nsINntpIncomingServer> nntpServer;
   rv = GetNntpServer(getter_AddRefs(nntpServer));
@@ -167,15 +155,12 @@ nsMsgNewsFolder::AddNewsgroup(const nsACString &name, const nsACString& setStr,
 
   uri.Append(escapedName);
 
-  nsCOMPtr<nsIRDFResource> res;
-  rv = rdf->GetResource(uri, getter_AddRefs(res));
-  if (NS_FAILED(rv)) return rv;
+  nsCOMPtr<nsIMsgFolder> folder;
+  rv = GetOrCreateFolder(uri, getter_AddRefs(folder));
+  NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIMsgFolder> folder(do_QueryInterface(res, &rv));
-  if (NS_FAILED(rv)) return rv;
-
-  nsCOMPtr<nsIMsgNewsFolder> newsFolder(do_QueryInterface(res, &rv));
-  if (NS_FAILED(rv)) return rv;
+  nsCOMPtr<nsIMsgNewsFolder> newsFolder(do_QueryInterface(folder, &rv));
+  NS_ENSURE_SUCCESS(rv, rv);
 
   // cache this for when we open the db
   rv = newsFolder->SetReadSetFromStr(setStr);
@@ -240,7 +225,7 @@ nsMsgNewsFolder::GetSubFolders(nsISimpleEnumerator **aResult)
     (void)UpdateSummaryTotals(false);
   }
 
-  return aResult ? NS_NewArrayEnumerator(aResult, mSubFolders) : NS_ERROR_NULL_POINTER;
+  return aResult ? NS_NewArrayEnumerator(aResult, mSubFolders, NS_GET_IID(nsIMsgFolder)) : NS_ERROR_NULL_POINTER;
 }
 
 //Makes sure the database is open and exists.  If the database is valid then
@@ -488,41 +473,8 @@ NS_IMETHODIMP nsMsgNewsFolder::CreateSubfolder(const nsAString& newsgroupName,
 
 NS_IMETHODIMP nsMsgNewsFolder::Delete()
 {
-  nsresult rv = GetDatabase();
-
-  if(NS_SUCCEEDED(rv))
-  {
-    mDatabase->ForceClosed();
-    mDatabase = nullptr;
-  }
-
-  nsCOMPtr<nsIFile> folderPath;
-  rv = GetFilePath(getter_AddRefs(folderPath));
-
-  if (NS_SUCCEEDED(rv))
-  {
-    nsCOMPtr<nsIFile> summaryPath;
-    rv = GetSummaryFileLocation(folderPath, getter_AddRefs(summaryPath));
-    if (NS_SUCCEEDED(rv))
-    {
-      bool exists = false;
-      rv = folderPath->Exists(&exists);
-
-      if (NS_SUCCEEDED(rv) && exists)
-        rv = folderPath->Remove(false);
-
-      if (NS_FAILED(rv))
-        NS_WARNING("Failed to remove News Folder");
-
-      rv = summaryPath->Exists(&exists);
-
-      if (NS_SUCCEEDED(rv) && exists)
-        rv = summaryPath->Remove(false);
-
-      if (NS_FAILED(rv))
-        NS_WARNING("Failed to remove News Folder Summary File");
-    }
-  }
+  nsresult rv = nsMsgDBFolder::Delete();
+  NS_ENSURE_SUCCESS(rv, rv);
 
   nsCOMPtr <nsINntpIncomingServer> nntpServer;
   rv = GetNntpServer(getter_AddRefs(nntpServer));
@@ -830,6 +782,12 @@ nsMsgNewsFolder::DeleteMessages(nsIArray *messages, nsIMsgWindow *aMsgWindow,
   if (!isMove)
     NotifyFolderEvent(NS_SUCCEEDED(rv) ? kDeleteOrMoveMsgCompleted :
       kDeleteOrMoveMsgFailed);
+
+  if (listener)
+  {
+    listener->OnStartCopy();
+    listener->OnStopCopy(NS_OK);
+  }
 
   (void) RefreshSizeOnDisk();
 

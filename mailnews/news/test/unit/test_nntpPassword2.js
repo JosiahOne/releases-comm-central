@@ -7,17 +7,15 @@
  * default port or the SSL default port. Nothing else!
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
+/* import-globals-from ../../../test/resources/passwordStorage.js */
 load("../../../resources/passwordStorage.js");
 
 // The basic daemon to use for testing nntpd.js implementations
 var daemon = setupNNTPDaemon();
 
-// Define these up here for checking with the transaction
-var test = null;
-
-add_task(async function () {
+add_task(async function() {
   let server = makeServer(NNTP_RFC4643_extension, daemon);
   server.start();
 
@@ -38,15 +36,11 @@ add_task(async function () {
   Services.prefs.setCharPref("mail.identity.id1.useremail",
                              "testnntp@localhost");
   Services.prefs.setBoolPref("mail.identity.id1.valid", true);
-  Services.prefs.setCharPref("mail.server.server1.directory-rel",
-                             "[ProfD]Mail/Local Folders");
   Services.prefs.setCharPref("mail.server.server1.hostname",
                              "Local Folders");
   Services.prefs.setCharPref("mail.server.server1.name", "Local Folders");
   Services.prefs.setCharPref("mail.server.server1.type", "none");
   Services.prefs.setCharPref("mail.server.server1.userName", "nobody");
-  Services.prefs.setCharPref("mail.server.server2.directory-rel",
-                             "[ProfD]News/invalid");
   Services.prefs.setCharPref("mail.server.server2.hostname", "invalid");
   Services.prefs.setCharPref("mail.server.server2.name",
                              "testnntp on localhost");
@@ -75,7 +69,7 @@ add_task(async function () {
     subscribeServer(incomingServer);
 
     // Now set up and run the tests
-    setupProtocolTest(server.port, prefix+"*", incomingServer);
+    setupProtocolTest(server.port, prefix + "*", incomingServer);
     server.performTest();
     var transaction = server.playTransaction();
     do_check_transaction(transaction, ["MODE READER", "LIST",
@@ -83,13 +77,12 @@ add_task(async function () {
                                        "AUTHINFO pass newstest", "LIST"]);
     incomingServer.QueryInterface(Ci.nsISubscribableServer)
                   .subscribeCleanup();
-
   } catch (e) {
-    dump("NNTP Protocol test "+test+" failed for type RFC 977:\n");
+    dump("NNTP Protocol test " + test + " failed for type RFC 977:\n");
     try {
       var trans = server.playTransaction();
-     if (trans)
-        dump("Commands called: "+trans.them+"\n");
+      if (trans)
+        dump("Commands called: " + trans.them + "\n");
     } catch (exp) {}
     do_throw(e);
   }
@@ -99,7 +92,3 @@ add_task(async function () {
   while (thread.hasPendingEvents())
     thread.processNextEvent(true);
 });
-
-function run_test() {
-  run_next_test();
-}

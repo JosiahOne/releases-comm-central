@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * HTML Export Plugin
@@ -78,8 +78,9 @@ calHtmlExporter.prototype = {
             } else {
                 let row = itemNode.querySelector(".intervalrow");
                 row.remove();
-                if (row.nextSibling.nodeType == row.nextSibling.TEXT_NODE ||
-                    row.nextSibling.nodeType == row.nextSibling.CDATA_SECTION_NODE) {
+                if (row.nextSibling &&
+                    (row.nextSibling.nodeType == row.nextSibling.TEXT_NODE ||
+                     row.nextSibling.nodeType == row.nextSibling.CDATA_SECTION_NODE)) {
                     row.nextSibling.remove();
                 }
             }
@@ -97,8 +98,8 @@ calHtmlExporter.prototype = {
         templates.remove();
 
         // Convert the javascript string to an array of bytes, using the utf8 encoder
-        let convStream = Components.classes["@mozilla.org/intl/converter-output-stream;1"]
-                                   .createInstance(Components.interfaces.nsIConverterOutputStream);
+        let convStream = Cc["@mozilla.org/intl/converter-output-stream;1"]
+                           .createInstance(Ci.nsIConverterOutputStream);
         convStream.init(aStream, "UTF-8");
         convStream.writeString(cal.xml.serializeDOM(document));
     }

@@ -2,23 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-treenode-checkbox {
-  -moz-binding: url("chrome://calendar/content/widgets/calendar-widgets.xml#treenode-checkbox");
-}
 
-modebox {
+modebox,
+modevbox {
   -moz-binding: url(chrome://calendar/content/widgets/calendar-widgets.xml#modebox);
   -moz-user-focus: normal;
 }
 
 modevbox {
-  -moz-binding: url(chrome://calendar/content/widgets/calendar-widgets.xml#modevbox);
-  -moz-user-focus: normal;
-}
-
-modehbox {
-  -moz-binding: url(chrome://calendar/content/widgets/calendar-widgets.xml#modehbox);
-  -moz-user-focus: normal;
+  -moz-box-orient: vertical;
 }
 
 toolbarbutton[doubleimage="true"] {
@@ -34,10 +26,6 @@ minimonth {
 }
 
 minimonth-header {
-  -moz-binding: url("chrome://calendar/content/widgets/minimonth.xml#active-minimonth-header");
-}
-
-minimonth-header[readonly="true"] {
   -moz-binding: url("chrome://calendar/content/widgets/minimonth.xml#minimonth-header");
 }
 
@@ -45,7 +33,7 @@ dragndropContainer {
    -moz-binding: url(chrome://calendar/content/widgets/calendar-widgets.xml#dragndropContainer);
 }
 
-tab[calview] {
+radio[calview] {
    -moz-binding: url(chrome://calendar/content/widgets/calendar-widgets.xml#view-tab);
 }
 
@@ -55,12 +43,4 @@ calendar-list-tree {
 
 calendar-list-tree[type="full"] {
    -moz-binding: url(chrome://calendar/content/widgets/calendar-list-tree.xml#full-calendar-list-tree);
-}
-
-menulist[type="panel-menulist"] {
-   -moz-binding: url(chrome://calendar/content/widgets/calendar-widgets.xml#panel-menulist);
-}
-
-panel[type="category-panel"] {
-   -moz-binding: url(chrome://calendar/content/widgets/calendar-widgets.xml#category-panel);
 }

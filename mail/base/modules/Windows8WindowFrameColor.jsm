@@ -6,23 +6,21 @@
 
 this.EXPORTED_SYMBOLS = ["Windows8WindowFrameColor"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-var Registry = ChromeUtils.import("resource://gre/modules/WindowsRegistry.jsm").WindowsRegistry;
+const {WindowsRegistry} = ChromeUtils.import("resource://gre/modules/WindowsRegistry.jsm");
 
 var Windows8WindowFrameColor = {
   _windowFrameColor: null,
 
-  get: function() {
+  get() {
     if (this._windowFrameColor)
       return this._windowFrameColor;
 
     const HKCU = Ci.nsIWindowsRegKey.ROOT_KEY_CURRENT_USER;
     const dwmKey = "Software\\Microsoft\\Windows\\DWM";
-    let customizationColor = Registry.readRegKey(HKCU, dwmKey,
-                                                 "ColorizationColor");
+    let customizationColor = WindowsRegistry.readRegKey(HKCU, dwmKey,
+                                                        "ColorizationColor");
     if (customizationColor == undefined) {
-      // Seems to be the default color (hardcoded because of bug 1065998, bug 1107902)
+      // Seems to be the default color (hardcoded because of bug 1065998)
       return [158, 158, 158];
     }
 
@@ -32,9 +30,9 @@ var Windows8WindowFrameColor = {
     // Zero-pad the number just to make sure that it is 8 digits.
     customizationColorHex = ("00000000" + customizationColorHex).substr(-8);
     let customizationColorArray = customizationColorHex.match(/../g);
-    let [unused, fgR, fgG, fgB] = customizationColorArray.map(val => parseInt(val, 16));
-    let colorizationColorBalance = Registry.readRegKey(HKCU, dwmKey,
-                                                       "ColorizationColorBalance");
+    let [, fgR, fgG, fgB] = customizationColorArray.map(val => parseInt(val, 16));
+    let colorizationColorBalance = WindowsRegistry.readRegKey(HKCU, dwmKey,
+                                                              "ColorizationColorBalance");
     if (colorizationColorBalance == undefined) {
       colorizationColorBalance = 78;
     }

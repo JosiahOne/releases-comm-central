@@ -3,11 +3,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gServer;
 var gDialog;
+
+document.addEventListener("dialogdisclosure", showInfo);
+document.addEventListener("dialogaccept", onAccept);
 
 function onLoad(event) {
   gServer = window.arguments[0].account.incomingServer;
@@ -121,11 +124,11 @@ function removeAccount() {
   }
 }
 
-function onAccept() {
+function onAccept(event) {
   // If Cancel is disabled, we already tried to remove the account
   // and can only close the dialog.
   if (gDialog.getButton("cancel").disabled)
-    return true;
+    return;
 
   gDialog.getButton("accept").disabled = true;
   gDialog.getButton("cancel").disabled = true;
@@ -144,5 +147,5 @@ function onAccept() {
   removeAccount();
 
   gDialog.getButton("accept").disabled = false;
-  return false;
+  event.preventDefault();
 }

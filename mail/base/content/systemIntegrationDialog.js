@@ -5,6 +5,9 @@
 
 // This dialog can only be opened if we have a shell service.
 
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {SearchIntegration} = ChromeUtils.import("resource:///modules/SearchIntegration.jsm");
+
 var gSystemIntegrationDialog = {
   _shellSvc: Cc["@mozilla.org/mail/shell-service;1"]
                .getService(Ci.nsIShellService),
@@ -19,13 +22,7 @@ var gSystemIntegrationDialog = {
 
   _searchCheckbox: null,
 
-  onLoad: function()
-  {
-    // Makes Services and SearchIntegration accessible via this.Services
-    // and this.SearchIntegration.
-    ChromeUtils.import("resource://gre/modules/Services.jsm", this);
-    ChromeUtils.import("resource:///modules/SearchIntegration.js", this);
-
+  onLoad() {
     // initialize elements
     this._mailCheckbox    = document.getElementById("checkMail");
     this._newsCheckbox    = document.getElementById("checkNews");
@@ -70,27 +67,24 @@ var gSystemIntegrationDialog = {
 
     // read the raw pref value and not shellSvc.shouldCheckDefaultMail
     this._startupCheckbox.checked =
-      this.Services.prefs.getBoolPref("mail.shell.checkDefaultClient");
+      Services.prefs.getBoolPref("mail.shell.checkDefaultClient");
 
     // Search integration - check whether we should show/disable integration options
-    if (this.SearchIntegration)
-    {
-      this._searchCheckbox.checked = this.SearchIntegration.prefEnabled;
+    if (SearchIntegration) {
+      this._searchCheckbox.checked = SearchIntegration.prefEnabled;
       // On Windows, do not offer the option on startup as it does not perform well.
-      if ((this.Services.appinfo.OS == "WINNT") && !calledFromPrefs &&
+      if ((Services.appinfo.OS == "WINNT") && !calledFromPrefs &&
           !this._searchCheckbox.checked) {
         this._searchCheckbox.hidden = true;
         // Even if the user wasn't presented the choice,
         // we do not want to ask again automatically.
-        this.SearchIntegration.firstRunDone = true;
-      } else {
+        SearchIntegration.firstRunDone = true;
+      } else if (!SearchIntegration.osVersionTooLow) {
         // Hide/disable the options if the OS does not support them.
-        if (!this.SearchIntegration.osVersionTooLow) {
-          this._searchCheckbox.hidden = false;
-          if (this.SearchIntegration.osComponentsNotRunning) {
-            this._searchCheckbox.checked = false;
-            this._searchCheckbox.disabled = true;
-          }
+        this._searchCheckbox.hidden = false;
+        if (SearchIntegration.osComponentsNotRunning) {
+          this._searchCheckbox.checked = false;
+          this._searchCheckbox.disabled = true;
         }
       }
     }
@@ -102,8 +96,7 @@ var gSystemIntegrationDialog = {
    * @param aSetAsDefault  If true, set TB as the default application for the
    *                       checked actions (mail/news/rss). Otherwise do nothing.
    */
-  onDialogClose: function(aSetAsDefault)
-  {
+  onDialogClose(aSetAsDefault) {
     // In all cases, save the user's decision for "always check at startup".
     this._shellSvc.shouldCheckDefaultClient = this._startupCheckbox.checked;
 
@@ -111,7 +104,7 @@ var gSystemIntegrationDialog = {
     // So do not ask next time.
     let searchIntegPossible = !this._searchCheckbox.hidden;
     if (searchIntegPossible) {
-      this.SearchIntegration.firstRunDone = true;
+      SearchIntegration.firstRunDone = true;
     }
 
     // If the "skip integration" button was used do not set any defaults
@@ -119,7 +112,7 @@ var gSystemIntegrationDialog = {
     if (!aSetAsDefault) {
       // Disable search integration in this case.
       if (searchIntegPossible)
-        this.SearchIntegration.prefEnabled = false;
+        SearchIntegration.prefEnabled = false;
 
       return true;
     }
@@ -146,8 +139,11 @@ var gSystemIntegrationDialog = {
     // Set the search integration pref if it is changed.
     // The integration will handle the rest.
     if (searchIntegPossible)
-      this.SearchIntegration.prefEnabled = this._searchCheckbox.checked;
+      SearchIntegration.prefEnabled = this._searchCheckbox.checked;
 
     return true;
-  }
+  },
 };
+
+document.addEventListener("dialogaccept", () => gSystemIntegrationDialog.onDialogClose(true));
+document.addEventListener("dialogcancel", () => gSystemIntegrationDialog.onDialogClose(false));

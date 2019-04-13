@@ -30,9 +30,7 @@ job-defaults:
             - comm/testing
             - comm/.taskcluster.yml
             - comm/AUTHORS
-            - comm/comm-confvars.sh
             - comm/moz.build
-            - comm/moz.configure
 
 xpcshell:
     description: "xpcshell test run"
@@ -45,7 +43,6 @@ xpcshell:
         by-test-platform:
             linux32/debug: 8
             linux64/debug: 8
-            macosx64.*: 2
             default: 4
     instance-size: default
     max-run-time: 5400
@@ -56,7 +53,7 @@ xpcshell:
         config:
             by-test-platform:
                 windows.*:
-                    - unittests/win_taskcluster_unittest.py
+                    - unittests/win_unittest.py
                     - unittests/thunderbird_extra.py
                 macosx64.*:
                     - unittests/mac_unittest.py
@@ -71,6 +68,9 @@ xpcshell:
             by-test-platform:
                 windows.*: true
                 default: false
+    fetches:
+        build:
+            - gdata-provider.en-US.xpi
 
 mozmill:
     description: "mozmill test run"
@@ -83,7 +83,6 @@ mozmill:
         by-test-platform:
             linux32/debug: 8
             linux64/debug: 8
-            macosx64.*: 2
             default: 4
     instance-size: default
     max-run-time: 5400
@@ -94,7 +93,7 @@ mozmill:
         config:
             by-test-platform:
                 windows.*:
-                    - unittests/win_taskcluster_unittest.py
+                    - unittests/win_unittest.py
                     - unittests/thunderbird_extra.py
                 macosx64.*:
                     - unittests/mac_unittest.py
@@ -106,3 +105,30 @@ mozmill:
         extra-options:
             - "--mozmill-suite=mozmill"
         requires-signed-builds: false
+
+mochitest-thunderbird:
+    description: "Mochitest browser-chrome-thunderbird run"
+    suite: mochitest/browser-chrome-thunderbird
+    treeherder-symbol: M(bct)
+    run-on-projects: built-projects
+    loopback-video: true
+    max-run-time: 3600
+    e10s: false
+    serviceworker-e10s: false
+    mozharness:
+        script: desktop_unittest.py
+        mochitest-flavor: browser
+        config:
+            by-test-platform:
+                windows.*:
+                    - unittests/win_unittest.py
+                    - unittests/thunderbird_extra.py
+                macosx64.*:
+                    - unittests/mac_unittest.py
+                    - unittests/thunderbird_extra.py
+                linux.*:
+                    - unittests/linux_unittest.py
+                    - remove_executables.py
+                    - unittests/thunderbird_extra.py
+    instance-size: default
+    allow-software-gl-layers: false

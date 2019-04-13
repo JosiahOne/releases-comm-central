@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://services-common/async.js");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {Async} = ChromeUtils.import("resource://services-common/async.js");
+const {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 // Load DownloadUtils module for convertByteUnits
-ChromeUtils.import("resource://gre/modules/DownloadUtils.jsm");
+const {DownloadUtils} = ChromeUtils.import("resource://gre/modules/DownloadUtils.jsm");
 
 // locally loaded services
 var gLocSvc = {};
@@ -1437,8 +1437,8 @@ var gPerms = {
       this.addType.removeAllItems(); // Make sure list is clean.
       let permTypes = ["allowXULXBL", "cookie", "geo", "image", "indexedDB",
                        "install", "login-saving", "object", "offline-app",
-                       "plugins", "popup", "script", "sts/use", "sts/subd",
-                       "stylesheet", "trackingprotection"];
+                       "plugins", "popup", "script", "stylesheet",
+                       "trackingprotection"];
 
       // Look for a translation.
       for (let permType of permTypes) {

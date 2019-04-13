@@ -28,6 +28,7 @@
 #include "nsIStreamConverterService.h"
 #include "nsIMsgProgress.h"
 #include "nsMsgUtils.h"
+#include "mozilla/Components.h"
 
 NS_IMPL_ISUPPORTS(nsURLFetcher,
                    nsIURLFetcher,
@@ -53,7 +54,7 @@ nsURLFetcher::nsURLFetcher()
   mOnStopRequestProcessed = false;
   mIsFile=false;
   nsURLFetcherStreamConsumer *consumer = new nsURLFetcherStreamConsumer(this);
-  mConverter = do_QueryInterface(consumer);
+  mConverter = consumer;
 }
 
 nsURLFetcher::~nsURLFetcher()
@@ -194,20 +195,20 @@ nsURLFetcher::StillRunning(bool *running)
 
 // Methods for nsIStreamListener...
 nsresult
-nsURLFetcher::OnDataAvailable(nsIRequest *request, nsISupports * ctxt, nsIInputStream *aIStream,
+nsURLFetcher::OnDataAvailable(nsIRequest *request, nsIInputStream *aIStream,
                               uint64_t sourceOffset, uint32_t aLength)
 {
   /* let our converter or consumer process the data */
   if (!mConverter)
     return NS_ERROR_FAILURE;
 
-  return mConverter->OnDataAvailable(request, ctxt, aIStream, sourceOffset, aLength);
+  return mConverter->OnDataAvailable(request, aIStream, sourceOffset, aLength);
 }
 
 
 // Methods for nsIStreamObserver
 nsresult
-nsURLFetcher::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
+nsURLFetcher::OnStartRequest(nsIRequest *request)
 {
   /* check if the user has canceld the operation */
   if (mTagData)
@@ -231,13 +232,13 @@ nsURLFetcher::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
 
   /* call our converter or consumer */
   if (mConverter)
-    return mConverter->OnStartRequest(request, ctxt);
+    return mConverter->OnStartRequest(request);
 
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsURLFetcher::OnStopRequest(nsIRequest *request, nsISupports * ctxt, nsresult aStatus)
+nsURLFetcher::OnStopRequest(nsIRequest *request, nsresult aStatus)
 {
   // it's possible we could get in here from the channel calling us with an OnStopRequest and from our
   // onStatusChange method (in the case of an error). So we should protect against this to make sure we
@@ -250,7 +251,7 @@ nsURLFetcher::OnStopRequest(nsIRequest *request, nsISupports * ctxt, nsresult aS
 
   /* first, call our converter or consumer */
   if (mConverter)
-    (void) mConverter->OnStopRequest(request, ctxt, aStatus);
+    (void) mConverter->OnStopRequest(request, aStatus);
 
   if (mTagData)
     mTagData->mRequest = nullptr;
@@ -313,7 +314,7 @@ nsURLFetcher::FireURLRequest(nsIURI *aURL, nsIFile *localFile, nsIOutputStream *
   mOnStopRequestProcessed = false;
 
   // let's try uri dispatching...
-  nsCOMPtr<nsIURILoader> pURILoader (do_GetService(NS_URI_LOADER_CONTRACTID));
+  nsCOMPtr<nsIURILoader> pURILoader = mozilla::components::URILoader::Service();
   NS_ENSURE_TRUE(pURILoader, NS_ERROR_FAILURE);
 
   nsCOMPtr<nsIChannel> channel;
@@ -322,6 +323,7 @@ nsURLFetcher::FireURLRequest(nsIURI *aURL, nsIFile *localFile, nsIOutputStream *
                      nsContentUtils::GetSystemPrincipal(),
                      nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
                      nsIContentPolicy::TYPE_OTHER,
+                     nullptr, // aCookieSettings
                      nullptr, // aPerformanceStorage
                      nullptr, // aLoadGroup
                      this); // aCallbacks
@@ -371,7 +373,7 @@ nsURLFetcher::OnStateChange(nsIWebProgress *aProgress, nsIRequest *aRequest,
   // the url....
 
   if (NS_FAILED(aStatus))
-    OnStopRequest(aRequest, nullptr, aStatus);
+    OnStopRequest(aRequest, aStatus);
 
   return NS_OK;
 }
@@ -405,6 +407,13 @@ nsURLFetcher::OnSecurityChange(nsIWebProgress *aWebProgress,
   return NS_OK;
 }
 
+NS_IMETHODIMP
+nsURLFetcher::OnContentBlockingEvent(nsIWebProgress *aWebProgress,
+                                     nsIRequest *aRequest, uint32_t aEvent)
+{
+  MOZ_ASSERT_UNREACHABLE("notification excluded in AddProgressListener(...)");
+  return NS_OK;
+}
 
 /**
  * Stream consumer used for handling special content type like multipart/x-mixed-replace
@@ -423,8 +432,8 @@ nsURLFetcherStreamConsumer::~nsURLFetcherStreamConsumer()
 
 /** nsIRequestObserver methods **/
 
-/* void onStartRequest (in nsIRequest request, in nsISupports ctxt); */
-NS_IMETHODIMP nsURLFetcherStreamConsumer::OnStartRequest(nsIRequest *aRequest, nsISupports *ctxt)
+/* void onStartRequest (in nsIRequest request); */
+NS_IMETHODIMP nsURLFetcherStreamConsumer::OnStartRequest(nsIRequest *aRequest)
 {
   if (!mURLFetcher || !mURLFetcher->mOutStream)
     return NS_ERROR_FAILURE;
@@ -441,8 +450,8 @@ NS_IMETHODIMP nsURLFetcherStreamConsumer::OnStartRequest(nsIRequest *aRequest, n
   return NS_OK;
 }
 
-/* void onStopRequest (in nsIRequest request, in nsISupports ctxt, in nsresult status); */
-NS_IMETHODIMP nsURLFetcherStreamConsumer::OnStopRequest(nsIRequest *aRequest, nsISupports *ctxt, nsresult status)
+/* void onStopRequest (in nsIRequest request, in nsresult status); */
+NS_IMETHODIMP nsURLFetcherStreamConsumer::OnStopRequest(nsIRequest *aRequest, nsresult status)
 {
   if (!mURLFetcher)
     return NS_ERROR_FAILURE;
@@ -478,8 +487,8 @@ NS_IMETHODIMP nsURLFetcherStreamConsumer::OnStopRequest(nsIRequest *aRequest, ns
 
 /** nsIStreamListener methods **/
 
-/* void onDataAvailable (in nsIRequest request, in nsISupports ctxt, in nsIInputStream inStr, in unsigned long long sourceOffset, in unsigned long count); */
-NS_IMETHODIMP nsURLFetcherStreamConsumer::OnDataAvailable(nsIRequest *aRequest, nsISupports *ctxt, nsIInputStream *inStr, uint64_t sourceOffset, uint32_t count)
+/* void onDataAvailable (in nsIRequest request, in nsIInputStream inStr, in unsigned long long sourceOffset, in unsigned long count); */
+NS_IMETHODIMP nsURLFetcherStreamConsumer::OnDataAvailable(nsIRequest *aRequest, nsIInputStream *inStr, uint64_t sourceOffset, uint32_t count)
 {
   uint32_t        readLen = count;
   uint32_t        wroteIt;

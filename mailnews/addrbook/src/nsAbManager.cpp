@@ -8,7 +8,7 @@
 #include "nsAddrDatabase.h"
 #include "nsIOutputStream.h"
 #include "nsNetUtil.h"
-#include "nsMsgI18N.h"
+#include "nsNativeCharsetUtils.h"
 #include "nsIStringBundle.h"
 #include "nsMsgUtils.h"
 #include "nsAppDirectoryServiceDefs.h"
@@ -137,6 +137,9 @@ nsresult nsAbManager::Init()
   nsresult rv = observerService->AddObserver(this, "profile-do-change", false);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  rv = observerService->AddObserver(this, "addrbook-reload", false);
+  NS_ENSURE_SUCCESS(rv, rv);
+
   rv = observerService->AddObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID,
                                     false);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -159,6 +162,14 @@ NS_IMETHODIMP nsAbManager::Observe(nsISupports *aSubject, const char *aTopic,
     return NS_OK;
   }
 
+  if (!strcmp(aTopic, "addrbook-reload"))
+  {
+    DIR_ShutDown();
+    mCacheTopLevelAb = nullptr;
+    mAbStore.Clear();
+    return NS_OK;
+  }
+
   if (!strcmp(aTopic, NS_XPCOM_SHUTDOWN_OBSERVER_ID))
   {
     DIR_ShutDown();
@@ -168,6 +179,9 @@ NS_IMETHODIMP nsAbManager::Observe(nsISupports *aSubject, const char *aTopic,
     NS_ENSURE_TRUE(observerService, NS_ERROR_UNEXPECTED);
 
     nsresult rv = observerService->RemoveObserver(this, "profile-do-change");
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    rv = observerService->RemoveObserver(this, "addrbook-reload");
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = observerService->RemoveObserver(this, NS_XPCOM_SHUTDOWN_OBSERVER_ID);
@@ -730,11 +744,10 @@ nsAbManager::ExportDirectoryToDelimitedText(nsIAbDirectory *aDirectory,
       if (NS_FAILED(bundle->GetStringFromID(EXPORT_ATTRIBUTES_TABLE[i].plainTextStringID, columnName)))
         columnName.AppendInt(EXPORT_ATTRIBUTES_TABLE[i].plainTextStringID);
 
-      rv = nsMsgI18NConvertFromUnicode(useUTF8 ? NS_LITERAL_CSTRING("UTF-8") :
-                                                 nsMsgI18NFileSystemCharset(),
-                                       columnName,
-                                       revisedName);
-      NS_ENSURE_SUCCESS(rv,rv);
+      if (useUTF8)
+        CopyUTF16toUTF8(columnName, revisedName);
+      else
+        NS_CopyUnicodeToNative(columnName, revisedName);
 
       rv = outputStream->Write(revisedName.get(),
                                revisedName.Length(),
@@ -823,16 +836,10 @@ nsAbManager::ExportDirectoryToDelimitedText(nsIAbDirectory *aDirectory,
                 newValue.Append(u'"');
               }
 
-              rv = nsMsgI18NConvertFromUnicode(useUTF8 ? NS_LITERAL_CSTRING("UTF-8") :
-                                                         nsMsgI18NFileSystemCharset(),
-                                               newValue,
-                                               valueCStr);
-              NS_ENSURE_SUCCESS(rv,rv);
-
-              if (NS_FAILED(rv)) {
-                NS_ERROR("failed to convert string to system charset.  use LDIF");
-                valueCStr = "?";
-              }
+              if (useUTF8)
+                CopyUTF16toUTF8(newValue, valueCStr);
+              else
+                NS_CopyUnicodeToNative(newValue, valueCStr);
 
               length = valueCStr.Length();
               if (length) {
@@ -1226,7 +1233,7 @@ bool nsAbManager::IsSafeLDIFString(const char16_t *aStr)
     // and MUST be base64 encoded
     if ((aStr[i] == char16_t('\n')) ||
         (aStr[i] == char16_t('\r')) ||
-        (!NS_IsAscii(aStr[i])))
+        (!mozilla::IsAscii(aStr[i])))
       return false;
   }
   return true;

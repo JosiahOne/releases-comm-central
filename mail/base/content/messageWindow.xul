@@ -53,6 +53,8 @@
   -->
 <window id="messengerWindow"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
+        icon="messengerWindow"
         title="&titledefault.label;@PRE_RELEASE_SUFFIX@"
         titlemodifier="&titledefault.label;@PRE_RELEASE_SUFFIX@"
         titlemenuseparator="&titleSeparator.label;"
@@ -75,8 +77,11 @@
     <stringbundle id="bundle_read_smime" src="chrome://messenger-smime/locale/msgReadSMIMEOverlay.properties"/>
   </stringbundleset>
 
+  <linkset>
+    <html:link rel="localization" href="toolkit/main-window/findbar.ftl"/>
+  </linkset>
+
   <script type="application/javascript" src="chrome://global/content/globalOverlay.js"/>
-  <script type="application/javascript" src="chrome://messenger/content/shareglue.js"/>
   <script type="application/javascript" src="chrome://messenger/content/commandglue.js"/>
   <script type="application/javascript" src="chrome://messenger/content/folderDisplay.js"/>
   <script type="application/javascript" src="chrome://messenger/content/messageDisplay.js"/>
@@ -93,7 +98,6 @@
   <script type="application/javascript" src="chrome://messenger/content/editContactPanel.js"/>
   <script type="application/javascript" src="chrome://messenger/content/toolbarIconColor.js"/>
   <script type="application/javascript" src="chrome://messenger/content/msgHdrView.js"/>
-  <script type="application/javascript" src="chrome://global/content/nsDragAndDrop.js"/>
   <script type="application/javascript" src="chrome://messenger-smime/content/msgHdrViewSMIMEOverlay.js"/>
   <script type="application/javascript" src="chrome://messenger-smime/content/msgReadSMIMEOverlay.js"/>
   <script type="application/javascript" src="chrome://messenger/content/mailCommands.js"/>
@@ -104,7 +108,6 @@
   <script type="application/javascript" src="chrome://messenger/content/mail-offline.js"/>
   <script type="application/javascript" src="chrome://global/content/printUtils.js"/>
   <script type="application/javascript" src="chrome://messenger/content/msgViewPickerOverlay.js"/>
-  <script type="application/javascript" src="chrome://messenger/content/plugins.js"/>
   <script type="application/javascript" src="chrome://global/content/viewZoomOverlay.js"/>
   <script type="application/javascript" src="chrome://communicator/content/utilityOverlay.js"/>
   <script type="application/javascript" src="chrome://messenger/content/mailCore.js"/>
@@ -115,7 +118,7 @@
   <script type="application/javascript" src="chrome://messenger/content/newmailaccount/uriListener.js"/>
 
   <commandset id="mailCommands">
-#include mainCommandSet.inc
+#include mainCommandSet.inc.xul
     <commandset id="mailSearchMenuItems"/>
     <commandset id="attachmentCommands">
       <command id="cmd_openAllAttachments"
@@ -139,13 +142,9 @@
     <command id="cmd_close" oncommand="window.close();"/>
   </commandset>
 
-  <broadcasterset id="otherActionsButtonBroadcasters">
-     <broadcaster id="otherActionsOpenIn"/>
-  </broadcasterset>
-
   <keyset id="mailKeys">
     <key keycode="VK_ESCAPE" oncommand="window.close();"/>
-#include mainKeySet.inc
+#include mainKeySet.inc.xul
     <keyset id="tasksKeys">
 #ifdef XP_MACOSX
       <key id="key_newMessage" key="&newMessageCmd.key;" command="cmd_newMessage"
@@ -163,10 +162,10 @@
 
   <!-- Popup menus provided by mailWindowOverlay.xul -->
   <popupset id="mainPopupSet">
-#include mainPopupSet.inc
-#include msgHdrPopup.inc
+#include mainPopupSet.inc.xul
+#include msgHdrPopup.inc.xul
   </popupset>
-#include editContactPanel.inc
+#include editContactPanel.inc.xul
 
 #ifdef XP_MACOSX
   <vbox id="titlebar">
@@ -185,15 +184,15 @@
 #endif
 
   <!-- navigation-toolbox with the main menubar -->
-#include mainNavigationToolbox.inc
+#include mainNavigationToolbox.inc.xul
   </toolbox>
 
   <!-- mail-toolbox with the main toolbarbuttons -->
-#include mainMailToolbox.inc
+#include mainMailToolbox.inc.xul
 
   <tooltip id="aHTMLTooltip" page="true"/>
 
- <!-- msg header view -->
+  <!-- msg header view -->
   <!-- a convenience box for ease of extension overlaying -->
   <hbox id="messagepaneboxwrapper" flex="1">
     <vbox id="messagepanebox" flex="3"
@@ -202,7 +201,7 @@
           ondragexit="nsDragAndDrop.dragExit(event, messagepaneObserver);">
 
       <hbox id="msgHeaderView" collapsed="true" class="main-header-area">
-#include msgHdrView.inc
+#include msgHdrView.inc.xul
       </hbox>
       <!-- The msgNotificationBar appears on top of the message and displays
            information like: junk, mdn, remote content and phishing warnings -->
@@ -216,7 +215,7 @@
                src="about:blank" onclick="return contentAreaClick(event);" />
       <splitter id="attachment-splitter" collapse="after" resizebefore="closest" resizeafter="closest" collapsed="true"/>
       <vbox id="attachmentView" collapsed="true">
-#include msgAttachmentView.inc
+#include msgAttachmentView.inc.xul
       </vbox>
       <findbar id="FindToolbar" browserid="messagepane"/>
     </vbox>
@@ -227,7 +226,10 @@
             hidden="true"/>
   </panel>
 
-  <statusbar class="chromeclass-status" id="status-bar">
-#include mainStatusbar.inc
-  </statusbar>
+  <hbox id="status-bar" class="statusbar chromeclass-status">
+#include mainStatusbar.inc.xul
+    <hbox class="statusbarpanel statusbar-resizerpanel">
+      <resizer dir="bottomend"/>
+    </hbox>
+  </hbox>
 </window>

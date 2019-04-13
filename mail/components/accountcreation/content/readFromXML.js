@@ -3,6 +3,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from emailWizard.js */
+
+var { logException } = ChromeUtils.import("resource:///modules/errUtils.js");
+var {
+  cleanUpHostName,
+  isLegalHostNameOrIP,
+  kMaxPort,
+  kMinPort,
+} = ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
+
+/* eslint-disable complexity */
 /**
  * Takes an XML snipplet (as JXON) and reads the values into
  * a new AccountConfig object.
@@ -17,20 +28,16 @@
  * @param clientConfigXML {JXON}  The <clientConfig> node.
  * @return AccountConfig   object filled with the data from XML
  */
-ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
-
-function readFromXML(clientConfigXML)
-{
+function readFromXML(clientConfigXML) {
   function array_or_undef(value) {
     return value === undefined ? [] : value;
   }
   var exception;
   if (typeof(clientConfigXML) != "object" ||
       !("clientConfig" in clientConfigXML) ||
-      !("emailProvider" in clientConfigXML.clientConfig))
-  {
+      !("emailProvider" in clientConfigXML.clientConfig)) {
     dump("client config xml = " + JSON.stringify(clientConfigXML) + "\n");
-    var stringBundle = getStringBundle(
+    let stringBundle = getStringBundle(
         "chrome://messenger/locale/accountCreationModel.properties");
     throw stringBundle.GetStringFromName("no_emailProvider.error");
   }
@@ -44,8 +51,7 @@ function readFromXML(clientConfigXML)
   try {
     d.displayName = sanitize.label(xml.displayName);
   } catch (e) { logException(e); }
-  for (var domain of xml.$domain)
-  {
+  for (var domain of xml.$domain) {
     try {
       d.domains.push(sanitize.hostname(domain));
     } catch (e) { logException(e); exception = e; }
@@ -55,8 +61,7 @@ function readFromXML(clientConfigXML)
   exception = null;
 
   // incoming server
-  for (let iX of array_or_undef(xml.$incomingServer)) // input (XML)
-  {
+  for (let iX of array_or_undef(xml.$incomingServer)) { // input (XML)
     let iO = d.createNewIncoming(); // output (object)
     try {
       // throws if not supported
@@ -71,11 +76,10 @@ function readFromXML(clientConfigXML)
         iO.password = sanitize.string(iX.password);
       }
 
-      for (let iXsocketType of array_or_undef(iX.$socketType))
-      {
+      for (let iXsocketType of array_or_undef(iX.$socketType)) {
         try {
           iO.socketType = sanitize.translate(iXsocketType,
-              { plain : 1, SSL: 2, STARTTLS: 3 });
+              { plain: 1, SSL: 2, STARTTLS: 3 });
           break; // take first that we support
         } catch (e) { exception = e; }
       }
@@ -83,19 +87,18 @@ function readFromXML(clientConfigXML)
         throw exception ? exception : "need proper <socketType> in XML";
       exception = null;
 
-      for (let iXauth of array_or_undef(iX.$authentication))
-      {
+      for (let iXauth of array_or_undef(iX.$authentication)) {
         try {
           iO.auth = sanitize.translate(iXauth,
-              { "password-cleartext" : Ci.nsMsgAuthMethod.passwordCleartext,
+              { "password-cleartext": Ci.nsMsgAuthMethod.passwordCleartext,
                 // @deprecated TODO remove
-                "plain" : Ci.nsMsgAuthMethod.passwordCleartext,
-                "password-encrypted" : Ci.nsMsgAuthMethod.passwordEncrypted,
+                "plain": Ci.nsMsgAuthMethod.passwordCleartext,
+                "password-encrypted": Ci.nsMsgAuthMethod.passwordEncrypted,
                 // @deprecated TODO remove
-                "secure" : Ci.nsMsgAuthMethod.passwordEncrypted,
-                "GSSAPI" : Ci.nsMsgAuthMethod.GSSAPI,
-                "NTLM" : Ci.nsMsgAuthMethod.NTLM,
-                "OAuth2" : Ci.nsMsgAuthMethod.OAuth2 });
+                "secure": Ci.nsMsgAuthMethod.passwordEncrypted,
+                "GSSAPI": Ci.nsMsgAuthMethod.GSSAPI,
+                "NTLM": Ci.nsMsgAuthMethod.NTLM,
+                "OAuth2": Ci.nsMsgAuthMethod.OAuth2 });
           break; // take first that we support
         } catch (e) { exception = e; }
       }
@@ -104,8 +107,7 @@ function readFromXML(clientConfigXML)
       exception = null;
 
       // defaults are in accountConfig.js
-      if (iO.type == "pop3" && "pop3" in iX)
-      {
+      if (iO.type == "pop3" && "pop3" in iX) {
         try {
           if ("leaveMessagesOnServer" in iX.pop3)
             iO.leaveMessagesOnServer =
@@ -133,24 +135,21 @@ function readFromXML(clientConfigXML)
   exception = null;
 
   // outgoing server
-  for (let oX of array_or_undef(xml.$outgoingServer)) // input (XML)
-  {
+  for (let oX of array_or_undef(xml.$outgoingServer)) { // input (XML)
     let oO = d.createNewOutgoing(); // output (object)
     try {
-      if (oX["@type"] != "smtp")
-      {
-        var stringBundle = getStringBundle(
+      if (oX["@type"] != "smtp") {
+        let stringBundle = getStringBundle(
             "chrome://messenger/locale/accountCreationModel.properties");
         throw stringBundle.GetStringFromName("outgoing_not_smtp.error");
       }
       oO.hostname = sanitize.hostname(oX.hostname);
       oO.port = sanitize.integerRange(oX.port, kMinPort, kMaxPort);
 
-      for (let oXsocketType of array_or_undef(oX.$socketType))
-      {
+      for (let oXsocketType of array_or_undef(oX.$socketType)) {
         try {
           oO.socketType = sanitize.translate(oXsocketType,
-              { plain : 1, SSL: 2, STARTTLS: 3 });
+              { plain: 1, SSL: 2, STARTTLS: 3 });
           break; // take first that we support
         } catch (e) { exception = e; }
       }
@@ -158,25 +157,24 @@ function readFromXML(clientConfigXML)
         throw exception ? exception : "need proper <socketType> in XML";
       exception = null;
 
-      for (let oXauth of array_or_undef(oX.$authentication))
-      {
+      for (let oXauth of array_or_undef(oX.$authentication)) {
         try {
           oO.auth = sanitize.translate(oXauth,
               { // open relay
-                "none" : Ci.nsMsgAuthMethod.none,
+                "none": Ci.nsMsgAuthMethod.none,
                 // inside ISP or corp network
-                "client-IP-address" : Ci.nsMsgAuthMethod.none,
+                "client-IP-address": Ci.nsMsgAuthMethod.none,
                 // hope for the best
-                "smtp-after-pop" : Ci.nsMsgAuthMethod.none,
-                "password-cleartext" : Ci.nsMsgAuthMethod.passwordCleartext,
+                "smtp-after-pop": Ci.nsMsgAuthMethod.none,
+                "password-cleartext": Ci.nsMsgAuthMethod.passwordCleartext,
                 // @deprecated TODO remove
-                "plain" : Ci.nsMsgAuthMethod.passwordCleartext,
-                "password-encrypted" : Ci.nsMsgAuthMethod.passwordEncrypted,
+                "plain": Ci.nsMsgAuthMethod.passwordCleartext,
+                "password-encrypted": Ci.nsMsgAuthMethod.passwordEncrypted,
                 // @deprecated TODO remove
-                "secure" : Ci.nsMsgAuthMethod.passwordEncrypted,
-                "GSSAPI" : Ci.nsMsgAuthMethod.GSSAPI,
-                "NTLM" : Ci.nsMsgAuthMethod.NTLM,
-                "OAuth2" : Ci.nsMsgAuthMethod.OAuth2,
+                "secure": Ci.nsMsgAuthMethod.passwordEncrypted,
+                "GSSAPI": Ci.nsMsgAuthMethod.GSSAPI,
+                "NTLM": Ci.nsMsgAuthMethod.NTLM,
+                "OAuth2": Ci.nsMsgAuthMethod.OAuth2,
               });
 
           break; // take first that we support
@@ -219,15 +217,13 @@ function readFromXML(clientConfigXML)
     throw exception ? exception : "Need proper <outgoingServer> in XML file";
   exception = null;
 
-  d.inputFields = new Array();
-  for (let inputField of array_or_undef(xml.$inputField))
-  {
+  d.inputFields = [];
+  for (let inputField of array_or_undef(xml.$inputField)) {
     try {
-      var fieldset =
-      {
-        varname : sanitize.alphanumdash(inputField["@key"]).toUpperCase(),
-        displayName : sanitize.label(inputField["@label"]),
-        exampleValue : sanitize.label(inputField.value)
+      let fieldset = {
+        varname: sanitize.alphanumdash(inputField["@key"]).toUpperCase(),
+        displayName: sanitize.label(inputField["@label"]),
+        exampleValue: sanitize.label(inputField.value),
       };
       d.inputFields.push(fieldset);
     } catch (e) { logException(e); } // for now, don't throw,
@@ -236,3 +232,4 @@ function readFromXML(clientConfigXML)
 
   return d;
 }
+/* eslint-enable complexity */

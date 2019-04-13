@@ -5,7 +5,6 @@
 dialog,
 window,
 prefpane,
-prefwindow,
 .windowDialog {
   -moz-appearance: none;
   background-color: #fbfbfb;
@@ -14,8 +13,17 @@ prefwindow,
   padding: 0;
 }
 
+prefpane {
+  -moz-box-orient: vertical;
+}
+
 .contentPane {
   margin: 0;
+}
+
+.contentPane,
+dialog > .dialog-content-box {
+  padding: 4px;
 }
 
 tabbox {
@@ -97,4 +105,9 @@ textbox.tree-input {
 #colorSelectRow {
   margin-top: 10px;
   margin-inline-start: 4px;
+}
+
+#logView {
+  border: 1px solid var(--in-content-box-border-color);
+  margin: 0 4px 5px;
 }

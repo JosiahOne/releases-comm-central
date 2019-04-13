@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Deprecated.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Deprecated } = ChromeUtils.import("resource://gre/modules/Deprecated.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 this.EXPORTED_SYMBOLS = ["cal"];
 

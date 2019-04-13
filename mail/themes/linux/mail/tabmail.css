@@ -18,12 +18,17 @@
 }
 
 #tabs-toolbar {
-  -moz-binding: url("chrome://messenger/content/toolbar.xml#toolbar-drag");
+  -moz-window-dragging: drag;
 }
 
 #tabs-toolbar:not(:-moz-lwtheme) {
   -moz-appearance: menubar;
   color: -moz-menubartext;
+}
+
+:root[tabsintitlebar][sizemode=normal] #mail-toolbar-menubar2[autohide=true] ~
+  #tabs-toolbar > #tabbar-toolbar {
+  margin-inline-start: 40px;
 }
 
 #tabpanelcontainer:-moz-lwtheme {
@@ -65,7 +70,12 @@ tabpanels {
  */
 
 .tabmail-arrowscrollbox > .scrollbutton-up,
-.tabmail-arrowscrollbox > stack > .scrollbutton-down,
+.tabmail-arrowscrollbox > stack > .scrollbutton-down {
+  -moz-appearance: none;
+  padding: 3px !important;
+  border-style: none !important;
+}
+
 .tabmail-arrowscrollbox > .scrollbutton-up > .toolbarbutton-icon,
 .tabmail-arrowscrollbox > stack > .scrollbutton-down > .toolbarbutton-icon {
   -moz-appearance: none;
@@ -102,4 +112,9 @@ tabpanels {
 
 .alltabs-item > .menu-iconic-left {
   visibility: visible !important;
+}
+
+/* Content Tabs */
+.contentTabAddress {
+  height: 32px;
 }

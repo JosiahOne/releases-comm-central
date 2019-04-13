@@ -9,14 +9,16 @@
 
 // make SOLO_TEST=composition/test-drafts.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-drafts";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "compose-helpers",
                        "window-helpers", "notificationbox-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var kBoxId = "msgNotificationBar";
 var draftsFolder;
@@ -93,9 +95,9 @@ function internal_check_delivery_format(editDraft) {
   // Select our wanted format.
   if (!mc.mozmillModule.isMac) {
     cwc.click(cwc.eid("optionsMenu"));
-    formatMenu = cwc.click_menus_in_sequence(cwc.e("optionsMenuPopup"),
-                                             [ { id: "outputFormatMenu" },
-                                               { id: "format_both" } ]);
+    cwc.click_menus_in_sequence(cwc.e("optionsMenuPopup"),
+                                [ { id: "outputFormatMenu" },
+                                  { id: "format_both" } ]);
   } else {
     // On OS X the main menu seems not accessible for clicking from mozmill.
     assert_true(cwc.e("outputFormatMenu").getAttribute("oncommand").startsWith("OutputFormatMenuSelect("));
@@ -106,7 +108,7 @@ function internal_check_delivery_format(editDraft) {
    * Check if the right format is selected in the menu.
    *
    * @param aMenuItemId  The id of the menuitem expected to be selected.
-   * @param aValue       A value of nsIMsgCompSendFormat contants of the expected selected format.
+   * @param aValue       A value of nsIMsgCompSendFormat constants of the expected selected format.
    */
   function assert_format_value(aMenuItemId, aValue) {
     if (!mc.mozmillModule.isMac) {
@@ -261,9 +263,7 @@ function test_remove_space_stuffing_format_flowed() {
   mc.click(mc.eid(kBoxId, {tagName: "button", label: "Edit"}));
   cwc = wait_for_compose_window();
 
-  let bodyText = cwc.e("content-frame").contentDocument
-                    .querySelector("body").innerHTML;
-
+  let bodyText = get_compose_body(cwc).innerHTML;
   if (!bodyText.includes("NoSpace<br> OneSpace<br>  TwoSpaces")) {
     assert_true(false, "Something went wrong with space stuffing");
   }

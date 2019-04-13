@@ -3,8 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+/* import-globals-from MsgComposeCommands.js */
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 top.MAX_RECIPIENTS = 1; /* for the initial listitem created in the XUL */
 
@@ -19,23 +20,18 @@ var gDragService = Cc["@mozilla.org/widget/dragservice;1"]
 
 var test_addresses_sequence = false;
 
-try {
-  if (sPrefs)
-    test_addresses_sequence = sPrefs.getBoolPref("mail.debug.test_addresses_sequence");
+if (Services.prefs.getPrefType("mail.debug.test_addresses_sequence") == Ci.nsIPrefBranch.PREF_BOOL) {
+  test_addresses_sequence = Services.prefs.getBoolPref("mail.debug.test_addresses_sequence");
 }
-catch (ex) {}
 
-function awGetMaxRecipients()
-{
+function awGetMaxRecipients() {
   return top.MAX_RECIPIENTS;
 }
 
-function awGetNumberOfCols()
-{
-  if (gNumberOfCols == 0)
-  {
-    var listbox = document.getElementById('addressingWidget');
-    var listCols = listbox.getElementsByTagName('listcol');
+function awGetNumberOfCols() {
+  if (gNumberOfCols == 0) {
+    var listbox = document.getElementById("addressingWidget");
+    var listCols = listbox.getElementsByTagName("treecol");
     gNumberOfCols = listCols.length;
     if (!gNumberOfCols)
       gNumberOfCols = 1;  /* if no cols defined, that means we have only one! */
@@ -47,8 +43,7 @@ function awGetNumberOfCols()
 /**
  * Adjust the default and minimum number of visible recipient rows for addressingWidget
  */
-function awInitializeNumberOfRowsShown()
-{
+function awInitializeNumberOfRowsShown() {
   let msgHeadersToolbar = document.getElementById("MsgHeadersToolbar");
   let addressingWidget = document.getElementById("addressingWidget");
   let awNumRowsShownDefault =
@@ -68,23 +63,21 @@ function awInitializeNumberOfRowsShown()
   // especially on small screens.
   msgHeadersToolbar.minHeight = msgHeadersToolbar.boxObject.height;
 
-  // Set default number of rows shown for address widget.
-  addressingWidget.setAttribute("rows", awNumRowsShownDefault);
-  msgHeadersToolbar.height = msgHeadersToolbar.boxObject.height + extraHeight;
+  msgHeadersToolbar.height = msgHeadersToolbar.boxObject.height +
+    addressingWidget.boxObject.height * (awNumRowsShownDefault - 1) +
+    extraHeight;
 
   // Update addressingWidget internals.
   awCreateOrRemoveDummyRows();
 }
 
-function awInputElementName()
-{
+function awInputElementName() {
   if (inputElementType == "")
     inputElementType = document.getElementById("addressCol2#1").localName;
   return inputElementType;
 }
 
-function awSelectElementName()
-{
+function awSelectElementName() {
   if (selectElementType == "")
       selectElementType = document.getElementById("addressCol1#1").localName;
   return selectElementType;
@@ -92,15 +85,12 @@ function awSelectElementName()
 
 // TODO: replace awGetSelectItemIndex with recipient type index constants
 
-function awGetSelectItemIndex(itemData)
-{
-  if (selectElementIndexTable == null)
-  {
-    selectElementIndexTable = new Object();
+function awGetSelectItemIndex(itemData) {
+  if (selectElementIndexTable == null) {
+    selectElementIndexTable = {};
     var selectElem = document.getElementById("addressCol1#1");
-    for (var i = 0; i < selectElem.childNodes[0].childNodes.length; i ++)
-    {
-      var aData = selectElem.childNodes[0].childNodes[i].getAttribute("value");
+    for (var i = 0; i < selectElem.menupopup.childNodes.length; i++) {
+      var aData = selectElem.menupopup.childNodes[i].getAttribute("value");
       selectElementIndexTable[aData] = i;
     }
   }
@@ -108,91 +98,103 @@ function awGetSelectItemIndex(itemData)
   return selectElementIndexTable[itemData];
 }
 
-function Recipients2CompFields(msgCompFields)
-{
+function Recipients2CompFields(msgCompFields) {
   if (!msgCompFields) {
     throw new Error("Message Compose Error: msgCompFields is null (ExtractRecipients)");
-    return;
   }
-    var i = 1;
-    var addrTo = "";
-    var addrCc = "";
-    var addrBcc = "";
-    var addrReply = "";
-    var addrNg = "";
-    var addrFollow = "";
-    var to_Sep = "";
-    var cc_Sep = "";
-    var bcc_Sep = "";
-    var reply_Sep = "";
-    var ng_Sep = "";
-    var follow_Sep = "";
 
-    var recipientType;
-    var inputField;
-    var fieldValue;
-    var recipient;
-    while ((inputField = awGetInputElement(i)))
-    {
-      fieldValue = inputField.value;
-      if (fieldValue != "")
-      {
-        recipientType = awGetPopupElement(i).value;
-        recipient = null;
+  var i = 1;
+  var addrTo = "";
+  var addrCc = "";
+  var addrBcc = "";
+  var addrReply = "";
+  var addrNg = "";
+  var addrFollow = "";
+  var to_Sep = "";
+  var cc_Sep = "";
+  var bcc_Sep = "";
+  var reply_Sep = "";
+  var ng_Sep = "";
+  var follow_Sep = "";
 
-        switch (recipientType)
-        {
-          case "addr_to"    :
-          case "addr_cc"    :
-          case "addr_bcc"   :
-          case "addr_reply" :
-            try {
-              let headerParser = MailServices.headerParser;
-              recipient =
-                headerParser.makeFromDisplayAddress(fieldValue, {})
-                            .map(fullValue => headerParser.makeMimeAddress(fullValue.name,
-                                                                           fullValue.email))
-                            .join(", ");
-            } catch (ex) {
-              recipient = fieldValue;
-            }
-            break;
-        }
+  var recipientType;
+  var inputField;
+  var fieldValue;
+  var recipient;
+  while ((inputField = awGetInputElement(i))) {
+    fieldValue = inputField.value;
+    if (fieldValue != "") {
+      recipientType = awGetPopupElement(i).value;
+      recipient = null;
 
-        switch (recipientType)
-        {
-          case "addr_to"          : addrTo += to_Sep + recipient; to_Sep = ",";               break;
-          case "addr_cc"          : addrCc += cc_Sep + recipient; cc_Sep = ",";               break;
-          case "addr_bcc"         : addrBcc += bcc_Sep + recipient; bcc_Sep = ",";            break;
-          case "addr_reply"       : addrReply += reply_Sep + recipient; reply_Sep = ",";      break;
-          case "addr_newsgroups"  : addrNg += ng_Sep + fieldValue; ng_Sep = ",";              break;
-          case "addr_followup"    : addrFollow += follow_Sep + fieldValue; follow_Sep = ",";  break;
-          case "addr_other":
-            let headerName = awGetPopupElement(i).label;
-            headerName = headerName.substring(0, headerName.indexOf(':'));
-            msgCompFields.setRawHeader(headerName, fieldValue, null);
-            break;
-        }
+      switch (recipientType) {
+        case "addr_to":
+        case "addr_cc":
+        case "addr_bcc":
+        case "addr_reply":
+          try {
+            let headerParser = MailServices.headerParser;
+            recipient =
+              headerParser.makeFromDisplayAddress(fieldValue, {})
+                          .map(fullValue => headerParser.makeMimeAddress(fullValue.name,
+                                                                         fullValue.email))
+                          .join(", ");
+          } catch (ex) {
+            recipient = fieldValue;
+          }
+          break;
       }
-      i ++;
-    }
 
-    msgCompFields.to = addrTo;
-    msgCompFields.cc = addrCc;
-    msgCompFields.bcc = addrBcc;
-    msgCompFields.replyTo = addrReply;
-    msgCompFields.newsgroups = addrNg;
-    msgCompFields.followupTo = addrFollow;
+      switch (recipientType) {
+        case "addr_to":
+          addrTo += to_Sep + recipient;
+          to_Sep = ",";
+          break;
+        case "addr_cc":
+          addrCc += cc_Sep + recipient;
+          cc_Sep = ",";
+          break;
+        case "addr_bcc":
+          addrBcc += bcc_Sep + recipient;
+          bcc_Sep = ",";
+          break;
+        case "addr_reply":
+          addrReply += reply_Sep + recipient;
+          reply_Sep = ",";
+          break;
+        case "addr_newsgroups":
+          addrNg += ng_Sep + fieldValue;
+          ng_Sep = ",";
+          break;
+        case "addr_followup":
+          addrFollow += follow_Sep + fieldValue;
+          follow_Sep = ",";
+          break;
+        case "addr_other":
+          let headerName = awGetPopupElement(i).label;
+          headerName = headerName.substring(0, headerName.indexOf(":"));
+          msgCompFields.setRawHeader(headerName, fieldValue, null);
+          break;
+      }
+    }
+    i++;
+  }
+
+  msgCompFields.to = addrTo;
+  msgCompFields.cc = addrCc;
+  msgCompFields.bcc = addrBcc;
+  msgCompFields.replyTo = addrReply;
+  msgCompFields.newsgroups = addrNg;
+  msgCompFields.followupTo = addrFollow;
 }
 
-function CompFields2Recipients(msgCompFields)
-{
+function CompFields2Recipients(msgCompFields) {
   if (msgCompFields) {
-    let listbox = document.getElementById('addressingWidget');
+    let listbox = document.getElementById("addressingWidget");
     let newListBoxNode = listbox.cloneNode(false);
     let listBoxColsClone = listbox.firstChild.cloneNode(true);
     newListBoxNode.appendChild(listBoxColsClone);
-    let templateNode = listbox.querySelector("listitem");
+    let templateNode = listbox.getElementsByTagName("richlistitem")[0];
     // dump("replacing child in comp fields 2 recips \n");
     listbox.parentNode.replaceChild(newListBoxNode, listbox);
 
@@ -207,11 +209,9 @@ function CompFields2Recipients(msgCompFields)
     if (msgReplyTo)
       awSetInputAndPopupFromArray(msgCompFields.splitRecipients(msgReplyTo, false, {}),
                                   "addr_reply", newListBoxNode, templateNode);
-    if (msgTo)
-    {
+    if (msgTo) {
       let rcp = msgCompFields.splitRecipients(msgTo, false, {});
-      if (rcp.length)
-      {
+      if (rcp.length) {
         awSetInputAndPopupFromArray(rcp, "addr_to", newListBoxNode, templateNode);
         havePrimaryRecipient = true;
       }
@@ -222,8 +222,7 @@ function CompFields2Recipients(msgCompFields)
     if (msgBCC)
       awSetInputAndPopupFromArray(msgCompFields.splitRecipients(msgBCC, false, {}),
                                   "addr_bcc", newListBoxNode, templateNode);
-    if (msgNewsgroups)
-    {
+    if (msgNewsgroups) {
       awSetInputAndPopup(msgNewsgroups, "addr_newsgroups", newListBoxNode, templateNode);
       havePrimaryRecipient = true;
     }
@@ -238,12 +237,11 @@ function CompFields2Recipients(msgCompFields)
     // CompFields2Recipients is called whenever a user replies or edits an existing message. We want to
     // add all of the non-empty recipients for this message to the ignore list for spell check
     let currentAddress = gCurrentIdentity ? gCurrentIdentity.fullAddress : "";
-    addRecipientsToIgnoreList([currentAddress,msgTo,msgCC,msgBCC].filter(adr => adr).join(", "));
+    addRecipientsToIgnoreList([currentAddress, msgTo, msgCC, msgBCC].filter(adr => adr).join(", "));
   }
 }
 
-function awSetInputAndPopupId(inputElem, popupElem, rowNumber)
-{
+function awSetInputAndPopupId(inputElem, popupElem, rowNumber) {
   popupElem.id = "addressCol1#" + rowNumber;
   inputElem.id = "addressCol2#" + rowNumber;
   inputElem.setAttribute("aria-labelledby", popupElem.id);
@@ -262,11 +260,10 @@ function awSetInputAndPopupId(inputElem, popupElem, rowNumber)
  *                                  added in batch when the caller takes care
  *                                  of the notification.
  */
-function awSetInputAndPopupValue(inputElem, inputValue, popupElem, popupValue, rowNumber, aNotifyRecipientsChanged = true)
-{
+function awSetInputAndPopupValue(inputElem, inputValue, popupElem, popupValue, rowNumber, aNotifyRecipientsChanged = true) {
   inputElem.value = inputValue.trimLeft();
 
-  popupElem.selectedItem = popupElem.childNodes[0].childNodes[awGetSelectItemIndex(popupValue)];
+  popupElem.selectedItem = popupElem.menupopup.childNodes[awGetSelectItemIndex(popupValue)];
   // TODO: can there be a row without ID yet?
   if (rowNumber >= 0)
     awSetInputAndPopupId(inputElem, popupElem, rowNumber);
@@ -277,56 +274,47 @@ function awSetInputAndPopupValue(inputElem, inputValue, popupElem, popupValue, r
     onRecipientsChanged(true);
 }
 
-function _awSetInputAndPopup(inputValue, popupValue, parentNode, templateNode)
-{
-    top.MAX_RECIPIENTS++;
+function _awSetInputAndPopup(inputValue, popupValue, parentNode, templateNode) {
+  top.MAX_RECIPIENTS++;
 
-    var newNode = templateNode.cloneNode(true);
-    parentNode.appendChild(newNode); // we need to insert the new node before we set the value of the select element!
+  var newNode = templateNode.cloneNode(true);
+  parentNode.appendChild(newNode); // we need to insert the new node before we set the value of the select element!
 
-    var input = newNode.getElementsByTagName(awInputElementName());
-    var select = newNode.getElementsByTagName(awSelectElementName());
+  var input = newNode.getElementsByTagName(awInputElementName());
+  var select = newNode.getElementsByTagName(awSelectElementName());
 
-    if (input && input.length == 1 && select && select.length == 1)
-      awSetInputAndPopupValue(input[0], inputValue, select[0], popupValue, top.MAX_RECIPIENTS)
+  if (input && input.length == 1 && select && select.length == 1)
+    awSetInputAndPopupValue(input[0], inputValue, select[0], popupValue, top.MAX_RECIPIENTS);
 }
 
-function awSetInputAndPopup(inputValue, popupValue, parentNode, templateNode)
-{
-  if ( inputValue && popupValue )
-  {
+function awSetInputAndPopup(inputValue, popupValue, parentNode, templateNode) {
+  if (inputValue && popupValue) {
     var addressArray = inputValue.split(",");
 
-    for ( var index = 0; index < addressArray.length; index++ )
-        _awSetInputAndPopup(addressArray[index], popupValue, parentNode, templateNode);
+    for (var index = 0; index < addressArray.length; index++)
+      _awSetInputAndPopup(addressArray[index], popupValue, parentNode, templateNode);
   }
 }
 
-function awSetInputAndPopupFromArray(inputArray, popupValue, parentNode, templateNode)
-{
-  if (popupValue)
-  {
+function awSetInputAndPopupFromArray(inputArray, popupValue, parentNode, templateNode) {
+  if (popupValue) {
     for (let recipient of inputArray)
       _awSetInputAndPopup(recipient, popupValue, parentNode, templateNode);
   }
 }
 
-function awRemoveRecipients(msgCompFields, recipientType, recipientsList)
-{
+function awRemoveRecipients(msgCompFields, recipientType, recipientsList) {
   if (!msgCompFields || !recipientsList)
     return;
 
   var recipientArray = msgCompFields.splitRecipients(recipientsList, false, {});
 
   for (var index = 0; index < recipientArray.length; index++)
-    for (var row = 1; row <= top.MAX_RECIPIENTS; row ++)
-    {
+    for (var row = 1; row <= top.MAX_RECIPIENTS; row++) {
       var popup = awGetPopupElement(row);
-      if (popup.value == recipientType)
-      {
+      if (popup.value == recipientType) {
         var input = awGetInputElement(row);
-        if (input.value == recipientArray[index])
-        {
+        if (input.value == recipientArray[index]) {
           awSetInputAndPopupValue(input, "", popup, "addr_to", -1);
           break;
         }
@@ -342,8 +330,7 @@ function awRemoveRecipients(msgCompFields, recipientType, recipientsList)
  * @param recipientType  Type of recipient, e.g. "addr_to".
  * @param recipientList  A string of addresses to add.
  */
-function awAddRecipients(msgCompFields, recipientType, recipientsList)
-{
+function awAddRecipients(msgCompFields, recipientType, recipientsList) {
   if (!msgCompFields || !recipientsList)
     return;
 
@@ -357,26 +344,20 @@ function awAddRecipients(msgCompFields, recipientType, recipientsList)
  * @param aRecipientType  Type of recipient, e.g. "addr_to".
  * @param aAddressArray   An array of recipient addresses (strings) to add.
  */
-function awAddRecipientsArray(aRecipientType, aAddressArray)
-{
+function awAddRecipientsArray(aRecipientType, aAddressArray) {
   // Find rows that are empty so that we can fill them.
   let emptyRows = [];
-  for (let row = 1; row <= top.MAX_RECIPIENTS; row ++)
-  {
+  for (let row = 1; row <= top.MAX_RECIPIENTS; row++) {
     if (awGetInputElement(row).value == "")
       emptyRows.push(row);
   }
 
   // Push the new recipients into the found empty rows or append new rows when needed.
   let row = 1;
-  for (let address of aAddressArray)
-  {
-    if (emptyRows.length > 0)
-    {
+  for (let address of aAddressArray) {
+    if (emptyRows.length > 0) {
       row = emptyRows.shift();
-    }
-    else
-    {
+    } else {
       awAppendNewRow(false);
       row = top.MAX_RECIPIENTS;
     }
@@ -387,8 +368,7 @@ function awAddRecipientsArray(aRecipientType, aAddressArray)
   }
 
   // Be sure we still have an empty row left.
-  if ((emptyRows.length == 0) && (awGetInputElement(top.MAX_RECIPIENTS).value != ""))
-  {
+  if ((emptyRows.length == 0) && (awGetInputElement(top.MAX_RECIPIENTS).value != "")) {
     // Insert empty row at the end and focus.
     awAppendNewRow(true);
     awSetInputAndPopupValue(awGetInputElement(top.MAX_RECIPIENTS), "",
@@ -397,7 +377,7 @@ function awAddRecipientsArray(aRecipientType, aAddressArray)
   } else {
     // Focus the next empty row, if any, or the pre-existing empty last row.
     row = (emptyRows.length > 0) ? emptyRows.shift() : top.MAX_RECIPIENTS;
-    awSetFocus(row, awGetInputElement(row));
+    awSetFocusTo(awGetInputElement(row));
   }
 
   onRecipientsChanged(true);
@@ -414,13 +394,11 @@ function awAddRecipientsArray(aRecipientType, aAddressArray)
  * @param aRecipientType  Type of recipient, e.g. addr_to.
  * @param aAddress        A string with recipient address.
  */
-function awAddRecipient(aRecipientType, aAddress)
-{
+function awAddRecipient(aRecipientType, aAddress) {
   awAddRecipientsArray(aRecipientType, [aAddress]);
 }
 
-function awTestRowSequence()
-{
+function awTestRowSequence() {
   /*
     This function is for debug and testing purpose only, normal user should not run it!
 
@@ -435,100 +413,86 @@ function awTestRowSequence()
 
   /* debug code to verify the sequence still good */
 
-  let listbox = document.getElementById('addressingWidget');
-  let listitems = listbox.getElementsByTagName('listitem');
-  if (listitems.length >= top.MAX_RECIPIENTS )
-  {
-    for (let i = 1; i <= listitems.length; i ++)
-    {
-      let item = listitems [i - 1];
+  let listbox = document.getElementById("addressingWidget");
+  let listitems = listbox.getElementsByTagName("richlistitem");
+  if (listitems.length >= top.MAX_RECIPIENTS) {
+    for (let i = 1; i <= listitems.length; i++) {
+      let item = listitems[i - 1];
       let inputID = item.querySelector(awInputElementName()).id.split("#")[1];
       let popupID = item.querySelector(awSelectElementName()).id.split("#")[1];
-      if (inputID != i || popupID != i)
-      {
+      if (inputID != i || popupID != i) {
         dump("#ERROR: sequence broken at row " + i + ", inputID=" + inputID + ", popupID=" + popupID + "\n");
         return false;
       }
       dump("---SEQUENCE OK---\n");
       return true;
     }
-  }
-  else
+  } else {
     dump("#ERROR: listitems.length(" + listitems.length + ") < top.MAX_RECIPIENTS(" + top.MAX_RECIPIENTS + ")\n");
+  }
 
   return false;
 }
 
-function awCleanupRows()
-{
+function awCleanupRows() {
   var maxRecipients = top.MAX_RECIPIENTS;
   var rowID = 1;
 
-  for (var row = 1; row <= maxRecipients; row ++)
-  {
+  for (var row = 1; row <= maxRecipients; row++) {
     var inputElem = awGetInputElement(row);
-    if (inputElem.value == "" && row < maxRecipients)
+    if (inputElem.value == "" && row < maxRecipients) {
       awRemoveRow(awGetRowByInputElement(inputElem));
-    else
-    {
+    } else {
       awSetInputAndPopupId(inputElem, awGetPopupElement(row), rowID);
-      rowID ++;
+      rowID++;
     }
   }
 
   awTestRowSequence();
 }
 
-function awDeleteRow(rowToDelete)
-{
+function awDeleteRow(rowToDelete) {
   // When we delete a row, we must reset the id of other rows in order to not break the sequence.
   var maxRecipients = top.MAX_RECIPIENTS;
   awRemoveRow(rowToDelete);
 
   // assume 2 column update (input and popup)
-  for (var row = rowToDelete + 1; row <= maxRecipients; row ++)
-    awSetInputAndPopupId(awGetInputElement(row), awGetPopupElement(row), (row-1));
+  for (var row = rowToDelete + 1; row <= maxRecipients; row++)
+    awSetInputAndPopupId(awGetInputElement(row), awGetPopupElement(row), (row - 1));
 
   awTestRowSequence();
 }
 
-function awClickEmptySpace(target, setFocus)
-{
-  if (document.getElementById("addressCol2#1").disabled || target == null ||
-      (target.localName != "listboxbody" &&
-      target.localName != "listcell" &&
-      target.localName != "listitem"))
+function awClickEmptySpace(target, setFocus) {
+  if (document.getElementById("addressCol2#1").disabled ||
+      target == null ||
+      target.localName != "hbox")
     return;
 
-  var lastInput = awGetInputElement(top.MAX_RECIPIENTS);
+  let lastInput = awGetInputElement(top.MAX_RECIPIENTS);
 
-  if ( lastInput && lastInput.value )
+  if (lastInput && lastInput.value)
     awAppendNewRow(setFocus);
-  else
-    if (setFocus)
-      awSetFocus(top.MAX_RECIPIENTS, lastInput);
+  else if (setFocus)
+    awSetFocusTo(lastInput);
 }
 
-function awReturnHit(inputElement)
-{
-  var row = awGetRowByInputElement(inputElement);
-  var nextInput = awGetInputElement(row+1);
+function awReturnHit(inputElement) {
+  let row = awGetRowByInputElement(inputElement);
+  let nextInput = awGetInputElement(row + 1);
 
-  if ( !nextInput )
-  {
-    if ( inputElement.value )
+  if (!nextInput) {
+    if (inputElement.value) {
       awAppendNewRow(true);
-    else // No address entered, switch to Subject field
-    {
-      var subjectField = document.getElementById( 'msgSubject' );
+    } else {
+      // No address entered, switch to Subject field
+      let subjectField = document.getElementById("msgSubject");
       subjectField.select();
       subjectField.focus();
     }
-  }
-  else
-  {
+  } else {
     nextInput.select();
-    awSetFocus(row+1, nextInput);
+    awSetFocusTo(nextInput);
   }
 
   // be sure to add the user add recipient to our ignore list
@@ -536,49 +500,73 @@ function awReturnHit(inputElement)
   addRecipientsToIgnoreList(inputElement.value);
 }
 
-function awDeleteHit(inputElement)
-{
-  var row = awGetRowByInputElement(inputElement);
+function awDeleteAddressOnClick(deleteAddressElement) {
+  awDeleteHit(deleteAddressElement.parentNode.parentNode
+                                  .querySelector("textbox.textbox-addressingWidget"),
+                                  true);
+}
 
-  /* 1. don't delete the row if it's the last one remaining, just reset it! */
-  if (top.MAX_RECIPIENTS <= 1)
-  {
+/**
+ * Delete recipient row (addressingWidgetItem) from UI.
+ *
+ * @param {<xul:textbox>} inputElement  the recipient input XUL textbox element
+ *                                      (textbox-addressingWidget) whose parent
+ *                                      row (addressingWidgetItem) will be deleted.
+ * @param {boolean} deleteForward  true: focus next row after deleting the row
+ *                                 false: focus previous row after deleting the row
+ */
+function awDeleteHit(inputElement, deleteForward = false) {
+  let row = awGetRowByInputElement(inputElement);
+
+  // Don't delete the row if it's the last one remaining; just reset it.
+  if (top.MAX_RECIPIENTS <= 1) {
     inputElement.value = "";
     return;
   }
 
-  /* 2. Set the focus to the previous field if possible */
-  if (row > 1)
-    awSetFocus(row - 1, awGetInputElement(row - 1))
-  else
-    awSetFocus(1, awGetInputElement(2))   /* We have to cheat a little bit because the focus will */
-                                          /* be set asynchronusly after we delete the current row, */
-                                          /* therefore the row number still the same! */
+  // Set the focus to the input field of the next/previous row according to
+  // the direction of deleting if possible.
+  // Note: awSetFocusTo() is asynchronous, i.e. we'll focus after row removal.
+  if (!deleteForward && row > 1 ||
+      deleteForward && row == top.MAX_RECIPIENTS) {
+    // We're deleting backwards, but not the first row,
+    // or forwards on the last row: Focus previous row.
+    awSetFocusTo(awGetInputElement(row - 1));
+  } else {
+    // We're deleting forwards, but not the last row,
+    // or backwards on the first row: Focus next row.
+    awSetFocusTo(awGetInputElement(row + 1));
+  }
 
-  /* 3. Delete the row */
+  // Delete the row.
   awDeleteRow(row);
 }
 
-function awInputChanged(inputElement)
-{
-  //Do we need to add a new row?
-  var lastInput = awGetInputElement(top.MAX_RECIPIENTS);
-  if ( lastInput && lastInput.value && !top.doNotCreateANewRow)
-    awAppendNewRow(false);
-  top.doNotCreateANewRow = false;
+// If we add a menulist to the DOM, it has some child nodes added to it
+// by the menulist custom element. If we then clone the menulist and add
+// it to the DOM again, more child nodes are added and we end up with
+// bug 1525828. This function clones any menulist as it originally was.
+function _menulistFriendlyClone(element) {
+  let clone = element.cloneNode(false);
+  if (element.localName == "menulist") {
+    clone.appendChild(element.menupopup.cloneNode(true));
+    return clone;
+  }
+  for (let child of element.children) {
+    clone.appendChild(_menulistFriendlyClone(child));
+  }
+  return clone;
 }
 
-function awAppendNewRow(setFocus)
-{
-  var listbox = document.getElementById('addressingWidget');
+function awAppendNewRow(setFocus) {
+  var listbox = document.getElementById("addressingWidget");
   var listitem1 = awGetListItem(1);
 
-  if ( listbox && listitem1 )
-  {
+  if (listbox && listitem1) {
     var lastRecipientType = awGetPopupElement(top.MAX_RECIPIENTS).value;
 
     var nextDummy = awGetNextDummyRow();
-    var newNode = listitem1.cloneNode(true);
+    var newNode = _menulistFriendlyClone(listitem1);
     if (nextDummy)
       listbox.replaceChild(newNode, nextDummy);
     else
@@ -587,8 +575,7 @@ function awAppendNewRow(setFocus)
     top.MAX_RECIPIENTS++;
 
     var input = newNode.getElementsByTagName(awInputElementName());
-    if ( input && input.length == 1 )
-    {
+    if (input && input.length == 1) {
       input[0].value = "";
 
       // We always clone the first row.  The problem is that the first row
@@ -607,18 +594,16 @@ function awAppendNewRow(setFocus)
       input[0].removeAttribute("nomatch");
     }
     var select = newNode.getElementsByTagName(awSelectElementName());
-    if ( select && select.length == 1 )
-    {
+    if (select && select.length == 1) {
       // It only makes sense to clone some field types; others
       // should not be cloned, since it just makes the user have
       // to go to the trouble of selecting something else. In such
       // cases let's default to 'To' (a reasonable default since
       // we already default to 'To' on the first dummy field of
       // a new message).
-      switch (lastRecipientType)
-      {
-        case  "addr_reply":
-        case  "addr_other":
+      switch (lastRecipientType) {
+        case "addr_reply":
+        case "addr_other":
           select[0].selectedIndex = awGetSelectItemIndex("addr_to");
           break;
         case "addr_followup":
@@ -635,9 +620,9 @@ function awAppendNewRow(setFocus)
         _awSetAutoComplete(select[0], input[0]);
     }
 
-    // focus on new input widget
-    if (setFocus && input[0] )
-      awSetFocus(top.MAX_RECIPIENTS, input[0]);
+    // Focus the new input widget
+    if (setFocus && input[0])
+      awSetFocusTo(input[0]);
   }
 }
 
@@ -649,9 +634,7 @@ function awAppendNewRow(setFocus)
  * @param row  Index of the recipient row to return. Starts at 1.
  * @return     This returns the menulist (not its child menupopup), despite the function name.
  */
-function awGetPopupElement(row)
-{
-
+function awGetPopupElement(row) {
     return document.getElementById("addressCol1#" + row);
 }
 
@@ -661,129 +644,89 @@ function awGetPopupElement(row)
  * @param row  Index of the recipient row to return. Starts at 1.
  * @return     This returns the textbox element.
  */
-function awGetInputElement(row)
-{
+function awGetInputElement(row) {
     return document.getElementById("addressCol2#" + row);
 }
 
-function awGetElementByCol(row, col)
-{
+function awGetElementByCol(row, col) {
   var colID = "addressCol" + col + "#" + row;
   return document.getElementById(colID);
 }
 
-function awGetListItem(row)
-{
-  var listbox = document.getElementById('addressingWidget');
+function awGetListItem(row) {
+  var listbox = document.getElementById("addressingWidget");
 
-  if ( listbox && row > 0)
-  {
-    var listitems = listbox.getElementsByTagName('listitem');
-    if ( listitems && listitems.length >= row )
-      return listitems[row-1];
+  if (listbox && row > 0) {
+    var listitems = listbox.getElementsByTagName("richlistitem");
+    if (listitems && listitems.length >= row)
+      return listitems[row - 1];
   }
   return 0;
 }
 
-function awGetRowByInputElement(inputElement)
-{
+function awGetRowByInputElement(inputElement) {
   var row = 0;
   if (inputElement) {
     var listitem = inputElement.parentNode.parentNode;
     while (listitem) {
-      if (listitem.localName == "listitem")
+      if (listitem.localName == "richlistitem") {
         ++row;
+      }
       listitem = listitem.previousSibling;
     }
   }
   return row;
 }
 
-
 // Copy Node - copy this node and insert ahead of the (before) node.  Append to end if before=0
-function awCopyNode(node, parentNode, beforeNode)
-{
+function awCopyNode(node, parentNode, beforeNode) {
   var newNode = node.cloneNode(true);
 
-  if ( beforeNode )
+  if (beforeNode)
     parentNode.insertBefore(newNode, beforeNode);
   else
     parentNode.appendChild(newNode);
 
-    return newNode;
+  return newNode;
 }
 
-// remove row
-
-function awRemoveRow(row)
-{
+function awRemoveRow(row) {
   awGetListItem(row).remove();
   awFitDummyRows();
 
-  top.MAX_RECIPIENTS --;
+  top.MAX_RECIPIENTS--;
 }
 
-
-function awSetFocus(row, inputElement)
-{
-  top.awRow = row;
-  top.awInputElement = inputElement;
-  setTimeout(_awSetFocus, 0);
+/**
+ * Set focus to the specified element, typically a recipient input element.
+ * We do this asynchronously to allow other processes like adding or removing rows
+ * to complete before shifting focus.
+ *
+ * @param element  the element to receive focus asynchronously
+ */
+function awSetFocusTo(element) {
+  // Remember the (input) element to focus for asynchronous focusing, so that we
+  // play safe if this gets called again and the original element gets removed
+  // before we can focus it.
+  top.awInputToFocus = element;
+  setTimeout(_awSetFocusTo, 0);
 }
 
-function _awSetFocus()
-{
-  var listbox = document.getElementById('addressingWidget');
-  var theNewRow = awGetListItem(top.awRow);
-
-  // Warning: firstVisibleRow is zero base but top.awRow is one base!
-  var firstVisibleRow = listbox.getIndexOfFirstVisibleRow();
-  var numOfVisibleRows = listbox.getNumberOfVisibleRows();
-
-  // Do we need to scroll in order to see the selected row?
-  if (top.awRow <= firstVisibleRow)
-    listbox.scrollToIndex(top.awRow - 1);
-  else if (top.awRow - 1 >= (firstVisibleRow + numOfVisibleRows))
-    listbox.scrollToIndex(top.awRow - numOfVisibleRows);
-
-  top.awInputElement.focus();
+function _awSetFocusTo() {
+  top.awInputToFocus.focus();
 }
 
-function awTabFromRecipient(element, event)
-{
-  // If we are the last element in the listbox, we don't want to create a new row.
-  if (element == awGetInputElement(top.MAX_RECIPIENTS))
-    top.doNotCreateANewRow = true;
-
-  var row = awGetRowByInputElement(element);
-  if (!event.shiftKey && row < top.MAX_RECIPIENTS) {
-    var listBoxRow = row - 1; // listbox row indices are 0-based, ours are 1-based.
-    var listBox = document.getElementById("addressingWidget");
-    listBox.listBoxObject.ensureIndexIsVisible(listBoxRow + 1);
-  }
-
-  // be sure to add the user add recipient to our ignore list
-  // when the user tabs out of an autocomplete line...
-  addRecipientsToIgnoreList(element.value);
+// Deprecated - use awSetFocusTo() instead.
+// ### TODO: This function should be removed if we're sure addons aren't using it.
+function awSetFocus(row, inputElement) {
+  awSetFocusTo(inputElement);
 }
 
-function awTabFromMenulist(element, event)
-{
-  var row = awGetRowByInputElement(element);
-  if (event.shiftKey && row > 1) {
-    var listBoxRow = row - 1; // listbox row indices are 0-based, ours are 1-based.
-    var listBox = document.getElementById("addressingWidget");
-    listBox.listBoxObject.ensureIndexIsVisible(listBoxRow - 1);
-  }
+function awGetNumberOfRecipients() {
+  return top.MAX_RECIPIENTS;
 }
 
-function awGetNumberOfRecipients()
-{
-    return top.MAX_RECIPIENTS;
-}
-
-function DragOverAddressingWidget(event)
-{
+function DragOverAddressingWidget(event) {
   var validFlavor = false;
   var dragSession = dragSession = gDragService.getCurrentSession();
 
@@ -794,24 +737,22 @@ function DragOverAddressingWidget(event)
     dragSession.canDrop = true;
 }
 
-function DropOnAddressingWidget(event)
-{
+function DropOnAddressingWidget(event) {
   var dragSession = gDragService.getCurrentSession();
 
   var trans = Cc["@mozilla.org/widget/transferable;1"].createInstance(Ci.nsITransferable);
   trans.init(getLoadContext());
   trans.addDataFlavor("text/x-moz-address");
 
-  for ( var i = 0; i < dragSession.numDropItems; ++i )
-  {
-    dragSession.getData ( trans, i );
-    var dataObj = new Object();
-    var bestFlavor = new Object();
-    var len = new Object();
-    trans.getAnyTransferData ( bestFlavor, dataObj, len );
-    if ( dataObj )
+  for (var i = 0; i < dragSession.numDropItems; ++i) {
+    dragSession.getData(trans, i);
+    var dataObj = {};
+    var bestFlavor = {};
+    var len = {};
+    trans.getAnyTransferData(bestFlavor, dataObj, len);
+    if (dataObj)
       dataObj = dataObj.value.QueryInterface(Ci.nsISupportsString);
-    if ( !dataObj )
+    if (!dataObj)
       continue;
 
     // pull the address out of the data object
@@ -823,89 +764,108 @@ function DropOnAddressingWidget(event)
   }
 }
 
-function DropRecipient(target, recipient)
-{
+function DropRecipient(target, recipient) {
   // break down and add each address
   return parseAndAddAddresses(recipient, awGetPopupElement(top.MAX_RECIPIENTS).value);
 }
 
-function _awSetAutoComplete(selectElem, inputElem)
-{
-  let params = JSON.parse(inputElem.getAttribute('autocompletesearchparam'));
+function _awSetAutoComplete(selectElem, inputElem) {
+  let params = JSON.parse(inputElem.getAttribute("autocompletesearchparam"));
   params.type = selectElem.value;
-  inputElem.setAttribute('autocompletesearchparam', JSON.stringify(params));
+  inputElem.setAttribute("autocompletesearchparam", JSON.stringify(params));
 }
 
-function awSetAutoComplete(rowNumber)
-{
-    var inputElem = awGetInputElement(rowNumber);
-    var selectElem = awGetPopupElement(rowNumber);
-    _awSetAutoComplete(selectElem, inputElem)
+function awSetAutoComplete(rowNumber) {
+  var inputElem = awGetInputElement(rowNumber);
+  var selectElem = awGetPopupElement(rowNumber);
+  _awSetAutoComplete(selectElem, inputElem);
 }
 
-function awRecipientTextCommand(enterEvent, element)
-{
+function awRecipientOnFocus(inputElement) {
+  inputElement.select();
+}
+
+function awRecipientTextCommand(enterEvent, element) {
   // Only add new row when enter was hit (not for tab/autocomplete select).
   if (enterEvent)
     awReturnHit(element);
 }
 
-function awRecipientKeyPress(event, element)
-{
-  switch(event.keyCode) {
-  case KeyEvent.DOM_VK_RETURN:
-  case KeyEvent.DOM_VK_TAB:
-    // if the user text contains a comma or a line return, ignore
-    if (element.value.includes(','))
-    {
-      var addresses = element.value;
-      element.value = ""; // clear out the current line so we don't try to autocomplete it..
-      parseAndAddAddresses(addresses, awGetPopupElement(awGetRowByInputElement(element)).value);
-    }
-    else if (event.keyCode == KeyEvent.DOM_VK_TAB)
-      awTabFromRecipient(element, event);
+function awRecipientKeyPress(event, element) {
+  switch (event.key) {
+    case "Enter":
+    case "Tab":
+      // If the recipient input text contains a comma (we also convert pasted line
+      // feeds into commas), check if multiple recipients and add them accordingly.
+      if (element.value.includes(",")) {
+        let addresses = element.value;
+        element.value = ""; // Clear out the current line so we don't try to autocomplete it.
+        parseAndAddAddresses(addresses, awGetPopupElement(awGetRowByInputElement(element)).value);
+      } else if (event.key == "Tab") {
+        // Single recipient added via Tab key:
+        // Add the recipient to our spellcheck ignore list.
+        // For Enter key, this is done in awReturnHit().
+        addRecipientsToIgnoreList(element.value);
+      }
 
-    break;
+      break;
   }
 }
 
-function awRecipientKeyDown(event, element)
-{
-  switch(event.keyCode) {
-  case KeyEvent.DOM_VK_DELETE:
-  case KeyEvent.DOM_VK_BACK_SPACE:
-    if (!element.value)
-      awDeleteHit(element);
+/**
+ * Handle keydown event on a recipient input textbox.
+ * Enables recipient row deletion with DEL or BACKSPACE and
+ * recipient list navigation with cursor up/down.
+ *
+ * Note that the keydown event fires for ALL keys, so this may affect
+ * autocomplete as user enters a recipient text.
+ *
+ * @param {keydown event} event  the keydown event fired on a recipient input
+ * @param {<xul:textbox>} inputElement  the recipient input XUL textbox element
+ *                                      on which the event fired (textbox-addressingWidget)
+ */
+function awRecipientKeyDown(event, inputElement) {
+  switch (event.key) {
+    // Enable deletion of empty recipient rows.
+    case "Delete":
+    case "Backspace":
+      if (inputElement.textLength == 1 && event.repeat) {
+        // User is holding down Delete or Backspace to delete recipient text
+        // inline and is now deleting the last character: Set flag to
+        // temporarily block row deletion.
+        top.awRecipientInlineDelete = true;
+      }
+      if (!inputElement.value && !event.altKey) {
+        // When user presses DEL or BACKSPACE on an empty row, and it's not an
+        // ongoing inline deletion, and not ALT+BACKSPACE for input undo,
+        // we delete the row.
+        if (top.awRecipientInlineDelete && !event.repeat) {
+          // User has released and re-pressed Delete or Backspace key
+          // after holding them down to delete recipient text inline:
+          // unblock row deletion.
+          top.awRecipientInlineDelete = false;
+        }
+        if (!top.awRecipientInlineDelete) {
+          let deleteForward = (event.key == "Delete");
+          awDeleteHit(inputElement, deleteForward);
+        }
+      }
+      break;
 
-    // We need to stop the event else the listbox will receive it and the
-    // function awKeyDown will be executed!
-    event.stopPropagation();
-    break;
-  }
-}
-
-function awKeyDown(event, listboxElement)
-{
-  switch(event.keyCode) {
-  case KeyEvent.DOM_VK_DELETE:
-  case KeyEvent.DOM_VK_BACK_SPACE:
-    /* Warning, the listboxElement.selectedItems will change every time we delete a row */
-    var length = listboxElement.selectedCount;
-    for (var i = 1; i <= length; i++) {
-      var inputs = listboxElement.selectedItem.getElementsByTagName(awInputElementName());
-      if (inputs && inputs.length == 1)
-        awDeleteHit(inputs[0]);
-    }
-    break;
-  }
-}
-
-function awMenulistKeyPress(event, element)
-{
-  switch(event.keyCode) {
-  case KeyEvent.DOM_VK_TAB:
-    awTabFromMenulist(element, event);
-    break;
+    // Enable browsing the list of recipients up and down with cursor keys.
+    case "ArrowDown":
+    case "ArrowUp":
+      // Only browse recipients if the autocomplete popup is not open.
+      if (!inputElement.popupOpen) {
+        let row = awGetRowByInputElement(inputElement);
+        let down = (event.key == "ArrowDown");
+        let noEdgeRow = down ? row < top.MAX_RECIPIENTS : row > 1;
+        if (noEdgeRow) {
+          let targetRow = down ? row + 1 : row - 1;
+          awSetFocusTo(awGetInputElement(targetRow));
+        }
+      }
+      break;
   }
 }
 
@@ -914,19 +874,17 @@ function awMenulistKeyPress(event, element)
 var gAWContentHeight = 0;
 var gAWRowHeight = 0;
 
-function awFitDummyRows()
-{
+function awFitDummyRows() {
   awCalcContentHeight();
   awCreateOrRemoveDummyRows();
 }
 
-function awCreateOrRemoveDummyRows()
-{
+function awCreateOrRemoveDummyRows() {
   let listbox = document.getElementById("addressingWidget");
   let listboxHeight = listbox.boxObject.height;
 
   // remove rows to remove scrollbar
-  let kids = listbox.querySelectorAll('[_isDummyRow]');
+  let kids = listbox.querySelectorAll("[_isDummyRow]");
   for (let i = kids.length - 1; gAWContentHeight > listboxHeight && i >= 0; --i) {
     gAWContentHeight -= gAWRowHeight;
     kids[i].remove();
@@ -941,10 +899,9 @@ function awCreateOrRemoveDummyRows()
   }
 }
 
-function awCalcContentHeight()
-{
+function awCalcContentHeight() {
   var listbox = document.getElementById("addressingWidget");
-  var items = listbox.getElementsByTagName("listitem");
+  var items = listbox.getElementsByTagName("richlistitem");
 
   gAWContentHeight = 0;
   if (items.length > 0) {
@@ -955,28 +912,38 @@ function awCalcContentHeight()
       gAWRowHeight = items[i].boxObject.height;
       ++i;
     } while (i < items.length && !gAWRowHeight);
-    gAWContentHeight = gAWRowHeight*items.length;
+    gAWContentHeight = gAWRowHeight * items.length;
   }
 }
 
-function awCreateDummyItem(aParent)
-{
-  var titem = document.createElement("listitem");
+function awCreateDummyItem(aParent) {
+  var listbox = document.getElementById("addressingWidget");
+  var item = listbox.getElementsByTagName("richlistitem")[0];
+
+  var titem = document.createElement("richlistitem");
   titem.setAttribute("_isDummyRow", "true");
   titem.setAttribute("class", "dummy-row");
+  titem.style.height = item.boxObject.height + "px";
 
-  for (var i = awGetNumberOfCols(); i > 0; i--)
-    awCreateDummyCell(titem);
+  for (let i = 0; i < awGetNumberOfCols(); i++) {
+    let cell = awCreateDummyCell(titem);
+    if (item.children[i].hasAttribute("style")) {
+      cell.setAttribute("style", item.children[i].getAttribute("style"));
+    }
+    if (item.children[i].hasAttribute("flex")) {
+      cell.setAttribute("flex", item.children[i].getAttribute("flex"));
+    }
+  }
 
-  if (aParent)
+  if (aParent) {
     aParent.appendChild(titem);
+  }
 
   return titem;
 }
 
-function awCreateDummyCell(aParent)
-{
-  var cell = document.createElement("listcell");
+function awCreateDummyCell(aParent) {
+  var cell = document.createElement("hbox");
   cell.setAttribute("class", "addressingWidgetCell dummy-row-cell");
   if (aParent)
     aParent.appendChild(cell);
@@ -984,37 +951,24 @@ function awCreateDummyCell(aParent)
   return cell;
 }
 
-function awGetNextDummyRow()
-{
+function awGetNextDummyRow() {
   // gets the next row from the top down
-  return document.querySelector('#addressingWidget > [_isDummyRow]');
+  return document.querySelector("#addressingWidget > [_isDummyRow]");
 }
 
-function awSizerListen()
-{
+function awSizerListen() {
   // when splitter is clicked, fill in necessary dummy rows each time the mouse is moved
   awCalcContentHeight(); // precalculate
   document.addEventListener("mousemove", awSizerMouseMove, true);
   document.addEventListener("mouseup", awSizerMouseUp, {capture: false, once: true});
 }
 
-function awSizerMouseMove()
-{
+function awSizerMouseMove() {
   awCreateOrRemoveDummyRows(2);
 }
 
-function awSizerMouseUp()
-{
+function awSizerMouseUp() {
   document.removeEventListener("mousemove", awSizerMouseMove, true);
-}
-
-function awDocumentKeyPress(event)
-{
-  try {
-    var id = event.target.id;
-    if (id.startsWith('addressCol1'))
-      awMenulistKeyPress(event, event.target);
-  } catch (e) { }
 }
 
 // Given an arbitrary block of text like a comma delimited list of names or a names separated by spaces,
@@ -1023,16 +977,14 @@ function awDocumentKeyPress(event)
 
 var gAutomatedAutoCompleteListener = null;
 
-function parseAndAddAddresses(addressText, recipientType)
-{
+function parseAndAddAddresses(addressText, recipientType) {
   // strip any leading >> characters inserted by the autocomplete widget
   var strippedAddresses = addressText.replace(/.* >> /, "");
 
   let addresses = MailServices.headerParser
                               .makeFromDisplayAddress(strippedAddresses);
 
-  if (addresses.length > 0)
-  {
+  if (addresses.length > 0) {
     // we need to set up our own autocomplete session and search for results
     if (!gAutomatedAutoCompleteListener)
       gAutomatedAutoCompleteListener = new AutomatedAutoCompleteHandler();
@@ -1042,16 +994,14 @@ function parseAndAddAddresses(addressText, recipientType)
   }
 }
 
-function AutomatedAutoCompleteHandler()
-{
+function AutomatedAutoCompleteHandler() {
 }
 
 // state driven self contained object which will autocomplete a block of addresses without any UI.
 // force picks the first match and adds it to the addressing widget, then goes on to the next
 // name to complete.
 
-AutomatedAutoCompleteHandler.prototype =
-{
+AutomatedAutoCompleteHandler.prototype = {
   param: this,
   sessionName: null,
   namesToComplete: null,
@@ -1064,8 +1014,7 @@ AutomatedAutoCompleteHandler.prototype =
   recipientType: null,
   searchResults: null,
 
-  init:function(namesToComplete, recipientType)
-  {
+  init(namesToComplete, recipientType) {
     this.indexIntoNames = 0;
     this.numNamesToComplete = namesToComplete.length;
     this.namesToComplete = namesToComplete;
@@ -1077,16 +1026,13 @@ AutomatedAutoCompleteHandler.prototype =
     this.autoCompleteNextAddress();
   },
 
-  autoCompleteNextAddress:function()
-  {
+  autoCompleteNextAddress() {
     this.numSessionsToSearch = 0;
     this.numSessionsSearched = 0;
     this.searchResults = [];
 
-    if (this.indexIntoNames < this.numNamesToComplete)
-    {
-      if (this.namesToComplete[this.indexIntoNames])
-      {
+    if (this.indexIntoNames < this.numNamesToComplete) {
+      if (this.namesToComplete[this.indexIntoNames]) {
       /* XXX This is used to work, until switching to the new toolkit broke it
          We should fix it see bug 456550.
       if (!this.namesToComplete[this.indexIntoNames].includes('@')) // don't autocomplete if address has an @ sign in it
@@ -1121,20 +1067,15 @@ AutomatedAutoCompleteHandler.prototype =
         if (!this.numSessionsToSearch)
           this.processAllResults(); // ldap and ab are turned off, so leave text alone.
       }
-    }
-    else
-    {
+    } else {
       this.finish();
     }
   },
 
-  onStatus:function(aStatus)
-  {
-    return;
+  onStatus(aStatus) {
   },
 
-  onAutoComplete: function(aResults, aStatus)
-  {
+  onAutoComplete(aResults, aStatus) {
     // store the results until all sessions are done and have reported in
     if (aResults)
       this.searchResults[this.numSessionsSearched] = aResults;
@@ -1145,8 +1086,7 @@ AutomatedAutoCompleteHandler.prototype =
       setTimeout(gAutomatedAutoCompleteListener.processAllResults, 0); // we are all done
   },
 
-  processAllResults: function()
-  {
+  processAllResults() {
     // Take the first result and add it to the compose window
     var addressToAdd;
 
@@ -1155,11 +1095,9 @@ AutomatedAutoCompleteHandler.prototype =
 
     var searchResultsForSession;
 
-    for (sessionIndex in this.searchResults)
-    {
+    for (sessionIndex in this.searchResults) {
       searchResultsForSession = this.searchResults[sessionIndex];
-      if (searchResultsForSession && searchResultsForSession.defaultItemIndex > -1)
-      {
+      if (searchResultsForSession && searchResultsForSession.defaultItemIndex > -1) {
         addressToAdd = searchResultsForSession.items
           .queryElementAt(searchResultsForSession.defaultItemIndex,
                           Ci.nsIAutoCompleteItem).value;
@@ -1168,13 +1106,10 @@ AutomatedAutoCompleteHandler.prototype =
     }
 
     // still no match? loop through looking for the -1 default index
-    if (!addressToAdd)
-    {
-      for (sessionIndex in this.searchResults)
-      {
+    if (!addressToAdd) {
+      for (sessionIndex in this.searchResults) {
         searchResultsForSession = this.searchResults[sessionIndex];
-        if (searchResultsForSession && searchResultsForSession.defaultItemIndex == -1)
-        {
+        if (searchResultsForSession && searchResultsForSession.defaultItemIndex == -1) {
           addressToAdd = searchResultsForSession.items
             .queryElementAt(0, Ci.nsIAutoCompleteItem).value;
           break;
@@ -1192,19 +1127,16 @@ AutomatedAutoCompleteHandler.prototype =
     this.autoCompleteNextAddress();
   },
 
-  finish: function()
-  {
+  finish() {
     // This will now append all the recipients, set the focus on a new
     // available row, and make sure it is visible.
     awAddRecipientsArray(this.recipientType, this.finalAddresses);
   },
 
   QueryInterface: ChromeUtils.generateQI(["nsIAutoCompleteListener"]),
-}
+};
 
 // Returns the load context for the current window
 function getLoadContext() {
-  return window.QueryInterface(Ci.nsIInterfaceRequestor)
-               .getInterface(Ci.nsIWebNavigation)
-               .QueryInterface(Ci.nsILoadContext);
+  return window.docShell.QueryInterface(Ci.nsILoadContext);
 }

@@ -4,8 +4,13 @@
 
 /* exported onLoad, onAcceptDialog, unsubscribeCalendar */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+/* import-globals-from ../calendar-ui-utils.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { PluralForm } = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+
+document.addEventListener("dialogextra1", unsubscribeCalendar);
+document.addEventListener("dialogaccept", onAcceptDialog);
 
 /**
  * The calendar to modify, is retrieved from window.arguments[0].calendar
@@ -103,9 +108,6 @@ function onAcceptDialog() {
         gCalendar.setProperty("disabled", !document.getElementById("calendar-enabled-checkbox").checked);
         gCalendar.deleteProperty("auto-enabled");
     }
-
-    // tell standard dialog stuff to close the dialog
-    return true;
 }
 
 /**
@@ -132,7 +134,7 @@ function unsubscribeCalendar() {
 
 function initRefreshInterval() {
     function createMenuItem(minutes) {
-        let menuitem = createXULElement("menuitem");
+        let menuitem = document.createXULElement("menuitem");
         menuitem.setAttribute("value", minutes);
 
         let everyMinuteString = cal.l10n.getCalString("calendarPropertiesEveryMinute");

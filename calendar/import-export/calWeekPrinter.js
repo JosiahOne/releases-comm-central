@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Prints a two column view of a week of events, much like a paper day-planner
@@ -75,8 +75,8 @@ calWeekPrinter.prototype = {
 
         // Stream out the resulting HTML
         let html = cal.xml.serializeDOM(document);
-        let convStream = Components.classes["@mozilla.org/intl/converter-output-stream;1"]
-                                   .createInstance(Components.interfaces.nsIConverterOutputStream);
+        let convStream = Cc["@mozilla.org/intl/converter-output-stream;1"]
+                           .createInstance(Ci.nsIConverterOutputStream);
         convStream.init(aStream, "UTF-8");
         convStream.writeString(html);
     },
@@ -111,7 +111,7 @@ calWeekPrinter.prototype = {
             let titleNode = currentPage.querySelector("." + weekdayName + "-title");
             titleNode.textContent = dateFormatter.formatDateLong(currentDate.getInTimezone(defaultTimezone));
 
-            if (Preferences.get(dayOffPrefName, false)) {
+            if (Services.prefs.getBoolPref(dayOffPrefName, false)) {
                 let daysOffNode = currentPage.querySelector("." + weekdayName + "-box");
                 daysOffNode.className += " day-off";
             }

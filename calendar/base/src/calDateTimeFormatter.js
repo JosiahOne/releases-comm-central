@@ -2,10 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function calDateTimeFormatter() {
     this.wrappedJSObject = this;
@@ -17,7 +15,7 @@ calDateTimeFormatter.prototype = {
 
     formatDate: function(aDate) {
         // Format the date using user's format preference (long or short)
-        let format = Preferences.get("calendar.date.format", 0);
+        let format = Services.prefs.getIntPref("calendar.date.format", 0);
         return (format == 0 ? this.formatDateLong(aDate) : this.formatDateShort(aDate));
     },
 
@@ -46,7 +44,7 @@ calDateTimeFormatter.prototype = {
         let formattedDate = this.formatDate(aDate);
         let formattedTime = this.formatTime(aDate);
 
-        let timeBeforeDate = Preferences.get("calendar.date.formatTimeBeforeDate", false);
+        let timeBeforeDate = Services.prefs.getBoolPref("calendar.date.formatTimeBeforeDate", false);
         if (timeBeforeDate) {
             return formattedTime + " " + formattedDate;
         } else {
@@ -184,7 +182,7 @@ calDateTimeFormatter.prototype = {
         if (end) {
             end = end.getInTimezone(kDefaultTimezone);
         }
-        // EndDate is exclusive. For all-day events, we ened to substract one day,
+        // EndDate is exclusive. For all-day events, we need to subtract one day,
         // to get into a format that's understandable.
         if (start && start.isDate && end) {
             end.day -= 1;

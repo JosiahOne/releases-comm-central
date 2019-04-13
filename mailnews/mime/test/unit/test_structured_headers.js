@@ -5,7 +5,7 @@
 // This tests the msgIStructuredHeaders and msgIWritableStructuredHeaders
 // interfaces.
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /// Verify that a specific XPCOM error code is thrown.
 function verifyError(block, errorCode) {
@@ -56,9 +56,8 @@ add_task(async function check_custom_header() {
     }
     Services.obs.addObserver(observer, "xpcom-category-entry-added");
   });
-  Cc["@mozilla.org/categorymanager;1"]
-    .getService(Ci.nsICategoryManager)
-    .addCategoryEntry("custom-mime-encoder", "X-Unusual", url, false, true);
+  Services.catMan
+          .addCategoryEntry("custom-mime-encoder", "X-Unusual", url, false, true);
   // The category manager doesn't fire until a later timestep.
   await promise;
   let headers = new StructuredHeaders();
@@ -121,18 +120,14 @@ add_task(async function check_raw() {
   headers.setHeader("unabashed-random-header", false);
   let headerList = ["Date", "Content-Description", "Subject",
     "Unabashed-Random-Header"];
-  let enumerator = headers.headerNames;
-  while (enumerator.hasMore()) {
-    let value = enumerator.getNext();
+  for (let value of headers.headerNames) {
     Assert.equal(value.toLowerCase(), headerList.shift().toLowerCase());
   }
 
   // Check that copying works
   let moreHeaders = new StructuredHeaders();
   moreHeaders.addAllHeaders(headers);
-  enumerator = headers.headerNames;
-  while (enumerator.hasMore()) {
-    let value = enumerator.getNext();
+  for (let value of headers.headerNames) {
     Assert.equal(moreHeaders.getHeader(value), headers.getHeader(value));
   }
   headers.deleteHeader("Date");
@@ -155,9 +150,7 @@ add_task(async function check_nsIMimeHeaders() {
     "FCC", "BCC", "X-Identity-Key", "Message-ID", "Date", "From",
     "X-Mozilla-Draft-Info", "User-Agent", "MIME-Version", "To", "Subject",
     "Content-Type", "Content-Transfer-Encoding"];
-  let enumerator = headers.headerNames;
-  while (enumerator.hasMore()) {
-    let value = enumerator.getNext();
+  for (let value of headers.headerNames) {
     Assert.equal(value.toLowerCase(), headerList.shift().toLowerCase());
   }
 });

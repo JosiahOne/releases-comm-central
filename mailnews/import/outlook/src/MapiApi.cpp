@@ -726,7 +726,7 @@ void CMapiApi::ListProperties(LPMAPIPROP lpProp, BOOL getValues)
 ULONG CMapiApi::GetEmailPropertyTag(LPMAPIPROP lpProp, LONG nameID)
 {
 static GUID emailGUID = {
-   0x00062004, 0x0000, 0x0000, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46
+   0x00062004, 0x0000, 0x0000, { 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 }
 };
 
   MAPINAMEID mapiNameID;
@@ -1220,7 +1220,8 @@ BOOL CMapiApi::GetLargeStringProperty(LPMAPIPROP pProp, ULONG tag, nsCString& va
     LossyCopyUTF16toASCII(nsDependentString(static_cast<wchar_t*>(result)), val);
   else // either PT_STRING8 or some other binary - use as is
     val.Assign(static_cast<char*>(result));
-  delete[] result;
+  // Despite being used as wchar_t*, result it allocated as "new char[]" in GetLargeProperty().
+  delete[] static_cast<char*>(result);
   return TRUE;
 }
 
@@ -1233,7 +1234,8 @@ BOOL CMapiApi::GetLargeStringProperty(LPMAPIPROP pProp, ULONG tag, nsString& val
     val.Assign(static_cast<wchar_t*>(result));
   else // either PT_STRING8 or some other binary
     CStrToUnicode(static_cast<char*>(result), val);
-  delete[] result;
+  // Despite being used as wchar_t*, result it allocated as "new char[]" in GetLargeProperty().
+  delete[] static_cast<char*>(result);
   return TRUE;
 }
 // If the value is a string, get it...
@@ -1428,7 +1430,7 @@ void CMapiApi::GetPropTagName(ULONG tag, nsCString& s)
   PR_snprintf(numStr, 256, "0x%lx, %ld", tag, tag);
   s = numStr;
   switch(tag) {
-#include "mapitagstrs.cpp"
+#include "MapiTagStrs.cpp"
   }
   s += ", data: ";
   switch(PROP_TYPE(tag)) {
@@ -1728,7 +1730,7 @@ CMsgStore::~CMsgStore()
 
   if (m_lpMdb) {
     ULONG flags = LOGOFF_NO_WAIT;
-    HRESULT hr = m_lpMdb->StoreLogoff(&flags);
+    m_lpMdb->StoreLogoff(&flags);
     m_lpMdb->Release();
     m_lpMdb = NULL;
   }
@@ -1736,8 +1738,6 @@ CMsgStore::~CMsgStore()
 
 void CMsgStore::SetEntryID(ULONG cbEid, LPENTRYID lpEid)
 {
-  HRESULT    hr;
-
   if (m_lpEid)
     delete m_lpEid;
 
@@ -1750,7 +1750,7 @@ void CMsgStore::SetEntryID(ULONG cbEid, LPENTRYID lpEid)
 
   if (m_lpMdb) {
     ULONG flags = LOGOFF_NO_WAIT;
-    hr = m_lpMdb->StoreLogoff(&flags);
+    m_lpMdb->StoreLogoff(&flags);
     m_lpMdb->Release();
     m_lpMdb = NULL;
   }

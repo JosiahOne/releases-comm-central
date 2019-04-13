@@ -9,7 +9,7 @@
 
 <!DOCTYPE page SYSTEM "chrome://messenger/locale/am-copies.dtd">
 
-<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
       title="&copyAndFolderTitle.label;"
       onload="parent.onPanelLoaded('am-copies.xul');">
 
@@ -18,7 +18,9 @@
     <script type="application/javascript" src="chrome://messenger/content/am-copies.js"/>
     <script type="application/javascript" src="chrome://messenger/content/amUtils.js"/>
 
-    <dialogheader title="&copyAndFolderTitle.label;"/>
-#include am-copies.inc
+    <hbox class="dialogheader">
+      <label class="dialogheader-title" value="&copyAndFolderTitle.label;"/>
+    </hbox>
+#include am-copies.inc.xul
   </vbox>
 </page>

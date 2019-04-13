@@ -2,10 +2,29 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/ltnInvitationUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from ../../../mail/base/content/msgHdrView.js */
+/* import-globals-from ../../base/content/calendar-item-editing.js */
+/* import-globals-from ../../base/content/calendar-ui-utils.js */
+/* globals msgWindow */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { ltn } = ChromeUtils.import("resource://calendar/modules/ltnInvitationUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+
+/**
+ * Provides shortcuts to set label and collapsed attribute of imip-bar node.
+ */
+const imipBar = {
+    get bar() {
+        return document.querySelector(".lightning-notification-bar");
+    },
+    set label(val) {
+        this.bar.querySelector(".msgNotificationBarText").textContent = val;
+    },
+    set collapsed(val) {
+        this.bar.collapsed = val;
+    }
+};
 
 /**
  * This bar lives inside the message window.
@@ -73,8 +92,7 @@ var ltnImipBar = {
                 if (!subject) {
                     let sinkProps = msgWindow.msgHeaderSink.properties;
                     // This property was set by lightningTextCalendarConverter.js
-                    itipItem = sinkProps.getPropertyAsInterface("itipItem",
-                                                                Components.interfaces.calIItipItem);
+                    itipItem = sinkProps.getPropertyAsInterface("itipItem", Ci.calIItipItem);
                     msgOverlay = sinkProps.getPropertyAsAUTF8String("msgOverlay");
                 }
             } catch (e) {
@@ -90,9 +108,8 @@ var ltnImipBar = {
             let imipMethod = gMessageDisplay.displayedMessage.getStringProperty("imip_method");
             cal.itip.initItemFromMsgData(itipItem, imipMethod, gMessageDisplay.displayedMessage);
 
-            let imipBar = document.getElementById("imip-bar");
-            imipBar.setAttribute("collapsed", "false");
-            imipBar.setAttribute("label", cal.itip.getMethodText(itipItem.receivedMethod));
+            imipBar.collapsed = false;
+            imipBar.label = cal.itip.getMethodText(itipItem.receivedMethod);
 
             ltnImipBar.msgOverlay = msgOverlay;
 
@@ -104,7 +121,7 @@ var ltnImipBar = {
      * Hide the imip bar and reset the itip item.
      */
     resetBar: function() {
-        document.getElementById("imip-bar").collapsed = true;
+        imipBar.collapsed = true;
         ltnImipBar.resetButtons();
 
         // Clear our iMIP/iTIP stuff so it doesn't contain stale information.
@@ -186,7 +203,6 @@ var ltnImipBar = {
      *                      in subscribed calendars
      */
     setupOptions: function(itipItem, rc, actionFunc, foundItems) {
-        let imipBar = document.getElementById("imip-bar");
         let data = cal.itip.getOptionsText(itipItem, rc, actionFunc, foundItems);
 
         if (Components.isSuccessCode(rc)) {
@@ -203,12 +219,10 @@ var ltnImipBar = {
                 return false;
             }
             let author = aMsgHdr.mime2DecodedAuthor;
-            let isSentFolder = aMsgHdr.folder && aMsgHdr.folder.flags &
-                               Components.interfaces.nsMsgFolderFlags.SentMail;
+            let isSentFolder = aMsgHdr.folder && aMsgHdr.folder.flags & Ci.nsMsgFolderFlags.SentMail;
             if (author && isSentFolder) {
                 let accounts = MailServices.accounts;
-                for (let identity of fixIterator(accounts.allIdentities,
-                                                 Components.interfaces.nsIMsgIdentity)) {
+                for (let identity of fixIterator(accounts.allIdentities, Ci.nsIMsgIdentity)) {
                     if (author.includes(identity.email) && !identity.fccReplyFollowsParent) {
                         return true;
                     }
@@ -226,12 +240,14 @@ var ltnImipBar = {
                 data = {
                     label: cal.l10n.getLtnString("imipBarSentButRemovedText"),
                     buttons: [],
-                    hideMenuItems: []
+                    hideMenuItems: [],
+                    hideItems: [],
+                    showItems: []
                 };
             }
         }
 
-        imipBar.setAttribute("label", data.label);
+        imipBar.label = data.label;
         // let's reset all buttons first
         ltnImipBar.resetButtons();
         // now we update the visible items - buttons are hidden by default
@@ -259,9 +275,9 @@ var ltnImipBar = {
 
         let msgOverlay = ltnImipBar.msgOverlay;
         let diff = cal.itip.compare(ltnImipBar.itipItem.getItemList({})[0], ltnImipBar.foundItems[0]);
-        // displaying chnages is only needed if that is enabled, an item already exists and there are
+        // displaying changes is only needed if that is enabled, an item already exists and there are
         // differences
-        if (diff != 0 && Preferences.get("calendar.itip.displayInvitationChanges", false)) {
+        if (diff != 0 && Services.prefs.getBoolPref("calendar.itip.displayInvitationChanges", false)) {
             let foundOverlay = ltn.invitation.createInvitationOverlay(ltnImipBar.foundItems[0],
                                                                       ltnImipBar.itipItem);
             let serializedOverlay = cal.xml.serializeDOM(foundOverlay);
@@ -281,7 +297,7 @@ var ltnImipBar = {
     },
 
     /**
-     * Exceutes an action triggered by an imip bar button
+     * Executes an action triggered by an imip bar button
      *
      * @param   {String}  aParticipantStatus  A partstat string as per RfC 5545
      * @param   {String}  aResponse           Either 'AUTO', 'NONE' or 'USER',
@@ -359,7 +375,7 @@ var ltnImipBar = {
                         }
                         // For now, we just state the status for the user something very simple
                         let label = cal.itip.getCompleteText(aStatus, aOperationType);
-                        imipBar.setAttribute("label", label);
+                        imipBar.label = label;
 
                         if (!Components.isSuccessCode(aStatus)) {
                             cal.showError(label);
@@ -372,14 +388,13 @@ var ltnImipBar = {
                 try {
                     aActionFunc(opListener, aParticipantStatus, aExtResponse);
                 } catch (exc) {
-                    Components.utils.reportError(exc);
+                    Cu.reportError(exc);
                 }
                 return true;
             }
             return false;
         }
 
-        let imipBar = document.getElementById("imip-bar");
         if (aParticipantStatus == null) {
             aParticipantStatus = "";
         }
@@ -415,18 +430,13 @@ var ltnImipBar = {
                             oldVersion: parsedProposal.result == "OLDVERSION" ||
                                         parsedProposal.result == "NOTLATESTUPDATE",
                             onReschedule: () => {
-                                imipBar.setAttribute(
-                                    "label",
-                                    cal.l10n.getLtnString("imipBarCounterPreviousVersionText")
-                                );
+                                imipBar.label =
+                                    cal.l10n.getLtnString("imipBarCounterPreviousVersionText");
                                 // TODO: should we hide the buttons in this case, too?
                             }
                         };
                     } else {
-                        imipBar.setAttribute(
-                            "label",
-                            cal.l10n.getLtnString("imipBarCounterErrorText")
-                        );
+                        imipBar.label = cal.l10n.getLtnString("imipBarCounterErrorText");
                         ltnImipBar.resetButtons();
                         if (proposingAttendee) {
                             cal.LOG(parsedProposal.result.descr);
@@ -451,15 +461,15 @@ var ltnImipBar = {
             let response;
             if (aResponse) {
                 if (aResponse == "AUTO" || aResponse == "NONE" || aResponse == "USER") {
-                    response = { responseMode: Components.interfaces.calIItipItem[aResponse] };
+                    response = { responseMode: Ci.calIItipItem[aResponse] };
                 }
                 // Open an extended response dialog to enable the user to add a comment, make a
                 // counterproposal, delegate the event or interact in another way.
                 // Instead of a dialog, this might be implemented as a separate container inside the
                 // imip-overlay as proposed in bug 458578
             }
-            let delmgr = Components.classes["@mozilla.org/calendar/deleted-items-manager;1"]
-                                   .getService(Components.interfaces.calIDeletedItems);
+            let delmgr = Cc["@mozilla.org/calendar/deleted-items-manager;1"]
+                           .getService(Ci.calIDeletedItems);
             let items = ltnImipBar.itipItem.getItemList({});
             if (items && items.length) {
                 let delTime = delmgr.getDeletedDate(items[0].id);
@@ -508,5 +518,9 @@ var ltnImipBar = {
     }
 };
 
-addEventListener("messagepane-loaded", ltnImipBar.load, true);
+if (document.getElementById("msgHeaderView").loaded) {
+    ltnImipBar.load();
+} else {
+    addEventListener("messagepane-loaded", ltnImipBar.load, true);
+}
 addEventListener("messagepane-unloaded", ltnImipBar.unload, true);

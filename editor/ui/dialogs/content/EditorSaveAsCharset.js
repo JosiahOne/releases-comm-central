@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/CharsetMenu.jsm");
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+var {CharsetMenu} = ChromeUtils.import("resource://gre/modules/CharsetMenu.jsm");
 
 var gCharset="";
 var gTitleWasEdited = false;
@@ -39,7 +42,6 @@ var gCharsetView = {
   selectionChanged: function() {},
   cycleCell: function(index, column) {},
   isEditable: function isEditable(index, column) { return false; },
-  isSelectable: function isSelectable(index, column) { return true; },
   performAction: function performAction(action) {},
   performActionOnCell: function performActionOnCell(action, index, column) {}
 };
@@ -105,7 +107,7 @@ function InitDialog()
   var index = gCharsetInfo.map(info => info.value).indexOf(gCharset);
   if (index >= 0) {
     tree.view.selection.select(index);
-    tree.treeBoxObject.ensureRowIsVisible(index);
+    tree.ensureRowIsVisible(index);
   }
 }
 
@@ -131,7 +133,6 @@ function onAccept()
   window.opener.ok = true;
   window.opener.exportToText = gDialog.exportToText.checked;
   SaveWindowLocation();
-  return true;
 }
 
 

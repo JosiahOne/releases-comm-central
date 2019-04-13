@@ -2,14 +2,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
-// Load these modules, which will inject into calUtils.jsm on old versions, and
-// silently fail on newer versions.
-try {
-    ChromeUtils.import("resource://calendar/modules/calAsyncUtils.jsm");
-} catch (e) {}
+// calAsyncUtils and calAlarmUtils should no longer be injected directly, so first check if it is
+// already on the cal object through newer calUtils.jsm
+if (typeof cal.async == "undefined") {
+    let { cal: temp } = ChromeUtils.import("resource://calendar/modules/calAsyncUtils.jsm");
+    cal.async = temp.async;
+}
+if (typeof cal.alarms == "undefined") {
+    let { cal: temp } = ChromeUtils.import("resource://calendar/modules/calAlarmUtils.jsm");
+    cal.alarms = temp.alarms;
+}
 
 this.EXPORTED_SYMBOLS = ["cal"];
 
@@ -88,7 +93,8 @@ if (typeof cal.category == "undefined") {
 }
 
 if (typeof cal.itip == "undefined") {
-    ChromeUtils.import("resource://calendar/modules/calItipUtils.jsm");
+    let { cal: temp } = ChromeUtils.import("resource://calendar/modules/calItipUtils.jsm");
+    cal.itip = temp.itip;
 }
 
 if (typeof cal.itip.isInvitation == "undefined") {

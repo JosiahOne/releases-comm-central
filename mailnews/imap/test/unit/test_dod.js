@@ -11,7 +11,7 @@
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gServer, gIMAPIncomingServer, gIMAPDaemon;
 
@@ -80,12 +80,12 @@ function* streamMessages() {
     for (let i = 1; i < inbox.uidnext ; i++) {
       let uri = {};
       imapS.GetUrlForUri("imap-message://user@localhost/INBOX#" + i, uri, null);
-      let channel = Services.io.newChannelFromURI2(uri.value,
-                                                   null,
-                                                   Services.scriptSecurityManager.getSystemPrincipal(),
-                                                   null,
-                                                   Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                                   Ci.nsIContentPolicy.TYPE_OTHER);
+      let channel = Services.io.newChannelFromURI(uri.value,
+                                                  null,
+                                                  Services.scriptSecurityManager.getSystemPrincipal(),
+                                                  null,
+                                                  Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                                  Ci.nsIContentPolicy.TYPE_OTHER);
       channel.asyncOpen(gStreamListener, null);
       yield false;
       let buf = gStreamListener._data;
@@ -107,14 +107,14 @@ var gStreamListener = {
   QueryInterface : ChromeUtils.generateQI([Ci.nsIStreamListener]),
   _stream : null,
   _data : null,
-  onStartRequest : function (aRequest, aContext) {
+  onStartRequest : function (aRequest) {
     this._data = "";
     this._stream = null;
   },
-  onStopRequest : function (aRequest, aContext, aStatusCode) {
+  onStopRequest : function (aRequest, aStatusCode) {
     async_driver();
   },
-  onDataAvailable : function (aRequest, aContext, aInputStream, aOff, aCount) {
+  onDataAvailable : function (aRequest, aInputStream, aOff, aCount) {
     if (this._stream == null) {
       this._stream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
       this._stream.init(aInputStream);

@@ -48,7 +48,7 @@ class nsMailboxProtocol : public nsMsgProtocol
 public:
   // Creating a protocol instance requires the URL which needs to be run AND it requires
   // a transport layer.
-  nsMailboxProtocol(nsIURI * aURL);
+  explicit nsMailboxProtocol(nsIURI * aURL);
   virtual ~nsMailboxProtocol();
 
   // initialization function given a new url and transport layer
@@ -61,8 +61,8 @@ public:
   // we support the nsIStreamListener interface
   ////////////////////////////////////////////////////////////////////////////////////////
 
-  NS_IMETHOD OnStartRequest(nsIRequest *request, nsISupports *ctxt) override;
-  NS_IMETHOD OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult aStatus) override;
+  NS_IMETHOD OnStartRequest(nsIRequest *request) override;
+  NS_IMETHOD OnStopRequest(nsIRequest *request, nsresult aStatus) override;
 
 private:
   nsCOMPtr<nsIMailboxUrl>  m_runningUrl; // the nsIMailboxURL that is currently running
@@ -72,7 +72,7 @@ private:
   nsCOMPtr<nsIStreamListener> m_mailboxParser;
 
   // Local state for the current operation
-  nsMsgLineStreamBuffer   * m_lineStreamBuffer; // used to efficiently extract lines from the incoming data stream
+  RefPtr<nsMsgLineStreamBuffer> m_lineStreamBuffer; // used to efficiently extract lines from the incoming data stream
 
   // Generic state information -- What state are we in? What state do we want to go to
   // after the next response? What was the last response code? etc.

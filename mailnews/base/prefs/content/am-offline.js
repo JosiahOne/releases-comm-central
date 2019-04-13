@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 var gIncomingServer;
 var gServerType;
@@ -132,8 +132,8 @@ function onPreInit(account, accountValues)
    "prefPanel-synchronization" : "prefPanel-diskspace";
 
   var prefBundle = document.getElementById("bundle_prefs");
-  var headertitle = document.getElementById("headertitle");
-  headertitle.setAttribute('title',prefBundle.getString(titleStringID));
+  document.querySelector("#headertitle > .dialogheader-title")
+          .setAttribute("value", prefBundle.getString(titleStringID));
   document.title = prefBundle.getString(titleStringID);
 
   if (gServerType == "pop3") {
@@ -206,7 +206,6 @@ function onCancel()
     // restore the offline flags for all folders
     restoreOfflineFolders(gOfflineMap);
     document.getElementById("offline.folders").checked = gOfflineFolders;
-    return true;
 }
 
 /**

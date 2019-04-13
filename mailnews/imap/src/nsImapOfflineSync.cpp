@@ -9,9 +9,7 @@
 #include "nsImapOfflineSync.h"
 #include "nsImapMailFolder.h"
 #include "nsMsgFolderFlags.h"
-#include "nsIRDFService.h"
 #include "nsMsgBaseCID.h"
-#include "nsRDFCID.h"
 #include "nsIMsgMailNewsUrl.h"
 #include "nsIMsgAccountManager.h"
 #include "nsINntpIncomingServer.h"
@@ -24,9 +22,6 @@
 #include "nsIAutoSyncManager.h"
 #include "nsArrayUtils.h"
 #include "mozilla/Unused.h"
-
-
-static NS_DEFINE_CID(kRDFServiceCID, NS_RDFSERVICE_CID);
 
 NS_IMPL_ISUPPORTS(nsImapOfflineSync, nsIUrlListener, nsIMsgCopyServiceListener, nsIDBChangeListener)
 
@@ -407,17 +402,10 @@ nsImapOfflineSync::ProcessAppendMsgOperation(nsIMsgOfflineImapOperation *current
   do {
     nsCString moveDestination;
     currentOp->GetDestinationFolderURI(getter_Copies(moveDestination));
-    nsCOMPtr<nsIRDFService> rdf(do_GetService(kRDFServiceCID, &rv));
-    if (NS_WARN_IF(NS_FAILED(rv)))
-      break;
 
-    nsCOMPtr<nsIRDFResource> res;
-    rv = rdf->GetResource(moveDestination, getter_AddRefs(res));
+    nsCOMPtr<nsIMsgFolder> destFolder;
+    rv = GetOrCreateFolder(moveDestination, getter_AddRefs(destFolder));
     if (NS_WARN_IF(NS_FAILED(rv)))
-      break;
-
-    nsCOMPtr<nsIMsgFolder> destFolder(do_QueryInterface(res, &rv));
-    if (NS_WARN_IF(!(NS_SUCCEEDED(rv) && destFolder)))
       break;
 
     nsCOMPtr <nsIInputStream> offlineStoreInputStream;
@@ -479,7 +467,7 @@ nsImapOfflineSync::ProcessAppendMsgOperation(nsIMsgOfflineImapOperation *current
     nsCOMPtr<nsIFile> cloneTmpFile;
     // clone the tmp file to defeat nsIFile's stat/size caching.
     tmpFile->Clone(getter_AddRefs(cloneTmpFile));
-    m_curTempFile = do_QueryInterface(cloneTmpFile);
+    m_curTempFile = cloneTmpFile;
     nsCOMPtr<nsIMsgCopyService> copyService = do_GetService(NS_MSGCOPYSERVICE_CONTRACTID);
 
     // CopyFileMessage returns error async to this->OnStopCopy
@@ -556,7 +544,7 @@ void nsImapOfflineSync::ProcessMoveOperation(nsIMsgOfflineImapOperation *op)
   while (currentOp);
 
   nsCOMPtr<nsIMsgFolder> destFolder;
-  GetExistingFolder(moveDestination, getter_AddRefs(destFolder));
+  FindFolder(moveDestination, getter_AddRefs(destFolder));
   // if the dest folder doesn't really exist, these operations are
   // going to fail, so clear them out and move on.
   if (!destFolder)
@@ -671,7 +659,7 @@ void nsImapOfflineSync::ProcessCopyOperation(nsIMsgOfflineImapOperation *aCurren
 
   nsAutoCString uids;
   nsCOMPtr<nsIMsgFolder> destFolder;
-  GetExistingFolder(copyDestination, getter_AddRefs(destFolder));
+  FindFolder(copyDestination, getter_AddRefs(destFolder));
   // if the dest folder doesn't really exist, these operations are
   // going to fail, so clear them out and move on.
   if (!destFolder)
@@ -1062,13 +1050,6 @@ nsresult nsImapOfflineSync::ProcessNextOperation()
     {
       m_singleFolderToUpdate->ClearFlag(nsMsgFolderFlags::OfflineEvents);
       m_singleFolderToUpdate->UpdateFolder(m_window);
-      nsCOMPtr<nsIMsgImapMailFolder> imapFolder(do_QueryInterface(m_singleFolderToUpdate));
-      if (imapFolder)
-      {
-        nsCOMPtr<nsIUrlListener> saveListener = m_listener;
-//        m_listener = nullptr;
-//        imapFolder->UpdateFolderWithListener(m_window, saveListener);
-      }
     }
   }
   // if we get here, then I *think* we're done. Not sure, though.

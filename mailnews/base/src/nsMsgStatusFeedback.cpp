@@ -8,7 +8,7 @@
 #include "nsIWebProgress.h"
 #include "nsIXULBrowserWindow.h"
 #include "nsMsgStatusFeedback.h"
-#include "nsIDocument.h"
+#include "mozilla/dom/Document.h"
 #include "nsIDocShell.h"
 #include "nsIDocShellTreeItem.h"
 #include "nsIChannel.h"
@@ -172,6 +172,12 @@ nsMsgStatusFeedback::OnSecurityChange(nsIWebProgress *aWebProgress,
     return NS_OK;
 }
 
+NS_IMETHODIMP
+nsMsgStatusFeedback::OnContentBlockingEvent(nsIWebProgress *aWebProgress,
+                                            nsIRequest *aRequest, uint32_t aEvent)
+{
+  return NS_OK;
+}
 
 NS_IMETHODIMP
 nsMsgStatusFeedback::ShowStatusString(const nsAString& aStatus)

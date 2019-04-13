@@ -11,11 +11,11 @@ this.EXPORTED_SYMBOLS = [
   "EmptyEnumerator",
   "ClassInfo",
   "l10nHelper",
-  "initLogModule"
+  "initLogModule",
 ];
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm");
+const {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
 
 var kLogLevelPref = "purple.debug.loglevel";
 
@@ -71,7 +71,7 @@ function scriptError(aModule, aLevel, aMessage, aOriginalError) {
     if (aOriginalError.fileName)
       fileName = aOriginalError.fileName;
     if (aOriginalError.lineNumber)
-      lineNumber = aOriginalError.lineNumber
+      lineNumber = aOriginalError.lineNumber;
   }
   scriptError.init(aMessage, fileName, sourceLine, lineNumber, null, flag,
                    "component javascript");
@@ -94,14 +94,14 @@ function initLogModule(aModule, aObj = {})
   aObj.ERROR = scriptError.bind(aObj, aModule, Ci.imIDebugMessage.LEVEL_ERROR);
   return aObj;
 }
-XPCOMUtils.defineLazyGetter(Cu.getGlobalForObject({}), "gLogLevels", function() {
+XPCOMUtils.defineLazyGetter(this, "gLogLevels", function() {
   // This object functions both as an obsever as well as a dict keeping the
   // log levels with prefs; the log levels all start with "level" (i.e. "level"
   // for the global level, "level.irc" for the IRC module).  The dual-purpose
   // is necessary to make sure the observe is left alive while being a weak ref
   // to avoid cycles with the pref service.
   let logLevels = {
-    observe: function(aSubject, aTopic, aData) {
+    observe(aSubject, aTopic, aData) {
       let module = "level" + aData.substr(kLogLevelPref.length);
       if (Services.prefs.getPrefType(aData) == Services.prefs.PREF_INT)
         gLogLevels[module] = Services.prefs.getIntPref(aData);
@@ -143,7 +143,7 @@ function setTimeout(aFunction, aDelay)
   // GC'ed before firing the callback.
   let callback = {
     _timer: timer,
-    notify: function (aTimer) { aFunction.apply(null, args); delete this._timer; }
+    notify(aTimer) { aFunction.apply(null, args); delete this._timer; },
   };
   timer.initWithCallback(callback, aDelay, Ci.nsITimer.TYPE_ONE_SHOT);
   return timer;
@@ -179,29 +179,27 @@ function ClassInfo(aInterfaces, aDescription = "JS Proto Object")
   this.classDescription = aDescription;
 }
 ClassInfo.prototype = {
-  QueryInterface: function ClassInfo_QueryInterface(iid) {
+  // eslint-disable-next-line mozilla/use-chromeutils-generateqi
+  QueryInterface(iid) {
     if (iid.equals(Ci.nsISupports) || iid.equals(Ci.nsIClassInfo) ||
         this._interfaces.some(i => i.equals(iid)))
       return this;
 
     throw Cr.NS_ERROR_NO_INTERFACE;
   },
-  getInterfaces: function(countRef) {
-    let interfaces =
-      [Ci.nsIClassInfo, Ci.nsISupports].concat(this._interfaces);
-    countRef.value = interfaces.length;
-    return interfaces;
+  get interfaces() {
+    return [Ci.nsIClassInfo, Ci.nsISupports].concat(this._interfaces);
   },
   getHelperForLanguage: language => null,
   contractID: null,
   classID: null,
-  flags: 0
+  flags: 0,
 };
 
 function l10nHelper(aChromeURL)
 {
   let bundle = Services.strings.createBundle(aChromeURL);
-  return function (aStringId) {
+  return function(aStringId) {
     try {
       if (arguments.length == 1)
         return bundle.GetStringFromName(aStringId);
@@ -229,18 +227,20 @@ function nsSimpleEnumerator(items)
   this._nextIndex = 0;
 }
 nsSimpleEnumerator.prototype = {
-  hasMoreElements: function() { return this._nextIndex < this._items.length; },
-  getNext: function() {
+  hasMoreElements() { return this._nextIndex < this._items.length; },
+  getNext() {
     if (!this.hasMoreElements())
       throw Cr.NS_ERROR_NOT_AVAILABLE;
 
     return this._items[this._nextIndex++];
   },
-  QueryInterface: ChromeUtils.generateQI([Ci.nsISimpleEnumerator])
+  QueryInterface: ChromeUtils.generateQI([Ci.nsISimpleEnumerator]),
+  [Symbol.iterator]() { return this._items.values(); },
 };
 
 var EmptyEnumerator = {
   hasMoreElements: () => false,
-  getNext: function() { throw Cr.NS_ERROR_NOT_AVAILABLE; },
-  QueryInterface: ChromeUtils.generateQI([Ci.nsISimpleEnumerator])
+  getNext() { throw Cr.NS_ERROR_NOT_AVAILABLE; },
+  QueryInterface: ChromeUtils.generateQI([Ci.nsISimpleEnumerator]),
+  * [Symbol.iterator]() {},
 };

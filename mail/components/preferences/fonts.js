@@ -3,7 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+// toolkit/content/preferencesBindings.js
+/* globals Preferences */
+// toolkit/mozapps/preferences/fontbuilder.js
+/* globals FontBuilder */
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var kDefaultFontType          = "font.default.%LANG%";
 var kFontNameFmtSerif         = "font.name.serif.%LANG%";
@@ -13,7 +18,7 @@ var kFontNameListFmtSerif     = "font.name-list.serif.%LANG%";
 var kFontNameListFmtSansSerif = "font.name-list.sans-serif.%LANG%";
 var kFontNameListFmtMonospace = "font.name-list.monospace.%LANG%";
 var kFontSizeFmtVariable      = "font.size.variable.%LANG%";
-var kFontSizeFmtFixed         = "font.size.fixed.%LANG%";
+var kFontSizeFmtFixed         = "font.size.monospace.%LANG%";
 var kFontMinSizeFmt           = "font.minimum-size.%LANG%";
 
 Preferences.addAll([
@@ -72,33 +77,28 @@ var gFontsDialog = {
     .catch(Cu.reportError);
   },
 
-  readFontLanguageGroup()
-  {
+  readFontLanguageGroup() {
     var languagePref = Preferences.get("font.language.group");
     this._selectLanguageGroup(languagePref.value);
     return undefined;
   },
 
-  readUseDocumentFonts: function ()
-  {
+  readUseDocumentFonts() {
     var preference = Preferences.get("browser.display.use_document_fonts");
     return preference.value == 1;
   },
 
-  writeUseDocumentFonts: function ()
-  {
+  writeUseDocumentFonts() {
     var useDocumentFonts = document.getElementById("useDocumentFonts");
     return useDocumentFonts.checked ? 1 : 0;
   },
 
-  readFixedWidthForPlainText: function ()
-  {
+  readFixedWidthForPlainText() {
     var preference = Preferences.get("mail.fixed_width_messages");
     return preference.value == 1;
   },
 
-  writeFixedWidthForPlainText: function ()
-  {
+  writeFixedWidthForPlainText() {
     var mailFixedWidthMessages = document.getElementById("mailFixedWidthMessages");
     return mailFixedWidthMessages.checked;
   },
@@ -108,8 +108,7 @@ var gFontsDialog = {
    * are nsIPrefLocalizedString. Its default value is different depending
    * on the user locale (see bug 48842).
    */
-  ondialogaccept: function()
-  {
+  ondialogaccept() {
     var sendCharsetStr = Services.prefs.getComplexValue(
       "mailnews.send_default_charset", Ci.nsIPrefLocalizedString).data;
 
@@ -127,7 +126,7 @@ var gFontsDialog = {
     if (viewCharsetStr === defaultPrefs.getComplexValue(
           "view_default_charset", Ci.nsIPrefLocalizedString).data)
       Services.prefs.clearUserPref("mailnews.view_default_charset");
-
-    return true;
-  }
+  },
 };
+
+document.addEventListener("dialogaccept", gFontsDialog.ondialogaccept);

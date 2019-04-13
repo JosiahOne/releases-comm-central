@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 var kNetworkProtocolCIDPrefix = "@mozilla.org/network/protocol;1?name=";
 var nsIProtocolHandler = Ci.nsIProtocolHandler;
@@ -28,12 +28,7 @@ function makeProtocolHandler(aProtocol, aDefaultPort, aClassID) {
       return url;
     },
 
-    newChannel: function (aURI) {
-      throw Cr.NS_ERROR_NOT_IMPLEMENTED;
-    },
-
-    newChannel2: function(aURI, aLoadInfo)
-    {
+    newChannel: function(aURI, aLoadInfo) {
       throw Cr.NS_ERROR_NOT_IMPLEMENTED;
     },
 

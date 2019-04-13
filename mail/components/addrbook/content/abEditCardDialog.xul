@@ -11,10 +11,10 @@
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/addressbook/abCard.dtd">
 
 <dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  xmlns:html="http://www.w3.org/1999/xhtml"
   id="abcardWindow"
-  onload="OnLoadEditCard()"
-  ondialogaccept="return EditCardOKButton();"
-  ondialogcancel="return EditCardCancelButton();">
+  icon="abcardWindow"
+  onload="OnLoadEditCard()">
 
   <stringbundleset id="stringbundleset">
     <stringbundle id="bundle_addressBook" src="chrome://messenger/locale/addressbook/addressBook.properties"/>
@@ -22,7 +22,11 @@
 
   <script type="application/javascript" src="chrome://messenger/content/addressbook/abCommon.js"/>
   <script type="application/javascript" src="chrome://messenger/content/addressbook/abCard.js"/>
+  <script type="application/javascript"><![CDATA[
+    document.addEventListener("dialogaccept", EditCardOKButton);
+    document.addEventListener("dialogcancel", EditCardCancelButton);
+  ]]></script>
 
-#include abCard.inc
+#include abCard.inc.xul
 
 </dialog>

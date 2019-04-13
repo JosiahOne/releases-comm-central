@@ -19,11 +19,11 @@ const SETUP_SUCCESS_PAGE            = 8;
 // See discussion in Bugs 508112 and 653307.
 const RECAPTCHA_DOMAIN = "https://www.google.com";
 
-ChromeUtils.import("resource://services-sync/main.js");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/PlacesUtils.jsm");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+const {Weave} = ChromeUtils.import("resource://services-sync/main.js");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+const {PlacesUtils} = ChromeUtils.import("resource://gre/modules/PlacesUtils.jsm");
+const {PluralForm} = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
 
 var gSyncSetup = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIWebProgressListener,
@@ -649,7 +649,7 @@ var gSyncSetup = {
       Weave.Svc.Prefs.reset("serverURL");
     } else {
       // Prevent double selection upon using down key.
-      control.menuBoxObject.activeChild = null;
+      control.activeChild = null;
       control.editable = true;
       control.value = "";
     }

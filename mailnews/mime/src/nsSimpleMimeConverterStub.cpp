@@ -128,7 +128,7 @@ Initialize(MimeObject *obj)
 
     nsCString value;
     rv = catman->GetCategoryEntry(NS_SIMPLEMIMECONVERTERS_CATEGORY,
-                                  contentType.get(), getter_Copies(value));
+                                  contentType, value);
     if (NS_FAILED(rv) || value.IsEmpty())
         return -1;
 
@@ -164,7 +164,7 @@ MimeSimpleStubClassInitialize(MimeSimpleStubClass *clazz)
 class nsSimpleMimeConverterStub : public nsIMimeContentTypeHandler
 {
 public:
-    nsSimpleMimeConverterStub(const char *aContentType) : mContentType(aContentType) { }
+    explicit nsSimpleMimeConverterStub(const char *aContentType) : mContentType(aContentType) { }
 
     NS_DECL_ISUPPORTS
 
@@ -205,5 +205,6 @@ MIME_NewSimpleMimeConverterStub(const char *aContentType,
     RefPtr<nsSimpleMimeConverterStub> inst = new nsSimpleMimeConverterStub(aContentType);
     NS_ENSURE_TRUE(inst, NS_ERROR_OUT_OF_MEMORY);
 
-    return CallQueryInterface(inst.get(), aResult);
+    inst.forget(aResult);
+    return NS_OK;
 }

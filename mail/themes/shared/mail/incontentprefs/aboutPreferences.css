@@ -11,25 +11,24 @@
   color: var(--in-content-page-color);
 }
 
-/* Don't show the Close button on tab content */
-#MailPreferences > .prefWindow-dlgbuttons {
-  display: none;
-}
-
 #prefBox {
   position: relative;
 }
 
-#category-box {
+#pref-category-box {
   background-color: #ebebef;
   width: 240px;
 }
 
-caption label {
-  font-size: 1.3rem;
+html|h2 {
+  font-size: 1.14em;
+  margin: 4px 0 !important;
+}
+
+html|h3 {
+  font-size: 1em;
   font-weight: 600;
-  line-height: 22px;
-  margin: 0 !important;
+  margin: 4px 0 !important;
 }
 
 #preferencesContainer {
@@ -37,11 +36,15 @@ caption label {
   overflow: auto;
 }
 
-#MailPreferences > prefpane {
+#MailPreferences prefpane {
   max-width: 800px;
   padding: 0;
-  font-size: 1.25rem;
-  line-height: 22px;
+  -moz-box-flex: 1;
+  -moz-box-orient: vertical;
+}
+
+#MailPreferences prefpane:not([selected]) {
+  display: none;
 }
 
 tabpanel > label,
@@ -50,10 +53,32 @@ tabpanel > hbox > description {
   margin-inline-start: 0;
 }
 
+textbox[type="number"][size="1"] {
+  width: 4em;
+}
+
+textbox[type="number"][size="2"] {
+  width: 4.5em;
+}
+
+textbox[type="number"][size="3"] {
+  width: 5em;
+}
+
+textbox[type="number"][size="4"] {
+  width: 5.5em;
+}
+
+textbox[type="number"][size="5"] {
+  width: 6em;
+}
+
 /* Web search menulist */
 #defaultWebSearch > .menulist-label-box > .menulist-icon[src] {
   margin-inline-start: 5px;
   margin-inline-end: 8px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Category List */
@@ -65,22 +90,24 @@ tabpanel > hbox > description {
   border-bottom: none;
   padding: 54px 0 0;
   margin: 0;
-  max-height: 100vh;
-  overflow-x: auto;
 }
 
 radio[pane] {
   -moz-box-orient: horizontal;
+  -moz-box-align: center;
   -moz-appearance: none;
   width: 240px;
-  color: var(--in-content-category-text);
+  color: var(--in-content-text-color);
   border-right-width: 0;
   border-left-width: 0;
   border-radius: 2px;
+  margin-top: 0;
+  margin-bottom: 0;
   margin-inline-start: 34px;
   margin-inline-end: 0;
   padding: 5px 10px;
   min-height: 40px;
+  outline-offset: -1px;
   transition: background-color 150ms;
 }
 
@@ -102,39 +129,55 @@ radio[pane]:hover:active {
   background-color: var(--in-content-category-background-selected-active);
 }
 
+.paneSelector[focused="true"][keyboard-navigation="true"] > radio[pane][focused="true"] {
+  outline: var(--in-content-category-outline-focus);
+}
+
 radio[pane]:hover::before,
 radio[pane][selected]::before {
   display: none;
 }
 
-.paneButtonLabel {
+radio[pane] > .radio-label-box {
   line-height: 22px;
-  font-size: 1.45rem;
   padding-bottom: 2px;
   padding-inline-start: 9px;
   margin: 0;
   -moz-user-select: none;
 }
 
-.paneButtonIcon {
+radio[pane][focused="true"] > .radio-label-box {
+  outline: none;
+}
+
+radio[pane] > .radio-label-box > .radio-label {
+  margin: 0;
+}
+
+radio[pane] > .radio-check {
   width: 24px;
   height: 24px;
+  border-width: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  margin-inline-end: 0;
   -moz-image-region: auto;
   -moz-context-properties: fill, fill-opacity;
   fill: currentColor;
   fill-opacity: 0.8;
 }
 
-radio[pane][selected] > .paneButtonIcon {
+radio[pane][selected] > .radio-check {
   fill-opacity: 1;
 }
 
 @media (max-width: 830px) {
-  #category-box {
+  #pref-category-box {
     width: 118px;
   }
 
-  .paneButtonLabel {
+  radio[pane] > .radio-label-box {
     display: none;
   }
 
@@ -150,43 +193,43 @@ radio[pane][selected] > .paneButtonIcon {
   }
 }
 
-radio[pane=paneGeneral] > .paneButtonIcon {
+radio[pane=paneGeneral] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/general.svg");
 }
 
-radio[pane=paneDisplay] > .paneButtonIcon {
+radio[pane=paneDisplay] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/display.svg");
 }
 
-radio[pane=paneApplications] > .paneButtonIcon {
+radio[pane=paneApplications] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/attachment.svg");
 }
 
-radio[pane=panePrivacy] > .paneButtonIcon {
+radio[pane=panePrivacy] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/privacy.svg");
 }
 
-radio[pane=paneSecurity]> .paneButtonIcon {
+radio[pane=paneSecurity]> .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/security.svg");
 }
 
-radio[pane=paneCompose] > .paneButtonIcon {
+radio[pane=paneCompose] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/compose.svg");
 }
 
-radio[pane=paneAdvanced] > .paneButtonIcon {
+radio[pane=paneAdvanced] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/advanced.svg");
 }
 
-radio[pane=paneChat] > .paneButtonIcon {
+radio[pane=paneChat] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/chat.svg");
 }
 
-radio[pane=paneLightning] > .paneButtonIcon {
+radio[pane=paneLightning] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/calendar.svg");
 }
 
-radio[pane=paneAccount] > .paneButtonIcon {
+radio[pane=paneAccount] > .radio-check {
   list-style-image: url("chrome://messenger/skin/shared/in-content/account.svg");
 }
 
@@ -209,40 +252,56 @@ textbox + button {
   margin-inline-start: -4px;
 }
 
-.spinbuttons-button {
-  min-height: initial;
-  margin-inline-start: 10px !important;
-  margin-inline-end: 2px !important;
+html|input[type="number"] {
+  padding: 0;
+  padding-inline-end: 1px;
 }
 
-.spinbuttons-up {
-  margin-top: 2px !important;
+html|input[type="number"]::-moz-number-spin-box {
+  margin-inline-start: 10px;
+}
+
+html|input[type="number"]::-moz-number-spin-up,
+html|input[type="number"]::-moz-number-spin-down {
+  -moz-appearance: none;
+  min-width: 25px;
+  border-color: var(--in-content-box-border-color);
+  background-color: var(--in-content-button-background);
+  background-position: center;
+}
+
+html|input[type="number"]::-moz-number-spin-up:hover,
+html|input[type="number"]::-moz-number-spin-down:hover {
+  background-color: var(--in-content-button-background-hover);
+}
+
+html|input[type="number"]::-moz-number-spin-up {
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
   border-radius: 1px 1px 0 0;
+  background-image: url("chrome://messenger/skin/icons/arrow/arrow-up.png");
 }
 
-.spinbuttons-down  {
-  margin-bottom: 2px !important;
+html|input[type="number"]::-moz-number-spin-down {
   border-radius: 0 0 1px 1px;
+  background-image: url("chrome://messenger/skin/icons/arrow/arrow-down.png");
 }
 
-.spinbuttons-button > .button-box {
-  padding: 1px 5px 2px !important;
+separator.groove:not([orient="vertical"]) {
+  border-top-color: #c1c1c1;
+  border-bottom-width: 0;
 }
 
-.spinbuttons-up > .button-box > .button-icon {
-  list-style-image: url("chrome://messenger/skin/icons/arrow/arrow-up.png");
+tab:-moz-focusring {
+  outline: var(--in-content-category-outline-focus);
 }
 
-.spinbuttons-up[disabled="true"] > .button-box > .button-icon {
-  list-style-image: url("chrome://messenger/skin/icons/arrow/arrow-up-dim.png");
+tab:-moz-focusring > .tab-middle {
+  outline: none;
 }
 
-.spinbuttons-down > .button-box > .button-icon {
-  list-style-image: url("chrome://messenger/skin/icons/arrow/arrow-down.png");
-}
-
-.spinbuttons-down[disabled="true"] > .button-box > .button-icon {
-  list-style-image: url("chrome://messenger/skin/icons/arrow/arrow-down-dim.png");
+#defaultWebSearchPopup > menuitem > .menu-iconic-left {
+  display: -moz-box;
 }
 
 /* Applications Pane Styles */
@@ -257,16 +316,26 @@ textbox + button {
 
 #handlersView > richlistitem {
   min-height: 36px !important;
+  padding: 0;
+}
+
+.shortDetails {
+  text-align: end;
+  opacity: 0.5;
+}
+
+#handlersView richlistitem[selected="true"] .shortDetails {
+  color: inherit;
 }
 
 .typeIcon {
-  margin-inline-start: 10px !important;
-  margin-inline-end: 9px !important;
+  margin-inline-start: 10px;
+  margin-inline-end: 9px;
 }
 
 .actionIcon {
-  margin-inline-start: 11px !important;
-  margin-inline-end: 8px !important;
+  margin-inline-start: 11px;
+  margin-inline-end: 8px;
 }
 
 .actionsMenu {
@@ -297,6 +366,21 @@ description > html|a {
   cursor: pointer;
 }
 
+#provider-listing {
+  width: 200px;
+}
+
+#addCloudFileAccountButtons button,
+#removeCloudFileAccount {
+  margin: 4px 0 0;
+}
+
+#addCloudFileAccountButtons button .button-icon {
+  width: 16px;
+  height: 16px;
+  margin-inline-end: 8px;
+}
+
 #paneChat {
   padding-top: 15px;
   padding-bottom: 15px;
@@ -310,13 +394,33 @@ tabs {
   margin-inline-start: 33px;
 }
 
-.inset {
-  border-color: #424e5a;
-}
-
 .update-throbber {
   margin-inline-start: 0;
   margin-inline-end: 4px;
+}
+
+.updateSettingCrossUserWarningContainer {
+  background: var(--grey-20);
+  border-radius: 5px;
+  padding-inline: 8px;
+  padding-block-start: 2px;
+  padding-block-end: 8px;
+  margin-block-end: 17px;
+}
+
+#updateSettingCrossUserWarning {
+  padding-inline-start: 30px;
+  margin-block-start: 20px;
+  line-height: 20px;
+  background-image: url("chrome://global/skin/icons/info.svg");
+  background-position-x: left 2px;
+  background-position-y: top 2px;
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+}
+
+#updateSettingCrossUserWarning:-moz-locale-dir(rtl) {
+  background-position-x: right 2px;
 }
 
 #releasenotes {
@@ -340,11 +444,90 @@ tabs {
  * Font dialog menulist fixes
  */
 
+#selectLangs {
+  font-weight: normal;
+  font-size: .877em;
+}
+
 #defaultFontType,
 #serif,
 #sans-serif,
 #monospace {
   min-width: 30ch;
+}
+
+/**
+ * toolkit element overrides
+ */
+
+groupbox label:not(.menu-accel):not(.menu-iconic-accel):not(.menu-text):not(.menu-iconic-text):not(.menulist-label):not(.indent):not(.learnMore):not(.tail-with-learn-more),
+groupbox description {
+  /* !important needed to override toolkit !important rule */
+  margin-inline-start: 0 !important;
+  margin-inline-end: 0 !important;
+}
+
+richlistbox {
+  -moz-appearance: none;
+  background-color: var(--in-content-box-background);
+  color: var(--in-content-text-color);
+}
+
+richlistbox richlistitem {
+  padding: 0.3em;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background-image: none;
+}
+
+richlistbox richlistitem:hover {
+  background-color: var(--in-content-item-hover);
+}
+
+richlistbox:focus > richlistitem[selected="true"] {
+  background-color: var(--in-content-item-selected);
+  color: var(--in-content-selected-text) !important;
+}
+
+#messengerLanguagesDialogPane {
+  min-height: 360px;
+}
+
+#defaultMessengerLanguage {
+  margin-inline-start: 0;
+  min-width: 20em;
+}
+
+#MessengerLanguagesDialog > .dialog-button-box > .dialog-button[dlgtype="accept"] {
+  margin-inline-end: 0;
+}
+
+#availableLocales {
+  margin: 0;
+  margin-inline-end: 4px;
+}
+
+#warning-message {
+  margin-top: 8px;
+}
+
+#warning-message > .message-bar-description {
+  width: 32em;
+}
+
+.add-messenger-language {
+  margin: 0;
+  margin-inline-start: 4px;
+}
+
+.action-button {
+  margin-inline-end: 0;
+}
+
+/* Menulist styles */
+.label-item {
+  font-size: .8em;
 }
 
 /**
@@ -359,6 +542,7 @@ tabs {
 }
 
 .dialogBox {
+  -moz-appearance: none;
   background-color: #fbfbfb;
   color: #424e5a;
   /* `transparent` will use the dialogText color in high-contrast themes and
@@ -378,14 +562,15 @@ tabs {
   min-width: 66ch;
 }
 
-.dialogBox > .groupbox-title {
+.dialogTitleBar {
   padding: 3.5px 0;
   background-color: #f1f1f1;
   border-bottom: 1px solid #c1c1c1;
 }
 
 .dialogTitle {
-  font-size: .9em;
+  font-size: 1.026em;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -396,12 +581,8 @@ tabs {
   min-height: auto;
 }
 
-.dialogBox > .groupbox-body {
-  -moz-appearance: none;
-  padding: 20px;
-}
-
 .dialogFrame {
+  margin: 20px;
   -moz-box-flex: 1;
   /* Default dialog dimensions */
   height: 12em;

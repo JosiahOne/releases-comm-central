@@ -7,15 +7,12 @@
  * type conversion.
  */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
-ChromeUtils.import("resource:///modules/MailUtils.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/FileUtils.jsm");
-ChromeUtils.import("resource://gre/modules/osfile.jsm");
-ChromeUtils.import("resource://gre/modules/Log.jsm");
-ChromeUtils.import("resource:///modules/mailstoreConverter.jsm");
-ChromeUtils.import("resource:///modules/folderUtils.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {FileUtils} = ChromeUtils.import("resource://gre/modules/FileUtils.jsm");
+var {Log} = ChromeUtils.import("resource://gre/modules/Log.jsm");
+var {allAccountsSorted} = ChromeUtils.import("resource:///modules/folderUtils.jsm");
+var MailstoreConverter = ChromeUtils.import("resource:///modules/mailstoreConverter.jsm");
 
 var log = Log.repository.getLogger("MailStoreConverter");
 // {nsIMsgIncomingServer} server for the account to be migrated.
@@ -38,12 +35,10 @@ var gOriginalOffline;
 function placeAccountName(aServer) {
   gOriginalOffline = Services.io.offline;
 
-  let bundle = Cc["@mozilla.org/intl/stringbundle;1"]
-    .getService(Ci.nsIStringBundleService)
+  let bundle = Services.strings
     .createBundle("chrome://messenger/locale/converterDialog.properties");
 
-  let brandShortName = Cc["@mozilla.org/intl/stringbundle;1"]
-    .getService(Ci.nsIStringBundleService)
+  let brandShortName = Services.strings
     .createBundle("chrome://branding/locale/brand.properties")
     .GetStringFromName("brandShortName");
 
@@ -130,7 +125,6 @@ function placeAccountName(aServer) {
       bundle.formatStringFromName("converterDialog.messageForDeferredAccount",
                                   [accountsToConvert, storeContractId], 2);
     gServer = deferredToAccount.incomingServer;
-
   } else {
     // No account is deferred.
     let storeContractId = Services.prefs.getCharPref(
@@ -157,6 +151,9 @@ function placeAccountName(aServer) {
                                   [tempName, storeContractId], 2);
     gServer = aServer;
   }
+
+  // Forces the resize of the dialog to the actual content
+  window.sizeToContent();
 }
 
 /**
@@ -168,8 +165,7 @@ function startContinue(aSelectedStoreType, aResponse) {
   gResponse = aResponse;
   gFolder = gServer.rootFolder.filePath;
 
-  let bundle = Cc["@mozilla.org/intl/stringbundle;1"]
-    .getService(Ci.nsIStringBundleService)
+  let bundle = Services.strings
     .createBundle("chrome://messenger/locale/converterDialog.properties");
 
   document.getElementById("progress").addEventListener("progress", function(e) {
@@ -178,8 +174,8 @@ function startContinue(aSelectedStoreType, aResponse) {
      bundle.formatStringFromName("converterDialog.percentDone", [e.detail], 1);
   });
 
-  document.getElementById("warning").style.display = "none";
-  document.getElementById("progressDiv").style.display = "block";
+  document.getElementById("warning").setAttribute("hidden", "hidden");
+  document.getElementById("progressDiv").removeAttribute("hidden");
 
   // Storing original prefs and root folder path
   // to revert changes in case of error.
@@ -204,7 +200,7 @@ function startContinue(aSelectedStoreType, aResponse) {
    * Called when promise returned by convertMailStoreTo() is rejected.
    * @param {String} aReason - error because of which the promise was rejected.
    */
-  function promiseRejected(aReason){
+  function promiseRejected(aReason) {
     log.error("Conversion to '" + aSelectedStoreType + "' failed: " + aReason);
     document.getElementById("messageSpan").style.display = "none";
 
@@ -275,23 +271,22 @@ function startContinue(aSelectedStoreType, aResponse) {
     &&
     canCompact(gServer.rootFolder)) {
     let urlListener = {
-      OnStartRunningUrl: function (aUrl) {
+      OnStartRunningUrl(aUrl) {
       },
-      OnStopRunningUrl: function (aUrl, aExitCode) {
-        let pConvert = convertMailStoreTo(originalStoreContractID,
+      OnStopRunningUrl(aUrl, aExitCode) {
+        let pConvert = MailstoreConverter.convertMailStoreTo(originalStoreContractID,
           gServer, document.getElementById("progress"));
         pConvert.then(function(val) {
           promiseResolved(val);
         }).catch(function(reason) {
           promiseRejected(reason);
         });
-      }
+      },
     };
     gServer.rootFolder.compactAll(urlListener, null, gServer.type == "imap" ||
       gServer.type == "nntp");
-  }
-  else {
-    let pConvert = convertMailStoreTo(originalStoreContractID,
+  } else {
+    let pConvert = MailstoreConverter.convertMailStoreTo(originalStoreContractID,
       gServer, document.getElementById("progress"));
     pConvert.then(function(val) {
       promiseResolved(val);
@@ -308,7 +303,7 @@ function startContinue(aSelectedStoreType, aResponse) {
 function cancelConversion(aResponse) {
   gResponse = aResponse;
   gResponse.newRootFolder = null;
-  terminateWorkers();
+  MailstoreConverter.terminateWorkers();
   Services.io.offline = gOriginalOffline;
   window.close();
 }

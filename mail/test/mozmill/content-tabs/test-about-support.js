@@ -2,13 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = 'test-about-support';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['folder-display-helpers', 'content-tab-helpers',
                        'compose-helpers', 'window-helpers'];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 Cu.importGlobalProperties(["DOMParser"]);
 
 var warningText = new Map();
@@ -64,10 +66,23 @@ const ABOUT_SUPPORT_ERROR_STRINGS = new Map([[ "text/html", ["undefined", "null"
 function open_about_support() {
   let tab = open_content_tab_with_click(mc.menus.helpMenu.aboutsupport_open,
                                         "about:support");
+
+  // Make sure L10n is done.
+  let l10nDone = false;
+  tab.browser.contentDocument.l10n.ready.then(() => l10nDone = true, Cu.reportError);
+  mc.waitFor(() => l10nDone, "Timeout waiting for L10n to complete.");
+
   // We have one variable that's asynchronously populated -- wait for it to be
   // populated.
   mc.waitFor(() => (tab.browser.contentWindow.gAccountDetails !== undefined),
              "Timeout waiting for about:support's gAccountDetails to populate.");
+
+  mc.waitFor(() => content_tab_e(tab, "accounts-tbody").children.length > 1,
+             "Accounts sections didn't load.");
+  // The population of the info fields is async, so we must wait until
+  // the last one is done.
+  mc.waitFor(() => content_tab_e(tab, "intl-osprefs-regionalprefs").textContent.trim() != "",
+             "Regional prefs section didn't load.");
 
   return tab;
 }
@@ -129,7 +144,7 @@ function test_display_about_support() {
   let tables = tab.browser.contentDocument.querySelectorAll("tbody");
   let emptyTables = [ "graphics-failures-tbody", "graphics-tbody",
                       "locked-prefs-tbody", "sandbox-syscalls-tbody",
-                      "crashes-tbody" ]; // some tables may be empty
+                      "crashes-tbody", "processes-tbody" ]; // some tables may be empty
   for (let table of tables) {
     if (!emptyTables.includes(table.id))
       assert_true(table.querySelectorAll("tr").length > 0,
@@ -360,7 +375,6 @@ function test_send_via_email_public() {
   close_compose_window(cwc);
   close_tab(tab);
 }
-test_send_via_email_public.EXCLUDED_PLATFORMS = ['linux'];  // See bug 1373809.
 
 /**
  * Test opening the compose window with private data.
@@ -398,4 +412,3 @@ function test_send_via_email_private() {
   close_compose_window(cwc);
   close_tab(tab);
 }
-test_send_via_email_private.EXCLUDED_PLATFORMS = ['linux'];  // See bug 1373809.

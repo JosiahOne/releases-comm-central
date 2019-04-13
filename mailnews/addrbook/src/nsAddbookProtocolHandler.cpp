@@ -50,7 +50,7 @@ NS_IMETHODIMP nsAddbookProtocolHandler::GetDefaultPort(int32_t *aDefaultPort)
 
 NS_IMETHODIMP nsAddbookProtocolHandler::GetProtocolFlags(uint32_t *aUritype)
 {
-  *aUritype = URI_STD | URI_LOADABLE_BY_ANYONE | URI_FORBIDS_COOKIE_ACCESS;
+  *aUritype = URI_STD | URI_LOADABLE_BY_ANYONE;
   return NS_OK;
 }
 
@@ -94,11 +94,10 @@ nsAddbookProtocolHandler::GenerateXMLOutputChannel( nsString &aOutput,
   rv = inStr->SetData(utf8String.get(), utf8String.Length());
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIInputStream> stream(do_QueryInterface(inStr));
   if (aLoadInfo) {
     return NS_NewInputStreamChannelInternal(_retval,
                                             aURI,
-                                            stream.forget(),
+                                            inStr.forget(),
                                             NS_LITERAL_CSTRING("text/xml"),
                                             EmptyCString(),
                                             aLoadInfo);
@@ -112,7 +111,7 @@ nsAddbookProtocolHandler::GenerateXMLOutputChannel( nsString &aOutput,
 
   return NS_NewInputStreamChannel(_retval,
                                   aURI,
-                                  stream.forget(),
+                                  inStr.forget(),
                                   nullPrincipal,
                                   nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
                                   nsIContentPolicy::TYPE_OTHER,
@@ -120,15 +119,9 @@ nsAddbookProtocolHandler::GenerateXMLOutputChannel( nsString &aOutput,
 }
 
 NS_IMETHODIMP
-nsAddbookProtocolHandler::NewChannel(nsIURI *aURI, nsIChannel **_retval)
-{
-  return NewChannel2(aURI, nullptr, _retval);
-}
-
-NS_IMETHODIMP
-nsAddbookProtocolHandler::NewChannel2(nsIURI *aURI,
-                                      nsILoadInfo* aLoadInfo,
-                                      nsIChannel **_retval)
+nsAddbookProtocolHandler::NewChannel(nsIURI *aURI,
+                                     nsILoadInfo* aLoadInfo,
+                                     nsIChannel **_retval)
 {
   nsresult rv;
   nsCOMPtr <nsIAddbookUrl> addbookUrl = do_QueryInterface(aURI, &rv);

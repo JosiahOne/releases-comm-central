@@ -1,5 +1,7 @@
 trust-domain: comm
 project-repo-param-prefix: comm_
+product-dir: comm/mail
+
 treeherder:
     group-names:
         'X': 'Xpcshell tests'
@@ -11,11 +13,21 @@ treeherder:
         'TW32': 'Toolchain builds for Windows 32-bits'
         'TW64': 'Toolchain builds for Windows 64-bits'
         'Deb7': 'Packages for Debian 7'
+        'Deb7-32': 'Packages for Debian 7 32-bits'
         'Deb9': 'Packages for Debian 9'
+        'Fetch-URL': 'Fetch and store content'
         'L10n': 'Localised Repacks'
         'L10n-Rpk': 'Localized Repackaged Repacks'
+        'M': 'Mochitests'
+        'M-sw': 'Mochitests with serviceworker redesign'
+        'M-e10s': 'Mochitests with e10s'
+        'M-sw-e10s': 'Mochitests with serviceworker redesign and e10s'
+        'ms': 'Complete MAR signing'
+        'MSI': 'Repack installers into MSIs'
+        'MSIs': 'Signing of Repacked installers of MSIs'
         'rs': 'Repackage signing'
-        'BMR-L10n': 'Beetmover repackages for locales'
+        'BM': 'Beetmover'
+        'BMR': 'Beetmover repackages'
         'c-Up': 'Balrog submission of complete updates'
         'cs': 'Checksum signing'
         'BMcs': 'Beetmover checksums,'
@@ -65,7 +77,53 @@ scriptworker:
         'scriptworker-prov-v1/tb-balrog-v1':
             - 'project:comm:thunderbird:releng:balrog:server:nightly'
             - 'project:comm:thunderbird:releng:balrog:server:beta'
+            - 'project:comm:thunderbird:releng:balrog:server:release'
 
-partner:
-    release: {}
-    staging: {}
+partner-urls:
+    release-partner-repack: {}
+    release-eme-free-repack: {}
+
+task-priority:
+    by-project:
+        'comm-esr60': 'very-high'
+        'comm-beta': 'high'
+        'comm-central': 'medium'
+        'default': 'low'
+
+workers:
+    aliases:
+        b-linux.*:
+            provisioner: aws-provisioner-v1
+            implementation: docker-worker
+            os: linux
+            worker-type: 'gecko-{level}-{alias}'
+        b-win2012:
+            provisioner: aws-provisioner-v1
+            implementation: generic-worker
+            os: windows
+            worker-type: 'gecko-{level}-{alias}'
+        images:
+            provisioner: aws-provisioner-v1
+            implementation: docker-worker
+            os: linux
+            worker-type: 'gecko-{level}-{alias}'
+        t-linux(-large|-xlarge):
+            provisioner: aws-provisioner-v1
+            implementation: docker-worker
+            os: linux
+            worker-type: 'gecko-{alias}'
+        t-osx-1010:
+            provisioner: releng-hardware
+            implementation: generic-worker
+            os: macosx
+            worker-type: 'gecko-{alias}'
+        t-win10-64(|-gpu):
+            provisioner: aws-provisioner-v1
+            implementation: generic-worker
+            os: windows
+            worker-type: 'gecko-{alias}'
+        t-win7-32(|-gpu):
+            provisioner: aws-provisioner-v1
+            implementation: generic-worker
+            os: windows
+            worker-type: 'gecko-{alias}'

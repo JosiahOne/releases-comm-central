@@ -12,27 +12,24 @@
 
 <dialog id="certPicker" title="&certPicker.title;"
   xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  xmlns:html="http://www.w3.org/1999/xhtml"
   style="width: 50em;"
   buttons="accept,cancel"
-  ondialogaccept="return doOK();"
-  ondialogcancel="return doCancel();"
   onload="onLoad();">
 
 <script type="application/javascript"
         src="chrome://messenger/content/certpicker.js"/>
 
   <hbox align="center">
-    <broadcaster id="certSelected" oncommand="onCertSelected();"/>
     <label id="pickerInfo" value="&certPicker.info;"/>
     <!-- The items in this menulist must never be sorted,
          but remain in the order filled by the application
     -->
-    <menulist id="nicknames" observes="certSelected">
+    <menulist id="nicknames" oncommand="onCertSelected();">
       <menupopup/>
     </menulist>
   </hbox>
   <separator class="thin"/>
   <label value="&certPicker.detailsLabel;"/>
-  <textbox readonly="true" id="details" multiline="true"
-           style="height: 12em;" flex="1"/>
+  <html:textarea id="details" readonly="readonly" style="height: 12em;" flex="1"/>
 </dialog>

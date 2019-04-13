@@ -14,14 +14,13 @@
 #include "nsIMsgFolder.h"
 #include "nsIMsgImapMailFolder.h"
 #include "nsIImapIncomingServer.h"
+#include "nsIImapMailFolderSink.h"
+#include "nsIImapMessageSink.h"
 #include "nsIImapServerSink.h"
 #include "nsIImapMockChannel.h"
 #include "nsImapUtils.h"
 #include "nsIMAPNamespace.h"
 #include "nsIDocShell.h"
-#include "nsIDocShellLoadInfo.h"
-#include "nsIRDFService.h"
-#include "nsRDFCID.h"
 #include "nsIProgressEventSink.h"
 #include "nsIPrefBranch.h"
 #include "nsIPrefService.h"
@@ -50,7 +49,6 @@
 #include "nsMsgLocalCID.h"
 #include "nsIOutputStream.h"
 #include "nsIDocShell.h"
-#include "nsIDocShellLoadInfo.h"
 #include "nsIMessengerWindowService.h"
 #include "nsIWindowMediator.h"
 #include "nsIPrompt.h"
@@ -63,6 +61,9 @@
 #include "nsMsgMessageFlags.h"
 #include "nsIMsgPluggableStore.h"
 #include "../../base/src/MailnewsLoadContextInfo.h"
+#include "nsDocShellLoadState.h"
+#include "nsContentUtils.h"
+#include "mozilla/LoadInfo.h"
 
 #define PREF_MAIL_ROOT_IMAP "mail.root.imap"            // old - for backward compatibility only
 #define PREF_MAIL_ROOT_IMAP_REL "mail.root.imap-rel"
@@ -440,12 +441,17 @@ NS_IMETHODIMP nsImapService::DisplayMessage(const char *aMessageURI,
       if (NS_SUCCEEDED(rv) && mailnewsUrl)
         mailnewsUrl->GetLoadGroup(getter_AddRefs(aLoadGroup));
 
-      rv = NewChannel(uri, getter_AddRefs(aChannel));
+      nsCOMPtr<nsILoadInfo> loadInfo = new mozilla::net::LoadInfo(
+        nsContentUtils::GetSystemPrincipal(),
+        nullptr,
+        nullptr,
+        nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+        nsIContentPolicy::TYPE_OTHER);
+      rv = NewChannel(uri, loadInfo, getter_AddRefs(aChannel));
       NS_ENSURE_SUCCESS(rv, rv);
 
-      nsCOMPtr<nsISupports> aCtxt = do_QueryInterface(uri);
       //  now try to open the channel passing in our display consumer as the listener
-      rv = aChannel->AsyncOpen(aStreamListener, aCtxt);
+      rv = aChannel->AsyncOpen(aStreamListener);
       return rv;
     }
   }
@@ -528,7 +534,7 @@ NS_IMETHODIMP nsImapService::DisplayMessage(const char *aMessageURI,
       nsCOMPtr<nsIPrefBranch> prefBranch(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
       // Should the message fetch force a peek or a traditional fetch?
       // Force peek if there is a delay in marking read (or no auto-marking at all).
-      // This is because a FETCH (BODY[]) will implicitly set tha \Seen flag on the msg,
+      // This is because a FETCH (BODY[]) will implicitly set the \Seen flag on the msg,
       // but a FETCH (BODY.PEEK[]) won't.
       bool forcePeek = false;
       if (NS_SUCCEEDED(rv) && prefBranch)
@@ -620,17 +626,18 @@ nsresult nsImapService::FetchMimePart(nsIImapUrl *aImapUrl,
     nsCOMPtr<nsIDocShell> docShell(do_QueryInterface(aDisplayConsumer, &rv));
     if (NS_SUCCEEDED(rv) && docShell)
     {
-      nsCOMPtr<nsIDocShellLoadInfo> loadInfo;
       // DIRTY LITTLE HACK --> if we are opening an attachment we want the docshell to
       // treat this load as if it were a user click event. Then the dispatching stuff will be much
       // happier.
+      RefPtr<nsDocShellLoadState> loadState = new nsDocShellLoadState(url);
+      loadState->SetLoadFlags(aImapAction == nsImapUrl::nsImapOpenMimePart
+                                ? nsIWebNavigation::LOAD_FLAGS_IS_LINK
+                                : nsIWebNavigation::LOAD_FLAGS_NONE);
       if (aImapAction == nsImapUrl::nsImapOpenMimePart)
-      {
-        docShell->CreateLoadInfo(getter_AddRefs(loadInfo));
-        loadInfo->SetLoadType(nsIDocShellLoadInfo::loadLink);
-      }
-
-      rv = docShell->LoadURI(url, loadInfo, nsIWebNavigation::LOAD_FLAGS_NONE, false);
+        loadState->SetLoadType(LOAD_LINK);
+      loadState->SetFirstParty(false);
+      loadState->SetTriggeringPrincipal(nsContentUtils::GetSystemPrincipal());
+      rv = docShell->LoadURI(loadState);
     }
     else
     {
@@ -643,7 +650,13 @@ nsresult nsImapService::FetchMimePart(nsIImapUrl *aImapUrl,
         if (NS_SUCCEEDED(rv) && mailnewsUrl)
           mailnewsUrl->GetLoadGroup(getter_AddRefs(loadGroup));
 
-        rv = NewChannel(url, getter_AddRefs(aChannel));
+        nsCOMPtr<nsILoadInfo> loadInfo = new mozilla::net::LoadInfo(
+          nsContentUtils::GetSystemPrincipal(),
+          nullptr,
+          nullptr,
+          nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+          nsIContentPolicy::TYPE_OTHER);
+        rv = NewChannel(url, loadInfo, getter_AddRefs(aChannel));
         NS_ENSURE_SUCCESS(rv, rv);
 
         // we need a load group to hold onto the channel. When the request is finished,
@@ -654,9 +667,8 @@ nsresult nsImapService::FetchMimePart(nsIImapUrl *aImapUrl,
 
         aChannel->SetLoadGroup(loadGroup);
 
-        nsCOMPtr<nsISupports> aCtxt = do_QueryInterface(url);
         //  now try to open the channel passing in our display consumer as the listener
-        rv = aChannel->AsyncOpen(aStreamListener, aCtxt);
+        rv = aChannel->AsyncOpen(aStreamListener);
       }
       else // do what we used to do before
       {
@@ -873,17 +885,9 @@ nsresult nsImapService::DecomposeImapURI(const nsACString &aMessageURI,
                                       folderURI, aMsgKey, nullptr);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr <nsIRDFService> rdf = do_GetService("@mozilla.org/rdf/rdf-service;1",&rv);
+  nsCOMPtr<nsIMsgFolder> folder;
+  rv = GetOrCreateFolder(folderURI, aFolder);
   NS_ENSURE_SUCCESS(rv, rv);
-
-  nsCOMPtr<nsIRDFResource> res;
-  rv = rdf->GetResource(folderURI, getter_AddRefs(res));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  nsCOMPtr<nsIMsgFolder> msgFolder = do_QueryInterface(res);
-  NS_ENSURE_TRUE(msgFolder, NS_ERROR_FAILURE);
-
-  msgFolder.forget(aFolder);
 
   return NS_OK;
 }
@@ -1060,7 +1064,11 @@ nsresult nsImapService::GetMessageFromUrl(nsIImapUrl *aImapUrl,
   if (NS_SUCCEEDED(rv) && docShell)
   {
     NS_ASSERTION(!aConvertDataToText, "can't convert to text when using docshell");
-    rv = docShell->LoadURI(url, nullptr, nsIWebNavigation::LOAD_FLAGS_NONE, false);
+    RefPtr<nsDocShellLoadState> loadState = new nsDocShellLoadState(url);
+    loadState->SetLoadFlags(nsIWebNavigation::LOAD_FLAGS_NONE);
+    loadState->SetFirstParty(false);
+    loadState->SetTriggeringPrincipal(nsContentUtils::GetSystemPrincipal());
+    rv = docShell->LoadURI(loadState);
   }
   else
   {
@@ -1075,7 +1083,13 @@ nsresult nsImapService::GetMessageFromUrl(nsIImapUrl *aImapUrl,
       if (NS_SUCCEEDED(rv) && mailnewsUrl)
         mailnewsUrl->GetLoadGroup(getter_AddRefs(loadGroup));
 
-      rv = NewChannel(url, getter_AddRefs(channel));
+      nsCOMPtr<nsILoadInfo> loadInfo = new mozilla::net::LoadInfo(
+        nsContentUtils::GetSystemPrincipal(),
+        nullptr,
+        nullptr,
+        nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+        nsIContentPolicy::TYPE_OTHER);
+      rv = NewChannel(url, loadInfo, getter_AddRefs(channel));
       NS_ENSURE_SUCCESS(rv, rv);
 
       // we need a load group to hold onto the channel. When the request is finished,
@@ -1098,9 +1112,8 @@ nsresult nsImapService::GetMessageFromUrl(nsIImapUrl *aImapUrl,
         streamListener = conversionListener; // this is our new listener.
       }
 
-      nsCOMPtr<nsISupports> aCtxt = do_QueryInterface(url);
       //  now try to open the channel passing in our display consumer as the listener
-      rv = channel->AsyncOpen(streamListener, aCtxt);
+      rv = channel->AsyncOpen(streamListener);
     }
     else // do what we used to do before
     {
@@ -1829,7 +1842,6 @@ NS_IMETHODIMP nsImapService::DiscoverAllFolders(nsIMsgFolder *aImapMailFolder,
       nsCOMPtr<nsIMsgMailNewsUrl> mailnewsurl = do_QueryInterface(imapUrl);
       mailnewsurl->SetMsgWindow(aMsgWindow);
       urlSpec.AppendLiteral("/discoverallboxes");
-      nsCOMPtr <nsIURI> url = do_QueryInterface(imapUrl, &rv);
       rv = mailnewsurl->SetSpecInternal(urlSpec);
       if (NS_SUCCEEDED(rv))
         rv = GetImapConnectionAndLoadUrl(imapUrl, nullptr, aURL);
@@ -2048,9 +2060,10 @@ nsresult nsImapService::OfflineAppendFromFile(nsIFile *aFile,
         if (NS_SUCCEEDED(rv) && inputStream)
         {
           // now, copy the temp file to the offline store for the dest folder.
-          nsMsgLineStreamBuffer *inputStreamBuffer = new nsMsgLineStreamBuffer(FILE_IO_BUFFER_SIZE,
-                                                                               true,    // allocate new lines
-                                                                               false);  // leave CRLFs on the returned string
+          RefPtr<nsMsgLineStreamBuffer> inputStreamBuffer =
+            new nsMsgLineStreamBuffer(FILE_IO_BUFFER_SIZE,
+                                      true,    // allocate new lines
+                                      false);  // leave CRLFs on the returned string
           int64_t fileSize;
           aFile->GetFileSize(&fileSize);
           uint32_t bytesWritten;
@@ -2096,7 +2109,6 @@ nsresult nsImapService::OfflineAppendFromFile(nsIFile *aFile,
           inputStream->Close();
           inputStream = nullptr;
           aListener->OnStopRunningUrl(aUrl, NS_OK);
-          delete inputStreamBuffer;
         }
         offlineStore->Close();
       }
@@ -2209,8 +2221,7 @@ nsresult nsImapService::GetImapConnectionAndLoadUrl(nsIImapUrl *aImapUrl,
 
   if (aURL)
   {
-    nsCOMPtr<nsIURI> msgUrlUri = do_QueryInterface(msgUrl);
-    msgUrlUri.forget(aURL);
+    msgUrl.forget(aURL);
   }
 
   if (NS_SUCCEEDED(rv) && aMsgIncomingServer)
@@ -2445,10 +2456,10 @@ NS_IMETHODIMP nsImapService::GetDefaultPort(int32_t *aDefaultPort)
 
 NS_IMETHODIMP nsImapService::GetProtocolFlags(uint32_t *result)
 {
-  *result = URI_STD | URI_FORBIDS_AUTOMATIC_DOCUMENT_REPLACEMENT |
-  URI_DANGEROUS_TO_LOAD | ALLOWS_PROXY | URI_FORBIDS_COOKIE_ACCESS
+  *result = URI_NORELATIVE | URI_FORBIDS_AUTOMATIC_DOCUMENT_REPLACEMENT |
+    URI_DANGEROUS_TO_LOAD | ALLOWS_PROXY
 #ifdef IS_ORIGIN_IS_FULL_SPEC_DEFINED
-  | ORIGIN_IS_FULL_SPEC
+    | ORIGIN_IS_FULL_SPEC
 #endif
   ;
   return NS_OK;
@@ -2600,16 +2611,15 @@ NS_IMETHODIMP nsImapService::NewURI(const nsACString &aSpec,
       nsCOMPtr<nsIImapMessageSink> msgSink = do_QueryInterface(folder);
       (void) aImapUrl->SetImapMessageSink(msgSink);
 
-      nsCOMPtr<nsIMsgFolder> msgFolder = do_QueryInterface(folder);
-      (void) SetImapUrlSink(msgFolder, aImapUrl);
+      (void) SetImapUrlSink(folder, aImapUrl);
 
       nsCString messageIdString;
       aImapUrl->GetListOfMessageIds(messageIdString);
       if (!messageIdString.IsEmpty())
       {
         bool useLocalCache = false;
-        msgFolder->HasMsgOffline(strtoul(messageIdString.get(), nullptr, 10),
-                                 &useLocalCache);
+        folder->HasMsgOffline(strtoul(messageIdString.get(), nullptr, 10),
+                              &useLocalCache);
         mailnewsUrl->SetMsgIsInLocalCache(useLocalCache);
       }
     }
@@ -2629,14 +2639,9 @@ NS_IMETHODIMP nsImapService::NewURI(const nsACString &aSpec,
   return rv;
 }
 
-NS_IMETHODIMP nsImapService::NewChannel(nsIURI *aURI, nsIChannel **aRetVal)
-{
-  return NewChannel2(aURI, nullptr, aRetVal);
-}
-
-NS_IMETHODIMP nsImapService::NewChannel2(nsIURI *aURI,
-                                         nsILoadInfo* aLoadInfo,
-                                         nsIChannel **aRetVal)
+NS_IMETHODIMP nsImapService::NewChannel(nsIURI *aURI,
+                                        nsILoadInfo* aLoadInfo,
+                                        nsIChannel **aRetVal)
 {
   NS_ENSURE_ARG_POINTER(aURI);
   NS_ENSURE_ARG_POINTER(aRetVal);

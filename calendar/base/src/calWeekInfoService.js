@@ -2,8 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 function calWeekInfoService() {
     this.wrappedJSObject = this;
@@ -46,10 +45,10 @@ calWeekInfoService.prototype = {
         // which may be part of the week counted in the previous year.) So we
         // need the startWeekday.
         const SUNDAY = 0;
-        let startWeekday = Preferences.get("calendar.week.start", SUNDAY); // default to monday per ISO8601 standard.
+        let startWeekday = Services.prefs.getIntPref("calendar.week.start", SUNDAY); // default to monday per ISO8601 standard.
 
         // The number of days since the start of the week.
-        // Notice that the result of the substraction might be negative.
+        // Notice that the result of the subtraction might be negative.
         // We correct for that by adding 7, and then using the remainder operator.
         let sinceStartOfWeek = (aDateTime.weekday - startWeekday + 7) % 7;
 
@@ -85,7 +84,7 @@ calWeekInfoService.prototype = {
     getStartOfWeek: function(aDate) {
         let date = aDate.clone();
         date.isDate = true;
-        let offset = Preferences.get("calendar.week.start", 0) - aDate.weekday;
+        let offset = Services.prefs.getIntPref("calendar.week.start", 0) - aDate.weekday;
         date.day += offset;
         if (offset > 0) {
             date.day -= 7;

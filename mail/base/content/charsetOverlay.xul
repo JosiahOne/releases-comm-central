@@ -4,12 +4,11 @@
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
 <!DOCTYPE overlay SYSTEM "chrome://global/locale/charsetMenu.dtd">
-<overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+<overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
   <script>
-    ChromeUtils.import("resource://gre/modules/CharsetMenu.jsm");
+    var {CharsetMenu} = ChromeUtils.import("resource://gre/modules/CharsetMenu.jsm");
 
-    function UpdateCharsetMenu(aCharset, aNode)
-    {
+    function UpdateCharsetMenu(aCharset, aNode) {
       var bundle = document.getElementById("charsetBundle");
       CharsetMenu.update(aNode, bundle.getString(aCharset.toLowerCase()));
     }

@@ -2,14 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "test-account-port-setting";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                        "account-manager-helpers", "keyboard-helpers" ];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 
 var PORT_NUMBERS_TO_TEST =
   [

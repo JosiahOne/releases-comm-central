@@ -15,20 +15,18 @@
 
 <dialog title="&windowTitle.label;"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         onload="Startup();"
-        buttons="accept,cancel"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();">
+        buttons="accept,cancel">
 
   <!-- Methods common to all editor dialogs -->
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdDialogCommon.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdTextAreaProps.js"/>
 
-  <broadcaster id="args" value=""/>
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
 
-  <groupbox><caption label="&Settings.label;"/>
+  <groupbox><label class="header">&Settings.label;</label>
     <grid><columns><column/><column/></columns>
       <rows>
         <row align="center">
@@ -38,13 +36,13 @@
         <row align="center">
           <label control="TextAreaRows" value="&TextAreaRows.label;" accesskey="&TextAreaRows.accessKey;"/>
           <hbox>
-            <textbox id="TextAreaRows" class="narrow" oninput="forceInteger(this.id);onInput();"/>
+            <textbox id="TextAreaRows" class="narrow" oninput="forceInteger(this.id); onInput();"/>
           </hbox>
         </row>
         <row align="center">
           <label control="TextAreaCols" value="&TextAreaCols.label;" accesskey="&TextAreaCols.accessKey;"/>
           <hbox>
-            <textbox id="TextAreaCols" class="narrow" oninput="forceInteger(this.id);onInput();"/>
+            <textbox id="TextAreaCols" class="narrow" oninput="forceInteger(this.id); onInput();"/>
           </hbox>
         </row>
       </rows>
@@ -96,7 +94,7 @@
         <row>
           <label control="TextAreaValue" value="&InitialText.label;" accesskey="&InitialText.accessKey;"/>
         </row>
-        <textbox id="TextAreaValue" flex="1" multiline="true" rows="5"/>
+        <html:textarea id="TextAreaValue" flex="1" rows="5"/>
       </rows>
     </grid>
   </groupbox>

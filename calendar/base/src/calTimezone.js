@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/ical.js");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { ICAL } = ChromeUtils.import("resource://calendar/modules/ical.js");
 
 function calICALJSTimezone(innerObject) {
     this.innerObject = innerObject || new ICAL.Timezone();
@@ -38,7 +38,7 @@ calICALJSTimezone.prototype = {
         try {
             displayName = bundle.GetStringFromName(stringName);
         } catch (e) {
-            // Just use the TZID if the string is mising.
+            // Just use the TZID if the string is missing.
         }
         this.__defineGetter__("displayName", () => {
             return displayName;

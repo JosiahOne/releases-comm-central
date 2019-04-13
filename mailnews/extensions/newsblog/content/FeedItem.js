@@ -3,14 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-function FeedItem()
-{
+function FeedItem() {
   this.mDate = FeedUtils.getValidRFC5322Date();
   this.mParserUtils = Cc["@mozilla.org/parserutils;1"].getService(Ci.nsIParserUtils);
 }
 
-FeedItem.prototype =
-{
+FeedItem.prototype = {
   // Only for IETF Atom.
   xmlContentBase: null,
   id: null,
@@ -19,7 +17,10 @@ FeedItem.prototype =
   content: null,
   enclosures: [],
   title: null,
-  author: "anonymous",
+  // Author must be angle bracket enclosed to function as an addr-spec, in the
+  // absence of an addr-spec portion of an RFC5322 email address, as other
+  // functionality (gloda search) depends on this.
+  author: "<anonymous>",
   inReplyTo: "",
   keywords: [],
   mURL: null,
@@ -27,30 +28,25 @@ FeedItem.prototype =
 
   ENCLOSURE_BOUNDARY_PREFIX: "--------------", // 14 dashes
   ENCLOSURE_HEADER_BOUNDARY_PREFIX: "------------", // 12 dashes
-  MESSAGE_TEMPLATE: '\n' +
-    '<html>\n' +
-    '  <head>\n' +
-    '    <title>%TITLE%</title>\n' +
-    '    <base href="%BASE%">\n' +
-    '  </head>\n' +
-    '  <body id="msgFeedSummaryBody" selected="false">\n' +
-    '    %CONTENT%\n' +
-    '  </body>\n' +
-    '</html>\n',
+  MESSAGE_TEMPLATE: "\n" +
+    "<html>\n" +
+    "  <head>\n" +
+    "    <title>%TITLE%</title>\n" +
+    "    <base href=\"%BASE%\">\n" +
+    "  </head>\n" +
+    "  <body id=\"msgFeedSummaryBody\" selected=\"false\">\n" +
+    "    %CONTENT%\n" +
+    "  </body>\n" +
+    "</html>\n",
 
-  get url()
-  {
+  get url() {
     return this.mURL;
   },
 
-  set url(aVal)
-  {
-    try
-    {
+  set url(aVal) {
+    try {
       this.mURL = Services.io.newURI(aVal).spec;
-    }
-    catch(ex)
-    {
+    } catch (ex) {
       // The url as published or constructed can be a non url.  It's used as a
       // feeditem identifier in feeditems.rdf, as a messageId, and as an href
       // and for the content-base header.  Save as is; ensure not null.
@@ -58,61 +54,54 @@ FeedItem.prototype =
     }
   },
 
-  get date()
-  {
+  get date() {
     return this.mDate;
   },
 
-  set date (aVal)
-  {
+  set date(aVal) {
     this.mDate = aVal;
   },
 
-  get identity ()
-  {
-    return this.feed.name + ": " + this.title + " (" + this.id + ")"
+  get identity() {
+    return this.feed.name + ": " + this.title + " (" + this.id + ")";
   },
 
-  normalizeMessageID: function(messageID)
-  {
+  normalizeMessageID(messageID) {
     // Escape occurrences of message ID meta characters <, >, and @.
     messageID.replace(/</g, "%3C");
     messageID.replace(/>/g, "%3E");
     messageID.replace(/@/g, "%40");
-    messageID = "<" + messageID.trim() + "@" + "localhost.localdomain" + ">";
+    messageID = "<" + messageID.trim() + "@localhost.localdomain>";
 
     FeedUtils.log.trace("FeedItem.normalizeMessageID: messageID - " + messageID);
     return messageID;
   },
 
-  get itemUniqueURI()
-  {
+  get itemUniqueURI() {
     return this.createURN(this.id);
   },
 
-  get contentBase()
-  {
-    if(this.xmlContentBase)
-      return this.xmlContentBase
-    else
-      return this.mURL;
+  get contentBase() {
+    if (this.xmlContentBase) {
+      return this.xmlContentBase;
+    }
+
+    return this.mURL;
   },
 
-  store: function()
-  {
+  store() {
     // this.title and this.content contain HTML.
     // this.mUrl and this.contentBase contain plain text.
 
     let stored = false;
     let resource = this.findStoredResource();
-    if (!this.feed.folder)
+    if (!this.feed.folder) {
       return stored;
+    }
 
-    if (resource == null)
-    {
+    if (resource == null) {
       resource = FeedUtils.rdf.GetResource(this.itemUniqueURI);
-      if (!this.content)
-      {
+      if (!this.content) {
         FeedUtils.log.trace("FeedItem.store: " + this.identity +
                             " no content; storing description or title");
         this.content = this.description || this.title;
@@ -127,12 +116,12 @@ FeedItem.prototype =
       this.markStored(resource);
       stored = true;
     }
+
     this.markValid(resource);
     return stored;
   },
 
-  findStoredResource: function()
-  {
+  findStoredResource() {
     // Checks to see if the item has already been stored in its feed's
     // message folder.
     FeedUtils.log.trace("FeedItem.findStoredResource: checking if stored - " +
@@ -141,8 +130,7 @@ FeedItem.prototype =
     let server = this.feed.server;
     let folder = this.feed.folder;
 
-    if (!folder)
-    {
+    if (!folder) {
       FeedUtils.log.debug("FeedItem.findStoredResource: folder '" +
                           this.feed.folderName +
                           "' doesn't exist; creating as child of " +
@@ -158,8 +146,7 @@ FeedItem.prototype =
     let downloaded = ds.GetTarget(itemResource, FeedUtils.FZ_STORED, true);
 
     if (!downloaded ||
-        downloaded.QueryInterface(Ci.nsIRDFLiteral).Value == "false")
-    {
+        downloaded.QueryInterface(Ci.nsIRDFLiteral).Value == "false") {
       FeedUtils.log.trace("FeedItem.findStoredResource: not stored");
       return null;
     }
@@ -168,85 +155,62 @@ FeedItem.prototype =
     return itemResource;
   },
 
-  markValid: function(resource)
-  {
+  markValid(resource) {
     let ds = FeedUtils.getItemsDS(this.feed.server);
 
     let newTimeStamp = FeedUtils.rdf.GetLiteral(new Date().getTime());
     let currentTimeStamp = ds.GetTarget(resource,
                                         FeedUtils.FZ_LAST_SEEN_TIMESTAMP,
                                         true);
-    if (currentTimeStamp)
+    if (currentTimeStamp) {
       ds.Change(resource, FeedUtils.FZ_LAST_SEEN_TIMESTAMP,
                 currentTimeStamp, newTimeStamp);
-    else
+    } else {
       ds.Assert(resource, FeedUtils.FZ_LAST_SEEN_TIMESTAMP,
                 newTimeStamp, true);
+    }
 
     if (!ds.HasAssertion(resource, FeedUtils.FZ_FEED,
-                         FeedUtils.rdf.GetResource(this.feed.url), true))
+                         FeedUtils.rdf.GetResource(this.feed.url), true)) {
       ds.Assert(resource, FeedUtils.FZ_FEED,
                 FeedUtils.rdf.GetResource(this.feed.url), true);
+    }
 
-    if (ds.hasArcOut(resource, FeedUtils.FZ_VALID))
-    {
+    if (ds.hasArcOut(resource, FeedUtils.FZ_VALID)) {
       let currentValue = ds.GetTarget(resource, FeedUtils.FZ_VALID, true);
       ds.Change(resource, FeedUtils.FZ_VALID,
                 currentValue, FeedUtils.RDF_LITERAL_TRUE);
-    }
-    else
+    } else {
       ds.Assert(resource, FeedUtils.FZ_VALID, FeedUtils.RDF_LITERAL_TRUE, true);
+    }
   },
 
-  markStored: function(resource)
-  {
+  markStored(resource) {
     let ds = FeedUtils.getItemsDS(this.feed.server);
 
     if (!ds.HasAssertion(resource, FeedUtils.FZ_FEED,
-                         FeedUtils.rdf.GetResource(this.feed.url), true))
+                         FeedUtils.rdf.GetResource(this.feed.url), true)) {
       ds.Assert(resource, FeedUtils.FZ_FEED,
                 FeedUtils.rdf.GetResource(this.feed.url), true);
+    }
 
     let currentValue;
-    if (ds.hasArcOut(resource, FeedUtils.FZ_STORED))
-    {
+    if (ds.hasArcOut(resource, FeedUtils.FZ_STORED)) {
       currentValue = ds.GetTarget(resource, FeedUtils.FZ_STORED, true);
       ds.Change(resource, FeedUtils.FZ_STORED,
                 currentValue, FeedUtils.RDF_LITERAL_TRUE);
-    }
-    else
+    } else {
       ds.Assert(resource, FeedUtils.FZ_STORED,
                 FeedUtils.RDF_LITERAL_TRUE, true);
+    }
   },
 
-  mimeEncodeSubject: function(aSubject)
-  {
-    // This routine sometimes throws exceptions for mis-encoded data so
-    // wrap it with a try catch for now.
-    let newSubject;
-    try
-    {
-      newSubject = mailServices.mimeConverter.encodeMimePartIIStr_UTF8(aSubject,
-                     false, 9, 72);
-    }
-    catch (ex)
-    {
-      newSubject = aSubject;
-    }
-
-    return newSubject;
-  },
-
-  writeToFolder: function()
-  {
+  writeToFolder() {
     FeedUtils.log.trace("FeedItem.writeToFolder: " + this.identity +
                         " writing to message folder " + this.feed.name);
-    // Convert the title to UTF-16 before performing our HTML entity
-    // replacement reg expressions.
-    let title = this.title;
-
     // The subject may contain HTML entities.  Convert these to their unencoded
     // state. i.e. &amp; becomes '&'.
+    let title = this.title;
     title = this.mParserUtils.convertToPlainText(
         title,
         Ci.nsIDocumentEncoder.OutputSelectionOnly |
@@ -256,46 +220,24 @@ FeedItem.prototype =
     // Compress white space in the subject to make it look better.  Trim
     // leading/trailing spaces to prevent mbox header folding issue at just
     // the right subject length.
-    title = title.replace(/[\t\r\n]+/g, " ").trim();
-
-    this.title = this.mimeEncodeSubject(title);
+    this.title = title.replace(/[\t\r\n]+/g, " ").trim();
 
     // If the date looks like it's in W3C-DTF format, convert it into
     // an IETF standard date.  Otherwise assume it's in IETF format.
-    if (this.mDate.search(/^\d\d\d\d/) != -1)
+    if (this.mDate.search(/^\d\d\d\d/) != -1) {
       this.mDate = new Date(this.mDate).toUTCString();
+    }
 
     // If there is an inreplyto value, create the headers.
     let inreplytoHdrsStr = this.inReplyTo ?
       ("References: " + this.inReplyTo + "\n" +
        "In-Reply-To: " + this.inReplyTo + "\n") : "";
 
-    // If there are keywords (categories), create the headers. In the case of
-    // a longer than RFC5322 recommended line length, create multiple folded
-    // lines (easier to parse than multiple Keywords headers).
-    let keywordsStr = "";
-    if (this.keywords.length)
-    {
-      let HEADER = "Keywords: ";
-      let MAXLEN = 78;
-      keywordsStr = HEADER;
-      let keyword;
-      let keywords = [].concat(this.keywords);
-      let lines = [];
-      while (keywords.length)
-      {
-        keyword = keywords.shift();
-        if (keywordsStr.length + keyword.length > MAXLEN)
-        {
-          lines.push(keywordsStr)
-          keywordsStr = " ".repeat(HEADER.length);
-        }
-        keywordsStr += keyword + ",";
-      }
-      keywordsStr = keywordsStr.replace(/,$/,"\n");
-      lines.push(keywordsStr)
-      keywordsStr = lines.join("\n");
-    }
+    // Support multiple authors in From.
+    let fromStr = this.createHeaderStrFromArray("From: ", this.author);
+
+    // If there are keywords (categories), create the headers.
+    let keywordsStr = this.createHeaderStrFromArray("Keywords: ", this.keywords);
 
     // Escape occurrences of "From " at the beginning of lines of
     // content per the mbox standard, since "From " denotes a new
@@ -309,44 +251,43 @@ FeedItem.prototype =
     // use it to calculate the offset of the X-Mozilla-Status lines from
     // the front of the message for the statusOffset property of the
     // DB header object.
-    let openingLine = 'From - ' + this.mDate + '\n';
+    let openingLine = "From - " + this.mDate + "\n";
 
     let source =
       openingLine +
-      'X-Mozilla-Status: 0000\n' +
-      'X-Mozilla-Status2: 00000000\n' +
-      'X-Mozilla-Keys: ' + " ".repeat(80) + '\n' +
-      'Received: by localhost; ' + FeedUtils.getValidRFC5322Date() + '\n' +
-      'Date: ' + this.mDate + '\n' +
-      'Message-Id: ' + this.normalizeMessageID(this.id) + '\n' +
-      'From: ' + this.author + '\n' +
-      'MIME-Version: 1.0\n' +
-      'Subject: ' + this.title + '\n' +
+      "X-Mozilla-Status: 0000\n" +
+      "X-Mozilla-Status2: 00000000\n" +
+      "X-Mozilla-Keys: " + " ".repeat(80) + "\n" +
+      "Received: by localhost; " + FeedUtils.getValidRFC5322Date() + "\n" +
+      "Date: " + this.mDate + "\n" +
+      "Message-Id: " + this.normalizeMessageID(this.id) + "\n" +
+      fromStr +
+      "MIME-Version: 1.0\n" +
+      "Subject: " + this.title + "\n" +
       inreplytoHdrsStr +
       keywordsStr +
-      'Content-Transfer-Encoding: 8bit\n' +
-      'Content-Base: ' + this.mURL + '\n';
+      "Content-Transfer-Encoding: 8bit\n" +
+      "Content-Base: " + this.mURL + "\n";
 
-    if (this.enclosures.length)
-    {
+    if (this.enclosures.length) {
       let boundaryID = source.length;
-      source += 'Content-Type: multipart/mixed; boundary="' +
-                this.ENCLOSURE_HEADER_BOUNDARY_PREFIX + boundaryID + '"' + '\n\n' +
-                'This is a multi-part message in MIME format.\n' +
-                this.ENCLOSURE_BOUNDARY_PREFIX + boundaryID + '\n' +
-                'Content-Type: text/html; charset=' + this.characterSet + '\n' +
-                'Content-Transfer-Encoding: 8bit\n' +
+      source += "Content-Type: multipart/mixed; boundary=\"" +
+                this.ENCLOSURE_HEADER_BOUNDARY_PREFIX + boundaryID + "\"\n\n" +
+                "This is a multi-part message in MIME format.\n" +
+                this.ENCLOSURE_BOUNDARY_PREFIX + boundaryID + "\n" +
+                "Content-Type: text/html; charset=" + this.characterSet + "\n" +
+                "Content-Transfer-Encoding: 8bit\n" +
                 this.content;
 
       this.enclosures.forEach(function(enclosure) {
         source += enclosure.convertToAttachment(boundaryID);
       });
 
-      source += this.ENCLOSURE_BOUNDARY_PREFIX + boundaryID + '--' + '\n\n\n';
-    }
-    else
-      source += 'Content-Type: text/html; charset=' + this.characterSet + '\n' +
+      source += this.ENCLOSURE_BOUNDARY_PREFIX + boundaryID + "--\n\n\n";
+    } else {
+      source += "Content-Type: text/html; charset=" + this.characterSet + "\n" +
                 this.content;
+    }
 
     FeedUtils.log.trace("FeedItem.writeToFolder: " + this.identity +
                         " is " + source.length + " characters long");
@@ -365,16 +306,60 @@ FeedItem.prototype =
   },
 
 /**
+ * Create a header string from an array. Intended for comma separated headers
+ * like From or Keywords. In the case of a longer than RFC5322 recommended
+ * line length, create multiple folded lines (easier to parse than multiple
+ * headers).
+ *
+ * @param  {String} headerName          - Name of the header.
+ * @param  {String[]} headerItemsArray  - An Array of strings to concatenate.
+ *
+ * @returns {String}                    - The header string.
+ */
+  createHeaderStrFromArray(headerName, headerItemsArray) {
+    let headerStr = "";
+    if (!headerItemsArray || headerItemsArray.length == 0) {
+      return headerStr;
+    }
+
+    const HEADER = headerName;
+    const LINELENGTH = 78;
+    const MAXLINELENGTH = 990;
+    let items = [].concat(headerItemsArray);
+    let lines = [];
+    headerStr = HEADER;
+    while (items.length) {
+      let item = items.shift();
+      if (headerStr.length + item.length > LINELENGTH &&
+          headerStr.length > HEADER.length) {
+        lines.push(headerStr);
+        headerStr = " ".repeat(HEADER.length);
+      }
+
+      headerStr += headerStr.length + item.length > MAXLINELENGTH ?
+                     item.substr(0, MAXLINELENGTH - headerStr.length) + "…, " :
+                     item + ", ";
+    }
+
+    headerStr = headerStr.replace(/,\s$/, "\n");
+    lines.push(headerStr);
+    headerStr = lines.join("\n");
+
+    return headerStr;
+  },
+
+/**
  * Autotag messages.
  *
- * @param  nsIMsgDBHdr aMsgDBHdr - message to tag
- * @param  array aKeywords       - keywords (tags)
+ * @param  {nsIMsgDBHdr} aMsgDBHdr - message to tag
+ * @param  {Array} aKeywords       - keywords (tags)
+ * @returns {void}
  */
-  tagItem: function(aMsgDBHdr, aKeywords)
-  {
+  tagItem(aMsgDBHdr, aKeywords) {
     let category = this.feed.options.category;
-    if (!aKeywords.length || !category.enabled)
+    if (!aKeywords.length || !category.enabled) {
       return;
+    }
 
     let msgArray = Cc["@mozilla.org/array;1"].createInstance(Ci.nsIMutableArray);
     msgArray.appendElement(aMsgDBHdr);
@@ -383,12 +368,10 @@ FeedItem.prototype =
     let rtl = Services.prefs.getIntPref("bidi.direction") == 2;
 
     let keys = [];
-    for (let keyword of aKeywords)
-    {
+    for (let keyword of aKeywords) {
       keyword = rtl ? keyword + prefix : prefix + keyword;
       let keyForTag = MailServices.tags.getKeyForTag(keyword);
-      if (!keyForTag)
-      {
+      if (!keyForTag) {
         // Add the tag if it doesn't exist.
         MailServices.tags.addTag(keyword, "", FeedUtils.AUTOTAG);
         keyForTag = MailServices.tags.getKeyForTag(keyword);
@@ -398,13 +381,13 @@ FeedItem.prototype =
       keys.push(keyForTag);
     }
 
-    if (keys.length)
+    if (keys.length) {
       // Add the keys to the message.
       aMsgDBHdr.folder.addKeywordsToMessages(msgArray, keys.join(" "));
+    }
   },
 
-  htmlEscape: function(s)
-  {
+  htmlEscape(s) {
     s = s.replace(/&/g, "&amp;");
     s = s.replace(/>/g, "&gt;");
     s = s.replace(/</g, "&lt;");
@@ -413,8 +396,7 @@ FeedItem.prototype =
     return s;
   },
 
-  createURN: function(aName)
-  {
+  createURN(aName) {
     // Returns name as a URN in the 'feeditem' namespace. The returned URN is
     // (or is intended to be) RFC2141 compliant.
     // The builtin encodeURI provides nearly the exact encoding functionality
@@ -431,14 +413,13 @@ FeedItem.prototype =
     encoded = encoded.replace(/\~/g, "%7e");
 
     return FeedUtils.FZ_ITEM_NS + encoded;
-  }
+  },
 };
 
 
 // A feed enclosure is to RSS what an attachment is for e-mail.  We make
 // enclosures look like attachments in the UI.
-function FeedEnclosure(aURL, aContentType, aLength, aTitle)
-{
+function FeedEnclosure(aURL, aContentType, aLength, aTitle) {
   this.mURL = aURL;
   // Store a reasonable mimetype if content-type is not present.
   this.mContentType = aContentType || "application/unknown";
@@ -446,23 +427,18 @@ function FeedEnclosure(aURL, aContentType, aLength, aTitle)
   this.mTitle = aTitle;
 
   // Generate a fileName from the URL.
-  if (this.mURL)
-  {
-    try
-    {
+  if (this.mURL) {
+    try {
       this.mFileName = Services.io.newURI(this.mURL).
                                    QueryInterface(Ci.nsIURL).
                                    fileName;
-    }
-    catch(ex)
-    {
+    } catch (ex) {
       this.mFileName = this.mURL;
     }
   }
 }
 
-FeedEnclosure.prototype =
-{
+FeedEnclosure.prototype = {
   mURL: "",
   mContentType: "",
   mLength: 0,
@@ -472,15 +448,14 @@ FeedEnclosure.prototype =
 
   // Returns a string that looks like an e-mail attachment which represents
   // the enclosure.
-  convertToAttachment: function(aBoundaryID)
-  {
-    return '\n' +
-      this.ENCLOSURE_BOUNDARY_PREFIX + aBoundaryID + '\n' +
-      'Content-Type: ' + this.mContentType +
-                     '; name="' + (this.mTitle || this.mFileName) +
-                     (this.mLength ? '"; size=' + this.mLength : '"') + '\n' +
-      'X-Mozilla-External-Attachment-URL: ' + this.mURL + '\n' +
-      'Content-Disposition: attachment; filename="' + this.mFileName + '"\n\n' +
-      FeedUtils.strings.GetStringFromName("externalAttachmentMsg") + '\n';
-  }
+  convertToAttachment(aBoundaryID) {
+    return "\n" +
+      this.ENCLOSURE_BOUNDARY_PREFIX + aBoundaryID + "\n" +
+      "Content-Type: " + this.mContentType +
+                     "; name=\"" + (this.mTitle || this.mFileName) +
+                     (this.mLength ? "\"; size=" + this.mLength : "\"") + "\n" +
+      "X-Mozilla-External-Attachment-URL: " + this.mURL + "\n" +
+      "Content-Disposition: attachment; filename=\"" + this.mFileName + "\"\n\n" +
+      FeedUtils.strings.GetStringFromName("externalAttachmentMsg") + "\n";
+  },
 };

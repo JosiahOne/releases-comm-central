@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 var MAPI_STARTUP_ARG = "MapiStartup";
 var MESSAGE_ID_PARAM = "?messageid=";
@@ -30,7 +30,7 @@ var nsMailNewsCommandLineHandler =
    */
   handle: function nsMailNewsCommandLineHandler_handle(aCommandLine) {
     // Do this here because xpcshell isn't too happy with this at startup
-    ChromeUtils.import("resource:///modules/MailUtils.js");
+    var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
     // -mail <URL>
     let mailURL = null;
     try {
@@ -56,7 +56,7 @@ var nsMailNewsCommandLineHandler =
           // Make sure the folder tree is initialized
           MailUtils.discoverFolders();
 
-          let folder = MailUtils.getFolderForURI(folderURI, true);
+          let folder = MailUtils.getExistingFolder(folderURI);
           // The folder might not exist, so guard against that
           if (folder && messageID.length > 0)
             msgHdr = folder.msgDatabase.getMsgHdrForMessageID(messageID);
@@ -133,11 +133,6 @@ var nsMailNewsCommandLineHandler =
 
   helpInfo: "  -mail              Open the mail folder view.\n" +
             "  -mail <URL>        Open the message specified by this URL.\n",
-
-  classInfo: XPCOMUtils.generateCI({classID: CMDLINEHANDLER_CID,
-                                    contractID: CMDLINEHANDLER_CONTRACTID,
-                                    interfaces: [Ci.nsICommandLineHandler],
-                                    flags: Ci.nsIClassInfo.SINGLETON}),
 
   /* nsIFactory */
   createInstance: function(outer, iid) {

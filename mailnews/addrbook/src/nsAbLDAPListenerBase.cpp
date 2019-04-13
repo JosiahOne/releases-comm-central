@@ -8,6 +8,7 @@
 #include "nsIWindowMediator.h"
 #include "mozIDOMWindow.h"
 #include "nsIAuthPrompt.h"
+#include "nsIAuthModule.h"
 #include "nsIStringBundle.h"
 #include "nsILDAPMessage.h"
 #include "nsILDAPErrors.h"
@@ -19,6 +20,8 @@
 #include "mozilla/Services.h"
 
 using namespace mozilla;
+
+uint32_t nsAbLDAPListenerBase::sCurrentRequestNum = 0;
 
 nsAbLDAPListenerBase::nsAbLDAPListenerBase(nsILDAPURL* url,
                                            nsILDAPConnection* connection,
@@ -249,6 +252,7 @@ NS_IMETHODIMP nsAbLDAPListenerBase::OnLDAPInit(nsILDAPConnection *aConn, nsresul
     InitFailed();
     return rv;
   }
+  mOperation->SetRequestNum(++sCurrentRequestNum);
 
   // Try non-password mechanisms first
   if (mSaslMechanism.EqualsLiteral("GSSAPI"))
@@ -260,8 +264,7 @@ NS_IMETHODIMP nsAbLDAPListenerBase::OnLDAPInit(nsILDAPConnection *aConn, nsresul
     service.InsertLiteral("ldap@", 0);
 
     nsCOMPtr<nsIAuthModule> authModule =
-      do_CreateInstance(NS_AUTH_MODULE_CONTRACTID_PREFIX "sasl-gssapi", &rv);
-    NS_ENSURE_SUCCESS(rv, rv);
+      nsIAuthModule::CreateInstance("sasl-gssapi");
 
     rv = mOperation->SaslBind(service, mSaslMechanism, authModule);
     if (NS_FAILED(rv))

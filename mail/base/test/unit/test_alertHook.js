@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/activity/alertHook.js");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://testing-common/mailnews/MockFactory.js");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {alertHook} = ChromeUtils.import("resource:///modules/activity/alertHook.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {MockFactory} = ChromeUtils.import("resource://testing-common/mailnews/MockFactory.js");
 alertHook.init();
 
 // Replace the alerts service with our own. This will let us check if we're
@@ -15,10 +15,9 @@ var gAlertShown = false;
 var mockAlertsService = {
   QueryInterface: ChromeUtils.generateQI([Ci.nsIAlertsService]),
 
-  showAlertNotification: function(imageUrl, title, text, textClickable, cookie,
-                                  alertListener, name) {
+  showAlertNotification(imageUrl, title, text, textClickable, cookie, alertListener, name) {
     gAlertShown = true;
-  }
+  },
 };
 
 var gMsgWindow = {};
@@ -29,7 +28,7 @@ var mailnewsURL = {
       return gMsgWindow;
 
     throw Cr.NS_ERROR_INVALID_POINTER;
-  }
+  },
 };
 
 function run_test() {

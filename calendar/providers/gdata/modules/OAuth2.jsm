@@ -7,10 +7,17 @@
  */
 var EXPORTED_SYMBOLS = ["OAuth2"]; /* exported OAuth2 */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
-ChromeUtils.import("resource://gre/modules/Http.jsm");
+// Backwards compatibility with Thunderbird <60.
+if (!("Cc" in this)) {
+    // eslint-disable-next-line mozilla/no-define-cc-etc, no-unused-vars
+    const { interfaces: Ci, results: Cr } = Components;
+}
+
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { Log4Moz } = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+var { httpRequest } = ChromeUtils.import("resource://gre/modules/Http.jsm");
+
+var { cal } = ChromeUtils.import("resource://gdata-provider/modules/calUtilsShim.jsm");
 
 function parseURLData(aData) {
     let result = {};
@@ -42,7 +49,7 @@ OAuth2.prototype = {
     consumerSecret: null,
     completionURI: "http://localhost",
     requestWindowURI: "chrome://messenger/content/browserRequest.xul",
-    requestWindowFeatures: "chrome,private,centerscreen,width=980,height=600",
+    requestWindowFeatures: "chrome,private,centerscreen,width=980,height=750",
     requestWindowTitle: "",
     requestWindowDescription: "",
     scope: null,
@@ -104,7 +111,7 @@ OAuth2.prototype = {
                 }
 
                 this.account.finishAuthorizationRequest();
-                this.account.onAuthorizationFailed(Components.results.NS_ERROR_ABORT, '{ "error": "cancelled"}');
+                this.account.onAuthorizationFailed(Cr.NS_ERROR_ABORT, '{ "error": "cancelled"}');
             },
 
             loaded: function(aWindow, aWebProgress) {
@@ -138,10 +145,10 @@ OAuth2.prototype = {
                     },
 
                     onStateChange: function(aChangedWebProgress, aRequest, aStateFlags, aStatus) {
-                        const wpl = Components.interfaces.nsIWebProgressListener;
+                        const wpl = Ci.nsIWebProgressListener;
                         if (aStateFlags & (wpl.STATE_STOP)) {
                             try {
-                                let httpchannel = aRequest.QueryInterface(Components.interfaces.nsIHttpChannel);
+                                let httpchannel = aRequest.QueryInterface(Ci.nsIHttpChannel);
 
                                 let responseCategory = Math.floor(httpchannel.responseStatus / 100);
 
@@ -151,7 +158,7 @@ OAuth2.prototype = {
                                 }
                             } catch (e) {
                                 // Throw the case where it's a http channel.
-                                if (e.result != Components.results.NS_ERROR_NO_INTERFACE) {
+                                if (e.result != Cr.NS_ERROR_NO_INTERFACE) {
                                     throw e;
                                 }
                             }
@@ -168,8 +175,7 @@ OAuth2.prototype = {
                     onStatusChange: function() {},
                     onSecurityChange: function() {},
                 };
-                aWebProgress.addProgressListener(this._listener,
-                                                 Components.interfaces.nsIWebProgress.NOTIFY_ALL);
+                aWebProgress.addProgressListener(this._listener, Ci.nsIWebProgress.NOTIFY_ALL);
                 aWindow.document.title = this.account.requestWindowTitle;
             }
         };

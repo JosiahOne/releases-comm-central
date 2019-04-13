@@ -3,10 +3,11 @@
  * Test suite for local folder functions.
  */
 
+/* import-globals-from ../../../test/resources/messageGenerator.js */
 load("../../../resources/messageGenerator.js");
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var { toXPCOMArray } = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+
 /**
  * Bug 66763
  * Test deletion of a folder with a name already existing in Trash.
@@ -26,7 +27,7 @@ function subtest_folder_deletion(root) {
   root.deleteSubFolders(folderArray, null);
   Assert.ok(!path.exists());
   Assert.equal(trash.numSubFolders, 1);
-  let folderDeleted = trash.getChildNamed("folder");
+  trash.getChildNamed("folder");
 
   // Create another "folder" in root.
   folder = root.createLocalSubfolder("folder");
@@ -35,14 +36,13 @@ function subtest_folder_deletion(root) {
   root.deleteSubFolders(folderArray, null);
   Assert.equal(trash.numSubFolders, 2);
   // The folder should be automatically renamed as the same name already is in Trash.
-  let folderDeleted2 = trash.getChildNamed("folder(2)");
+  trash.getChildNamed("folder(2)");
 
   // Create yet another "folder" in root.
   folder = root.createLocalSubfolder("folder");
 
   // But now with another subfolder
-  let subfolder = folder.QueryInterface(Ci.nsIMsgLocalMailFolder)
-                        .createLocalSubfolder("subfolder");
+  folder.QueryInterface(Ci.nsIMsgLocalMailFolder).createLocalSubfolder("subfolder");
 
   // Delete folder into Trash again
   folderArray = toXPCOMArray([folder], Ci.nsIMutableArray);
@@ -113,15 +113,14 @@ function subtest_folder_operations(root) {
   var thrown = false;
   try {
     root.getChildNamed("folder2");
-  }
-  catch (e) {
+  } catch (e) {
     thrown = true;
   }
 
   Assert.ok(thrown);
 
   // folder2 is a child of folder however.
-  var folder2 = folder.getChildNamed("folder2");
+  folder2 = folder.getChildNamed("folder2");
 
   // Test - isAncestorOf
 
@@ -131,30 +130,28 @@ function subtest_folder_operations(root) {
 
   // Test - FoldersWithFlag
 
-  const nsMsgFolderFlags = Ci.nsMsgFolderFlags;
+  folder.setFlag(Ci.nsMsgFolderFlags.CheckNew);
+  Assert.ok(folder.getFlag(Ci.nsMsgFolderFlags.CheckNew));
+  Assert.ok(!folder.getFlag(Ci.nsMsgFolderFlags.Offline));
 
-  folder.setFlag(nsMsgFolderFlags.CheckNew);
-  Assert.ok(folder.getFlag(nsMsgFolderFlags.CheckNew));
-  Assert.ok(!folder.getFlag(nsMsgFolderFlags.Offline));
+  folder.setFlag(Ci.nsMsgFolderFlags.Offline);
+  Assert.ok(folder.getFlag(Ci.nsMsgFolderFlags.CheckNew));
+  Assert.ok(folder.getFlag(Ci.nsMsgFolderFlags.Offline));
 
-  folder.setFlag(nsMsgFolderFlags.Offline);
-  Assert.ok(folder.getFlag(nsMsgFolderFlags.CheckNew));
-  Assert.ok(folder.getFlag(nsMsgFolderFlags.Offline));
+  folder.toggleFlag(Ci.nsMsgFolderFlags.CheckNew);
+  Assert.ok(!folder.getFlag(Ci.nsMsgFolderFlags.CheckNew));
+  Assert.ok(folder.getFlag(Ci.nsMsgFolderFlags.Offline));
 
-  folder.toggleFlag(nsMsgFolderFlags.CheckNew);
-  Assert.ok(!folder.getFlag(nsMsgFolderFlags.CheckNew));
-  Assert.ok(folder.getFlag(nsMsgFolderFlags.Offline));
+  folder.clearFlag(Ci.nsMsgFolderFlags.Offline);
+  Assert.ok(!folder.getFlag(Ci.nsMsgFolderFlags.CheckNew));
+  Assert.ok(!folder.getFlag(Ci.nsMsgFolderFlags.Offline));
 
-  folder.clearFlag(nsMsgFolderFlags.Offline);
-  Assert.ok(!folder.getFlag(nsMsgFolderFlags.CheckNew));
-  Assert.ok(!folder.getFlag(nsMsgFolderFlags.Offline));
+  folder.setFlag(Ci.nsMsgFolderFlags.Favorite);
+  folder2.setFlag(Ci.nsMsgFolderFlags.Favorite);
+  folder.setFlag(Ci.nsMsgFolderFlags.CheckNew);
+  folder2.setFlag(Ci.nsMsgFolderFlags.Offline);
 
-  folder.setFlag(nsMsgFolderFlags.Favorite);
-  folder2.setFlag(nsMsgFolderFlags.Favorite);
-  folder.setFlag(nsMsgFolderFlags.CheckNew);
-  folder2.setFlag(nsMsgFolderFlags.Offline);
-
-  Assert.equal(root.getFolderWithFlags(nsMsgFolderFlags.CheckNew),
+  Assert.equal(root.getFolderWithFlags(Ci.nsMsgFolderFlags.CheckNew),
                folder);
 
   // Test - Move folders around
@@ -174,13 +171,12 @@ function subtest_folder_operations(root) {
   // Test - Get the new folders, make sure the old ones don't exist
 
   var folder1Moved = folder3.getChildNamed("folder1");
-  var folder2Moved = folder1Moved.getChildNamed("folder2");
+  folder1Moved.getChildNamed("folder2");
 
   thrown = false;
   try {
     root.getChildNamed("folder1");
-  }
-  catch (e) {
+  } catch (e) {
     thrown = true;
   }
 
@@ -245,7 +241,7 @@ function test_store_rename(root) {
   let folder2 = folder1.createLocalSubfolder("newfolder1-sub");
   let folder3 = root.createLocalSubfolder("newfolder3")
                     .QueryInterface(Ci.nsIMsgLocalMailFolder);
-  let folder3Subfolder = folder3.createLocalSubfolder("newfolder3-sub");
+  folder3.createLocalSubfolder("newfolder3-sub");
 
   Assert.ok(folder1.hasSubFolders);
   Assert.ok(!folder2.hasSubFolders);
@@ -266,8 +262,9 @@ function test_store_rename(root) {
   folder3 = root.getChildNamed("newfolder3");
   root.propagateDelete(folder3, true, null);
   Assert.ok(!root.containsChildNamed("newfolder3"));
-  folder3 = root.createLocalSubfolder("newfolder3");
-  folder3SubFolder = folder3.createLocalSubfolder("newfolder3-sub");
+  folder3 = root.createLocalSubfolder("newfolder3")
+                .QueryInterface(Ci.nsIMsgLocalMailFolder);
+  folder3.createLocalSubfolder("newfolder3-sub");
   folder3.rename("folder3", null);
 
   Assert.ok(root.containsChildNamed("folder3"));
@@ -276,7 +273,7 @@ function test_store_rename(root) {
 
 var gPluggableStores = [
   "@mozilla.org/msgstore/berkeleystore;1",
-  "@mozilla.org/msgstore/maildirstore;1"
+  "@mozilla.org/msgstore/maildirstore;1",
 ];
 
 function run_all_tests(aHostName) {

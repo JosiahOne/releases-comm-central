@@ -37,11 +37,12 @@ nsLDAPURL::Init(uint32_t aUrlType, int32_t aDefaultPort,
                 nsIURI *aBaseURI)
 {
   nsresult rv;
+  nsCOMPtr<nsIURI> base(aBaseURI);
   rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID)
          .Apply(NS_MutatorMethod(&nsIStandardURLMutator::Init,
                                  nsIStandardURL::URLTYPE_STANDARD,
                                  aDefaultPort, PromiseFlatCString(aSpec),
-                                 aOriginCharset, aBaseURI, nullptr))
+                                 aOriginCharset, base, nullptr))
          .Finalize(mBaseURL);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -373,8 +374,7 @@ NS_IMETHODIMP nsLDAPURL::SchemeIs(const char *aScheme, bool *aEquals)
 // nsIURI clone ();
 //
 nsresult
-nsLDAPURL::CloneInternal(RefHandlingEnum aRefHandlingMode,
-                         const nsACString& newRef, nsIURI** aResult)
+nsLDAPURL::Clone(nsIURI** aResult)
 {
   NS_ENSURE_ARG_POINTER(aResult);
 
@@ -389,36 +389,11 @@ nsLDAPURL::CloneInternal(RefHandlingEnum aRefHandlingMode,
   clone->mOptions = mOptions;
   clone->mAttributes = mAttributes;
 
-  nsresult rv;
-  if (aRefHandlingMode == eHonorRef) {
-    rv = NS_MutateURI(mBaseURL).Finalize(clone->mBaseURL);
-  } else if (aRefHandlingMode == eReplaceRef) {
-    rv = mBaseURL->CloneWithNewRef(newRef, getter_AddRefs(clone->mBaseURL));
-  } else {
-    rv = mBaseURL->CloneIgnoringRef(getter_AddRefs(clone->mBaseURL));
-  }
+  nsresult rv = NS_MutateURI(mBaseURL).Finalize(clone->mBaseURL);
   NS_ENSURE_SUCCESS(rv, rv);
 
   NS_ADDREF(*aResult = clone);
   return NS_OK;
-}
-
-nsresult
-nsLDAPURL::Clone(nsIURI** result)
-{
-  return CloneInternal(eHonorRef, EmptyCString(), result);
-}
-
-NS_IMETHODIMP
-nsLDAPURL::CloneIgnoringRef(nsIURI** result)
-{
-  return CloneInternal(eIgnoreRef, EmptyCString(), result);
-}
-
-NS_IMETHODIMP
-nsLDAPURL::CloneWithNewRef(const nsACString& newRef, nsIURI** result)
-{
-  return CloneInternal(eReplaceRef, newRef, result);
 }
 
 // string resolve (in string relativePath);
@@ -694,25 +669,25 @@ nsLDAPURL::GetSpecIgnoringRef(nsACString &result)
 NS_IMETHODIMP
 nsLDAPURL::GetDisplaySpec(nsACString& aUnicodeSpec)
 {
-  return GetSpec(aUnicodeSpec);
+  return mBaseURL->GetDisplaySpec(aUnicodeSpec);
 }
 
 NS_IMETHODIMP
 nsLDAPURL::GetDisplayHostPort(nsACString& aUnicodeHostPort)
 {
-  return GetHostPort(aUnicodeHostPort);
+  return mBaseURL->GetDisplayHostPort(aUnicodeHostPort);
 }
 
 NS_IMETHODIMP
 nsLDAPURL::GetDisplayHost(nsACString& aUnicodeHost)
 {
-  return GetHost(aUnicodeHost);
+  return mBaseURL->GetDisplayHost(aUnicodeHost);
 }
 
 NS_IMETHODIMP
 nsLDAPURL::GetDisplayPrePath(nsACString& aPrePath)
 {
-  return GetPrePath(aPrePath);
+  return mBaseURL->GetDisplayPrePath(aPrePath);
 }
 
 NS_IMETHODIMP
@@ -746,6 +721,12 @@ nsresult nsLDAPURL::SetQuery(const nsACString &aQuery)
 nsresult nsLDAPURL::SetQueryWithEncoding(const nsACString &aQuery, const mozilla::Encoding* aEncoding)
 {
   return NS_MutateURI(mBaseURL).SetQueryWithEncoding(aQuery, aEncoding).Finalize(mBaseURL);
+}
+
+NS_IMETHODIMP_(void)
+nsLDAPURL::Serialize(mozilla::ipc::URIParams &aParams)
+{
+  mBaseURL->Serialize(aParams);
 }
 
 NS_IMPL_ISUPPORTS(nsLDAPURL::Mutator, nsIURISetters, nsIURIMutator)

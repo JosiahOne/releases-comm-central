@@ -2,22 +2,383 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/* exported onLoad, onAccept, onCancel */
+/* exported onLoad */
 
-ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+/* import-globals-from ../calendar-ui-utils.js */
+
+var { splitRecurrenceRules } = ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gIsReadOnly = false;
 var gStartTime = null;
 var gEndTime = null;
 var gUntilDate = null;
 
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+/**
+ * Object wrapping the methods and properties of recurrence-preview binding.
+ */
+const RecurrencePreview = {
+    /**
+     * Initializes some properties and adds event listener to the #recurrence-preview node.
+     */
+    init() {
+        this.node = document.getElementById("recurrence-preview");
+        this.mRecurrenceInfo = null;
+        this.mResizeHandler = null;
+        this.mDateTime = null;
+        this.mResizeHandler = this.onResize.bind(this);
+        window.addEventListener("resize", this.mResizeHandler, true);
+    },
+    /**
+     * Removes the event listener added in init method.
+     */
+    destruct() {
+        window.removeEventListener("resize", this.mResizeHandler, true);
+    },
+    /**
+     * Setter for mDateTime property.
+     * @param {date} val - The date value that is to be set.
+     */
+    set dateTime(val) {
+        this.mDateTime = val.clone();
+        return this.mDateTime;
+    },
+    /**
+     * Getter for mDateTime property.
+     */
+    get dateTime() {
+        if (this.mDateTime == null) {
+            this.mDateTime = cal.dtz.now();
+        }
+        return this.mDateTime;
+    },
+    /**
+     * Updates #recurrence-preview node layout on window resize.
+     */
+    onResize() {
+        let minimonth = this.node.querySelector("minimonth");
+
+        let row = this.node.querySelector("row");
+        let rows = row.parentNode;
+
+        let contentWidth = minimonth.boxObject.width;
+        let containerWidth = this.node.boxObject.width;
+
+        // Now find out how much elements can be displayed.
+        // this is a simple division which always yields a positive integer value.
+        const cWidth = containerWidth % contentWidth;
+        let numHorizontal = (containerWidth - cWidth) / contentWidth;
+
+        let contentHeight = minimonth.boxObject.height;
+        let containerHeight = this.node.boxObject.height;
+
+        const cHeight = containerHeight % contentHeight;
+        // Now find out how much elements can be displayed.
+        // this is a simple division which always yields a positive integer value.
+        let numVertical = (containerHeight - cHeight) / contentHeight;
+
+        // Count the number of existing rows
+        let numRows = 0;
+        let rowIterator = row;
+        while (rowIterator) {
+            numRows++;
+            rowIterator = rowIterator.nextSibling;
+        }
+
+        // Adjust rows
+        while (numRows < numVertical) {
+            let newNode = row.cloneNode(true);
+            rows.appendChild(newNode);
+            numRows++;
+        }
+        while (numRows > numVertical) {
+            rows.firstChild.remove();
+            numRows--;
+        }
+
+        // Adjust columns in the grid
+        let column = this.node.querySelector(".first-column");
+        let columns = column.parentNode;
+        while ((columns.childNodes.length - 1) < numHorizontal) {
+            let newColumn = column.cloneNode(false);
+            columns.insertBefore(newColumn, column.nextSibling);
+        }
+        while ((columns.childNodes.length - 1) > numHorizontal) {
+            columns.firstChild.remove();
+        }
+
+        // Walk all rows and adjust column elements
+        row = this.node.querySelector("row");
+        while (row) {
+            let firstChild = row.firstChild;
+            while ((row.childNodes.length - 1) < numHorizontal) {
+                let newNode = firstChild.cloneNode(true);
+                firstChild.parentNode.insertBefore(newNode, firstChild);
+            }
+            while ((row.childNodes.length - 1) > numHorizontal) {
+                row.firstChild.remove();
+            }
+            row = row.nextSibling;
+        }
+
+        this.updateContent();
+        this.updatePreview(this.mRecurrenceInfo);
+    },
+    /**
+     * Updates content of #recurrence-preview node.
+     */
+    updateContent() {
+        let date = cal.dtz.dateTimeToJsDate(this.dateTime);
+        let row = this.node.querySelector("row");
+        while (row) {
+            let numChilds = row.childNodes.length - 1;
+            for (let i = 0; i < numChilds; i++) {
+                let minimonth = row.childNodes[i];
+                minimonth.showMonth(date);
+                date.setMonth(date.getMonth() + 1);
+            }
+            row = row.nextSibling;
+        }
+    },
+    /**
+     * Updates preview of #recurrence-preview node.
+     */
+    updatePreview(recurrenceInfo) {
+        let minimonth = this.node.querySelector("minimonth");
+        this.node.style.minHeight = minimonth.boxObject.height + "px";
+
+        this.mRecurrenceInfo = recurrenceInfo;
+        let start = this.dateTime.clone();
+        start.day = 1;
+        start.hour = 0;
+        start.minute = 0;
+        start.second = 0;
+        let end = start.clone();
+        end.month++;
+
+        // the 'minimonth' controls are arranged in a
+        // grid, sorted by rows first -> iterate the rows that may exist.
+        let row = this.node.querySelector("row");
+        while (row) {
+            // now iterate all the child nodes of this row
+            // in order to visit each minimonth in turn.
+            let numChilds = row.childNodes.length - 1;
+            for (let i = 0; i < numChilds; i++) {
+                // we now have one of the minimonth controls while 'start'
+                // and 'end' are set to the interval this minimonth shows.
+                minimonth = row.childNodes[i];
+                minimonth.showMonth(cal.dtz.dateTimeToJsDate(start));
+                if (recurrenceInfo) {
+                    // retrieve an array of dates that represents all occurrences
+                    // that fall into this time interval [start,end[.
+                    // note: the following loop assumes that this array contains
+                    // dates that are strictly monotonically increasing.
+                    // should getOccurrenceDates() not enforce this assumption we
+                    // need to fall back to some different algorithm.
+                    let dates = recurrenceInfo.getOccurrenceDates(start, end, 0, {});
+
+                    // now run through all days of this month and set the
+                    // 'busy' attribute with respect to the occurrence array.
+                    let index = 0;
+                    let occurrence = null;
+                    if (index < dates.length) {
+                        occurrence =
+                            dates[index++]
+                                .getInTimezone(start.timezone);
+                    }
+                    let current = start.clone();
+                    while (current.compare(end) < 0) {
+                        let box = minimonth.getBoxForDate(current);
+                        if (box) {
+                            if (occurrence &&
+                                occurrence.day == current.day &&
+                                occurrence.month == current.month &&
+                                occurrence.year == current.year) {
+                                box.setAttribute("busy", 1);
+                                if (index < dates.length) {
+                                    occurrence =
+                                        dates[index++]
+                                            .getInTimezone(start.timezone);
+                                    // take into account that the very next occurrence
+                                    // can happen at the same day as the previous one.
+                                    if (occurrence.day == current.day &&
+                                        occurrence.month == current.month &&
+                                        occurrence.year == current.year) {
+                                        continue;
+                                    }
+                                } else {
+                                    occurrence = null;
+                                }
+                            } else {
+                                box.removeAttribute("busy");
+                            }
+                        }
+                        current.day++;
+                    }
+                }
+                start.month++;
+                end.month++;
+            }
+            row = row.nextSibling;
+        }
+    }
+};
+
+/**
+ * An object containing the daypicker-weekday binding functionalities.
+ */
+const DaypickerWeekday = {
+    /**
+     * Method intitializing DaypickerWeekday.
+     */
+    init() {
+        this.weekStartOffset = Services.prefs.getIntPref("calendar.week.start", 0);
+
+        let mainbox = document.getElementById("daypicker-weekday");
+        let numChilds = mainbox.childNodes.length;
+        for (let i = 0; i < numChilds; i++) {
+            let child = mainbox.childNodes[i];
+            let dow = i + this.weekStartOffset;
+            if (dow >= 7) {
+                dow -= 7;
+            }
+            let day = cal.l10n.getString("dateFormat", `day.${dow + 1}.Mmm`);
+            child.label = day;
+            child.calendar = mainbox;
+        }
+    },
+    /**
+     * Getter for days property.
+     */
+    get days() {
+        let mainbox = document.getElementById("daypicker-weekday");
+        let numChilds = mainbox.childNodes.length;
+        let days = [];
+        for (let i = 0; i < numChilds; i++) {
+            let child = mainbox.childNodes[i];
+            if (child.getAttribute("checked") == "true") {
+                let index = i + this.weekStartOffset;
+                if (index >= 7) {
+                    index -= 7;
+                }
+                days.push(index + 1);
+            }
+        }
+        return days;
+    },
+    /**
+     * The weekday-picker manages an array of selected days of the week and
+     * the 'days' property is the interface to this array. the expected argument is
+     * an array containing integer elements, where each element represents a selected
+     * day of the week, starting with SUNDAY=1.
+     */
+    set days(val) {
+        let mainbox = document.getElementById("daypicker-weekday");
+        for (let child of mainbox.childNodes) {
+            child.removeAttribute("checked");
+        }
+        for (let i in val) {
+            let index = val[i] - 1 - this.weekStartOffset;
+            if (index < 0) {
+                index += 7;
+            }
+            mainbox.childNodes[index].setAttribute("checked", "true");
+        }
+        return val;
+    }
+};
+
+/**
+ * An object containing the daypicker-monthday binding functionalities.
+ */
+const DaypickerMonthday = {
+    /**
+     * Method intitializing DaypickerMonthday.
+     */
+    init() {
+        let mainbox = document.querySelector(".daypicker-monthday-mainbox");
+        let child = null;
+        for (let row of mainbox.childNodes) {
+            for (child of row.childNodes) {
+                child.calendar = mainbox;
+            }
+        }
+        let labelLastDay = cal.l10n.getString(
+            "calendar-event-dialog", "eventRecurrenceMonthlyLastDayLabel"
+        );
+        child.setAttribute("label", labelLastDay);
+    },
+    /**
+     * Setter for days property.
+     */
+    set days(val) {
+        let mainbox = document.querySelector(".daypicker-monthday-mainbox");
+        let days = [];
+        for (let row of mainbox.childNodes) {
+            for (let child of row.childNodes) {
+                child.removeAttribute("checked");
+                days.push(child);
+            }
+        }
+        for (let i in val) {
+            let lastDayOffset = val[i] == -1 ? 0 : -1;
+            let index = (val[i] < 0) ? val[i] + days.length + lastDayOffset : (val[i] - 1);
+            days[index].setAttribute("checked", "true");
+        }
+        return val;
+    },
+    /**
+     * Getter for days property.
+     */
+    get days() {
+        let mainbox = document.querySelector(".daypicker-monthday-mainbox");
+        let days = [];
+        for (let row of mainbox.childNodes) {
+            for (let child of row.childNodes) {
+                if (child.getAttribute("checked") == "true") {
+                    days.push(Number(child.label) ? Number(child.label) : -1);
+                }
+            }
+        }
+        return days;
+    },
+    /**
+     * Disables daypicker elements.
+     */
+    disable() {
+        let mainbox = document.querySelector(".daypicker-monthday-mainbox");
+        for (let row of mainbox.childNodes) {
+            for (let child of row.childNodes) {
+                child.setAttribute("disabled", "true");
+            }
+        }
+    },
+    /**
+     * Enables daypicker elements.
+     */
+    enable() {
+        let mainbox = document.querySelector(".daypicker-monthday-mainbox");
+        for (let row of mainbox.childNodes) {
+            for (let child of row.childNodes) {
+                child.removeAttribute("disabled");
+            }
+        }
+    }
+};
+
+
 /**
  * Sets up the recurrence dialog from the window arguments. Takes care of filling
  * the dialog controls with the recurrence information for this window.
  */
 function onLoad() {
+    RecurrencePreview.init();
+    DaypickerWeekday.init();
+    DaypickerMonthday.init();
     changeWidgetsOrder();
 
     let args = window.arguments[0];
@@ -27,8 +388,7 @@ function onLoad() {
 
     gStartTime = args.startTime;
     gEndTime = args.endTime;
-    let preview = document.getElementById("recurrence-preview");
-    preview.dateTime = gStartTime.getInTimezone(cal.dtz.defaultTimezone);
+    RecurrencePreview.dateTime = gStartTime.getInTimezone(cal.dtz.defaultTimezone);
 
     onChangeCalendar(calendar);
 
@@ -49,10 +409,10 @@ function onLoad() {
             // Deal with the rules
             if (rules.length > 0) {
                 // We only handle 1 rule currently
-                rule = cal.wrapInstance(rules[0], Components.interfaces.calIRecurrenceRule);
+                rule = cal.wrapInstance(rules[0], Ci.calIRecurrenceRule);
             }
         } catch (ex) {
-            Components.utils.reportError(ex);
+            Cu.reportError(ex);
         }
     }
     if (!rule) {
@@ -147,9 +507,9 @@ function initializeControls(rule) {
 
     // "WEEKLY" ruletype
     if (byDayRuleComponent.length == 0 || rule.type != "WEEKLY") {
-        document.getElementById("daypicker-weekday").days = [startDate.weekday + 1];
+        DaypickerWeekday.days = [startDate.weekday + 1];
     } else {
-        document.getElementById("daypicker-weekday").days = byDayRuleComponent;
+        DaypickerWeekday.days = byDayRuleComponent;
     }
 
     // "MONTHLY" ruletype
@@ -157,7 +517,7 @@ function initializeControls(rule) {
                                byMonthDayRuleComponent.length == 0);
     if (ruleComponentsEmpty || rule.type != "MONTHLY") {
         document.getElementById("monthly-group").selectedIndex = 1;
-        document.getElementById("monthly-days").days = [startDate.day];
+        DaypickerMonthday.days = [startDate.day];
         let day = Math.floor((startDate.day - 1) / 7) + 1;
         setElementValue("monthly-ordinal", day);
         setElementValue("monthly-weekday", startDate.weekday + 1);
@@ -179,7 +539,7 @@ function initializeControls(rule) {
         setElementValue("monthly-weekday", byMonthDayRuleComponent[0]);
     } else if (byMonthDayRuleComponent.length > 0) {
         document.getElementById("monthly-group").selectedIndex = 1;
-        document.getElementById("monthly-days").days = byMonthDayRuleComponent;
+        DaypickerMonthday.days = byMonthDayRuleComponent;
     }
 
     // "YEARLY" ruletype
@@ -299,7 +659,7 @@ function onSave(item) {
             recRule.type = "WEEKLY";
             let ndays = Number(getElementValue("weekly-weeks"));
             recRule.interval = ndays;
-            let onDays = document.getElementById("daypicker-weekday").days;
+            let onDays = DaypickerWeekday.days;
             if (onDays.length > 0) {
                 recRule.setComponent("BYDAY", onDays.length, onDays);
             }
@@ -327,7 +687,7 @@ function onSave(item) {
                     recRule.setComponent("BYDAY", onDays.length, onDays);
                 }
             } else {
-                let monthlyDays = document.getElementById("monthly-days").days;
+                let monthlyDays = DaypickerMonthday.days;
                 if (monthlyDays.length > 0) {
                     recRule.setComponent("BYMONTHDAY", monthlyDays.length, monthlyDays);
                 }
@@ -404,12 +764,14 @@ function onSave(item) {
  *
  * @return      Returns true if the window should be closed
  */
-function onAccept() {
+function onAccept(event) {
     let args = window.arguments[0];
     let item = args.calendarEvent;
     args.onOk(onSave(item));
     // Don't close the dialog if a warning must be showed.
-    return !checkUntilDate.warning;
+    if (checkUntilDate.warning) {
+        event.preventDefault();
+    }
 }
 
 /**
@@ -420,7 +782,6 @@ function onAccept() {
 function onCancel() {
     // Don't show any warning if the dialog must be closed.
     checkUntilDate.warning = false;
-    return true;
 }
 
 /**
@@ -499,30 +860,6 @@ function enableRecurrenceFields(aAttributeName) {
     for (let i = 0; i < enableElements.length; i++) {
         enableElements[i].removeAttribute("disabled");
     }
-}
-
-/**
- * Split rules into negative and positive rules.
- *
- * XXX This function is duplicate from calendar-dialog-utils.js, which we may
- * want to include in this dialog.
- *
- * @param recurrenceInfo    An item's recurrence info to parse.
- * @return                  An array with two elements: an array of positive
- *                            rules and an array of negative rules.
- */
-function splitRecurrenceRules(recurrenceInfo) {
-    let recItems = recurrenceInfo.getRecurrenceItems({});
-    let rules = [];
-    let exceptions = [];
-    for (let recItem of recItems) {
-        if (recItem.isNegative) {
-            exceptions.push(recItem);
-        } else {
-            rules.push(recItem);
-        }
-    }
-    return [rules, exceptions];
 }
 
 /**
@@ -622,8 +959,7 @@ function updatePreview() {
     }
 
     let recInfo = onSave(item);
-    let preview = document.getElementById("recurrence-preview");
-    preview.updatePreview(recInfo);
+    RecurrencePreview.updatePreview(recInfo);
 }
 
 /**
@@ -633,6 +969,10 @@ function updatePreview() {
  * dialog when the user enters a wrong until date.
  */
 function checkUntilDate() {
+    if (!gStartTime) { // This function shouldn't run before onLoad.
+        return;
+    }
+
     let untilDate = cal.dtz.jsDateToDateTime(getElementValue("repeat-until-date"), gStartTime.timezone);
     let startDate = gStartTime.clone();
     startDate.isDate = true;
@@ -697,12 +1037,12 @@ function updateRecurrencePattern() {
             let monthlyGroup = document.getElementById("monthly-group");
             let monthlyOrdinal = document.getElementById("monthly-ordinal");
             let monthlyWeekday = document.getElementById("monthly-weekday");
-            let monthlyDays = document.getElementById("monthly-days");
+            let monthlyDays = DaypickerMonthday;
             monthlyOrdinal.removeAttribute("disabled");
             monthlyWeekday.removeAttribute("disabled");
-            monthlyDays.removeAttribute("disabled");
+            monthlyDays.enable();
             if (monthlyGroup.selectedIndex == 0) {
-                monthlyDays.setAttribute("disabled", "true");
+                monthlyDays.disable();
             } else {
                 monthlyOrdinal.setAttribute("disabled", "true");
                 monthlyWeekday.setAttribute("disabled", "true");
@@ -766,7 +1106,7 @@ function changeOrderForElements(aPropKey, aPropParams) {
         let msg = "The key " + aPropKey + " in calendar-event-dialog.prop" +
                   "erties has incorrect number of params. Expected " +
                   aPropParams.length + " params.";
-        Components.utils.reportError(msg + " " + ex);
+        Cu.reportError(msg + " " + ex);
         return;
     }
 

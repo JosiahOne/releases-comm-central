@@ -12,7 +12,12 @@ pref("mailnews.timeline_is_enabled", false);
 pref("mailnews.logComposePerformance", false);
 
 pref("mail.wrap_long_lines",                true);
+
+// Show attachments of supported types rendered directly in the message body view.
 pref("mail.inline_attachments",             true);
+// When rendering attachments inline, show also text attachments (e.g. CSV, HTML,
+// plain text) which are potentially very long.
+pref("mail.inline_attachments.text",        false);
 pref("mail.reply_quote_inline",             false);
 // When in a message the List-Post header contains the content of the Reply-To
 // (which is called "Reply-To Munging") we override the Reply-To header with
@@ -125,6 +130,13 @@ pref("mail.imap.hdr_chunk_size", 200);
 // Should we filter imap messages based on new messages since the previous
 // highest UUID seen instead of unread?
 pref("mail.imap.filter_on_new", true);
+
+pref("mail.imap.tcp_keepalive.enabled", true);
+// For both items below if set less than 0 it means "use network.tcp.keepalive.*"
+// values. Or if set to 0, the value will be changed to 1, both in units of seconds.
+// Note: idle_time is the TCP keepalive idle time and not related to IMAP IDLE.
+pref("mail.imap.tcp_keepalive.idle_time", 100);
+pref("mail.imap.tcp_keepalive.retry_interval", 5);
 
 // if true, we assume that a user access a folder in the other users namespace
 // is acting as a delegate for that folder, and wishes to use the other users
@@ -255,7 +267,7 @@ pref("mailnews.reply_header_authorwroteondate", "chrome://messenger/locale/messe
 pref("mailnews.reply_header_originalmessage",   "chrome://messenger/locale/messengercompose/composeMsgs.properties");
 pref("mailnews.forward_header_originalmessage", "chrome://messenger/locale/messengercompose/composeMsgs.properties");
 
-pref("mailnews.reply_to_self_check_all_ident", false);
+pref("mailnews.reply_to_self_check_all_ident", true);
 
 pref("mailnews.reply_quoting_selection",               true);
 pref("mailnews.reply_quoting_selection.only_if_chars", "");
@@ -284,6 +296,14 @@ pref("mailnews.reply_in_default_charset",   false);
 // don't fallback from <charset> to UTF-8 even if some characters are not found in <charset>.
 // those characters will be crippled.
 pref("mailnews.disable_fallback_to_utf8.ISO-2022-JP", false);
+
+// AppleDouble is causing problems with some webmail clients and Microsoft mail servers
+// rejecting a MIME part of multipart/appledouble. Mac uses resource forks less and less
+// so we only use AppleDouble if the file has no extension or its extension is whitelisted below.
+// "" (default) - AppleDouble won't be used if the file has an extension
+// "*" - AppleDouble will always be used
+// Comma-separated list of extensions for which to use AppleDouble, for example "doc,xls" (not-case sensitive).
+pref("mailnews.extensions_using_appledouble", "");
 pref("mailnews.localizedRe",                "chrome://messenger-region/locale/region.properties");
 
 pref("mailnews.search_date_format",        "chrome://messenger/locale/messenger.properties");
@@ -605,6 +625,9 @@ pref("mail.smtp.useSenderForSmtpMailFrom", true);
 pref("mail.smtpserver.default.authMethod", 3); // cleartext password. @see nsIMsgIncomingServer.authMethod.
 pref("mail.smtpserver.default.try_ssl", 0); // @see nsISmtpServer.socketType
 
+// If true, SMTP LOGIN auth and POP3 USER/PASS auth, the last of the methods to try, will use Latin1.
+pref("mail.smtp_login_pop3_user_pass_auth_is_latin1", true);
+
 // For the next 3 prefs, see <http://www.bucksch.org/1/projects/mozilla/16507>
 pref("mail.display_glyph", true);   // TXT->HTML :-) etc. in viewer
 pref("mail.display_struct", true);  // TXT->HTML *bold* etc. in viewer; ditto
@@ -819,6 +842,9 @@ pref("mailnews.customHeaders", "");
 // default msg compose font prefs
 pref("msgcompose.font_face",                "");
 pref("msgcompose.font_size",                "medium");
+// If true, let the user agent use default colors (don't set text_color and
+// background_color on the message body).
+pref("msgcompose.default_colors",           true);
 pref("msgcompose.text_color",               "#000000");
 pref("msgcompose.background_color",         "#FFFFFF");
 
@@ -885,13 +911,26 @@ pref("mailnews.emptyTrash.dontAskAgain", false);
 pref("mailnews.auto_config_url", "https://live.thunderbird.net/autoconfig/v1.1/");
 // Added in bug 551519. Remove when bug 545866 is fixed.
 pref("mailnews.mx_service_url", "https://live.thunderbird.net/dns/mx/");
+// The list of addons which can handle certain account types
+pref("mailnews.auto_config.addons_url", "https://live.thunderbird.net/autoconfig/addons.json");
 // Allow to contact ISP (email address domain)
 // This happens via insecure means (HTTP), so the config cannot be trusted,
 // and also contains the email address
 pref("mailnews.auto_config.fetchFromISP.enabled", true);
 // Allow the fetch from ISP via HTTP, but not the email address
 pref("mailnews.auto_config.fetchFromISP.sendEmailAddress", true);
+// Allow the Microsoft Exchange AutoDiscover protocol.
+// This also sends the email address and password to the server,
+// which the protocol unfortunately requires in practice.
+pref("mailnews.auto_config.fetchFromExchange.enabled", true);
+// Whether we will attempt to guess the account configuration based on
+// protocol default ports and common domain practices
+// (e.g. {mail,pop,imap,smtp}.<email-domain>).
 pref("mailnews.auto_config.guess.enabled", true);
+// The timeout (in seconds) for each guess
+pref("mailnews.auto_config.guess.timeout", 10);
+// Work around bug 1454325 by disabling mimetype mungling in XmlHttpRequest
+pref("dom.xhr.standard_content_type_normalization", false);
 
 // -- Summary Database options
 // dontPreserveOnCopy: a space separated list of properties that are not

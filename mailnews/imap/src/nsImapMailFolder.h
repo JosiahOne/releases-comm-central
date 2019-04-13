@@ -24,6 +24,8 @@
 #include "nsIMsgThread.h"
 #include "nsIImapMailFolderSink.h"
 #include "nsIMsgFilterPlugin.h"
+#include "nsISimpleEnumerator.h"
+#include "nsIStringEnumerator.h"
 #include "nsDataHashtable.h"
 #include "nsIMutableArray.h"
 #include "nsITimer.h"
@@ -109,7 +111,7 @@ class nsImapMailFolder;
 class nsMsgIMAPFolderACL
 {
 public:
-  nsMsgIMAPFolderACL(nsImapMailFolder *folder);
+  explicit nsMsgIMAPFolderACL(nsImapMailFolder *folder);
   ~nsMsgIMAPFolderACL();
 
   bool SetFolderRightsForUser(const nsACString& userName, const nsACString& rights);
@@ -352,7 +354,8 @@ protected:
 
   nsresult SyncFlags(nsIImapFlagAndUidState *flagState);
   nsresult HandleCustomFlags(nsMsgKey uidOfMessage, nsIMsgDBHdr *dbHdr,
-                             uint16_t userFlags, nsCString& keywords);
+                             uint16_t userFlags, nsCString& keywords,
+                             nsIImapFlagAndUidState *flagState);
   nsresult NotifyMessageFlagsFromHdr(nsIMsgDBHdr *dbHdr, nsMsgKey msgKey,
                                      uint32_t flags);
 

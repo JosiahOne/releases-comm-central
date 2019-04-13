@@ -219,16 +219,6 @@
 { 0x91fd6b19, 0xe0bc, 0x11d3,  \
 { 0x8f, 0x97, 0x0, 0x0, 0x64, 0x65, 0x73, 0x74 }}
 
-//
-// nsMsgServiceProviderService
-//
-#define NS_MSGSERVICEPROVIDERSERVICE_CONTRACTID \
-  NS_RDF_DATASOURCE_CONTRACTID_PREFIX "ispdefaults"
-
-#define NS_MSGSERVICEPROVIDERSERVICE_CID \
-{ 0x10998cef, 0xd7f2, 0x4772,            \
-{ 0xb7, 0xdb, 0xbd, 0x09, 0x74, 0x54, 0x98, 0x4c }}
-
 #define NS_MSGLOGONREDIRECTORSERVICE_CONTRACTID \
   "@mozilla.org/messenger/msglogonredirector;1"
 
@@ -245,16 +235,6 @@
 #define NS_SUBSCRIBABLESERVER_CID \
 { 0x8510876a, 0x1dd2, 0x11b2,     \
 { 0x82, 0x53, 0x91, 0xf7, 0x1b, 0x34, 0x8a, 0x25 }}
-
-//
-// nsSubscribeDataSource
-//
-#define NS_SUBSCRIBEDATASOURCE_CONTRACTID \
-  NS_RDF_DATASOURCE_CONTRACTID_PREFIX "subscribe"
-
-#define NS_SUBSCRIBEDATASOURCE_CID \
-{ 0x00e89c82, 0x1dd2, 0x11b2,      \
-{ 0x9a, 0x1c, 0xe7, 0x59, 0x95, 0xd7, 0xd5, 0x95 }}
 
 #define NS_MSGLOCALFOLDERCOMPACTOR_CONTRACTID \
   "@mozilla.org/messenger/localfoldercompactor;1"

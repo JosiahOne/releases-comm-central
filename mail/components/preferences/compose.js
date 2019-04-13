@@ -3,15 +3,47 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/InlineSpellChecker.jsm");
+"use strict";
+
+/* import-globals-from preferences.js */
+/* import-globals-from subdialogs.js */
+
+var {InlineSpellChecker} = ChromeUtils.import("resource://gre/modules/InlineSpellChecker.jsm");
+
+Preferences.addAll([
+  { id: "mail.preferences.compose.selectedTabIndex", type: "int" },
+  { id: "mail.forward_message_mode", type: "int" },
+  { id: "mail.forward_add_extension", type: "bool" },
+  { id: "mail.SpellCheckBeforeSend", type: "bool" },
+  { id: "mail.spellcheck.inline", type: "bool" },
+  { id: "mail.warn_on_send_accel_key", type: "bool" },
+  { id: "mail.compose.autosave", type: "bool" },
+  { id: "mail.compose.autosaveinterval", type: "int" },
+  { id: "mail.enable_autocomplete", type: "bool" },
+  { id: "ldap_2.autoComplete.useDirectory", type: "bool" },
+  { id: "ldap_2.autoComplete.directoryServer", type: "string" },
+  { id: "pref.ldap.disable_button.edit_directories", type: "bool" },
+  { id: "mail.collect_email_address_outgoing", type: "bool" },
+  { id: "mail.collect_addressbook", type: "string" },
+  { id: "spellchecker.dictionary", type: "unichar" },
+  { id: "msgcompose.default_colors", type: "bool" },
+  { id: "msgcompose.font_face", type: "string" },
+  { id: "msgcompose.font_size", type: "string" },
+  { id: "msgcompose.text_color", type: "string" },
+  { id: "msgcompose.background_color", type: "string" },
+  { id: "mail.compose.attachment_reminder", type: "bool" },
+  { id: "mail.compose.default_to_paragraph", type: "bool" },
+]);
+
+document.getElementById("paneCompose")
+        .addEventListener("paneload", function() { gComposePane.init(); });
 
 var gComposePane = {
   mInitialized: false,
   mSpellChecker: null,
-  mDictCount : 0,
+  mDictCount: 0,
 
-  init: function ()
-  {
+  init() {
     this.enableAutocomplete();
 
     this.initLanguageMenu();
@@ -20,15 +52,19 @@ var gComposePane = {
 
     this.updateAutosave();
 
+    this.updateUseReaderDefaults();
+
     this.updateAttachmentCheck();
 
     this.updateEmailCollection();
 
     this.initAbDefaultStartupDir();
 
+    this.setButtonColors();
+
     if (!(("arguments" in window) && window.arguments[1])) {
       // If no tab was specified, select the last used tab.
-      let preference = document.getElementById("mail.preferences.compose.selectedTabIndex");
+      let preference = Preferences.get("mail.preferences.compose.selectedTabIndex");
       if (preference.value)
         document.getElementById("composePrefs").selectedIndex = preference.value;
     }
@@ -36,66 +72,76 @@ var gComposePane = {
     this.mInitialized = true;
   },
 
-  tabSelectionChanged: function ()
-  {
-    if (this.mInitialized)
-    {
-      var preference = document.getElementById("mail.preferences.compose.selectedTabIndex");
+  tabSelectionChanged() {
+    if (this.mInitialized) {
+      var preference = Preferences.get("mail.preferences.compose.selectedTabIndex");
       preference.valueFromPreferences = document.getElementById("composePrefs").selectedIndex;
     }
   },
 
-  sendOptionsDialog: function()
-  {
+  sendOptionsDialog() {
     gSubDialog.open("chrome://messenger/content/preferences/sendoptions.xul");
   },
 
-  attachmentReminderOptionsDialog: function()
-  {
+  attachmentReminderOptionsDialog() {
     gSubDialog.open("chrome://messenger/content/preferences/attachmentReminder.xul",
                     "resizable=no");
   },
 
-  updateAutosave: function()
-  {
-    this.enableElement(document.getElementById("autoSaveInterval"),
-      document.getElementById("autoSave").checked);
+  updateAutosave() {
+    gComposePane.enableElement(
+      document.getElementById("autoSaveInterval"),
+      Preferences.get("mail.compose.autosave").value
+    );
   },
 
-  updateAttachmentCheck: function()
-  {
-    this.enableElement(document.getElementById("attachment_reminder_button"),
-      document.getElementById("attachment_reminder_label").checked);
+  updateUseReaderDefaults() {
+    let useReaderDefaultsChecked = Preferences.get("msgcompose.default_colors").value;
+    gComposePane.enableElement(
+      document.getElementById("textColorLabel"), !useReaderDefaultsChecked
+    );
+    gComposePane.enableElement(
+      document.getElementById("backgroundColorLabel"), !useReaderDefaultsChecked
+    );
+    gComposePane.enableElement(
+      document.getElementById("textColorButton"), !useReaderDefaultsChecked
+    );
+    gComposePane.enableElement(
+      document.getElementById("backgroundColorButton"), !useReaderDefaultsChecked
+    );
   },
 
-  updateEmailCollection: function()
-  {
-    this.enableElement(document.getElementById("localDirectoriesList"),
-      document.getElementById("emailCollectionOutgoing").checked);
+  updateAttachmentCheck() {
+    gComposePane.enableElement(
+      document.getElementById("attachment_reminder_button"),
+      Preferences.get("mail.compose.attachment_reminder").value
+    );
   },
 
-  enableElement: function(aElement, aEnable)
-  {
+  updateEmailCollection() {
+    gComposePane.enableElement(
+      document.getElementById("localDirectoriesList"),
+      Preferences.get("mail.collect_email_address_outgoing").value
+    );
+  },
+
+  enableElement(aElement, aEnable) {
     let pref = aElement.getAttribute("preference");
-    let prefIsLocked = pref ? document.getElementById(pref).locked : false;
+    let prefIsLocked = pref ? Preferences.get(pref).locked : false;
     aElement.disabled = !aEnable || prefIsLocked;
   },
 
-  enableAutocomplete: function()
-  {
-    var acLDAPPref = document.getElementById("ldap_2.autoComplete.useDirectory")
-                             .value;
-
-    this.enableElement(document.getElementById("directoriesList"), acLDAPPref);
-    this.enableElement(document.getElementById("editButton"), acLDAPPref);
+  enableAutocomplete() {
+    let acLDAPPref = Preferences.get("ldap_2.autoComplete.useDirectory").value;
+    gComposePane.enableElement(document.getElementById("directoriesList"), acLDAPPref);
+    gComposePane.enableElement(document.getElementById("editButton"), acLDAPPref);
   },
 
-  editDirectories: function()
-  {
+  editDirectories() {
     gSubDialog.open("chrome://messenger/content/addressbook/pref-editdirectories.xul");
   },
 
-  initAbDefaultStartupDir: function() {
+  initAbDefaultStartupDir() {
     if (!this.startupDirListener.inited)
       this.startupDirListener.load();
 
@@ -117,7 +163,14 @@ var gComposePane = {
     }
   },
 
-  setDefaultStartupDir: function(aDirURI) {
+  setButtonColors() {
+    document.getElementById("textColorButton").value =
+      Preferences.get("msgcompose.text_color").value;
+    document.getElementById("backgroundColorButton").value =
+      Preferences.get("msgcompose.background_color").value;
+  },
+
+  setDefaultStartupDir(aDirURI) {
     if (aDirURI) {
       // Some AB directory was selected. Set prefs to make this directory
       // the default view when starting up the main AB.
@@ -129,10 +182,9 @@ var gComposePane = {
     }
   },
 
-  initLanguageMenu: function ()
-  {
+  initLanguageMenu() {
     var languageMenuList = document.getElementById("languageMenuList");
-    this.mSpellChecker = Cc['@mozilla.org/spellchecker/engine;1'].getService(Ci.mozISpellCheckingEngine);
+    this.mSpellChecker = Cc["@mozilla.org/spellchecker/engine;1"].getService(Ci.mozISpellCheckingEngine);
     var o1 = {};
     var o2 = {};
 
@@ -162,59 +214,61 @@ var gComposePane = {
 
     // append the dictionaries to the menu list...
     for (var i = 0; i < count; i++)
-      languageMenuList.appendItem(sortedList[i].label, sortedList[i].id);
+      languageMenuList.appendItem(sortedList[i].displayName, sortedList[i].localeCode);
 
     languageMenuList.setInitialSelection();
   },
 
-  populateFonts: function()
-  {
+  populateFonts() {
     var fontsList = document.getElementById("FontSelect");
-    try
-    {
+    try {
       var enumerator = Cc["@mozilla.org/gfx/fontenumerator;1"]
                          .getService(Ci.nsIFontEnumerator);
-      var localFontCount = { value: 0 }
+      var localFontCount = { value: 0 };
       var localFonts = enumerator.EnumerateAllFonts(localFontCount);
-      for (var i = 0; i < localFonts.length; ++i)
-      {
+      for (let i = 0; i < localFonts.length; ++i) {
         // Remove Linux system generic fonts that collide with CSS generic fonts.
         if (localFonts[i] != "" && localFonts[i] != "serif" &&
             localFonts[i] != "sans-serif" && localFonts[i] != "monospace")
           fontsList.appendItem(localFonts[i], localFonts[i]);
       }
-    }
-    catch(e) { }
+    } catch (e) { }
     // Choose the item after the list is completely generated.
-    var preference = document.getElementById(fontsList.getAttribute("preference"));
+    var preference = Preferences.get(fontsList.getAttribute("preference"));
     fontsList.value = preference.value;
   },
 
-   restoreHTMLDefaults: function()
-   {
+   restoreHTMLDefaults() {
      // reset throws an exception if the pref value is already the default so
      // work around that with some try/catch exception handling
      try {
-       document.getElementById('msgcompose.font_face').reset();
+       Preferences.get("msgcompose.font_face").reset();
      } catch (ex) {}
 
      try {
-       document.getElementById('msgcompose.font_size').reset();
+       Preferences.get("msgcompose.font_size").reset();
      } catch (ex) {}
 
      try {
-       document.getElementById('msgcompose.text_color').reset();
+       Preferences.get("msgcompose.text_color").reset();
      } catch (ex) {}
 
      try {
-       document.getElementById('msgcompose.background_color').reset();
+       Preferences.get("msgcompose.background_color").reset();
      } catch (ex) {}
+
+     try {
+       Preferences.get("msgcompose.default_colors").reset();
+     } catch (ex) {}
+
+     this.updateUseReaderDefaults();
+     this.setButtonColors();
   },
 
   startupDirListener: {
     inited: false,
     domain: "mail.addr_book.view.startupURI",
-    observe: function(subject, topic, prefName) {
+    observe(subject, topic, prefName) {
       if (topic != "nsPref:changed")
         return;
 
@@ -222,7 +276,7 @@ var gComposePane = {
       // reinitialize the default startup dir picker to show the new value.
       gComposePane.initAbDefaultStartupDir();
     },
-    load: function() {
+    load() {
       // Observe changes of our prefs.
       Services.prefs.addObserver(this.domain, this);
       // Unload the pref observer when preferences window is closed.
@@ -230,9 +284,15 @@ var gComposePane = {
       this.inited = true;
     },
 
-    unload: function(event) {
+    unload(event) {
       Services.prefs.removeObserver(gComposePane.startupDirListener.domain,
                                     gComposePane.startupDirListener);
-    }
-  }
+    },
+  },
 };
+
+Preferences.get("mail.compose.autosave").on("change", gComposePane.updateAutosave);
+Preferences.get("mail.compose.attachment_reminder").on("change", gComposePane.updateAttachmentCheck);
+Preferences.get("msgcompose.default_colors").on("change", gComposePane.updateUseReaderDefaults);
+Preferences.get("ldap_2.autoComplete.useDirectory").on("change", gComposePane.enableAutocomplete);
+Preferences.get("mail.collect_email_address_outgoing").on("change", gComposePane.updateEmailCollection);

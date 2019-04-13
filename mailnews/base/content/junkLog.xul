@@ -10,14 +10,13 @@
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/junkLog.dtd">
 
 <dialog id="viewLogWindow"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="onLoad();"
         title="&adaptiveJunkLog.title;"
         windowtype="mailnews:junklog"
         buttons="accept"
         buttonlabelaccept="&closeLog.label;"
         buttonaccesskeyaccept="&closeLog.accesskey;"
-        ondialogaccept="window.close();"
         persist="screenX screenY width height"
         style="width: 40em; height: 25em;">
 
@@ -34,7 +33,6 @@
     <separator class="thin"/>
     <hbox flex="1">
       <browser id="logView"
-               class="inset"
                type="content"
                disablehistory="true"
                disablesecurity="true"

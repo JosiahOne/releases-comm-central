@@ -14,8 +14,12 @@
  */
 this.EXPORTED_SYMBOLS = ["ircNonStandard"];
 
-ChromeUtils.import("resource:///modules/ircHandlers.jsm");
-ChromeUtils.import("resource:///modules/ircUtils.jsm");
+const {ircHandlers} = ChromeUtils.import("resource:///modules/ircHandlers.jsm");
+var {
+  _,
+  conversationErrorMessage,
+  kListRefreshInterval,
+} = ChromeUtils.import("resource:///modules/ircUtils.jsm");
 
 var ircNonStandard = {
   name: "Non-Standard IRC Extensions",
@@ -153,7 +157,7 @@ var ircNonStandard = {
     "378": function(aMessage) { // RPL_WHOISHOST (Unreal & Charybdis)
       // <nick> :is connecting from <host> <ip>
       let [host, ip] = aMessage.params[2].split(" ").slice(-2);
-      return this.setWhois(aMessage.params[1], {host: host, ip: ip});
+      return this.setWhois(aMessage.params[1], {host, ip});
     },
 
     "379": function(aMessage) { // RPL_WHOISMODES (Unreal, Inspircd)
@@ -210,6 +214,6 @@ var ircNonStandard = {
           .writeMessage(aMessage.origin, aMessage.params[1],
                         {incoming: true, noFormat: true});
       return true;
-    }
-  }
+    },
+  },
 };

@@ -265,7 +265,7 @@ nsPop3Sink::EndMailDelivery(nsIPop3Protocol *protocol)
   {
     if (m_outFileStream)
       m_outFileStream->Flush();  // try this.
-    m_newMailParser->OnStopRequest(nullptr, nullptr, NS_OK);
+    m_newMailParser->OnStopRequest(nullptr, NS_OK);
     m_newMailParser->EndMsgDownload();
   }
   if (m_outFileStream)
@@ -480,13 +480,10 @@ nsPop3Sink::IncorporateBegin(const char* uidlString,
       rv = tmpDownloadFile->CreateUnique(nsIFile::NORMAL_FILE_TYPE, 00600);
       NS_ENSURE_SUCCESS(rv, rv);
 
-      m_tmpDownloadFile = do_QueryInterface(tmpDownloadFile, &rv);
+      m_tmpDownloadFile = tmpDownloadFile;
     }
-    if (NS_SUCCEEDED(rv))
-    {
-      rv = MsgGetFileStream(m_tmpDownloadFile, getter_AddRefs(m_outFileStream));
-      NS_ENSURE_SUCCESS(rv, rv);
-    }
+    rv = MsgGetFileStream(m_tmpDownloadFile, getter_AddRefs(m_outFileStream));
+    NS_ENSURE_SUCCESS(rv, rv);
   }
   else
   {
@@ -544,10 +541,9 @@ nsPop3Sink::IncorporateBegin(const char* uidlString,
     nsresult rv4 = seekableOutStream->Tell(&first_post_seek_pos);
     if (NS_SUCCEEDED(rv3) && NS_SUCCEEDED(rv4)) {
       if (first_pre_seek_pos != first_post_seek_pos) {
-        nsCOMPtr<nsIMsgFolder> localFolder = do_QueryInterface(m_folder);
         nsString folderName;
-        if (localFolder)
-          localFolder->GetPrettyName(folderName);
+        if (m_folder)
+          m_folder->GetPrettyName(folderName);
         if (!folderName.IsEmpty()) {
           fprintf(stderr,"(seekdebug) Seek was necessary in IncorporateBegin() for folder %s.\n",
                   NS_ConvertUTF16toUTF8(folderName).get());
@@ -714,10 +710,9 @@ nsresult nsPop3Sink::WriteLineToMailbox(const nsACString& buffer)
 
     if (NS_SUCCEEDED(rv2) && NS_SUCCEEDED(rv3)) {
       if (before_seek_pos != after_seek_pos) {
-        nsCOMPtr<nsIMsgFolder> localFolder = do_QueryInterface(m_folder);
         nsString folderName;
-        if (localFolder)
-          localFolder->GetPrettyName(folderName);
+        if (m_folder)
+          m_folder->GetPrettyName(folderName);
         // This merits a console message, it's poor man's telemetry.
         MsgLogToConsole4(
           NS_LITERAL_STRING("Unexpected file position change detected") +

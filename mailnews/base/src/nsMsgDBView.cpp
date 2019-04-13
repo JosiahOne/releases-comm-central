@@ -223,7 +223,7 @@ char16_t * nsMsgDBView::GetString(const char16_t *aStringName)
   if (NS_SUCCEEDED(res))
     return ToNewUnicode(str);
   else
-    return NS_strdup(aStringName);
+    return NS_xstrdup(aStringName);
 }
 
 // Helper function used to fetch localized strings from the prefs
@@ -248,10 +248,9 @@ nsMsgDBView::GetPrefLocalizedString(const char *aPrefName,
 
 nsresult
 nsMsgDBView::AppendKeywordProperties(const nsACString& keywords,
-                                     nsAString& properties,
-                                     bool addSelectedTextProperty)
+                                     nsAString& properties)
 {
-  // Get the top most keyword's color and append that as a property.
+  // Get the top most keyword's CSS selector and append that as a property.
   nsresult rv;
   if (!mTagService)
   {
@@ -265,21 +264,13 @@ nsMsgDBView::AppendKeywordProperties(const nsACString& keywords,
   if (topKey.IsEmpty())
     return NS_OK;
 
-  nsCString color;
-  rv = mTagService->GetColorForKey(topKey, color);
-  if (NS_SUCCEEDED(rv) && !color.IsEmpty())
+  nsString selector;
+  rv = mTagService->GetSelectorForKey(topKey, selector);
+  if (NS_SUCCEEDED(rv))
   {
-    if (addSelectedTextProperty)
-    {
-      if (color.EqualsLiteral(LABEL_COLOR_WHITE_STRING))
-        properties.AppendLiteral(" lc-black");
-      else
-        properties.AppendLiteral(" lc-white");
-    }
-    color.Replace(0, 1, NS_LITERAL_CSTRING(LABEL_COLOR_STRING));
-    properties.AppendASCII(color.get());
+    properties.Append(' ');
+    properties.Append(selector);
   }
-
   return rv;
 }
 
@@ -409,11 +400,12 @@ nsMsgDBView::FetchAuthor(nsIMsgDBHdr * aHdr,
   nsCString headerCharset;
   aHdr->GetEffectiveCharset(headerCharset);
 
-  nsCString emailAddress;
   nsString name;
-  ExtractFirstAddress(EncodedHeader(author, headerCharset.get()),
-                      name,
-                      emailAddress);
+  nsCString emailAddress;
+  nsCOMArray<msgIAddressObject> addresses = EncodedHeader(author, headerCharset.get());
+  bool multipleAuthors = addresses.Length() > 1;
+
+  ExtractFirstAddress(addresses, name, emailAddress);
 
   if (showCondensedAddresses)
     GetDisplayNameInAddressBook(emailAddress, aSenderString);
@@ -437,6 +429,12 @@ nsMsgDBView::FetchAuthor(nsIMsgDBHdr * aHdr,
         aSenderString.Append('>');
       }
     }
+  }
+
+  if (multipleAuthors)
+  {
+    aSenderString.AppendLiteral(" ");
+    aSenderString.Append(GetString(u"andOthers"));
   }
 
   UpdateCachedName(aHdr, "sender_name", aSenderString);
@@ -911,6 +909,24 @@ nsMsgDBView::FetchLabel(nsIMsgDBHdr *aHdr,
   return NS_OK;
 }
 
+/**
+ * Lowercase the email and remove a possible plus addressing part.
+ * E.g. John+test@example.com -> john@example.com.
+ */
+static void
+ToLowerCaseDropPlusAddessing(nsCString& aEmail)
+{
+  ToLowerCase(aEmail);
+  int32_t indPlus;
+  if ((indPlus = aEmail.FindChar('+')) == kNotFound)
+    return;
+  int32_t indAt;
+  indAt = aEmail.FindChar('@', indPlus);
+  if (indAt == kNotFound)
+    return;
+  aEmail.ReplaceLiteral(indPlus, indAt - indPlus, "");
+}
+
 bool
 nsMsgDBView::IsOutgoingMsg(nsIMsgDBHdr* aHdr)
 {
@@ -920,7 +936,7 @@ nsMsgDBView::IsOutgoingMsg(nsIMsgDBHdr* aHdr)
   nsCString emailAddress;
   nsString name;
   ExtractFirstAddress(DecodedHeader(author), name, emailAddress);
-
+  ToLowerCaseDropPlusAddessing(emailAddress);
   return mEmails.Contains(emailAddress);
 }
 
@@ -1065,15 +1081,6 @@ nsMsgDBView::IsEditable(int32_t row,
 }
 
 NS_IMETHODIMP
-nsMsgDBView::IsSelectable(int32_t row,
-                          nsTreeColumn* col,
-                          bool* _retval)
-{
-  *_retval = false;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 nsMsgDBView::SetCellValue(int32_t row,
                           nsTreeColumn* col,
                           const nsAString& value)
@@ -1162,6 +1169,8 @@ nsMsgDBView::UpdateDisplayMessage(nsMsgViewIndex viewPosition)
   NS_ENSURE_SUCCESS(rv,rv);
 
   nsString subject;
+  if (viewPosition >= (nsMsgViewIndex)m_flags.Length())
+    return NS_MSG_INVALID_DBVIEW_INDEX;
   FetchSubject(msgHdr, m_flags[viewPosition], subject);
 
   nsCString keywords;
@@ -1174,6 +1183,8 @@ nsMsgDBView::UpdateDisplayMessage(nsMsgViewIndex viewPosition)
 
   if (folder)
   {
+    if (viewPosition >= (nsMsgViewIndex)m_keys.Length())
+      return NS_MSG_INVALID_DBVIEW_INDEX;
     rv = folder->SetLastMessageLoaded(m_keys[viewPosition]);
     NS_ENSURE_SUCCESS(rv,rv);
   }
@@ -1202,6 +1213,8 @@ nsMsgDBView::LoadMessageByViewIndex(nsMsgViewIndex aViewIndex)
     nsCOMPtr<nsIMessenger> messenger (do_QueryReferent(mMessengerWeak));
     NS_ENSURE_TRUE(messenger, NS_ERROR_FAILURE);
     messenger->OpenURL(uri);
+    if (aViewIndex >= (nsMsgViewIndex)m_keys.Length())
+      return NS_MSG_INVALID_DBVIEW_INDEX;
     m_currentlyDisplayedMsgKey = m_keys[aViewIndex];
     m_currentlyDisplayedMsgUri = uri;
     m_currentlyDisplayedViewIndex = aViewIndex;
@@ -1230,7 +1243,7 @@ nsMsgDBView::LoadMessageByUrl(const char *aUrl)
 }
 
 NS_IMETHODIMP
-nsMsgDBView::SelectionChanged()
+nsMsgDBView::SelectionChangedXPCOM()
 {
   // If the currentSelection changed then we have a message to display -
   // not if we are in the middle of deleting rows.
@@ -1422,8 +1435,12 @@ nsMsgDBView::GetRowProperties(int32_t index,
 
   nsCString keywordProperty;
   FetchRowKeywords(index, msgHdr, keywordProperty);
-  if (!keywordProperty.IsEmpty())
-    AppendKeywordProperties(keywordProperty, properties, false);
+  if (keywordProperty.IsEmpty()) {
+    properties.AppendLiteral(" untagged");
+  } else {
+    AppendKeywordProperties(keywordProperty, properties);
+    properties.AppendLiteral(" tagged");
+  }
 
   // Give the custom column handlers a chance to style the row.
   for (int i = 0; i < m_customColumnHandlers.Count(); i++)
@@ -1553,8 +1570,12 @@ nsMsgDBView::GetCellProperties(int32_t aRow,
 
   nsCString keywords;
   FetchRowKeywords(aRow, msgHdr, keywords);
-  if (!keywords.IsEmpty())
-    AppendKeywordProperties(keywords, properties, true);
+  if (keywords.IsEmpty()) {
+    properties.AppendLiteral(" untagged");
+  } else {
+    AppendKeywordProperties(keywords, properties);
+    properties.AppendLiteral(" tagged");
+  }
 
   // This is a double fetch of the keywords property since we also fetch
   // it for the tags - do we want to do this?
@@ -1923,7 +1944,7 @@ nsMsgDBView::GetCellValue(int32_t aRow,
       {
         nsCString junkScoreStr;
         msgHdr->GetStringProperty("junkscore", getter_Copies(junkScoreStr));
-        // Only need to assing a real value for junk, it's empty already
+        // Only need to assign a real value for junk, it's empty already
         // as it should be for non-junk.
         if (!junkScoreStr.IsEmpty() &&
             (junkScoreStr.ToInteger(&rv) == nsIJunkMailPlugin::IS_SPAM_SCORE))
@@ -1955,7 +1976,7 @@ nsMsgDBView::GetCellValue(int32_t aRow,
       }
       break;
     case 'u':
-      if (colID.EqualsLiteral("unreadCol") &&
+      if (colID.EqualsLiteral("unreadButtonColHeader") &&
           !(flags & nsMsgMessageFlags::Read))
       {
         nsString tmp_str;
@@ -2315,7 +2336,7 @@ nsMsgDBView::CellTextForColumn(int32_t aRow,
 }
 
 NS_IMETHODIMP
-nsMsgDBView::SetTree(nsITreeBoxObject *tree)
+nsMsgDBView::SetTree(mozilla::dom::XULTreeElement *tree)
 {
   mTree = tree;
   return NS_OK;
@@ -2553,12 +2574,16 @@ nsMsgDBView::Open(nsIMsgFolder *folder,
 
     nsCString email;
     identity->GetEmail(email);
-    if (!email.IsEmpty())
+    if (!email.IsEmpty()) {
+      ToLowerCaseDropPlusAddessing(email);
       mEmails.PutEntry(email);
+    }
 
     identity->GetReplyTo(email);
-    if (!email.IsEmpty())
+    if (!email.IsEmpty()) {
+      ToLowerCaseDropPlusAddessing(email);
       mEmails.PutEntry(email);
+    }
   }
 
   return NS_OK;
@@ -2748,22 +2773,6 @@ nsMsgDBView::GetSelectedMsgHdrs(uint32_t *aLength,
   *aLength = numMsgsSelected;
   *aResult = headers;
   return NS_OK;
-}
-
-NS_IMETHODIMP
-nsMsgDBView::GetMsgHdrsForSelection(nsIMutableArray **aResult)
-{
-  nsMsgViewIndexArray selection;
-  GetSelectedIndices(selection);
-  uint32_t numIndices = selection.Length();
-
-  nsresult rv;
-  nsCOMPtr<nsIMutableArray> messages(do_CreateInstance(NS_ARRAY_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  rv = GetHeadersFromSelection(selection.Elements(), numIndices, messages);
-  NS_ENSURE_SUCCESS(rv, rv);
-  messages.forget(aResult);
-  return rv;
 }
 
 NS_IMETHODIMP
@@ -3139,7 +3148,7 @@ nsMsgDBView::OperateOnMsgsInCollapsedThreads()
 {
   if (mTreeSelection)
   {
-    nsCOMPtr<nsITreeBoxObject> selTree;
+    RefPtr<mozilla::dom::XULTreeElement> selTree;
     mTreeSelection->GetTree(getter_AddRefs(selTree));
     // No tree means stand-alone message window.
     if (!selTree)
@@ -4134,23 +4143,24 @@ nsMsgDBView::DetermineActionsForJunkChange(bool msgsAreJunk,
     NS_ASSERTION(!spamFolderURI.IsEmpty(), "spam folder URI is empty, can't move");
     if (!spamFolderURI.IsEmpty())
     {
-      rv = GetExistingFolder(spamFolderURI, targetFolder);
-      if (NS_SUCCEEDED(rv) && *targetFolder)
+      rv = FindFolder(spamFolderURI, targetFolder);
+      NS_ENSURE_SUCCESS(rv,rv);
+      if (*targetFolder)
       {
         moveMessages = true;
       }
       else
       {
-        // XXX ToDo: GetOrCreateFolder will only create a folder with localized
+        // XXX ToDo: GetOrCreateJunkFolder will only create a folder with localized
         //           name "Junk" regardless of spamFolderURI. So if someone
         //           sets the junk folder to an existing folder of a different
         //           name, then deletes that folder, this will fail to create
         //           the correct folder.
-        rv = GetOrCreateFolder(spamFolderURI, nullptr /* aListener */);
+        rv = GetOrCreateJunkFolder(spamFolderURI, nullptr /* aListener */);
         if (NS_SUCCEEDED(rv))
           rv = GetExistingFolder(spamFolderURI, targetFolder);
 
-        NS_ASSERTION(NS_SUCCEEDED(rv) && *targetFolder, "GetOrCreateFolder failed");
+        NS_ASSERTION(NS_SUCCEEDED(rv), "GetOrCreateJunkFolder failed");
       }
     }
 
@@ -5646,7 +5656,7 @@ nsMsgDBView::ToggleExpansion(nsMsgViewIndex index,
     rv = CollapseByIndex(threadIndex, numChanged);
 
   // If we collaps/uncollapse a thread, this changes the selected URIs.
-  SelectionChanged();
+  SelectionChangedXPCOM();
   return rv;
 }
 
@@ -5750,7 +5760,7 @@ nsMsgDBView::ExpandAll()
   if (mTree)
     mTree->EndUpdateBatch();
 
-  SelectionChanged();
+  SelectionChangedXPCOM();
   return NS_OK;
 }
 
@@ -5818,7 +5828,7 @@ nsMsgDBView::CollapseAll()
       CollapseByIndex(i, &numExpanded);
   }
 
-  SelectionChanged();
+  SelectionChangedXPCOM();
   return NS_OK;
 }
 
@@ -8836,8 +8846,6 @@ nsMsgDBView::SetMRUTimeForFolder(nsIMsgFolder *folder)
   nowStr.AppendInt(seconds);
   folder->SetStringProperty(MRU_TIME_PROPERTY, nowStr);
 }
-
-NS_IMPL_ISUPPORTS(nsMsgDBView::nsMsgViewHdrEnumerator, nsISimpleEnumerator)
 
 nsMsgDBView::nsMsgViewHdrEnumerator::nsMsgViewHdrEnumerator(nsMsgDBView *view)
 {

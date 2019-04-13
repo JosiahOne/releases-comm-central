@@ -3,9 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource:///modules/MailUtils.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {BrowserUtils} = ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
 
 var gServer;
 var gOriginalStoreType;
@@ -25,7 +26,7 @@ function clickStoreTypeMenu(aStoreTypeElement) {
   let response = { newRootFolder: null };
   // Send 'response' as an argument to converterDialog.xhtml.
   window.openDialog("converterDialog.xhtml","mailnews:mailstoreconverter",
-                    "modal,centerscreen,width=800,height=180", gServer,
+                    "modal,centerscreen,resizable=no,width=700,height=130", gServer,
                     aStoreTypeElement.value, response);
   changeStoreType(response);
 }
@@ -111,8 +112,6 @@ function onPreInit(account, accountValues)
   var type = parent.getAccountValue(account, accountValues, "server", "type", null, false);
   hideShowControls(type);
 
-  Services.obs.notifyObservers(null, "charsetmenu-selected", "other");
-
   gServer = account.incomingServer;
 
   if(!account.incomingServer.canEmptyTrashOnExit)
@@ -143,7 +142,7 @@ function initServerType()
   setLabelFromStringBundle("authMethod-any", "authAny");
   setLabelFromStringBundle("authMethod-password-encrypted",
       "authPasswordEncrypted");
-  //authMethod-password-cleartext already set in selectSelect()
+  // authMethod-password-cleartext already set in secureSelect()
 
   // Hide deprecated/hidden auth options, unless selected
   hideUnlessSelected(document.getElementById("authMethod-no"));
@@ -378,7 +377,7 @@ function setupImapDeleteUI(aServerId)
   // set folderPicker menulist
   var trashPopup = document.getElementById("msgTrashFolderPopup");
   trashPopup._teardown();
-  trashPopup._parentFolder = MailUtils.getFolderForURI(aServerId);
+  trashPopup._parentFolder = MailUtils.getOrCreateFolder(aServerId);
   trashPopup._ensureInitialized();
 
   // Convert the folder path in Unicode to MUTF-7.
@@ -388,7 +387,7 @@ function setupImapDeleteUI(aServerId)
   let trashMutf7 = manager.unicodeToMutf7(trashFolderName.replace(/([\\"])/g, '\\$1'));
   // TODO: There is something wrong here, selectFolder() fails even if the
   // folder does exist. Try to fix in bug 802609.
-  let trashFolder = MailUtils.getFolderForURI(aServerId + "/" + trashMutf7, false);
+  let trashFolder = MailUtils.getOrCreateFolder(aServerId + "/" + trashMutf7);
   try {
     trashPopup.selectFolder(trashFolder);
   } catch(ex) {
@@ -433,10 +432,8 @@ function folderPickerChange(aEvent)
   // We need to convert that from MUTF-7 to Unicode.
   var manager = Cc['@mozilla.org/charset-converter-manager;1']
                   .getService(Ci.nsICharsetConverterManager);
-  var util = Cc["@mozilla.org/network/util;1"]
-               .getService(Ci.nsINetUtil);
   var trashUnicode = manager.mutf7ToUnicode(
-    util.unescapeString(folderPath, Ci.nsINetUtil.ESCAPE_URL_PATH));
+    Services.netUtils.unescapeString(folderPath, Ci.nsINetUtil.ESCAPE_URL_PATH));
 
   // Set the value to be persisted.
   document.getElementById("imap.trashFolderName")

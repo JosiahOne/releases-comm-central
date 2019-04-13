@@ -12,12 +12,16 @@ var gMessengerBundle = null;
 
 var nsMsgSearchScope = Ci.nsMsgSearchScope;
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/virtualFolderWrapper.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource:///modules/MailUtils.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {PluralForm} = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {
+  VirtualFolderHelper,
+} = ChromeUtils.import("resource:///modules/virtualFolderWrapper.js");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+
+document.addEventListener("dialogaccept", onOK);
 
 function onLoad()
 {
@@ -106,7 +110,7 @@ function updateOnlineSearchState()
   var srchFolderUriArray = gSearchFolderURIs.split('|');
   if (srchFolderUriArray[0])
   {
-    var realFolder = MailUtils.getFolderForURI(srchFolderUriArray[0]);
+    var realFolder = MailUtils.getOrCreateFolder(srchFolderUriArray[0]);
     enableCheckbox =  realFolder.server.offlineSupportLevel; // anything greater than 0 is an online server like IMAP or news
   }
 
@@ -152,7 +156,7 @@ function onFolderPick(aEvent) {
           .selectFolder(gPickedFolder);
 }
 
-function onOK()
+function onOK(event)
 {
   var name = document.getElementById("name").value;
   var searchOnline = document.getElementById('searchOnline').checked;
@@ -161,7 +165,8 @@ function onOK()
   {
     Services.prompt.alert(window, null,
                           gMessengerBundle.getString('alertNoSearchFoldersSelected'));
-    return false;
+    event.preventDefault();
+    return;
   }
 
   if (window.arguments[0].editExistingFolder)
@@ -180,13 +185,13 @@ function onOK()
 
     if (window.arguments[0].onOKCallback)
       window.arguments[0].onOKCallback(virtualFolderWrapper.virtualFolder.URI);
-    return true;
+    return;
   }
   var uri = gPickedFolder.URI;
   if (name && uri) // create a new virtual folder
   {
     // check to see if we already have a folder with the same name and alert the user if so...
-    var parentFolder = MailUtils.getFolderForURI(uri);
+    var parentFolder = MailUtils.getOrCreateFolder(uri);
 
     // sanity check the name based on the logic used by nsMsgBaseUtils.cpp. It can't start with a '.', it can't end with a '.', '~' or ' '.
     // it can't contain a ';' or '#'.
@@ -194,13 +199,15 @@ function onOK()
     {
       Services.prompt.alert(window, null,
                             gMessengerBundle.getString("folderCreationFailed"));
-      return false;
+      event.preventDefault();
+      return;
     }
     else if (parentFolder.containsChildNamed(name))
     {
       Services.prompt.alert(window, null,
                             gMessengerBundle.getString("folderExists"));
-      return false;
+      event.preventDefault();
+      return;
     }
 
     saveSearchTerms(gSearchTermSession.searchTerms, gSearchTermSession);
@@ -208,8 +215,6 @@ function onOK()
                                                gSearchTermSession.searchTerms,
                                                searchOnline);
   }
-
-  return true;
 }
 
 function doEnabling()
@@ -248,7 +253,7 @@ function updateFoldersCount()
   if (folderCount > 0) {
     let folderNames = [];
     for (let folderURI of srchFolderUriArray) {
-      let folder = MailUtils.getFolderForURI(folderURI);
+      let folder = MailUtils.getOrCreateFolder(folderURI);
       let name = this.gMessengerBundle.getFormattedString("verboseFolderFormat",
         [folder.prettyName, folder.server.prettyName]);
       folderNames.push(name);

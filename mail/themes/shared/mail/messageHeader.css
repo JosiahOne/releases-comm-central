@@ -34,7 +34,7 @@
 
 /* ::::: expanded header pane ::::: */
 
-#expandedsubjectBox > .headerValue {
+#expandedsubjectBox {
   font-weight: bold;
 }
 
@@ -97,12 +97,26 @@ toolbarpaletteitem #hdrDummyReplyButton {
   display: -moz-box !important;
 }
 
+.headerValue {
+  overflow-wrap: anywhere;
+  display: block;
+}
+
 .headerValue[containsEmail="true"] {
   margin-inline-start: 0px !important;
 }
 
 #otherActionsBox {
   margin-inline-start: 8px;
+}
+
+.headerValueBox {
+  overflow: visible;
+}
+
+mail-newsgroups-headerfield.headerValueBox {
+  padding: .1em 0;
+  margin-bottom: 4px;
 }
 
 .headerValueBox[singleline="true"] > .headerValue[containsEmail="true"] {
@@ -124,8 +138,9 @@ toolbarpaletteitem #hdrDummyReplyButton {
 
 .tagvalue {
   padding: 0 0.5ex;
-  margin-inline-start: 0px;
-  background-image: url("chrome://messenger/skin/tagbg.png");
+  margin-inline-start: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.35),
+                                    rgba(255,255,255,0.35));
   border-radius: 3px;
   border-width: 0.5px;
   border-style: outset;
@@ -245,20 +260,43 @@ mail-emailaddress[selected="true"] > .emailDisplayButton > .emailStar {
   list-style-image:url("chrome://messenger/skin/icons/arrow/arrow-down.png");
 }
 
+.emailToggleHeaderfield {
+  padding-top: 1px;
+  width: 8px; /* The image's width is 8 pixels */
+  height: 8px;
+  margin-inline-end: 2px;
+  margin-inline-start: 4px;
+  background: url("chrome://global/skin/icons/twisty-collapsed.svg") no-repeat left 7px;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+.emailToggleHeaderfield:-moz-locale-dir(rtl) {
+  background: url("chrome://global/skin/icons/twisty-collapsed-rtl.svg");
+}
+
+.emailToggleHeaderfield.open {
+  background: url("chrome://global/skin/icons/twisty-expanded.svg") no-repeat left 6px;
+}
+
 /* ::::: view expand and collapse twisties  ::::: */
 
-mail-multi-emailHeaderField,
+mail-multi-emailheaderfield,
 mail-headerfield,
+mail-urlfield,
 mail-newsgroups-headerfield {
-  margin: 0;
-  padding: 0;
   -moz-box-align: baseline;
 }
 
-mail-headerfield > .headerValue {
+mail-headerfield {
   -moz-user-focus: normal;
   -moz-user-select: text;
   word-wrap: break-word;
+}
+
+mail-headerfield:focus {
+  outline: 1px dotted;
+  outline-offset: -1px;
 }
 
 #header-view-toolbox:-moz-locale-dir(rtl) {

@@ -10,17 +10,20 @@
  * font.name-list.<style>.<language>.
  */
 
+"use strict";
+
 var MODULE_NAME = "test-font-chooser";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                        "pref-window-helpers", "content-tab-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var {Preferences} = ChromeUtils.import("resource://gre/modules/Preferences.jsm");
 
 var gFontEnumerator;
+var gTodayPane;
 
 // We'll test with Western. Unicode has issues on Windows (bug 550443).
 const kLanguage = "x-western";
@@ -39,6 +42,17 @@ function setupModule(module) {
   let finished = false;
   buildFontList().then(() => finished = true, Cu.reportError);
   mc.waitFor(() => finished, "Timeout waiting for font enumeration to complete.");
+
+  // Hide Lightning's Today pane as it obscures buttons in preferences in the
+  // small TB window our tests run in.
+  gTodayPane = mc.e("today-pane-panel");
+  if (gTodayPane) {
+    if (!gTodayPane.collapsed) {
+      mc.keypress(null, "VK_F11", {});
+    } else {
+      gTodayPane = null;
+    }
+  }
 }
 
 async function buildFontList() {
@@ -80,42 +94,42 @@ function _verify_fonts_displayed(aDefaults, aSerif, aSansSerif, aMonospace) {
                 "No font names were populated in the font picker.");
   assert_fonts_equal("display pane", displayPaneExpected, displayPaneActual.value);
 
-  // Now verify the advanced dialog.
-  function verify_advanced(fontc) {
-    // The font pickers are populated async so we need to wait for it.
-    for (let fontElemId of ["serif", "sans-serif", "monospace"]) {
-      fontc.waitFor(() => fontc.e(fontElemId).label != "",
-                    "Timeout waiting for font picker '" + fontElemId + "' to populate.");
-    }
+  // Now open the advanced dialog.
+  mc.click(content_tab_eid(prefTab, "advancedFonts"));
+  let fontc = wait_for_frame_load(
+    prefTab.browser.contentDocument
+           .getElementById("dialogOverlay-0")
+           .querySelector("browser"),
+    "chrome://messenger/content/preferences/fonts.xul"
+  );
 
-    if (!aDefaults) {
-      assert_fonts_equal("serif", aSerif, fontc.e("serif").value);
-      assert_fonts_equal("sans-serif", aSansSerif, fontc.e("sans-serif").value);
-      assert_fonts_equal("monospace", aMonospace, fontc.e("monospace").value);
-    } else {
-      // When default fonts are displayed in the menulist, there is no value set,
-      // only the label, in the form "Default (font name)".
-      if (AppConstants.platform == "linux") {
-        // On Linux the prefs we set contained only the generic font names,
-        // like 'serif', but here a specific font name will be shown, but it is
-        // system-dependent what it will be. So we just check for the 'Default'
-        // prefix.
-        assert_fonts_equal("serif", `Default (`, fontc.e("serif").label, true);
-        assert_fonts_equal("sans-serif", `Default (`, fontc.e("sans-serif").label, true);
-        assert_fonts_equal("monospace", `Default (`, fontc.e("monospace").label, true);
-      } else {
-        assert_fonts_equal("serif", `Default (${aSerif})`, fontc.e("serif").label);
-        assert_fonts_equal("sans-serif", `Default (${aSansSerif})`, fontc.e("sans-serif").label);
-        assert_fonts_equal("monospace", `Default (${aMonospace})`, fontc.e("monospace").label);
-      }
-    }
+  // The font pickers are populated async so we need to wait for it.
+  for (let fontElemId of ["serif", "sans-serif", "monospace"]) {
+    fontc.waitFor(() => fontc.e(fontElemId).label != "",
+                  "Timeout waiting for font picker '" + fontElemId + "' to populate.");
   }
 
-  // Now open the advanced dialog.
-  plan_for_modal_dialog("FontsDialog", verify_advanced);
-  mc.window.openDialog("chrome://messenger/content/preferences/fonts.xul",
-                       "Fonts", "chrome,titlebar,toolbar,centerscreen,modal");
-  wait_for_modal_dialog("FontsDialog");
+  if (!aDefaults) {
+    assert_fonts_equal("serif", aSerif, fontc.e("serif").value);
+    assert_fonts_equal("sans-serif", aSansSerif, fontc.e("sans-serif").value);
+    assert_fonts_equal("monospace", aMonospace, fontc.e("monospace").value);
+  } else {
+    // When default fonts are displayed in the menulist, there is no value set,
+    // only the label, in the form "Default (font name)".
+    if (AppConstants.platform == "linux") {
+      // On Linux the prefs we set contained only the generic font names,
+      // like 'serif', but here a specific font name will be shown, but it is
+      // system-dependent what it will be. So we just check for the 'Default'
+      // prefix.
+      assert_fonts_equal("serif", `Default (`, fontc.e("serif").label, true);
+      assert_fonts_equal("sans-serif", `Default (`, fontc.e("sans-serif").label, true);
+      assert_fonts_equal("monospace", `Default (`, fontc.e("monospace").label, true);
+    } else {
+      assert_fonts_equal("serif", `Default (${aSerif})`, fontc.e("serif").label);
+      assert_fonts_equal("sans-serif", `Default (${aSansSerif})`, fontc.e("sans-serif").label);
+      assert_fonts_equal("monospace", `Default (${aMonospace})`, fontc.e("monospace").label);
+    }
+  }
 
   close_pref_tab(prefTab);
 }
@@ -199,4 +213,7 @@ function teardownTest() {
 
 function teardownModule() {
   Services.prefs.clearUserPref("font.language.group");
+  if (gTodayPane && gTodayPane.collapsed) {
+    mc.keypress(null, "VK_F11", {});
+  }
 }

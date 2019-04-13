@@ -2,11 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { fixIterator } = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "cal", "resource://calendar/modules/calUtils.jsm", "cal");
 ChromeUtils.defineModuleGetter(this, "Deprecated", "resource://gre/modules/Deprecated.jsm");
@@ -37,30 +36,34 @@ var calprovider = {
      * @return {nsIChannel}                                     The prepared channel
      */
     prepHttpChannel: function(aUri, aUploadData, aContentType, aNotificationCallbacks, aExisting=null) {
-        let channel = aExisting || Services.io.newChannelFromURI2(aUri,
-                                                                  null,
-                                                                  Services.scriptSecurityManager.getSystemPrincipal(),
-                                                                  null,
-                                                                  Components.interfaces.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                                                  Components.interfaces.nsIContentPolicy.TYPE_OTHER);
-        let httpchannel = channel.QueryInterface(Components.interfaces.nsIHttpChannel);
+        // We cannot use a system principal here since the connection setup will fail if
+        // same-site cookie protection is enabled in TB and server-side.
+        let principal = aExisting ? null
+                                  : Services.scriptSecurityManager.createCodebasePrincipal(aUri, {});
+        let channel = aExisting || Services.io.newChannelFromURI(aUri,
+                                                                 null,
+                                                                 principal,
+                                                                 null,
+                                                                 Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                                                 Ci.nsIContentPolicy.TYPE_OTHER);
+        let httpchannel = channel.QueryInterface(Ci.nsIHttpChannel);
 
         httpchannel.setRequestHeader("Accept", "text/xml", false);
         httpchannel.setRequestHeader("Accept-Charset", "utf-8,*;q=0.1", false);
-        httpchannel.loadFlags |= Components.interfaces.nsIRequest.LOAD_BYPASS_CACHE;
+        httpchannel.loadFlags |= Ci.nsIRequest.LOAD_BYPASS_CACHE;
         httpchannel.notificationCallbacks = aNotificationCallbacks;
 
         if (aUploadData) {
-            httpchannel = httpchannel.QueryInterface(Components.interfaces.nsIUploadChannel);
+            httpchannel = httpchannel.QueryInterface(Ci.nsIUploadChannel);
             let stream;
-            if (aUploadData instanceof Components.interfaces.nsIInputStream) {
+            if (aUploadData instanceof Ci.nsIInputStream) {
                 // Make sure the stream is reset
-                stream = aUploadData.QueryInterface(Components.interfaces.nsISeekableStream);
-                stream.seek(Components.interfaces.nsISeekableStream.NS_SEEK_SET, 0);
+                stream = aUploadData.QueryInterface(Ci.nsISeekableStream);
+                stream.seek(Ci.nsISeekableStream.NS_SEEK_SET, 0);
             } else {
                 // Otherwise its something that should be a string, convert it.
-                let converter = Components.classes["@mozilla.org/intl/scriptableunicodeconverter"]
-                                          .createInstance(Components.interfaces.nsIScriptableUnicodeConverter);
+                let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
+                                  .createInstance(Ci.nsIScriptableUnicodeConverter);
                 converter.charset = "UTF-8";
                 stream = converter.convertToInputStream(aUploadData.toString());
             }
@@ -80,7 +83,7 @@ var calprovider = {
      */
     sendHttpRequest: function(aStreamLoader, aChannel, aListener) {
         aStreamLoader.init(aListener);
-        aChannel.asyncOpen(aStreamLoader, aChannel);
+        aChannel.asyncOpen(aStreamLoader);
     },
 
     /**
@@ -89,8 +92,7 @@ var calprovider = {
      * @return {nsIStreamLoader}        A fresh streamloader
      */
     createStreamLoader: function() {
-        return Components.classes["@mozilla.org/network/stream-loader;1"]
-                         .createInstance(Components.interfaces.nsIStreamLoader);
+        return Cc["@mozilla.org/network/stream-loader;1"].createInstance(Ci.nsIStreamLoader);
     },
 
     /**
@@ -143,15 +145,15 @@ var calprovider = {
             return this.QueryInterface(aIID);
         } catch (e) {
             // Support Auth Prompt Interfaces
-            if (aIID.equals(Components.interfaces.nsIAuthPrompt2)) {
+            if (aIID.equals(Ci.nsIAuthPrompt2)) {
                 if (!this.calAuthPrompt) {
                     this.calAuthPrompt = new cal.auth.Prompt();
                 }
                 return this.calAuthPrompt;
-            } else if (aIID.equals(Components.interfaces.nsIAuthPromptProvider) ||
-                       aIID.equals(Components.interfaces.nsIPrompt)) {
+            } else if (aIID.equals(Ci.nsIAuthPromptProvider) ||
+                       aIID.equals(Ci.nsIPrompt)) {
                 return Services.ww.getNewPrompter(null);
-            } else if (aIID.equals(Components.interfaces.nsIBadCertListener2)) {
+            } else if (aIID.equals(Ci.nsIBadCertListener2)) {
                 if (!this.badCertHandler) {
                     this.badCertHandler = new cal.provider.BadCertHandler(this);
                 }
@@ -168,8 +170,8 @@ var calprovider = {
      * Dialog if a certificate Problem occurs.
      */
     BadCertHandler: class {
-        QueryInterface(iid) {
-            return cal.generateClassQI(this, iid, [Components.interfaces.nsIBadCertListener2]);
+        QueryInterface() {
+            return ChromeUtils.generateQI([Ci.nsIBadCertListener2]);
         }
 
         constructor(thisProvider) {
@@ -177,7 +179,7 @@ var calprovider = {
             this.timer = null;
         }
 
-        notifyCertProblem(socketInfo, status, targetSite) {
+        notifyCertProblem(socketInfo, secInfo, targetSite) {
             // Unfortunately we can't pass js objects using the window watcher, so
             // we'll just take the first available calendar window. We also need to
             // do this on a timer so that the modal window doesn't block the
@@ -189,7 +191,7 @@ var calprovider = {
                 notify: function(timer) {
                     let params = {
                         exceptionAdded: false,
-                        sslStatus: status,
+                        securityInfo: secInfo,
                         prefetchCert: true,
                         location: targetSite
                     };
@@ -205,12 +207,11 @@ var calprovider = {
                     }
                 }
             };
-            this.timer = Components.classes["@mozilla.org/timer;1"]
-                                   .createInstance(Components.interfaces.nsITimer);
+            this.timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
             this.timer.initWithCallback(
                 timerCallback,
                 0,
-                Components.interfaces.nsITimer.TYPE_ONE_SHOT
+                Ci.nsITimer.TYPE_ONE_SHOT
             );
             return true;
         }
@@ -226,18 +227,18 @@ var calprovider = {
      * @return               The fresh calIFreeBusyInterval.
      */
     FreeBusyInterval: class {
-        QueryInterface(iid) {
-            return cal.generateClassQI(this, iid, [Components.interfaces.calIFreeBusyInterval]);
+        QueryInterface() {
+            return ChromeUtils.generateQI([Ci.calIFreeBusyInterval]);
         }
 
         constructor(aCalId, aFreeBusyType, aStart, aEnd) {
             this.calId = aCalId;
-            this.interval = Components.classes["@mozilla.org/calendar/period;1"]
-                                      .createInstance(Components.interfaces.calIPeriod);
+            this.interval = Cc["@mozilla.org/calendar/period;1"]
+                              .createInstance(Ci.calIPeriod);
             this.interval.start = aStart;
             this.interval.end = aEnd;
 
-            this.freeBusyType = aFreeBusyType || Components.interfaces.calIFreeBusyInterval.UNKNOWN;
+            this.freeBusyType = aFreeBusyType || Ci.calIFreeBusyInterval.UNKNOWN;
         }
     },
 
@@ -250,8 +251,8 @@ var calprovider = {
     getImipTransport: function(aCalendar) {
         // assure an identity is configured for the calendar
         if (aCalendar && aCalendar.getProperty("imip.identity")) {
-            return Components.classes["@mozilla.org/calendar/itip-transport;1?type=email"]
-                             .getService(Components.interfaces.calIItipTransport);
+            return Cc["@mozilla.org/calendar/itip-transport;1?type=email"]
+                     .getService(Ci.calIItipTransport);
         }
         return null;
     },
@@ -264,29 +265,23 @@ var calprovider = {
      * @return {nsIMsgIdentity}             The configured identity
      */
     getEmailIdentityOfCalendar: function(aCalendar, outAccount) {
-        cal.ASSERT(aCalendar, "no calendar!", Components.results.NS_ERROR_INVALID_ARG);
+        cal.ASSERT(aCalendar, "no calendar!", Cr.NS_ERROR_INVALID_ARG);
         let key = aCalendar.getProperty("imip.identity.key");
         if (key === null) { // take default account/identity:
             let findIdentity = function(account) {
                 if (account && account.identities.length) {
                     return account.defaultIdentity ||
-                           account.identities.queryElementAt(0, Components.interfaces.nsIMsgIdentity);
+                           account.identities.queryElementAt(0, Ci.nsIMsgIdentity);
                 }
                 return null;
             };
 
-            let foundAccount = (function() {
-                try {
-                    return MailServices.accounts.defaultAccount;
-                } catch (e) {
-                    return null;
-                }
-            })();
+            let foundAccount = MailServices.accounts.defaultAccount;
             let foundIdentity = findIdentity(foundAccount);
 
             if (!foundAccount || !foundIdentity) {
                 let accounts = MailServices.accounts.accounts;
-                for (let account of fixIterator(accounts, Components.interfaces.nsIMsgAccount)) {
+                for (let account of fixIterator(accounts, Ci.nsIMsgAccount)) {
                     let identity = findIdentity(account);
 
                     if (account && identity) {
@@ -355,11 +350,11 @@ var calprovider = {
      */
     getCalendarDirectory: function() {
         if (calprovider.getCalendarDirectory.mDir === undefined) {
-            let dir = Services.dirsvc.get("ProfD", Components.interfaces.nsIFile);
+            let dir = Services.dirsvc.get("ProfD", Ci.nsIFile);
             dir.append("calendar-data");
             if (!dir.exists()) {
                 try {
-                    dir.create(Components.interfaces.nsIFile.DIRECTORY_TYPE, 0o700);
+                    dir.create(Ci.nsIFile.DIRECTORY_TYPE, 0o700);
                 } catch (exc) {
                     cal.ASSERT(false, exc);
                     throw exc;
@@ -377,7 +372,7 @@ var calprovider = {
      */
     BaseClass: class {
         /**
-         * The transient proeprties that are not pesisted to storage
+         * The transient properties that are not pesisted to storage
          */
         static get mTransientProperties() {
             return {
@@ -394,8 +389,8 @@ var calprovider = {
 
         QueryInterface(iid) {
             return cal.generateClassQI(this, iid, [
-                Components.interfaces.calICalendar,
-                Components.interfaces.calISchedulingSupport
+                Ci.calICalendar,
+                Ci.calISchedulingSupport
             ]);
         }
 
@@ -410,9 +405,9 @@ var calprovider = {
             this.mACLEntry = null;
             this.mBatchCount = 0;
             this.transientProperties = false;
-            this.mObservers = new cal.data.ObserverSet(Components.interfaces.calIObserver);
+            this.mObservers = new cal.data.ObserverSet(Ci.calIObserver);
             this.mProperties = {};
-            this.mProperties.currentStatus = Components.results.NS_OK;
+            this.mProperties.currentStatus = Cr.NS_OK;
         }
 
         /**
@@ -428,7 +423,7 @@ var calprovider = {
         }
         set id(aValue) {
             if (this.mID) {
-                throw Components.results.NS_ERROR_ALREADY_INITIALIZED;
+                throw Cr.NS_ERROR_ALREADY_INITIALIZED;
             }
             this.mID = aValue;
 
@@ -459,10 +454,10 @@ var calprovider = {
         get aclManager() {
             const defaultACLProviderClass = "@mozilla.org/calendar/acl-manager;1?type=default";
             let providerClass = this.getProperty("aclManagerClass");
-            if (!providerClass || !Components.classes[providerClass]) {
+            if (!providerClass || !Cc[providerClass]) {
                 providerClass = defaultACLProviderClass;
             }
-            return Components.classes[providerClass].getService(Components.interfaces.calICalendarACLManager);
+            return Cc[providerClass].getService(Ci.calICalendarACLManager);
         }
 
         // readonly attribute calICalendarACLEntry aclEntry;
@@ -515,7 +510,7 @@ var calprovider = {
                     this.mObservers.notify("onEndBatch");
                 }
             } else {
-                cal.ASSERT(this.mBatchCount > 0, "unexepcted endBatch!");
+                cal.ASSERT(this.mBatchCount > 0, "unexpected endBatch!");
             }
         }
 
@@ -553,20 +548,20 @@ var calprovider = {
         notifyOperationComplete(aListener, aStatus, aOperationType, aId, aDetail, aExtraMessage) {
             this.notifyPureOperationComplete(aListener, aStatus, aOperationType, aId, aDetail);
 
-            if (aStatus == Components.interfaces.calIErrors.OPERATION_CANCELLED) {
+            if (aStatus == Ci.calIErrors.OPERATION_CANCELLED) {
                 return; // cancellation doesn't change current status, no notification
             }
             if (Components.isSuccessCode(aStatus)) {
                 this.setProperty("currentStatus", aStatus);
             } else {
-                if (aDetail instanceof Components.interfaces.nsIException) {
+                if (aDetail instanceof Ci.nsIException) {
                     this.notifyError(aDetail); // will set currentStatus
                 } else {
                     this.notifyError(aStatus, aDetail); // will set currentStatus
                 }
-                this.notifyError(aOperationType == Components.interfaces.calIOperationListener.GET
-                                 ? Components.interfaces.calIErrors.READ_FAILED
-                                 : Components.interfaces.calIErrors.MODIFICATION_FAILED,
+                this.notifyError(aOperationType == Ci.calIOperationListener.GET
+                                 ? Ci.calIErrors.READ_FAILED
+                                 : Ci.calIErrors.MODIFICATION_FAILED,
                                  aExtraMessage || "");
             }
         }
@@ -579,10 +574,10 @@ var calprovider = {
          * @param {?String} aMessage                The message to show for the error
          */
         notifyError(aErrNo, aMessage=null) {
-            if (aErrNo == Components.interfaces.calIErrors.OPERATION_CANCELLED) {
+            if (aErrNo == Ci.calIErrors.OPERATION_CANCELLED) {
                 return; // cancellation doesn't change current status, no notification
             }
-            if (aErrNo instanceof Components.interfaces.nsIException) {
+            if (aErrNo instanceof Ci.nsIException) {
                 if (!aMessage) {
                     aMessage = aErrNo.message;
                 }
@@ -598,7 +593,7 @@ var calprovider = {
                 case "itip.transport": // iTIP/iMIP default:
                     return calprovider.getImipTransport(this);
                 case "itip.notify-replies": // iTIP/iMIP default:
-                    return Preferences.get("calendar.itip.notify-replies", false);
+                    return Services.prefs.getBoolPref("calendar.itip.notify-replies", false);
                 // temporary hack to get the uncached calendar instance:
                 case "cache.uncachedCalendar":
                     return this;
@@ -622,14 +617,14 @@ var calprovider = {
                     case "organizerId": { // itip/imip default: derived out of imip.identity
                         let identity = this.getProperty("imip.identity");
                         ret = (identity
-                               ? ("mailto:" + identity.QueryInterface(Components.interfaces.nsIMsgIdentity).email)
+                               ? ("mailto:" + identity.QueryInterface(Ci.nsIMsgIdentity).email)
                                : null);
                         break;
                     }
                     case "organizerCN": { // itip/imip default: derived out of imip.identity
                         let identity = this.getProperty("imip.identity");
                         ret = (identity
-                               ? identity.QueryInterface(Components.interfaces.nsIMsgIdentity).fullName
+                               ? identity.QueryInterface(Ci.nsIMsgIdentity).fullName
                                : null);
                         break;
                     }

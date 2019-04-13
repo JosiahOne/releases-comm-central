@@ -3,8 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+/* import-globals-from mailCore.js */
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 // Load and add the menu item to the OS X Dock icon menu.
 addEventListener("load", function() {
@@ -25,11 +27,9 @@ addEventListener("load", function() {
  */
 function loadListener(event) {
   setTimeout(function() {
-    let preWin = Services.wm.getMostRecentWindow("Mail:Preferences");
-    preWin.document.documentElement
-          .openSubDialog("chrome://messenger/content/preferences/dockoptions.xul",
-                         "", null);
-  }, 0);
+    let prefWin = Services.wm.getMostRecentWindow("Mail:Preferences");
+    prefWin.gSubDialog.open("chrome://messenger/content/preferences/dockoptions.xul");
+  });
 }
 
 /**
@@ -51,26 +51,22 @@ function PrefWindowObserver() {
  * If Preference window was already opened, this will select General pane before
  * opening Dock Options sub-dialog.
  */
-function openDockOptions()
-{
+function openDockOptions() {
   let win = Services.wm.getMostRecentWindow("Mail:Preferences");
 
   if (win) {
     openOptionsDialog("paneGeneral");
-    win.document.documentElement
-       .openSubDialog("chrome://messenger/content/preferences/dockoptions.xul",
-                      "", null);
+    win.gSubDialog("chrome://messenger/content/preferences/dockoptions.xul");
   } else {
-      Services.ww.registerNotification(new PrefWindowObserver());
-      openOptionsDialog("paneGeneral");
+    Services.ww.registerNotification(new PrefWindowObserver());
+    openOptionsDialog("paneGeneral");
   }
 }
 
 /**
  * Open a new window for writing a new message
  */
-function writeNewMessageDock()
-{
+function writeNewMessageDock() {
   // Default identity will be used as sender for the new message.
   MailServices.compose.OpenComposeWindow(null, null, null,
     Ci.nsIMsgCompType.New,
@@ -80,15 +76,12 @@ function writeNewMessageDock()
 /**
  * Open the address book window
  */
-function openAddressBookDock()
-{
+function openAddressBookDock() {
   let win = Services.wm.getMostRecentWindow("mail:addressbook");
   if (win) {
     win.focus();
   } else {
-    let ww = Cc["@mozilla.org/embedcomp/window-watcher;1"].
-                                getService(Ci.nsIWindowWatcher);
-    ww.openWindow(null, "chrome://messenger/content/addressbook/addressbook.xul", null,
-                  "chrome,extrachrome,menubar,resizable,scrollbars,status,toolbar", null);
+    Services.ww.openWindow(null, "chrome://messenger/content/addressbook/addressbook.xul", null,
+                           "chrome,extrachrome,menubar,resizable,scrollbars,status,toolbar", null);
   }
 }

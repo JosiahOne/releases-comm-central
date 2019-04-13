@@ -8,7 +8,7 @@
 <!DOCTYPE overlay SYSTEM "chrome://calendar/locale/calendar.dtd">
 
 <overlay id="calendar-list-overlay"
-         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <popupset id="calendar-popupset">
     <menupopup id="list-calendars-context-menu"
@@ -69,7 +69,6 @@
                       type="full"
                       writable="true"
                       allowdrag="true"
-                      onSortOrderChanged="updateSortOrderPref(event)"
                       onselect="document.commandDispatcher.updateCommands('calendar_commands')"
                       childtooltip="calendar-list-tooltip"
                       childcontext="list-calendars-context-menu"/>

@@ -1,50 +1,12 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-  <prefpane id="paneCompose" label="&paneComposition.title;" onpaneload="gComposePane.init();">
+  <prefpane id="paneCompose" label="&paneComposition.title;">
     <script type="application/javascript" src="chrome://messenger/content/preferences/compose.js"/>
     <script type="application/javascript" src="chrome://global/content/contentAreaUtils.js"/>
     <script type="application/javascript" src="chrome://communicator/content/utilityOverlay.js"/>
 
     <stringbundle id="bundle_addressBook" src="chrome://messenger/locale/addressbook/addressBook.properties"/>
-
-    <preferences id="composePreferences">
-      <preference id="mail.preferences.compose.selectedTabIndex" name="mail.preferences.compose.selectedTabIndex" type="int"/>
-      <preference id="mail.forward_message_mode" name="mail.forward_message_mode" type="int"/>
-      <preference id="mail.forward_add_extension" name="mail.forward_add_extension" type="bool"/>
-      <preference id="mail.SpellCheckBeforeSend" name="mail.SpellCheckBeforeSend" type="bool"/>
-      <preference id="mail.spellcheck.inline" name="mail.spellcheck.inline" type="bool"/>
-      <preference id="mail.warn_on_send_accel_key" name="mail.warn_on_send_accel_key" type="bool"/>
-      <preference id="mail.compose.autosave" name="mail.compose.autosave" type="bool"/>
-      <preference id="mail.compose.autosaveinterval" name="mail.compose.autosaveinterval" type="int"/>
-      <preference id="mail.enable_autocomplete" name="mail.enable_autocomplete" type="bool"/>
-      <preference id="ldap_2.autoComplete.useDirectory"
-                  name="ldap_2.autoComplete.useDirectory"
-                  onchange="gComposePane.enableAutocomplete();" type="bool"/>
-      <preference id="ldap_2.autoComplete.directoryServer" name="ldap_2.autoComplete.directoryServer" type="string"/>
-      <preference id="pref.ldap.disable_button.edit_directories"
-                  name="pref.ldap.disable_button.edit_directories" type="bool"/>
-      <preference id="mail.collect_email_address_outgoing" name="mail.collect_email_address_outgoing" type="bool"/>
-      <preference id="mail.collect_addressbook" name="mail.collect_addressbook" type="string"/>
-      <preference id="spellchecker.dictionary"  name="spellchecker.dictionary"   type="unichar"/>
-      <preference id="msgcompose.font_face"      name="msgcompose.font_face" type="string"/>
-      <preference id="msgcompose.font_size"      name="msgcompose.font_size" type="string"/>
-      <preference id="msgcompose.text_color"     name="msgcompose.text_color" type="string"/>
-      <preference id="msgcompose.background_color" name="msgcompose.background_color" type="string"/>
-      <preference id="mail.compose.attachment_reminder"
-                  name="mail.compose.attachment_reminder"
-                  type="bool"/>
-      <preference id="mail.compose.default_to_paragraph"
-                  name="mail.compose.default_to_paragraph"
-                  type="bool"/>
-    </preferences>
-
-    <commandset id="compositionGeneralCommandSet">
-      <command id="cmd_toggleAutosave"
-               oncommand="gComposePane.updateAutosave();"/>
-      <command id="cmd_toggleAttachmentCheck"
-               oncommand="gComposePane.updateAttachmentCheck();"/>
-    </commandset>
 
     <tabbox id="composePrefs" flex="1" onselect="gComposePane.tabSelectionChanged();">
       <tabs id="composePrefsTabs">
@@ -73,7 +35,7 @@
 
             <hbox align="center" pack="start">
               <checkbox id="autoSave" label="&autoSave.label;" preference="mail.compose.autosave"
-                        accesskey="&autoSave.accesskey;" command="cmd_toggleAutosave"/>
+                        accesskey="&autoSave.accesskey;"/>
               <textbox id="autoSaveInterval"
                        size="2" type="number" min="1" max="35790"
                        preference="mail.compose.autosaveinterval"
@@ -91,8 +53,7 @@
               <checkbox id="attachment_reminder_label"
                         label="&attachmentReminder.label;"
                         accesskey="&attachmentReminder.accesskey;"
-                        preference="mail.compose.attachment_reminder"
-                        command="cmd_toggleAttachmentCheck"/>
+                        preference="mail.compose.attachment_reminder"/>
               <spacer flex="1"/>
               <button id="attachment_reminder_button"
                       label="&attachmentReminderOptions.label;"
@@ -103,7 +64,7 @@
           </groupbox>
 
           <groupbox>
-            <caption label="&htmlComposeHeader.label;"/>
+            <label><html:h2>&htmlComposeHeader.label;</html:h2></label>
             <hbox align="center">
               <label control="FontSelect" value="&font.label;" accesskey="&font.accesskey;"/>
               <menulist id="FontSelect" preference="msgcompose.font_face"
@@ -119,7 +80,7 @@
                 </menupopup>
               </menulist>
 
-              <label control="fontSizeSelect" value="&size.label;" accesskey="&size.accesskey;"/>
+              <label control="fontSizeSelect" value="&fontSize.label;" accesskey="&fontSize.accesskey;"/>
               <menulist id="fontSizeSelect" preference="msgcompose.font_size">
                 <menupopup>
                   <menuitem value="x-small" label="&size-tinyCmd.label;"/>
@@ -135,13 +96,28 @@
             <separator class="thin"/>
 
             <hbox align="center">
-              <label control="textColorButton" value="&fontColor.label;" accesskey="&fontColor.accesskey;"/>
-              <colorpicker type="button" id="textColorButton" preference="msgcompose.text_color"/>
+              <checkbox id="useReaderDefaults"
+                        label="&useReaderDefaults.label;"
+                        accesskey="&useReaderDefaults.accesskey;"
+                        preference="msgcompose.default_colors"/>
+            </hbox>
+            <hbox align="center" class="indent">
+              <label id="textColorLabel"
+                     control="textColorButton"
+                     value="&fontColor.label;"
+                     accesskey="&fontColor.accesskey;"/>
+              <html:input type="color" id="textColorButton" preference="msgcompose.text_color"/>
               <separator orient="vertical" class="thin"/>
-              <label control="backgroundColorButton" value="&bgColor.label;" accesskey="&bgColor.accesskey;"/>
-              <colorpicker type="button" id="backgroundColorButton" preference="msgcompose.background_color"/>
+              <label id="backgroundColorLabel"
+                     control="backgroundColorButton"
+                     value="&bgColor.label;"
+                     accesskey="&bgColor.accesskey;"/>
+              <html:input type="color" id="backgroundColorButton" preference="msgcompose.background_color"/>
+            </hbox>
+            <hbox align="center">
               <spacer flex="1"/>
-              <button label="&restoreHTMLDefaults.label;" accesskey="&restoreHTMLDefaults.accesskey;"
+              <button label="&restoreHTMLDefaults.label;"
+                      accesskey="&restoreHTMLDefaults.accesskey;"
                       oncommand="gComposePane.restoreHTMLDefaults();"/>
             </hbox>
 
@@ -166,7 +142,7 @@
          <tabpanel orient="vertical">
            <groupbox>
               <!-- Address Autocomplete -->
-              <caption label="&addressingTitle.label;"/>
+              <label><html:h2>&addressingTitle.label;</html:h2></label>
 
               <description>&autocompleteText.label;</description>
 
@@ -198,8 +174,7 @@
             <hbox align="center" pack="start">
               <checkbox id="emailCollectionOutgoing" label="&emailCollectionPicker.label;"
                         accesskey="&emailCollectionPicker.accesskey;"
-                        preference="mail.collect_email_address_outgoing"
-                        oncommand="gComposePane.updateEmailCollection();"/>
+                        preference="mail.collect_email_address_outgoing"/>
               <menulist id="localDirectoriesList" flex="1"
                         preference="mail.collect_addressbook"
                         aria-labelledby="emailCollectionOutgoing">

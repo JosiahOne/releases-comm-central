@@ -5,6 +5,9 @@
 /*
  * Test that cycling through the focus of the 3pane's panes works correctly.
  */
+
+"use strict";
+
 var MODULE_NAME = "test-pane-focus";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -18,7 +21,7 @@ function setupModule(module) {
 
   folder = create_folder("PaneFocus");
   let msg1 = create_thread(1);
-  thread = create_thread(3);
+  let thread = create_thread(3);
   let msg2 = create_thread(1);
   add_sets_to_folders([folder], [msg1, thread, msg2]);
 

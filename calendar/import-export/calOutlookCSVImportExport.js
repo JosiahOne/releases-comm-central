@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var localeEn = {
     headTitle:       "Subject",
@@ -49,10 +49,10 @@ var localeNl = {
     headAlarm:        "Herinneringen aan/uit",
     headAlarmDate:    "Herinneringsdatum",
     headAlarmTime:    "Herinneringstijd",
-    headCategories:   "Categorieën",
+    headCategories:   "CategorieÃ«n",
     headDescription:  "Beschrijving",
     headLocation:     "Locatie",
-    headPrivate:      "Privé",
+    headPrivate:      "PrivÃ©",
 
     valueTrue:        "Waar",
     valueFalse:       "Onwaar",
@@ -100,7 +100,7 @@ calOutlookCSVImporter.prototype = {
      * parse that into individual events.
      *
      * First line is field names, all quoted with double quotes.  Field names are
-     * locale dependendent.  In English the recognized field names are:
+     * locale dependent. In English the recognized field names are:
      *   "Title","Start Date","Start Time","End Date","End Time","All day event",
      *   "Reminder on/off","Reminder Date","Reminder Time","Categories",
      *   "Description","Location","Private"
@@ -109,14 +109,14 @@ calOutlookCSVImporter.prototype = {
      *  default durations are set.
      *
      * The rest of the lines are events, one event per line, with fields in the
-     * order descibed by the first line.   All non-empty values must be quoted.
+     * order described by the first line. All non-empty values must be quoted.
      *
      * Returns: an array of parsed calendarEvents.
      *   If the parse is cancelled, a zero length array is returned.
      */
     importFromStream: function(aStream, aCount) {
-        let scriptableInputStream = Components.classes["@mozilla.org/scriptableinputstream;1"]
-                                              .createInstance(Components.interfaces.nsIScriptableInputStream);
+        let scriptableInputStream = Cc["@mozilla.org/scriptableinputstream;1"]
+                                      .createInstance(Ci.nsIScriptableInputStream);
         scriptableInputStream.init(aStream);
         let str = scriptableInputStream.read(-1);
 
@@ -265,7 +265,7 @@ calOutlookCSVImporter.prototype = {
                         // end date is exclusive, so set to next day after start.
                         eDate.day += 1;
                     } else {
-                        eDate.minute += Preferences.get("calendar.event.defaultlength", 60);
+                        eDate.minute += Services.prefs.getIntPref("calendar.event.defaultlength", 60);
                     }
                 } else if (sDate.isDate) {
                     // A time part for the startDate is missing or was
@@ -468,8 +468,8 @@ calOutlookCSVExporter.prototype = {
             line = line.map(value => `"${String(value).replace(/"/g, '""')}"`);
             str = line.join(",") + exportLineEnding;
 
-            let converter = Components.classes["@mozilla.org/intl/scriptableunicodeconverter"]
-                                      .createInstance(Components.interfaces.nsIScriptableUnicodeConverter);
+            let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
+                              .createInstance(Ci.nsIScriptableUnicodeConverter);
             converter.charset = "UTF-8";
             str = converter.ConvertFromUnicode(str);
 

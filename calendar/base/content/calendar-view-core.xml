@@ -3,6 +3,10 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from ../../resources/content/mouseoverPreviews.js -->
+<!-- import-globals-from calendar-dnd-listener.js -->
+<!-- import-globals-from calendar-views.js -->
+
 <bindings id="calendar-core-view-bindings"
           xmlns="http://www.mozilla.org/xbl"
           xmlns:html="http://www.w3.org/1999/xhtml"
@@ -61,9 +65,6 @@
 
     <implementation>
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-          ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-
           this.eventNameTextbox.onblur = () => {
               this.stopEditing(true);
           };
@@ -154,7 +155,7 @@
         <body><![CDATA[
             let locationLabel = document.getAnonymousElementByAttribute(this, "anonid", "event-location");
             let location = this.mOccurrence.getProperty("LOCATION");
-            let showLocation = Preferences.get("calendar.view.showLocation", false);
+            let showLocation = Services.prefs.getBoolPref("calendar.view.showLocation", false);
 
             locationLabel.value = showLocation && location ? location : "";
             setBooleanAttribute(locationLabel, "hidden", !showLocation || !location);
@@ -174,7 +175,7 @@
 
             // Add alarm icons as needed.
             let alarms = item.getAlarms({});
-            if (alarms.length && Preferences.get("calendar.alarms.indicator.show", true)) {
+            if (alarms.length && Services.prefs.getBoolPref("calendar.alarms.indicator.show", true)) {
                 let iconsBox = document.getAnonymousElementByAttribute(this, "anonid", "alarm-icons-box");
                 cal.alarms.addReminderImages(iconsBox, alarms);
 
@@ -365,7 +366,7 @@
               return;
           }
           let item = this.occurrence;
-          let isInvitation = item.calendar instanceof Components.interfaces.calISchedulingSupport && item.calendar.isInvitation(item);
+          let isInvitation = item.calendar instanceof Ci.calISchedulingSupport && item.calendar.isInvitation(item);
           if (!cal.acl.isCalendarWritable(item.calendar) || !cal.acl.userCanModifyItem(item) || isInvitation) {
               return;
           }

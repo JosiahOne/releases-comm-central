@@ -3,11 +3,12 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<?xml-stylesheet href="chrome://calendar/skin/calendar-task-tree.css" type="text/css"?>
 <?xml-stylesheet href="chrome://calendar/skin/calendar-unifinder.css" type="text/css"?>
 
 <!DOCTYPE overlay SYSTEM "chrome://calendar/locale/calendar.dtd">
 
-<overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+<overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
   <script type="application/javascript" src="chrome://calendar/content/calendar-unifinder.js"/>
   <script type="application/javascript" src="chrome://global/content/globalOverlay.js"/>
 
@@ -50,7 +51,7 @@
         <box align="center" flex="1">
           <label control="unifinder-search-field" value="&calendar.search.options.searchfor;"/>
           <textbox id="unifinder-search-field"
-                   class="searchBox"
+                   class="themeableSearchBox"
                    type="search"
                    oncommand="refreshEventTree();"
                    flex="1"/>
@@ -122,10 +123,10 @@
         <!-- on mousedown here happens before onclick above -->
         <treechildren tooltip="eventTreeTooltip"
                       context="calendar-item-context-menu"
-                      onkeypress="if (event.key == 'Enter') unifinderEditCommand();"
+                      onkeypress="if (event.key == 'Enter') { unifinderEditCommand(); }"
                       ondragenter="return false;"
                       ondblclick="unifinderDoubleClick(event)"
-                      onfocus="focusFirstItemIfNoSelection( );"/>
+                      onfocus="focusFirstItemIfNoSelection();"/>
       </tree>
     </vbox>
     <splitter id="calendar-view-splitter"

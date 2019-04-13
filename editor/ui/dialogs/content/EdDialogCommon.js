@@ -4,9 +4,13 @@
 
 // Each editor window must include this file
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* globals InitDialog, ChangeLinkLocation, ValidateData */
+
 // Object to attach commonly-used widgets (all dialogs should use this)
 var gDialog = {};
 
+var gHaveDocumentUrl = false;
 var gValidationError = false;
 
 // Use for 'defaultIndex' param in InitPixelOrPercentMenulist
@@ -52,10 +56,8 @@ var globalElement;
  *  Returns the "value" as a string, or "" if error or input contents are empty
  *  The global "gValidationError" variable is set true if error was found
  */
-function ValidateNumber(inputWidget, listWidget, minVal, maxVal, element, attName, mustHaveValue, mustShowMoreSection)
-{
-  if (!inputWidget)
-  {
+function ValidateNumber(inputWidget, listWidget, minVal, maxVal, element, attName, mustHaveValue, mustShowMoreSection) {
+  if (!inputWidget) {
     gValidationError = true;
     return "";
   }
@@ -66,8 +68,7 @@ function ValidateNumber(inputWidget, listWidget, minVal, maxVal, element, attNam
   var isPercent = false;
 
   var numString = TrimString(inputWidget.value);
-  if (numString || mustHaveValue)
-  {
+  if (numString || mustHaveValue) {
     if (listWidget)
       isPercent = (listWidget.selectedIndex == 1);
     if (isPercent)
@@ -75,32 +76,28 @@ function ValidateNumber(inputWidget, listWidget, minVal, maxVal, element, attNam
 
     // This method puts up the error message
     numString = ValidateNumberRange(numString, minVal, maxLimit, mustHaveValue);
-    if(!numString)
-    {
+    if (!numString) {
       // Switch to appropriate panel for error reporting
       SwitchToValidatePanel();
 
       // or expand dialog for users of "More / Fewer" button
-      if ("dialog" in window && dialog &&
-           "MoreSection" in gDialog && gDialog.MoreSection)
-      {
-        if ( !SeeMore )
+      if ("dialog" in window && window.dialog &&
+           "MoreSection" in gDialog && gDialog.MoreSection) {
+        if (!SeeMore)
           onMoreFewer();
       }
 
       // Error - shift to offending input widget
       SetTextboxFocus(inputWidget);
       gValidationError = true;
-    }
-    else
-    {
+    } else {
       if (isPercent)
         numString += "%";
       if (element)
         GetCurrentEditor().setAttributeOrEquivalent(element, attName, numString, true);
     }
   } else if (element) {
-    GetCurrentEditor().removeAttributeOrEquivalent(element, attName, true)
+    GetCurrentEditor().removeAttributeOrEquivalent(element, attName, true);
   }
   return numString;
 }
@@ -121,8 +118,7 @@ function ValidateNumber(inputWidget, listWidget, minVal, maxVal, element, attNam
  *  Returns the "value" as a string, or "" if error or input contents are empty
  *  The global "gValidationError" variable is set true if error was found
  */
-function ValidateNumberRange(value, minValue, maxValue, mustHaveValue)
-{
+function ValidateNumberRange(value, minValue, maxValue, mustHaveValue) {
   // Initialize global error flag
   gValidationError = false;
   value = TrimString(String(value));
@@ -133,12 +129,10 @@ function ValidateNumberRange(value, minValue, maxValue, mustHaveValue)
 
   var numberStr = "";
 
-  if (value.length > 0)
-  {
+  if (value.length > 0) {
     // Extract just numeric characters
     var number = Number(value.replace(/\D+/g, ""));
-    if (number >= minValue && number <= maxValue )
-    {
+    if (number >= minValue && number <= maxValue) {
       // Return string version of the number
       return String(number);
     }
@@ -147,14 +141,13 @@ function ValidateNumberRange(value, minValue, maxValue, mustHaveValue)
 
   var message = "";
 
-  if (numberStr.length > 0)
-  {
+  if (numberStr.length > 0) {
     // We have a number from user outside of allowed range
-    message = GetString( "ValidateRangeMsg");
+    message = GetString("ValidateRangeMsg");
     message = message.replace(/%n%/, numberStr);
     message += "\n ";
   }
-  message += GetString( "ValidateNumberMsg");
+  message += GetString("ValidateNumberMsg");
 
   // Replace variable placeholders in message with number values
   message = message.replace(/%min%/, minValue).replace(/%max%/, maxValue);
@@ -165,23 +158,19 @@ function ValidateNumberRange(value, minValue, maxValue, mustHaveValue)
   return "";
 }
 
-function SetTextboxFocusById(id)
-{
+function SetTextboxFocusById(id) {
   SetTextboxFocus(document.getElementById(id));
 }
 
-function SetTextboxFocus(textbox)
-{
-  if (textbox)
-  {
-    //XXX Using the setTimeout is hacky workaround for bug 103197
+function SetTextboxFocus(textbox) {
+  if (textbox) {
+    // XXX Using the setTimeout is hacky workaround for bug 103197
     // Must create a new function to keep "textbox" in scope
-    setTimeout( function(textbox) { textbox.focus(); textbox.select(); }, 0, textbox );
+    setTimeout(function(textbox) { textbox.focus(); textbox.select(); }, 0, textbox);
   }
 }
 
-function ShowInputErrorMessage(message)
-{
+function ShowInputErrorMessage(message) {
   Services.prompt.alert(window, GetString("InputError"), message);
   window.focus();
 }
@@ -191,43 +180,39 @@ function ShowInputErrorMessage(message)
 // elementForAtt is element we are actually setting attributes on
 //  (a temporary copy of element in the doc to allow canceling),
 //  but elementInDoc is needed to find parent context in document
-function GetAppropriatePercentString(elementForAtt, elementInDoc)
-{
+function GetAppropriatePercentString(elementForAtt, elementInDoc) {
   var editor = GetCurrentEditor();
   try {
     var name = elementForAtt.nodeName.toLowerCase();
-    if ( name == "td" || name == "th")
+    if (name == "td" || name == "th")
       return GetString("PercentOfTable");
 
     // Check if element is within a table cell
     if (editor.getElementOrParentByTagName("td", elementInDoc))
       return GetString("PercentOfCell");
-    else
-      return GetString("PercentOfWindow");
-  } catch (e) { return "";}
+    return GetString("PercentOfWindow");
+  } catch (e) {
+    return "";
+  }
 }
 
-function ClearListbox(listbox)
-{
-  if (listbox)
-  {
+function ClearListbox(listbox) {
+  if (listbox) {
     listbox.clearSelection();
     while (listbox.hasChildNodes())
       listbox.lastChild.remove();
   }
 }
 
-function forceInteger(elementID)
-{
-  var editField = document.getElementById( elementID );
-  if ( !editField )
+function forceInteger(elementID) {
+  var editField = document.getElementById(elementID);
+  if (!editField)
     return;
 
   var stringIn = editField.value;
-  if (stringIn && stringIn.length > 0)
-  {
+  if (stringIn && stringIn.length > 0) {
     // Strip out all nonnumeric characters
-    stringIn = stringIn.replace(/\D+/g,"");
+    stringIn = stringIn.replace(/\D+/g, "");
     if (!stringIn) stringIn = "";
 
     // Write back only if changed
@@ -236,19 +221,17 @@ function forceInteger(elementID)
   }
 }
 
-function InitPixelOrPercentMenulist(elementForAtt, elementInDoc, attribute, menulistID, defaultIndex)
-{
+function InitPixelOrPercentMenulist(elementForAtt, elementInDoc, attribute, menulistID, defaultIndex) {
   if (!defaultIndex) defaultIndex = gPixel;
 
   // var size  = elementForAtt.getAttribute(attribute);
-  var size = GetHTMLOrCSSStyleValue(elementForAtt, attribute, attribute)
+  var size = GetHTMLOrCSSStyleValue(elementForAtt, attribute, attribute);
   var menulist = document.getElementById(menulistID);
   var pixelItem;
   var percentItem;
 
-  if (!menulist)
-  {
-    dump("NO MENULIST found for ID="+menulistID+"\n");
+  if (!menulist) {
+    dump("NO MENULIST found for ID=" + menulistID + "\n");
     return size;
   }
 
@@ -258,129 +241,108 @@ function InitPixelOrPercentMenulist(elementForAtt, elementInDoc, attribute, menu
   if (!pixelItem) return 0;
 
   percentItem = menulist.appendItem(GetAppropriatePercentString(elementForAtt, elementInDoc));
-  if (size && size.length > 0)
-  {
+  if (size && size.length > 0) {
     // Search for a "%" or "px"
-    if (size.includes("%"))
-    {
+    if (size.includes("%")) {
       // Strip out the %
       size = size.substr(0, size.indexOf("%"));
       if (percentItem)
         menulist.selectedItem = percentItem;
-    }
-    else
-    {
+    } else {
       if (size.includes("px"))
         // Strip out the px
         size = size.substr(0, size.indexOf("px"));
       menulist.selectedItem = pixelItem;
     }
-  }
-  else
+  } else {
     menulist.selectedIndex = defaultIndex;
+  }
 
   return size;
 }
 
-function onAdvancedEdit()
-{
+function onAdvancedEdit() {
   // First validate data from widgets in the "simpler" property dialog
-  if (ValidateData())
-  {
+  if (ValidateData()) {
     // Set true if OK is clicked in the Advanced Edit dialog
     window.AdvancedEditOK = false;
     // Open the AdvancedEdit dialog, passing in the element to be edited
     //  (the copy named "globalElement")
     window.openDialog("chrome://editor/content/EdAdvancedEdit.xul", "_blank", "chrome,close,titlebar,modal,resizable=yes", "", globalElement);
     window.focus();
-    if (window.AdvancedEditOK)
-    {
+    if (window.AdvancedEditOK) {
       // Copy edited attributes to the dialog widgets:
       InitDialog();
     }
   }
 }
 
-function getColor(ColorPickerID)
-{
+function getColor(ColorPickerID) {
   var colorPicker = document.getElementById(ColorPickerID);
   var color;
-  if (colorPicker)
-  {
+  if (colorPicker) {
     // Extract color from colorPicker and assign to colorWell.
     color = colorPicker.getAttribute("color");
     if (color && color == "")
       return null;
     // Clear color so next if it's called again before
     //  color picker is actually used, we dedect the "don't set color" state
-    colorPicker.setAttribute("color","");
+    colorPicker.setAttribute("color", "");
   }
 
   return color;
 }
 
-function setColorWell(ColorWellID, color)
-{
+function setColorWell(ColorWellID, color) {
   var colorWell = document.getElementById(ColorWellID);
-  if (colorWell)
-  {
-    if (!color || color == "")
-    {
+  if (colorWell) {
+    if (!color || color == "") {
       // Don't set color (use default)
       // Trigger change to not show color swatch
-      colorWell.setAttribute("default","true");
+      colorWell.setAttribute("default", "true");
       // Style in CSS sets "background-color",
       //   but color won't clear unless we do this:
       colorWell.removeAttribute("style");
-    }
-    else
-    {
+    } else {
       colorWell.removeAttribute("default");
       // Use setAttribute so colorwell can be a XUL element, such as button
-      colorWell.setAttribute("style", "background-color:"+color);
+      colorWell.setAttribute("style", "background-color:" + color);
     }
   }
 }
 
-function getColorAndSetColorWell(ColorPickerID, ColorWellID)
-{
+function getColorAndSetColorWell(ColorPickerID, ColorWellID) {
   var color = getColor(ColorPickerID);
   setColorWell(ColorWellID, color);
   return color;
 }
 
-function InitMoreFewer()
-{
+function InitMoreFewer() {
   // Set SeeMore bool to the OPPOSITE of the current state,
   //   which is automatically saved by using the 'persist="more"'
   //   attribute on the gDialog.MoreFewerButton button
   //   onMoreFewer will toggle it and redraw the dialog
   SeeMore = (gDialog.MoreFewerButton.getAttribute("more") != "1");
   onMoreFewer();
-  gDialog.MoreFewerButton.setAttribute("accesskey",GetString("PropertiesAccessKey"));
+  gDialog.MoreFewerButton.setAttribute("accesskey", GetString("PropertiesAccessKey"));
 }
 
-function onMoreFewer()
-{
-  if (SeeMore)
-  {
+function onMoreFewer() {
+  if (SeeMore) {
     gDialog.MoreSection.collapsed = true;
-    gDialog.MoreFewerButton.setAttribute("more","0");
-    gDialog.MoreFewerButton.setAttribute("label",GetString("MoreProperties"));
+    gDialog.MoreFewerButton.setAttribute("more", "0");
+    gDialog.MoreFewerButton.setAttribute("label", GetString("MoreProperties"));
     SeeMore = false;
-  }
-  else
-  {
+  } else {
     gDialog.MoreSection.collapsed = false;
-    gDialog.MoreFewerButton.setAttribute("more","1");
-    gDialog.MoreFewerButton.setAttribute("label",GetString("FewerProperties"));
+    gDialog.MoreFewerButton.setAttribute("more", "1");
+    gDialog.MoreFewerButton.setAttribute("label", GetString("FewerProperties"));
     SeeMore = true;
   }
   window.sizeToContent();
 }
 
-function SwitchToValidatePanel()
-{
+function SwitchToValidatePanel() {
   // no default implementation
   // Only EdTableProps.js currently implements this
 }
@@ -390,21 +352,17 @@ const nsIFilePicker = Ci.nsIFilePicker;
 /**
  * @return {Promise} URL spec of the file chosen, or null
  */
-function GetLocalFileURL(filterType)
-{
+function GetLocalFileURL(filterType) {
   var fp = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
   var fileType = "html";
 
-  if (filterType == "img")
-  {
+  if (filterType == "img") {
     fp.init(window, GetString("SelectImageFile"), nsIFilePicker.modeOpen);
     fp.appendFilters(nsIFilePicker.filterImages);
     fileType = "image";
-  }
-  // Current usage of this is in Link dialog,
-  //  where we always want HTML first
-  else if (filterType.startsWith("html"))
-  {
+  } else if (filterType.startsWith("html")) {
+    // Current usage of this is in Link dialog,
+    //  where we always want HTML first
     fp.init(window, GetString("OpenHTMLFile"), nsIFilePicker.modeOpen);
 
     // When loading into Composer, direct user to prefer HTML files and text files,
@@ -415,7 +373,6 @@ function GetLocalFileURL(filterType)
     // Link dialog also allows linking to images
     if (filterType.includes("img", 1))
       fp.appendFilters(nsIFilePicker.filterImages);
-
   }
   // Default or last filter is "All Files"
   fp.appendFilters(nsIFilePicker.filterAll);
@@ -435,21 +392,18 @@ function GetLocalFileURL(filterType)
   });
 }
 
-function GetMetaElementByAttribute(name, value)
-{
-  if (name)
-  {
+function GetMetaElementByAttribute(name, value) {
+  if (name) {
     name = name.toLowerCase();
     let editor = GetCurrentEditor();
     try {
-      return editor.document.querySelector('meta[' + name + '="' + value + '"]');
+      return editor.document.querySelector("meta[" + name + '="' + value + '"]');
     } catch (e) {}
   }
   return null;
 }
 
-function CreateMetaElementWithAttribute(name, value)
-{
+function CreateMetaElementWithAttribute(name, value) {
   let editor = GetCurrentEditor();
   try {
     let metaElement = editor.createElementWithDefaults("meta");
@@ -464,36 +418,27 @@ function CreateMetaElementWithAttribute(name, value)
 // Change "content" attribute on a META element,
 //   or delete entire element it if content is empty
 // This uses undoable editor transactions
-function SetMetaElementContent(metaElement, content, insertNew, prepend)
-{
-  if (metaElement)
-  {
+function SetMetaElementContent(metaElement, content, insertNew, prepend) {
+  if (metaElement) {
     var editor = GetCurrentEditor();
     try {
-      if(!content || content == "")
-      {
+      if (!content || content == "") {
         if (!insertNew)
           editor.deleteNode(metaElement);
-      }
-      else
-      {
-        if (insertNew)
-        {
-          metaElement.setAttribute("content", content);
-          if (prepend)
-            PrependHeadElement(metaElement);
-          else
-            AppendHeadElement(metaElement);
-        }
+      } else if (insertNew) {
+        metaElement.setAttribute("content", content);
+        if (prepend)
+          PrependHeadElement(metaElement);
         else
-          editor.setAttribute(metaElement, "content", content);
+          AppendHeadElement(metaElement);
+      } else {
+        editor.setAttribute(metaElement, "content", content);
       }
     } catch (e) {}
   }
 }
 
-function GetHeadElement()
-{
+function GetHeadElement() {
   var editor = GetCurrentEditor();
   try {
     return editor.document.querySelector("head");
@@ -502,11 +447,9 @@ function GetHeadElement()
   return null;
 }
 
-function PrependHeadElement(element)
-{
+function PrependHeadElement(element) {
   var head = GetHeadElement();
-  if (head)
-  {
+  if (head) {
     var editor = GetCurrentEditor();
     try {
       // Use editor's undoable transaction
@@ -516,11 +459,9 @@ function PrependHeadElement(element)
   }
 }
 
-function AppendHeadElement(element)
-{
+function AppendHeadElement(element) {
   var head = GetHeadElement();
-  if (head)
-  {
+  if (head) {
     var position = 0;
     if (head.hasChildNodes())
       position = head.childNodes.length;
@@ -534,11 +475,9 @@ function AppendHeadElement(element)
   }
 }
 
-function SetWindowLocation()
-{
+function SetWindowLocation() {
   gLocation = document.getElementById("location");
-  if (gLocation)
-  {
+  if (gLocation) {
     window.screenX = Math.max(0, Math.min(window.opener.screenX + Number(gLocation.getAttribute("offsetX")),
                                           screen.availWidth - window.outerWidth));
     window.screenY = Math.max(0, Math.min(window.opener.screenY + Number(gLocation.getAttribute("offsetY")),
@@ -546,26 +485,18 @@ function SetWindowLocation()
   }
 }
 
-function SaveWindowLocation()
-{
-  if (gLocation)
-  {
-    var newOffsetX = window.screenX - window.opener.screenX;
-    var newOffsetY = window.screenY - window.opener.screenY;
+function SaveWindowLocation() {
+  if (gLocation) {
     gLocation.setAttribute("offsetX", window.screenX - window.opener.screenX);
     gLocation.setAttribute("offsetY", window.screenY - window.opener.screenY);
   }
 }
 
-function onCancel()
-{
+function onCancel() {
   SaveWindowLocation();
-  // Close dialog by returning true
-  return true;
 }
 
-function SetRelativeCheckbox(checkbox)
-{
+function SetRelativeCheckbox(checkbox) {
   if (!checkbox) {
     checkbox = document.getElementById("MakeRelativeCheckbox");
     if (!checkbox)
@@ -574,8 +505,7 @@ function SetRelativeCheckbox(checkbox)
 
   var editor = GetCurrentEditor();
   // Mail never allows relative URLs, so hide the checkbox
-  if (editor && (editor.flags & Ci.nsIPlaintextEditor.eEditorMailMask))
-  {
+  if (editor && (editor.flags & Ci.nsIPlaintextEditor.eEditorMailMask)) {
     checkbox.collapsed = true;
     return;
   }
@@ -596,33 +526,23 @@ function SetRelativeCheckbox(checkbox)
   var docUrl = GetDocumentBaseUrl();
   var docScheme = GetScheme(docUrl);
 
-  if (url && docUrl && docScheme)
-  {
-    if (urlScheme)
-    {
+  if (url && docUrl && docScheme) {
+    if (urlScheme) {
       // Url is absolute
       // If we can make a relative URL, then enable must be true!
       // (this lets the smarts of MakeRelativeUrl do all the hard work)
       enable = (GetScheme(MakeRelativeUrl(url)).length == 0);
-    }
-    else
-    {
-      // Url is relative
+    } else if (url[0] == "#") { // Url is relative
       // Check if url is a named anchor
       //  but document doesn't have a filename
       // (it's probably "index.html" or "index.htm",
       //  but we don't want to allow a malformed URL)
-      if (url[0] == "#")
-      {
-        var docFilename = GetFilename(docUrl);
-        enable = docFilename.length > 0;
-      }
-      else
-      {
-        // Any other url is assumed
-        //  to be ok to try to make absolute
-        enable = true;
-      }
+      var docFilename = GetFilename(docUrl);
+      enable = docFilename.length > 0;
+    } else {
+      // Any other url is assumed
+      //  to be ok to try to make absolute
+      enable = true;
     }
   }
 
@@ -630,22 +550,18 @@ function SetRelativeCheckbox(checkbox)
 }
 
 // oncommand handler for the Relativize checkbox in EditorOverlay.xul
-function MakeInputValueRelativeOrAbsolute(checkbox)
-{
+function MakeInputValueRelativeOrAbsolute(checkbox) {
   var input =  document.getElementById(checkbox.getAttribute("for"));
   if (!input)
     return;
 
   var docUrl = GetDocumentBaseUrl();
-  if (!docUrl)
-  {
+  if (!docUrl) {
     // Checkbox should be disabled if not saved,
     //  but keep this error message in case we change that
     Services.prompt.alert(window, "", GetString("SaveToUseRelativeUrl"));
     window.focus();
-  }
-  else
-  {
+  } else {
     // Note that "checked" is opposite of its last state,
     //  which determines what we want to do here
     if (checkbox.checked)
@@ -688,14 +604,12 @@ var NotAnInlineParent = [
   "ul",
 ];
 
-function nodeIsBreak(editor, node)
-{
+function nodeIsBreak(editor, node) {
   // XXX This doesn't work because .localName is lowercase (see bug 1306060).
-  return !node || node.localName == 'BR' || editor.nodeIsBlock(node);
+  return !node || node.localName == "BR" || editor.nodeIsBlock(node);
 }
 
-function InsertElementAroundSelection(element)
-{
+function InsertElementAroundSelection(element) {
   var editor = GetCurrentEditor();
   editor.beginTransaction();
 
@@ -703,12 +617,11 @@ function InsertElementAroundSelection(element)
     // First get the selection as a single range
     var range, start, end, offset;
     var count = editor.selection.rangeCount;
-    if (count == 1)
+    if (count == 1) {
       range = editor.selection.getRangeAt(0).cloneRange();
-    else
-    {
+    } else {
       range = editor.document.createRange();
-      start = editor.selection.getRangeAt(0)
+      start = editor.selection.getRangeAt(0);
       range.setStart(start.startContainer, start.startOffset);
       end = editor.selection.getRangeAt(--count);
       range.setEnd(end.endContainer, end.endOffset);
@@ -720,42 +633,38 @@ function InsertElementAroundSelection(element)
     while (range.endContainer != range.commonAncestorContainer)
       range.setEndAfter(range.endContainer);
 
-    if (editor.nodeIsBlock(element))
+    if (editor.nodeIsBlock(element)) {
       // Block element parent must be a valid block
       while (!IsBlockParent.includes(range.commonAncestorContainer.localName))
         range.selectNode(range.commonAncestorContainer);
-    else
-    {
+    } else if (!nodeIsBreak(editor, range.commonAncestorContainer)) {
       // Fail if we're not inserting a block (use setInlineProperty instead)
-      if (!nodeIsBreak(editor, range.commonAncestorContainer))
-        return false;
-      else if (NotAnInlineParent.includes(range.commonAncestorContainer.localName))
-        // Inline element parent must not be an invalid block
-        do range.selectNode(range.commonAncestorContainer);
-        while (NotAnInlineParent.includes(range.commonAncestorContainer.localName));
-      else
-        // Further insert block check
-        for (var i = range.startOffset; ; i++)
-          if (i == range.endOffset)
-            return false;
-          else if (nodeIsBreak(editor, range.commonAncestorContainer.childNodes[i]))
-            break;
+      return false;
+    } else if (NotAnInlineParent.includes(range.commonAncestorContainer.localName)) {
+      // Inline element parent must not be an invalid block
+      do range.selectNode(range.commonAncestorContainer);
+      while (NotAnInlineParent.includes(range.commonAncestorContainer.localName));
+    } else {
+      // Further insert block check
+      for (var i = range.startOffset; ; i++) {
+        if (i == range.endOffset)
+          return false;
+        else if (nodeIsBreak(editor, range.commonAncestorContainer.childNodes[i]))
+          break;
+      }
     }
 
     // The range may be contained by body text, which should all be selected.
     offset = range.startOffset;
     start = range.startContainer.childNodes[offset];
-    if (!nodeIsBreak(editor, start))
-    {
-      while (!nodeIsBreak(editor, start.previousSibling))
-      {
+    if (!nodeIsBreak(editor, start)) {
+      while (!nodeIsBreak(editor, start.previousSibling)) {
         start = start.previousSibling;
         offset--;
       }
     }
     end = range.endContainer.childNodes[range.endOffset];
-    if (end && !nodeIsBreak(editor, end.previousSibling))
-    {
+    if (end && !nodeIsBreak(editor, end.previousSibling)) {
       while (!nodeIsBreak(editor, end))
         end = end.nextSibling;
     }
@@ -768,22 +677,19 @@ function InsertElementAroundSelection(element)
 
     // Move all the old child nodes to the element
     var empty = true;
-    while (start != end)
-    {
+    while (start != end) {
       var next = start.nextSibling;
       editor.deleteNode(start);
       editor.insertNode(start, element, element.childNodes.length);
       empty = false;
       start = next;
     }
-    if (!editor.nodeIsBlock(element))
+    if (!editor.nodeIsBlock(element)) {
       editor.setShouldTxnSetSelection(true);
-    else
-    {
+    } else {
       // Also move a trailing <br>
       // XXX This doesn't work because .localName is lowercase (see bug 1306060).
-      if (start && start.localName == 'BR')
-      {
+      if (start && start.localName == "BR") {
         editor.deleteNode(start);
         editor.insertNode(start, element, element.childNodes.length);
         empty = false;
@@ -795,36 +701,31 @@ function InsertElementAroundSelection(element)
       // Hack to set the selection just inside the element
       editor.insertNode(editor.document.createTextNode(""), element, offset);
     }
-  }
-  finally {
+  } finally {
     editor.endTransaction();
   }
 
   return true;
 }
 
-function nodeIsBlank(node)
-{
+function nodeIsBlank(node) {
   return node && node.nodeType == Node.TEXT_NODE && !/\S/.test(node.data);
 }
 
-function nodeBeginsBlock(editor, node)
-{
+function nodeBeginsBlock(editor, node) {
   while (nodeIsBlank(node))
     node = node.nextSibling;
   return nodeIsBreak(editor, node);
 }
 
-function nodeEndsBlock(editor, node)
-{
+function nodeEndsBlock(editor, node) {
   while (nodeIsBlank(node))
     node = node.previousSibling;
   return nodeIsBreak(editor, node);
 }
 
 // C++ function isn't exposed to JS :-(
-function RemoveBlockContainer(element)
-{
+function RemoveBlockContainer(element) {
   var editor = GetCurrentEditor();
   editor.beginTransaction();
 
@@ -850,15 +751,13 @@ function RemoveBlockContainer(element)
     // Need to copy the contained nodes?
     for (var i = 0; i < element.childNodes.length; i++)
       editor.insertNode(element.childNodes[i].cloneNode(true), parent, offset++);
-  }
-  finally {
+  } finally {
     editor.endTransaction();
   }
 }
 
 // C++ function isn't exposed to JS :-(
-function RemoveContainer(element)
-{
+function RemoveContainer(element) {
   var editor = GetCurrentEditor();
   editor.beginTransaction();
 
@@ -874,14 +773,12 @@ function RemoveContainer(element)
     }
     // Now remove the element
     editor.deleteNode(element);
-  }
-  finally {
+  } finally {
     editor.endTransaction();
   }
 }
 
-function FillLinkMenulist(linkMenulist, headingsArray)
-{
+function FillLinkMenulist(linkMenulist, headingsArray) {
   var menupopup = linkMenulist.firstChild;
   var editor = GetCurrentEditor();
   try {
@@ -891,8 +788,7 @@ function FillLinkMenulist(linkMenulist, headingsArray)
     var anchorMap  = {}; // for weeding out duplicates and making heading anchors unique
     var anchor;
     var i;
-    for (var element = treeWalker.nextNode(); element; element = treeWalker.nextNode())
-    {
+    for (var element = treeWalker.nextNode(); element; element = treeWalker.nextNode()) {
       // grab headings
       // Skip headings that already have a named anchor as their first child
       //  (this may miss nearby anchors, but at least we don't insert another
@@ -902,62 +798,53 @@ function FillLinkMenulist(linkMenulist, headingsArray)
         headingList.push(element);
 
       // grab named anchors
-      if (element instanceof HTMLAnchorElement && element.name)
-      {
-        anchor = '#' + element.name;
-        if (!(anchor in anchorMap))
-        {
-          anchorList.push({anchor: anchor, sortkey: anchor.toLowerCase()});
+      if (element instanceof HTMLAnchorElement && element.name) {
+        anchor = "#" + element.name;
+        if (!(anchor in anchorMap)) {
+          anchorList.push({anchor, sortkey: anchor.toLowerCase()});
           anchorMap[anchor] = true;
         }
       }
 
       // grab IDs
-      if (element.id)
-      {
-        anchor = '#' + element.id;
-        if (!(anchor in anchorMap))
-        {
-          anchorList.push({anchor: anchor, sortkey: anchor.toLowerCase()});
+      if (element.id) {
+        anchor = "#" + element.id;
+        if (!(anchor in anchorMap)) {
+          anchorList.push({anchor, sortkey: anchor.toLowerCase()});
           anchorMap[anchor] = true;
         }
       }
     }
     // add anchor for headings
-    for (i = 0; i < headingList.length; i++)
-    {
+    for (i = 0; i < headingList.length; i++) {
       var heading = headingList[i];
 
       // Use just first 40 characters, don't add "...",
       //  and replace whitespace with "_" and strip non-word characters
-      anchor = '#' + ConvertToCDATAString(TruncateStringAtWordEnd(heading.textContent, 40, false));
+      anchor = "#" + ConvertToCDATAString(TruncateStringAtWordEnd(heading.textContent, 40, false));
 
       // Append "_" to any name already in the list
       while (anchor in anchorMap)
         anchor += "_";
-      anchorList.push({anchor: anchor, sortkey: anchor.toLowerCase()});
+      anchorList.push({anchor, sortkey: anchor.toLowerCase()});
       anchorMap[anchor] = true;
 
       // Save nodes in an array so we can create anchor node under it later
       headingsArray[anchor] = heading;
     }
-    if (anchorList.length)
-    {
+    if (anchorList.length) {
       // case insensitive sort
-      anchorList.sort(function compare(a, b) {
+      anchorList.sort((a, b) => {
         if (a.sortkey < b.sortkey) return -1;
         if (a.sortkey > b.sortkey) return 1;
         return 0;
       });
 
       for (i = 0; i < anchorList.length; i++)
-        createMenuItem(menupopup,anchorList[i].anchor);
-    }
-    else
-    {
+        createMenuItem(menupopup, anchorList[i].anchor);
+    } else {
       // Don't bother with named anchors in Mail.
-      if (editor && (editor.flags & Ci.nsIPlaintextEditor.eEditorMailMask))
-      {
+      if (editor && (editor.flags & Ci.nsIPlaintextEditor.eEditorMailMask)) {
         menupopup.remove();
         linkMenulist.removeAttribute("enablehistory");
         return;
@@ -968,8 +855,7 @@ function FillLinkMenulist(linkMenulist, headingsArray)
   } catch (e) {}
 }
 
-function createMenuItem(aMenuPopup, aLabel)
-{
+function createMenuItem(aMenuPopup, aLabel) {
   var menuitem = document.createElement("menuitem");
   menuitem.setAttribute("label", aLabel);
   aMenuPopup.appendChild(menuitem);
@@ -977,8 +863,7 @@ function createMenuItem(aMenuPopup, aLabel)
 }
 
 // Shared by Image and Link dialogs for the "Choose" button for links
-function chooseLinkFile()
-{
+function chooseLinkFile() {
   GetLocalFileURL("html, img").then(fileURL => {
     // Always try to relativize local file URLs
     if (gHaveDocumentUrl)

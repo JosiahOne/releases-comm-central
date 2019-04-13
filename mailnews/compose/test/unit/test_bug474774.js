@@ -4,7 +4,7 @@
  * FCC switched off.
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var type = null;
 var test = null;
@@ -192,6 +192,7 @@ function run_test() {
   account.addIdentity(identity);
   account.defaultIdentity = identity;
   account.incomingServer = incomingServer;
+  MailServices.accounts.defaultAccount = account;
 
   sentFolder = localAccountUtils.rootFolder.createLocalSubfolder("Sent");
 

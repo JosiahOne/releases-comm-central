@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "cal", "resource://calendar/modules/calUtils.jsm", "cal");
 
@@ -28,17 +28,17 @@ var calemail = {
      * @param {nsIMsgIdentity} aIdentity    The email identity to use for sending
      */
     sendTo: function(aRecipient, aSubject, aBody, aIdentity) {
-        let msgParams = Components.classes["@mozilla.org/messengercompose/composeparams;1"]
-                                  .createInstance(Components.interfaces.nsIMsgComposeParams);
-        let composeFields = Components.classes["@mozilla.org/messengercompose/composefields;1"]
-                                      .createInstance(Components.interfaces.nsIMsgCompFields);
+        let msgParams = Cc["@mozilla.org/messengercompose/composeparams;1"]
+                          .createInstance(Ci.nsIMsgComposeParams);
+        let composeFields = Cc["@mozilla.org/messengercompose/composefields;1"]
+                              .createInstance(Ci.nsIMsgCompFields);
 
         composeFields.to = aRecipient;
         composeFields.subject = aSubject;
         composeFields.body = aBody;
 
-        msgParams.type = Components.interfaces.nsIMsgCompType.New;
-        msgParams.format = Components.interfaces.nsIMsgCompFormat.Default;
+        msgParams.type = Ci.nsIMsgCompType.New;
+        msgParams.format = Ci.nsIMsgCompFormat.Default;
         msgParams.composeFields = composeFields;
         msgParams.identity = aIdentity;
 
@@ -54,10 +54,10 @@ var calemail = {
     iterateIdentities: function(aFunc) {
         let accounts = MailServices.accounts.accounts;
         for (let i = 0; i < accounts.length; ++i) {
-            let account = accounts.queryElementAt(i, Components.interfaces.nsIMsgAccount);
+            let account = accounts.queryElementAt(i, Ci.nsIMsgAccount);
             let identities = account.identities;
             for (let j = 0; j < identities.length; ++j) {
-                let identity = identities.queryElementAt(j, Components.interfaces.nsIMsgIdentity);
+                let identity = identities.queryElementAt(j, Ci.nsIMsgIdentity);
                 if (!aFunc(identity, account)) {
                     break;
                 }
@@ -139,8 +139,8 @@ var calemail = {
      * @return {String}                 A validated comma-seperated list of e-mail addresses
      */
     validateRecipientList: function(aRecipients) {
-        let compFields = Components.classes["@mozilla.org/messengercompose/composefields;1"]
-                                   .createInstance(Components.interfaces.nsIMsgCompFields);
+        let compFields = Cc["@mozilla.org/messengercompose/composefields;1"]
+                           .createInstance(Ci.nsIMsgCompFields);
         // Resolve the list considering also configured common names
         let members = compFields.splitRecipients(aRecipients, false, {});
         let list = [];

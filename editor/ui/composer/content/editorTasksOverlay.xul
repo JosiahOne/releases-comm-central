@@ -6,7 +6,7 @@
 <!DOCTYPE overlay SYSTEM "chrome://communicator/locale/tasksOverlay.dtd">
 
 <overlay id="editorTasksOverlay"
-         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <script type="application/javascript"
           src="chrome://editor/content/editorApplicationOverlay.js"/>
@@ -19,10 +19,10 @@
     <command id="Tasks:Editor" oncommand="toEditor();"/>
   </commandset>
 
-  <statusbarpanel id="component-bar">
+  <hbox id="component-bar" class="statusbarpanel">
     <toolbarbutton class="taskbutton" id="mini-comp" command="Tasks:Editor"
                    tooltiptext="&taskComposer.tooltip;" insertafter="mini-nav"/>
-  </statusbarpanel>
+  </hbox>
 
   <menupopup id="windowPopup">
     <menuitem label="&editorCmd.label;" accesskey="&editorCmd.accesskey;" key="key_editor" command="Tasks:Editor" id="tasksMenuEditor" insertafter="IMMenuItem,tasksMenuNavigator" class="menuitem-iconic icon-composer16 menu-iconic"/>

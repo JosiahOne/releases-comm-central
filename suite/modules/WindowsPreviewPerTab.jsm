@@ -41,14 +41,14 @@
  * buttons appear on the taskbar, so a magic pref-controlled number determines
  * when this threshold has been crossed.
  */
-this.EXPORTED_SYMBOLS = ["AeroPeek"];
+var EXPORTED_SYMBOLS = ["AeroPeek"];
 
 
-ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
-ChromeUtils.import("resource://gre/modules/PlacesUtils.jsm");
-ChromeUtils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {NetUtil} = ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
+const {PlacesUtils} = ChromeUtils.import("resource://gre/modules/PlacesUtils.jsm");
+const {PrivateBrowsingUtils} = ChromeUtils.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
+const {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+const {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 // Pref to enable/disable preview-per-tab.
 const TOGGLE_PREF_NAME = "browser.taskbar.previews.enable";
@@ -85,7 +85,7 @@ function _imageFromURI(uri, privateMode, callback) {
     if (!Components.isSuccessCode(resultCode))
       return;
     try {
-      let out_img = imgTools.decodeImage(inputStream, channel.contentType);
+      let out_img = imgTools.decodeImageAsync(inputStream, channel.contentType);
       callback(out_img);
     } catch (e) {
       // We failed, so use the default favicon (only if this wasn't the default
@@ -616,7 +616,7 @@ TabWindow.prototype = {
 
 // This object acts as global storage and external interface for this feature.
 // It maintains the values of the prefs.
-this.AeroPeek = {
+var AeroPeek = {
   available: false,
   // Does the pref say we're enabled?
   _prefenabled: false,

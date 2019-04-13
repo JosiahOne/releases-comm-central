@@ -191,7 +191,7 @@ mime_locate_external_content_handler(const char *content_type,
 
     nsCString value;
     rv = catman->GetCategoryEntry(NS_SIMPLEMIMECONVERTERS_CATEGORY,
-                                  contentType.get(), getter_Copies(value));
+                                  contentType, value);
     if (NS_FAILED(rv) || value.IsEmpty())
       return nullptr;
     rv = MIME_NewSimpleMimeConverterStub(contentType.get(),
@@ -511,10 +511,18 @@ mime_find_class(const char *content_type, MimeHeaders *hdrs,
       if (!PL_strcasecmp(content_type+5, "html"))
       {
         if (opts &&
-            opts->format_out == nsMimeOutput::nsMimeMessageSaveAs)
+            (opts->format_out == nsMimeOutput::nsMimeMessageSaveAs ||
+             opts->format_out == nsMimeOutput::nsMimeMessageFilterSniffer ||
+             opts->format_out == nsMimeOutput::nsMimeMessageDecrypt ||
+             opts->format_out == nsMimeOutput::nsMimeMessageAttach))
           // SaveAs in new modes doesn't work yet.
         {
-          clazz = (MimeObjectClass *)&mimeInlineTextHTMLParsedClass;
+          // Don't use the parsed HTML class if we're ...
+          // - saving the HTML of a message
+          // - getting message content for filtering
+          // - snarfing attachments (nsMimeMessageDecrypt used in SnarfMsgAttachment)
+          // - processing attachments (like deleting attachments).
+          clazz = (MimeObjectClass *)&mimeInlineTextHTMLClass;
           types_of_classes_to_disallow = 0;
         }
         else if (html_as == 0 || html_as == 4) // Render sender's HTML
@@ -922,17 +930,18 @@ mime_create(const char *content_type, MimeHeaders *hdrs,
   {
     // override messages that have content disposition set to "attachment"
     // even though we probably should show them inline.
-    if (  (clazz != (MimeObjectClass *)&mimeInlineTextClass) &&
-          (clazz != (MimeObjectClass *)&mimeInlineTextPlainClass) &&
-          (clazz != (MimeObjectClass *)&mimeInlineTextPlainFlowedClass) &&
-          (clazz != (MimeObjectClass *)&mimeInlineTextHTMLClass) &&
+    if ((clazz != (MimeObjectClass *)&mimeMessageClass) &&
+        (clazz != (MimeObjectClass *)&mimeInlineImageClass) &&
+        (!opts->show_attachment_inline_text ||
+         ((clazz != (MimeObjectClass *)&mimeInlineTextHTMLClass) &&
           (clazz != (MimeObjectClass *)&mimeInlineTextHTMLParsedClass) &&
           (clazz != (MimeObjectClass *)&mimeInlineTextHTMLSanitizedClass) &&
           (clazz != (MimeObjectClass *)&mimeInlineTextHTMLAsPlaintextClass) &&
           (clazz != (MimeObjectClass *)&mimeInlineTextRichtextClass) &&
           (clazz != (MimeObjectClass *)&mimeInlineTextEnrichedClass) &&
-          (clazz != (MimeObjectClass *)&mimeMessageClass) &&
-          (clazz != (MimeObjectClass *)&mimeInlineImageClass) )
+          (clazz != (MimeObjectClass *)&mimeInlineTextClass) &&
+          (clazz != (MimeObjectClass *)&mimeInlineTextPlainClass) &&
+          (clazz != (MimeObjectClass *)&mimeInlineTextPlainFlowedClass))))
       // not a special inline type, so show as attachment
       clazz = (MimeObjectClass *)&mimeExternalObjectClass;
   }

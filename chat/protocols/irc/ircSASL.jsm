@@ -10,8 +10,7 @@
 
 this.EXPORTED_SYMBOLS = ["ircSASL", "capSASL"];
 
-ChromeUtils.import("resource:///modules/ircHandlers.jsm");
-ChromeUtils.import("resource:///modules/ircUtils.jsm");
+const {ircHandlers} = ChromeUtils.import("resource:///modules/ircHandlers.jsm");
 
 var ircSASL = {
   name: "SASL AUTHENTICATE",
@@ -117,8 +116,8 @@ var ircSASL = {
       // List of SASL mechanisms supported by the server (or network, services).
       // The numeric contains a comma-separated list of mechanisms.
       return false;
-    }
-  }
+    },
+  },
 };
 
 var capSASL = {
@@ -140,6 +139,6 @@ var capSASL = {
       }
 
       return true;
-    }
-  }
+    },
+  },
 };

@@ -5,12 +5,11 @@
 
 #include "nsCOMPtr.h"
 #include "nsIFile.h"
-#include "nsISimpleEnumerator.h"
+#include "nsIDirectoryEnumerator.h"
 #include "nsServiceManagerUtils.h"
 #include "nsComponentManagerUtils.h"
 #include "nsString.h"
 #include "nsMsgI18N.h"
-#include "nsUConvCID.h"
 #include "nsNativeCharsetUtils.h"
 #include "nsIInputStream.h"
 #include "nsIOutputStream.h"
@@ -82,16 +81,14 @@ nsBeckyUtils::FindUserDirectoryOnWindowsXP(nsIFile **aLocation)
   if (!isDirectory)
     return NS_ERROR_FILE_NOT_FOUND;
 
-  nsCOMPtr<nsISimpleEnumerator> entries;
+  nsCOMPtr<nsIDirectoryEnumerator> entries;
   rv = directory->GetDirectoryEntries(getter_AddRefs(entries));
   NS_ENSURE_SUCCESS(rv, rv);
 
   bool more;
-  nsCOMPtr<nsISupports> entry;
   while (NS_SUCCEEDED(entries->HasMoreElements(&more)) && more) {
-    rv = entries->GetNext(getter_AddRefs(entry));
-
-    nsCOMPtr<nsIFile> file = do_QueryInterface(entry, &rv);
+    nsCOMPtr<nsIFile> file;
+    rv = entries->GetNextFile(getter_AddRefs(file));
     NS_ENSURE_SUCCESS(rv, rv);
 
     bool isDirectory = false;

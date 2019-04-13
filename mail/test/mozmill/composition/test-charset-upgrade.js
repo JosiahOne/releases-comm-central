@@ -9,13 +9,15 @@
 
 // make SOLO_TEST=composition/test-charset-upgrade.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-charset-upgrade";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers", "compose-helpers"];
 
-ChromeUtils.import('resource://gre/modules/Services.jsm');
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gDrafts;
 var gOutbox;
@@ -64,7 +66,8 @@ function test_encoding_upgrade_html_compose() {
   // Charset should still be the default.
   assert_equals(draftMsg.Charset, "windows-1252");
 
-  let draftMsgContent = get_msg_source(draftMsg, true);
+  // We could pass "windows-1252", but the message is ASCII.
+  let draftMsgContent = get_msg_source(draftMsg);
   if (!draftMsgContent.includes('content="text/html; charset=windows-1252"'))
     throw new Error("Expected content type not in msg; draftMsgContent=" +
                     draftMsgContent);
@@ -86,7 +89,7 @@ function test_encoding_upgrade_html_compose() {
   // Charset should have be upgraded to UTF-8.
   assert_equals(draftMsg2.Charset, "UTF-8");
 
-  let draftMsg2Content = get_msg_source(draftMsg2, true);
+  let draftMsg2Content = get_msg_source(draftMsg2, "UTF-8");
   if (!draftMsg2Content.includes('content="text/html; charset=UTF-8"'))
     throw new Error("Expected content type not in msg; draftMsg2Content=" +
                     draftMsg2Content);
@@ -101,7 +104,7 @@ function test_encoding_upgrade_html_compose() {
 
   be_in_folder(gOutbox);
   let outMsg = select_click_row(0);
-  let outMsgContent = get_msg_source(outMsg, true);
+  let outMsgContent = get_msg_source(outMsg, "UTF-8");
 
   // This message should be multipart/alternative.
   if (!outMsgContent.includes("Content-Type: multipart/alternative"))
@@ -158,7 +161,7 @@ function test_encoding_upgrade_plaintext_compose() {
   // Charset should have be upgraded to UTF-8.
   assert_equals(draftMsg2.Charset, "UTF-8");
 
-  let draftMsg2Content = get_msg_source(draftMsg2, true);
+  let draftMsg2Content = get_msg_source(draftMsg2, "UTF-8");
   if (draftMsg2Content.includes("<html>"))
     throw new Error("Plaintext draft contained <html>; "+
                     "draftMsg2Content=" + draftMsg2Content);
@@ -173,7 +176,7 @@ function test_encoding_upgrade_plaintext_compose() {
 
   be_in_folder(gOutbox);
   let outMsg = select_click_row(0);
-  let outMsgContent = get_msg_source(outMsg, true);
+  let outMsgContent = get_msg_source(outMsg, "UTF-8");
 
   // This message should be text/plain;
   if (!outMsgContent.includes("Content-Type: text/plain"))

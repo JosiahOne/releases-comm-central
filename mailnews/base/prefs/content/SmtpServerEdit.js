@@ -3,9 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {cleanUpHostName, isLegalHostNameOrIP} = ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gSmtpServer;
 var gSmtpUsername;
@@ -18,13 +18,15 @@ var gSmtpSocketType;
 var gPort;
 var gDefaultPort;
 
+document.addEventListener("dialogaccept", onAccept);
+
 function onLoad(event)
 {
   gSmtpServer = window.arguments[0].server;
   initSmtpSettings(gSmtpServer);
 }
 
-function onAccept()
+function onAccept(event)
 {
   if (!isLegalHostNameOrIP(cleanUpHostName(gSmtpHostname.value))) {
     let prefsBundle = document.getElementById("bundle_prefs");
@@ -34,7 +36,8 @@ function onAccept()
     Services.prompt.alert(window, alertTitle, alertMsg);
 
     window.arguments[0].result = false;
-    return false;
+    event.preventDefault();
+    return;
   }
 
   // If we didn't have an SMTP server to initialize with,
@@ -51,7 +54,6 @@ function onAccept()
   }
 
   window.arguments[0].result = true;
-  return true;
 }
 
 function initSmtpSettings(server) {

@@ -9,10 +9,8 @@
 <!DOCTYPE dialog SYSTEM "chrome://editor/locale/EditorSaveAsCharset.dtd">
 
 <dialog title="&windowTitle2.label;"
-    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
     onload = "Startup()"
-    ondialogaccept="return onAccept();"
-    ondialogcancel="return onCancel();"
     style="width: 32em;">
 
     <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
@@ -20,15 +18,15 @@
     <script type="application/javascript" src="chrome://editor/content/EditorSaveAsCharset.js"/>
 
     <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
-    <broadcaster id="args" value=""/>
 
-    <groupbox><caption label="&documentTitleTitle.label;"/>
+    <groupbox>
+        <label class="header">&documentTitleTitle.label;</label>
         <label id="EnterTitleLabel"/>
         <textbox id="TitleInput" oninput="TitleChanged();"/>
         <description id="TitleHelp" class="wrap" style="width:1em" />
     </groupbox>
 
-    <groupbox flex="1"><caption label="&documentCharsetTitle2.label;"/>
+    <groupbox flex="1"><label class="header">&documentCharsetTitle2.label;</label>
         <label value="&documentCharsetDesc2.label;"/>
         <tree id="CharsetTree" rows="8" hidecolumnpicker="true" onselect="SelectCharset();">
             <treecols>

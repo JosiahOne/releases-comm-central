@@ -7,8 +7,12 @@
  * that they get updated when messages are moved to folders, and
  * don't get updated when we archive.
  */
-ChromeUtils.import("resource:///modules/MailUtils.js");
-ChromeUtils.import("resource:///modules/mailServices.js");
+
+"use strict";
+
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 var MODULE_NAME = 'test-recent-menu';
 
@@ -44,9 +48,9 @@ function test_move_message() {
   // which should be empty and disabled.
   right_click_on_row(0);
   let popups = mc.click_menus_in_sequence(mc.e("mailContext"),
-                                          [{id: "mailContext-moveMenu"}], true);
-  let recentMenu = popups[popups.length - 1]
-                         .querySelector('[label="Recent"]');
+                                          [{id: "mailContext-moveMenu"},
+                                           {label: "Recent"}], true);
+  let recentMenu = popups[popups.length - 2].querySelector('[label="Recent"]');
   assert_equals(recentMenu.getAttribute("disabled"), "true");
   gInitRecentMenuCount = recentMenu.itemCount;
   assert_equals(gInitRecentMenuCount, 0);

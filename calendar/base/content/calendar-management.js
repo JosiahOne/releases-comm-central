@@ -9,10 +9,12 @@
  *         calendarOfflineManager
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+/* import-globals-from dialogs/calendar-migration-dialog.js */
+/* import-globals-from calendar-common-sets.js */
+/* import-globals-from calendar-ui-utils.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
  * Get this window's currently selected calendar.
@@ -31,8 +33,8 @@ function getSelectedCalendar() {
  * @param aCalendar     The calendar to delete.
  */
 function promptDeleteCalendar(aCalendar) {
-    const nIPS = Components.interfaces.nsIPromptService;
-    const cICM = Components.interfaces.calICalendarManager;
+    const nIPS = Ci.nsIPromptService;
+    const cICM = Ci.calICalendarManager;
 
     let calMgr = cal.getCalendarManager();
     let calendars = calMgr.getCalendars({});
@@ -84,10 +86,13 @@ function promptDeleteCalendar(aCalendar) {
 /**
  * Called to initialize the calendar manager for a window.
  */
-function loadCalendarManager() {
+async function loadCalendarManager() {
     // Set up the composite calendar in the calendar list widget.
     let tree = document.getElementById("calendar-list-tree-widget");
     let compositeCalendar = cal.view.getCompositeCalendar(window);
+    if (!tree.__lookupSetter__("compositeCalendar")) {
+        await new Promise(resolve => tree.addEventListener("bindingattached", resolve, { once: true }));
+    }
     tree.compositeCalendar = compositeCalendar;
 
     // Initialize our composite observer
@@ -119,16 +124,16 @@ function initHomeCalendar() {
     let homeCalendar = calMgr.createCalendar("storage", url);
     homeCalendar.name = cal.l10n.getCalString("homeCalendarName");
     calMgr.registerCalendar(homeCalendar);
-    Preferences.set("calendar.list.sortOrder", homeCalendar.id);
+    Services.prefs.setStringPref("calendar.list.sortOrder", homeCalendar.id);
     composite.addCalendar(homeCalendar);
 
     // Wrapping this in a try/catch block, as if any of the migration code
     // fails, the app may not load.
-    if (Preferences.get("calendar.migrator.enabled", true)) {
+    if (Services.prefs.getBoolPref("calendar.migrator.enabled", true)) {
         try {
             gDataMigrator.checkAndMigrate();
         } catch (e) {
-            Components.utils.reportError("Migrator error: " + e);
+            Cu.reportError("Migrator error: " + e);
         }
     }
 
@@ -153,7 +158,7 @@ function unloadCalendarManager() {
  */
 function updateSortOrderPref(event) {
     let sortOrderString = event.sortOrder.join(" ");
-    Preferences.set("calendar.list.sortOrder", sortOrderString);
+    Services.prefs.setStringPref("calendar.list.sortOrder", sortOrderString);
     try {
         Services.prefs.savePrefFile(null);
     } catch (e) {
@@ -410,7 +415,7 @@ var calendarOfflineManager = {
 
     init: function() {
         if (this.initialized) {
-            throw Components.results.NS_ERROR_ALREADY_INITIALIZED;
+            throw Cr.NS_ERROR_ALREADY_INITIALIZED;
         }
         Services.obs.addObserver(this, "network:offline-status-changed");
 
@@ -420,7 +425,7 @@ var calendarOfflineManager = {
 
     uninit: function() {
         if (!this.initialized) {
-            throw Components.results.NS_ERROR_NOT_INITIALIZED;
+            throw Cr.NS_ERROR_NOT_INITIALIZED;
         }
         Services.obs.removeObserver(this, "network:offline-status-changed");
         this.initialized = false;

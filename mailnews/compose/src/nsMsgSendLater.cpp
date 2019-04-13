@@ -117,12 +117,13 @@ nsMsgSendLater::Init()
   // Subscribe to the unsent messages folder
   // XXX This code should be set up for multiple unsent folders, however we
   // don't support that at the moment, so for now just assume one folder.
-  rv = GetUnsentMessagesFolder(nullptr, getter_AddRefs(mMessageFolder));
+  nsCOMPtr<nsIMsgFolder> folder;
+  rv = GetUnsentMessagesFolder(nullptr, getter_AddRefs(folder));
   // There doesn't have to be a nsMsgQueueForLater flagged folder.
-  if (NS_FAILED(rv) || !mMessageFolder)
+  if (NS_FAILED(rv) || !folder)
     return NS_OK;
 
-  rv = mMessageFolder->AddFolderListener(this);
+  rv = folder->AddFolderListener(this);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // XXX may want to send messages X seconds after startup if there are any.
@@ -164,8 +165,12 @@ nsMsgSendLater::Observe(nsISupports *aSubject, const char* aTopic,
     nsresult rv;
     if (mMessageFolder)
     {
-      rv = mMessageFolder->RemoveFolderListener(this);
-      NS_ENSURE_SUCCESS(rv, rv);
+      nsCOMPtr<nsIMsgFolder> folder = do_QueryReferent(mMessageFolder, &rv);
+      if (folder)
+      {
+        rv = folder->RemoveFolderListener(this);
+        NS_ENSURE_SUCCESS(rv, rv);
+      }
     }
 
     // Now remove ourselves from the observer service as well.
@@ -203,7 +208,7 @@ nsMsgSendLater::GetStatusFeedback(nsIMsgStatusFeedback **aFeedback)
 
 // Stream is done...drive on!
 NS_IMETHODIMP
-nsMsgSendLater::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult status)
+nsMsgSendLater::OnStopRequest(nsIRequest *request, nsresult status)
 {
   nsresult    rv;
 
@@ -321,7 +326,7 @@ nsMsgSendLater::BuildNewBuffer(const char* aBuf, uint32_t aCount, uint32_t *tota
 
 // Got data?
 NS_IMETHODIMP
-nsMsgSendLater::OnDataAvailable(nsIRequest *request, nsISupports *ctxt, nsIInputStream *inStr, uint64_t sourceOffset, uint32_t count)
+nsMsgSendLater::OnDataAvailable(nsIRequest *request, nsIInputStream *inStr, uint64_t sourceOffset, uint32_t count)
 {
   NS_ENSURE_ARG_POINTER(inStr);
 
@@ -391,7 +396,7 @@ nsMsgSendLater::OnStopRunningUrl(nsIURI *url, nsresult aExitCode)
 }
 
 NS_IMETHODIMP
-nsMsgSendLater::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
+nsMsgSendLater::OnStartRequest(nsIRequest *request)
 {
   return NS_OK;
 }
@@ -511,6 +516,8 @@ nsMsgSendLater::CompleteMailFileSend()
   nsCOMPtr<nsIMsgIdentity> identity;
   nsresult rv = GetIdentityFromKey(mIdentityKey, getter_AddRefs(identity));
   NS_ENSURE_SUCCESS(rv,rv);
+  if (!identity)
+    return NS_ERROR_UNEXPECTED;
 
   // If for some reason the tmp file didn't get created, we've failed here
   bool created;
@@ -610,7 +617,9 @@ nsMsgSendLater::StartNextMailFileSend(nsresult prevStatus)
     return NS_ERROR_UNEXPECTED;
 
   nsCString messageURI;
-  mMessageFolder->GetUriForMsg(mMessage, messageURI);
+  nsCOMPtr<nsIMsgFolder> folder = do_QueryReferent(mMessageFolder, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+  folder->GetUriForMsg(mMessage, messageURI);
 
   rv = nsMsgCreateTempFile("nsqmail.tmp", getter_AddRefs(mTempFile));
   NS_ENSURE_SUCCESS(rv, rv);
@@ -630,6 +639,8 @@ nsMsgSendLater::StartNextMailFileSend(nsresult prevStatus)
   nsCOMPtr<nsIMsgIdentity> identity;
   rv = GetIdentityFromKey(identityKey.get(), getter_AddRefs(identity));
   NS_ENSURE_SUCCESS(rv, rv);
+  if (!identity)
+    return NS_ERROR_UNEXPECTED;
 
   // Notify that we're just about to start sending this message
   NotifyListenersOnMessageStartSending(mTotalSendCount, mMessagesToSend.Count(),
@@ -657,12 +668,21 @@ nsMsgSendLater::StartNextMailFileSend(nsresult prevStatus)
 }
 
 NS_IMETHODIMP
-nsMsgSendLater::GetUnsentMessagesFolder(nsIMsgIdentity *aIdentity, nsIMsgFolder **folder)
+nsMsgSendLater::GetUnsentMessagesFolder(nsIMsgIdentity *aIdentity, nsIMsgFolder **aFolder)
 {
-  nsCString uri;
-  GetFolderURIFromUserPrefs(nsIMsgSend::nsMsgQueueForLater, aIdentity, uri);
-  return LocateMessageFolder(aIdentity, nsIMsgSend::nsMsgQueueForLater,
-                             uri.get(), folder);
+  nsresult rv = NS_OK;
+  nsCOMPtr<nsIMsgFolder> folder = do_QueryReferent(mMessageFolder);
+  if (!folder) {
+    nsCString uri;
+    GetFolderURIFromUserPrefs(nsIMsgSend::nsMsgQueueForLater, aIdentity, uri);
+    rv = LocateMessageFolder(aIdentity, nsIMsgSend::nsMsgQueueForLater, uri.get(), getter_AddRefs(folder));
+    mMessageFolder = do_GetWeakReference(folder);
+    if (!mMessageFolder)
+      return NS_ERROR_FAILURE;
+  }
+  if (folder)
+    folder.forget(aFolder);
+  return rv;
 }
 
 NS_IMETHODIMP
@@ -689,16 +709,19 @@ nsMsgSendLater::HasUnsentMessages(nsIMsgIdentity *aIdentity, bool *aResult)
   // don't support that at the moment, so for now just assume one folder.
   if (!mMessageFolder)
   {
-    rv = GetUnsentMessagesFolder(nullptr, getter_AddRefs(mMessageFolder));
+    nsCOMPtr<nsIMsgFolder> folder;
+    rv = GetUnsentMessagesFolder(nullptr, getter_AddRefs(folder));
     // There doesn't have to be a nsMsgQueueForLater flagged folder.
-    if (NS_FAILED(rv) || !mMessageFolder)
+    if (NS_FAILED(rv) || !folder)
       return NS_OK;
   }
   rv = ReparseDBIfNeeded(nullptr);
   NS_ENSURE_SUCCESS(rv, rv);
 
   int32_t totalMessages;
-  rv = mMessageFolder->GetTotalMessages(false, &totalMessages);
+  nsCOMPtr<nsIMsgFolder> folder = do_QueryReferent(mMessageFolder, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = folder->GetTotalMessages(false, &totalMessages);
   NS_ENSURE_SUCCESS(rv, rv);
 
   *aResult = totalMessages > 0;
@@ -741,7 +764,7 @@ nsresult nsMsgSendLater::ReparseDBIfNeeded(nsIUrlListener *aListener)
   // there are unsent messages, the db will be up to date.
   nsCOMPtr<nsIMsgDatabase> unsentDB;
   nsresult rv;
-  nsCOMPtr<nsIMsgLocalMailFolder> locFolder(do_QueryInterface(mMessageFolder, &rv));
+  nsCOMPtr<nsIMsgLocalMailFolder> locFolder(do_QueryReferent(mMessageFolder, &rv));
   NS_ENSURE_SUCCESS(rv, rv);
   return locFolder->GetDatabaseWithReparse(aListener, nullptr,
                                            getter_AddRefs(unsentDB));
@@ -767,9 +790,10 @@ nsMsgSendLater::InternalSendMessages(bool aUserInitiated,
   // don't support that at the moment, so for now just assume one folder.
   if (!mMessageFolder)
   {
-    rv = GetUnsentMessagesFolder(nullptr,
-                                 getter_AddRefs(mMessageFolder));
-    NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsIMsgFolder> folder;
+    rv = GetUnsentMessagesFolder(nullptr, getter_AddRefs(folder));
+    if (NS_FAILED(rv) || !folder)
+      return NS_ERROR_FAILURE;
   }
   nsCOMPtr<nsIMsgDatabase> unsentDB;
   // Remember these in case we need to reparse the db.
@@ -780,7 +804,9 @@ nsMsgSendLater::InternalSendMessages(bool aUserInitiated,
   mIdentity = nullptr; // don't hold onto the identity since we're a service.
 
   nsCOMPtr<nsISimpleEnumerator> enumerator;
-  rv = mMessageFolder->GetMessages(getter_AddRefs(enumerator));
+  nsCOMPtr<nsIMsgFolder> folder = do_QueryReferent(mMessageFolder, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = folder->GetMessages(getter_AddRefs(enumerator));
   NS_ENSURE_SUCCESS(rv, rv);
 
   // copy all the elements in the enumerator into our isupports array....
@@ -812,7 +838,7 @@ nsMsgSendLater::InternalSendMessages(bool aUserInitiated,
   }
 
   // Now get an enumerator for our array.
-  rv = NS_NewArrayEnumerator(getter_AddRefs(mEnumerator), mMessagesToSend);
+  rv = NS_NewArrayEnumerator(getter_AddRefs(mEnumerator), mMessagesToSend, NS_GET_IID(nsIMsgDBHdr));
   NS_ENSURE_SUCCESS(rv, rv);
 
   // We're now sending messages so its time to signal that and reset our counts.
@@ -886,8 +912,11 @@ nsMsgSendLater::DeleteCurrentMessage()
 
   msgArray->InsertElementAt(mMessage, 0);
 
-  nsresult res = mMessageFolder->DeleteMessages(msgArray, nullptr, true, false, nullptr, false /*allowUndo*/);
-  if (NS_FAILED(res))
+  nsresult rv;
+  nsCOMPtr<nsIMsgFolder> folder = do_QueryReferent(mMessageFolder, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = folder->DeleteMessages(msgArray, nullptr, true, false, nullptr, false /*allowUndo*/);
+  if (NS_FAILED(rv))
     return NS_ERROR_FAILURE;
 
   // Null out the message so we don't try and delete it again.
@@ -1313,8 +1342,11 @@ nsMsgSendLater::EndSendMessages(nsresult aStatus, const char16_t *aMsg,
   // Clear out our array of messages.
   mMessagesToSend.Clear();
 
+  nsresult rv;
+  nsCOMPtr<nsIMsgFolder> folder = do_QueryReferent(mMessageFolder, &rv);
+  NS_ENSURE_SUCCESS(rv,);
   // We don't need to keep hold of the database now we've finished sending.
-  (void)mMessageFolder->SetMsgDatabase(nullptr);
+  (void)folder->SetMsgDatabase(nullptr);
 
   // or the enumerator, temp file or output stream
   mEnumerator = nullptr;
@@ -1419,14 +1451,17 @@ nsMsgSendLater::GetIdentityFromKey(const char *aKey, nsIMsgIdentity  **aIdentity
     }
   }
 
-  // if no aKey, or we failed to find the identity from the key
+  // If no aKey, or we failed to find the identity from the key
   // use the identity from the default account.
   nsCOMPtr<nsIMsgAccount> defaultAccount;
   rv = accountManager->GetDefaultAccount(getter_AddRefs(defaultAccount));
   NS_ENSURE_SUCCESS(rv,rv);
 
-  rv = defaultAccount->GetDefaultIdentity(aIdentity);
-  NS_ENSURE_SUCCESS(rv,rv);
+  if (defaultAccount)
+    rv = defaultAccount->GetDefaultIdentity(aIdentity);
+  else
+    *aIdentity = nullptr;
+
   return rv;
 }
 

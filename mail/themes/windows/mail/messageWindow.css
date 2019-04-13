@@ -8,13 +8,18 @@
 
 @import url("chrome://messenger/skin/");
 @import url("chrome://messenger/skin/primaryToolbar.css");
-@import url("chrome://messenger/skin/tagColors.css");
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 
 #messengerWindow {
   -moz-appearance: window;
   background-color: -moz-Dialog;
+}
+
+#messengerWindow[lwt-tree] > #navigation-toolbox {
+  background-color: var(--toolbar-bgcolor);
+  background-image: var(--toolbar-bgimage);
+  color: var(--toolbar-color, inherit);
 }
 
 #messagepanebox {
@@ -24,6 +29,13 @@
 
 #mail-toolbox:-moz-lwtheme {
   text-shadow: none;
+}
+
+/* Set position: relative to let the LW-background-box be behind them. */
+#navigation-toolbox:-moz-lwtheme,
+#mail-toolbox:-moz-lwtheme,
+#messagepaneboxwrapper:-moz-lwtheme {
+  position: relative;
 }
 
 /* ..... splitter adjustments ..... */
@@ -49,14 +61,6 @@
 
 #attachment-splitter[state="collapsed"]:hover {
   border-bottom: 4px solid highlight;
-}
-
-@media (-moz-windows-compositor) {
-  #status-bar {
-    -moz-appearance: none;
-    border-style: none;
-    border-top: 1px solid ThreeDShadow;
-  }
 }
 
 @media (-moz-os-version: windows-win10) and (-moz-windows-default-theme) {

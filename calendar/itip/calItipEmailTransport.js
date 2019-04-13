@@ -2,12 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://calendar/modules/ltnInvitationUtils.jsm");
+var { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { ltn } = ChromeUtils.import("resource://calendar/modules/ltnInvitationUtils.jsm");
 
 /**
  * Constructor of calItipEmailTransport object
@@ -63,15 +62,15 @@ calItipEmailTransport.prototype = {
         let body = "";
         switch (aItipItem.responseMethod) {
             case "REQUEST": {
-                let usePrefixes = Preferences.get(
+                let usePrefixes = Services.prefs.getBoolPref(
                     "calendar.itip.useInvitationSubjectPrefixes",
                     true
                 );
                 if (usePrefixes) {
                     let seq = item.getProperty("SEQUENCE");
                     let subjectKey = seq && seq > 0
-                        ? "itipRequestUpdatedSubject"
-                        : "itipRequestSubject";
+                        ? "itipRequestUpdatedSubject2"
+                        : "itipRequestSubject2";
                     subject = cal.l10n.getLtnString(subjectKey, [summary]);
                 } else {
                     subject = summary;
@@ -83,7 +82,7 @@ calItipEmailTransport.prototype = {
                 break;
             }
             case "CANCEL": {
-                subject = cal.l10n.getLtnString("itipCancelSubject", [summary]);
+                subject = cal.l10n.getLtnString("itipCancelSubject2", [summary]);
                 body = cal.l10n.getLtnString(
                     "itipCancelBody",
                     [item.organizer ? item.organizer.toString() : "", summary]
@@ -117,19 +116,19 @@ calItipEmailTransport.prototype = {
                 let subjectKey, bodyKey;
                 switch (myPartStat) {
                     case "ACCEPTED":
-                        subjectKey = "itipReplySubjectAccept";
+                        subjectKey = "itipReplySubjectAccept2";
                         bodyKey = "itipReplyBodyAccept";
                         break;
                     case "TENTATIVE":
-                        subjectKey = "itipReplySubjectTentative";
+                        subjectKey = "itipReplySubjectTentative2";
                         bodyKey = "itipReplyBodyAccept";
                         break;
                     case "DECLINED":
-                        subjectKey = "itipReplySubjectDecline";
+                        subjectKey = "itipReplySubjectDecline2";
                         bodyKey = "itipReplyBodyDecline";
                         break;
                     default:
-                        subjectKey = "itipReplySubject";
+                        subjectKey = "itipReplySubject2";
                         bodyKey = "itipReplyBodyAccept";
                         break;
                 }
@@ -151,7 +150,7 @@ calItipEmailTransport.prototype = {
         try {
             this.mDefaultSmtpServer = MailServices.smtp.defaultServer;
             this.mDefaultAccount = MailServices.accounts.defaultAccount;
-            this.mDefaultIdentity = this.mDefaultAccount.defaultIdentity;
+            this.mDefaultIdentity = this.mDefaultAccount ? this.mDefaultAccount.defaultIdentity : null;
 
             if (!this.mDefaultIdentity) {
                 // If there isn't a default identity (i.e Local Folders is your
@@ -164,7 +163,7 @@ calItipEmailTransport.prototype = {
                     // If there are no identities, then we are in the same
                     // situation as if we didn't have Xpcom Mail.
                     this.mHasXpcomMail = false;
-                    cal.LOG("initEmailService: No XPCOM Mail available: " + e);
+                    cal.LOG("initEmailService: No XPCOM Mail available");
                 }
             }
         } catch (ex) {
@@ -191,6 +190,9 @@ calItipEmailTransport.prototype = {
         if (!identity) { // use some default identity/account:
             identity = this.mDefaultIdentity;
             account = this.mDefaultAccount;
+            if (!account || !identity) {
+                throw new Error("sendXpcomMail: No usable account and identity found");
+            }
         }
 
         switch (aItipItem.autoResponse) {
@@ -238,13 +240,13 @@ calItipEmailTransport.prototype = {
                 }
                 let toList = toMap.join(", ");
                 let composeUtils = Cc["@mozilla.org/messengercompose/computils;1"]
-                                   .createInstance(Ci.nsIMsgCompUtils);
+                                     .createInstance(Ci.nsIMsgCompUtils);
                 let messageId = composeUtils.msgGenerateMessageId(identity);
                 let mailFile = this._createTempImipFile(toList, aSubject, aBody, aItipItem, identity, messageId);
                 if (mailFile) {
                     // compose fields for message: from/to etc need to be specified both here and in the file
                     let composeFields = Cc["@mozilla.org/messengercompose/composefields;1"]
-                                        .createInstance(Ci.nsIMsgCompFields);
+                                          .createInstance(Ci.nsIMsgCompFields);
                     composeFields.characterSet = "UTF-8";
                     composeFields.to = toList;
                     let mailfrom = (identity.fullName.length ? identity.fullName + " <" + identity.email + ">" : identity.email);
@@ -271,8 +273,7 @@ calItipEmailTransport.prototype = {
                     //           "@mozilla.org/messengercompose/composesendlistener;1"
                     //           and/or "chrome://messenger/content/messengercompose/sendProgress.xul"
                     // i.e. bug 432662
-                    let msgSend = Cc["@mozilla.org/messengercompose/send;1"]
-                                  .createInstance(Ci.nsIMsgSend);
+                    let msgSend = Cc["@mozilla.org/messengercompose/send;1"].createInstance(Ci.nsIMsgSend);
                     msgSend.sendMessageFile(identity,
                                             account.key,
                                             composeFields,
@@ -290,7 +291,7 @@ calItipEmailTransport.prototype = {
                 break;
             }
             case Ci.calIItipItem.NONE: {
-                // we shouldn't get here, as we stoppped processing in this case
+                // we shouldn't get here, as we stopped processing in this case
                 // earlier in checkAndSend in calItipUtils.jsm
                 cal.LOG("sendXpcomMail: Found NONE autoResponse type.");
                 break;
@@ -309,7 +310,7 @@ calItipEmailTransport.prototype = {
         try {
             let itemList = aItipItem.getItemList({});
             let serializer = Cc["@mozilla.org/calendar/ics-serializer;1"]
-                             .createInstance(Ci.calIIcsSerializer);
+                               .createInstance(Ci.calIIcsSerializer);
             serializer.addItems(itemList, itemList.length);
             let methodProp = cal.getIcsService().createIcalProperty("METHOD");
             methodProp.value = aItipItem.responseMethod;
@@ -357,7 +358,7 @@ calItipEmailTransport.prototype = {
                                   parseInt("0600", 8));
 
             let outputStream = Cc["@mozilla.org/network/file-output-stream;1"]
-                               .createInstance(Ci.nsIFileOutputStream);
+                                 .createInstance(Ci.nsIFileOutputStream);
             // Let's write the file - constants from file-utils.js
             const MODE_WRONLY = 0x02;
             const MODE_CREATE = 0x08;

@@ -8,16 +8,15 @@
 
 <?xml-stylesheet href="chrome://editor/skin/editor.css" type="text/css"?>
 <?xml-stylesheet href="chrome://editor/skin/EditorDialog.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/menulist.css" type="text/css"?>
 
 <!DOCTYPE dialog SYSTEM "chrome://editor/locale/EdAdvancedEdit.dtd">
 
-<dialog title="&WindowTitle.label;"
+<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
     id="advancedEditDlg"
     style="width: 40em;"
-    xmlns ="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-    onload="Startup()"
-    ondialogaccept="return onAccept();"
-    ondialogcancel="return onCancel();">
+    title="&WindowTitle.label;"
+    onload="Startup()">
 
   <!-- Methods common to all editor dialogs -->
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
@@ -31,7 +30,7 @@
   <!-- global dialog functions -->
   <script type="application/javascript" src="chrome://editor/content/EdAdvancedEdit.js"/>
 
-  <broadcaster id="args" value=""/>
+  <script type="application/javascript" src="chrome://messenger/content/customElements.js"/>
 
   <hbox>
     <label value="&currentattributesfor.label;"/>
@@ -79,7 +78,8 @@
             </row>
             <row align="top" equalsize="always">
               <!-- Lists are built at runtime -->
-              <menulist id="AddHTMLAttributeNameInput" editable="true" flex="1"
+              <menulist is="menulist-editable" id="AddHTMLAttributeNameInput"
+                        editable="true" flex="1"
                         oninput="onInputHTMLAttributeName();"
                         oncommand="onInputHTMLAttributeName();"/>
               <deck id="AddHTMLAttributeValueDeck" selectedIndex="0">
@@ -88,7 +88,8 @@
                            oninput="onInputHTMLAttributeValue();"/>
                 </hbox>
                 <hbox align="top">
-                  <menulist id="AddHTMLAttributeValueMenulist" editable="true" flex="1"
+                  <menulist is="menulist-editable" id="AddHTMLAttributeValueMenulist"
+                            editable="true" flex="1"
                             oninput="onInputHTMLAttributeValue();"
                             oncommand="onInputHTMLAttributeValue();"/>
                 </hbox>

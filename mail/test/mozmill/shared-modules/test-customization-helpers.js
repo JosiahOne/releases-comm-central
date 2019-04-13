@@ -2,14 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "customization-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 
 var USE_SHEET_PREF = "toolbar.customization.usesheet";
 

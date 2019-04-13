@@ -9,9 +9,9 @@
  **/
 
 // Services = object with smart getters for common XPCOM services
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {BrowserUtils} = ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
 
 // XPCOMUtils.defineLazyGetter(this, "Weave", function() {
 //   let tmp = {};
@@ -1155,11 +1155,34 @@ function BrowserOnCommand(event)
       reason = "unwanted";
     }
 
+    let docShell = ownerDoc.defaultView
+                           .QueryInterface(Ci.nsIInterfaceRequestor)
+                           .getInterface(Ci.nsIWebNavigation)
+                           .QueryInterface(Ci.nsIDocShell);
+    let blockedInfo = {};
+    if (docShell.failedChannel) {
+      let classifiedChannel = docShell.failedChannel.
+                              QueryInterface(Ci.nsIClassifiedChannel);
+      if (classifiedChannel) {
+        let httpChannel = docShell.failedChannel.QueryInterface(Ci.nsIHttpChannel);
+
+        let reportUri = httpChannel.URI.clone();
+
+        // Remove the query to avoid leaking sensitive data
+        if (reportUri instanceof Ci.nsIURL) {
+          reportUri = reportUri.mutate().setQuery("").finalize();
+        }
+
+        blockedInfo = { list: classifiedChannel.matchedList,
+                        provider: classifiedChannel.matchedProvider,
+                        uri: reportUri.asciiSpec };
+      }
+    }
+
     switch (buttonID) {
       case "getMeOutOfHereButton":
         getMeOutOfHere();
         break;
-
       case "reportButton":
         // This is the "Why is this site blocked" button. We redirect
         // to the generic page describing phishing/malware protection.
@@ -1169,13 +1192,11 @@ function BrowserOnCommand(event)
           Cu.reportError("Couldn't get phishing info URL: " + e);
         }
         break;
-
       case "ignoreWarningButton":
         if (Services.prefs.getBoolPref("browser.safebrowsing.allowOverride")) {
-          getBrowser().getNotificationBox().ignoreSafeBrowsingWarning(reason);
+          getBrowser().getNotificationBox().ignoreSafeBrowsingWarning(reason, blockedInfo);
         }
         break;
-
     }
   }
 }
@@ -1499,7 +1520,7 @@ function openUILinkIn(url, where, aAllowThirdPartyFixup, aPostData, aReferrerURI
 
   params.fromChrome = true;
 
-  openLinkIn(url, where, params);
+  return openLinkIn(url, where, params);
 }
 
 function openLinkIn(url, where, params)
@@ -1786,16 +1807,12 @@ function subscribeToFeed(href, event) {
   if (w) {
     var browser = w.getBrowser();
     charset = browser.characterSet;
-  }
-  else
+  } else {
     // When calling this function without any open navigator window
     charset = document.characterSet;
-  var feedURI = makeURI(href, charset);
+  }
+  let feedURI = makeURI(href, charset);
 
-  // Use the feed scheme so X-Moz-Is-Feed will be set
-  // The value doesn't matter
-  if (/^https?/.test(feedURI.scheme))
-    href = "feed:" + href;
   openUILink(href, event, false, true);
 }
 
@@ -1923,8 +1940,7 @@ function GetFileFromString(aString)
 
 function CopyImage()
 {
-  var param = Cc["@mozilla.org/embedcomp/command-params;1"]
-                .createInstance(Ci.nsICommandParams);
+  var param = Cu.createCommandParams();
   param.setLongValue("imageCopy",
                      Ci.nsIContentViewerEdit.COPY_IMAGE_ALL);
   document.commandDispatcher.getControllerForCommand("cmd_copyImage")

@@ -4,7 +4,7 @@
 
 this.EXPORTED_SYMBOLS = ["StringBundle"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
  * A string bundle.

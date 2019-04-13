@@ -21,10 +21,9 @@
 ]>
 
 <dialog id="identityDialog"
-        xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
         onload="onLoadIdentityProperties();"
-        ondialogaccept="return onOk();"
         style="&identityDialog.style;">
 
   <stringbundle id="bundle_prefs"
@@ -52,8 +51,6 @@
   ]]>
   </script>
 
-  <broadcaster id="broadcaster_attachSignature"/>
-
   <description>&identityListDesc.label;</description>
   <separator class="thin"/>
 
@@ -69,7 +66,7 @@
       <!-- Identity Settings Tab -->
       <vbox flex="1" name="settings">
         <groupbox>
-          <caption label="&publicData.label;"/>
+          <label class="header">&publicData.label;</label>
 
         <grid>
           <columns>
@@ -102,7 +99,7 @@
         </grid>
 
         <hbox class="indent" flex="1">
-          <textbox id="identity.htmlSigText" flex="1" multiline="true" wrap="off" rows="4" class="signatureBox"/>
+          <html:textarea id="identity.htmlSigText" rows="4" cols="72" class="signatureBox"/>
         </hbox>
 
         <hbox align="center">
@@ -133,7 +130,7 @@
         </groupbox>
 
         <groupbox>
-          <caption label="&privateData.label;"/>
+          <label class="header">&privateData.label;</label>
 
           <label value="&smtpName.label;"
                  control="identity.smtpServerKey"
@@ -169,13 +166,13 @@
       </vbox>
 
       <!-- Copies & Folders Tab -->
-#include am-copies.inc
+#include am-copies.inc.xul
 
       <!-- Composition & Addressing Tab -->
-#include am-addressing.inc
+#include am-addressing.inc.xul
 
       <!-- Security Tab -->
-#include ../../../extensions/smime/content/am-smime.inc
+#include ../../../extensions/smime/content/am-smime.inc.xul
 
     </tabpanels>
   </tabbox>

@@ -429,7 +429,7 @@
                    context="placesContext"
                    openInTabs="children"
                    oncommand="BookmarksEventHandler.onCommand(event);"
-                   onclick="BookmarksEventHandler.onClick(event);"
+                   onclick="BookmarksEventHandler.onClick(event, this.parentNode._placesView);"
                    onpopupshowing="BookmarksMenu.onPopupShowing(event, 'BMB_');
                                    BookmarksEventHandler.onPopupShowing(event);"
                    tooltip="bhTooltip" popupsinherittooltip="true">
@@ -473,7 +473,7 @@
         <hbox flex="1"
               id="PlacesToolbar"
               context="placesContext"
-              onclick="BookmarksEventHandler.onClick(event);"
+              onclick="BookmarksEventHandler.onClick(event, this._placesView);"
               oncommand="BookmarksEventHandler.onCommand(event);"
               tooltip="bhTooltip"
               popupsinherittooltip="true">
@@ -544,6 +544,13 @@
     <statusbarpanel class="statusbarpanel-progress" id="statusbar-progresspanel" collapsed="true">
       <progressmeter class="progressmeter-statusbar" id="statusbar-icon" mode="normal" value="0"/>
     </statusbarpanel>
+    <statusbarpanel class="statusbarpanel-iconic-text zoom-button-align" id="zoomOut-button" label="[-]"
+                    oncommand="zoomOut();"
+                    tooltiptext="&zoomOut.tooltiptext;"/>
+    <statusbarpanel class="statusbarpanel-iconic-text" id="zoomLevel-display" label="" oncommand="zoomReset();"/>
+    <statusbarpanel class="statusbarpanel-iconic-text zoom-button-align" id="zoomIn-button" label="[+]"
+                    oncommand="zoomIn();"
+                    tooltiptext="&zoomIn.tooltiptext;"/>
     <statusbarpanel id="popupIcon" class="statusbarpanel-iconic" hidden="true"
                     oncommand="StatusbarViewPopupManager()"
                     tooltiptext="&popupIcon.tooltiptext;"

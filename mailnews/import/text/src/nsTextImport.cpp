@@ -42,7 +42,7 @@
 class ImportAddressImpl final : public nsIImportAddressBooks
 {
 public:
-  ImportAddressImpl(nsIStringBundle* aStringBundle);
+  explicit ImportAddressImpl(nsIStringBundle* aStringBundle);
 
   static nsresult Create(nsIImportAddressBooks** aImport,
                          nsIStringBundle *aStringBundle);
@@ -265,7 +265,7 @@ NS_IMETHODIMP ImportAddressImpl::FindAddressBooks(nsIFile *pLoc, nsIArray **ppAr
   m_haveDelim = true;
   m_delim = m_text.GetDelim();
 
-  m_fileLoc = do_QueryInterface(pLoc);
+  m_fileLoc = pLoc;
 
   /* Build an address book descriptor based on the file passed in! */
   nsCOMPtr<nsIMutableArray> array(do_CreateInstance(NS_ARRAY_CONTRACTID, &rv));
@@ -541,7 +541,7 @@ NS_IMETHODIMP ImportAddressImpl::GetSampleData(int32_t index, bool *pFound, char
 
   if (!fileExists) {
     *pFound = false;
-    *pStr = NS_strdup(&term);
+    *pStr = NS_xstrdup(&term);
     return NS_OK;
   }
 
@@ -567,7 +567,7 @@ NS_IMETHODIMP ImportAddressImpl::GetSampleData(int32_t index, bool *pFound, char
   }
   else {
     *pFound = false;
-    *pStr = NS_strdup(&term);
+    *pStr = NS_xstrdup(&term);
   }
 
   return NS_OK;
@@ -577,7 +577,7 @@ NS_IMETHODIMP ImportAddressImpl::SetSampleLocation(nsIFile *pLocation)
 {
   NS_ENSURE_ARG_POINTER(pLocation);
 
-  m_fileLoc = do_QueryInterface(pLocation);
+  m_fileLoc = pLocation;
   m_haveDelim = false;
   return NS_OK;
 }

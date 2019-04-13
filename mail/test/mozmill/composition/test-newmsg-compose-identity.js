@@ -7,13 +7,15 @@
  * called from the context of an open composer.
  */
 
+"use strict";
+
 var MODULE_NAME = "test-newmsg-compose-identity";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers",
                        "window-helpers", "compose-helpers"];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gInbox;
 var gDrafts;

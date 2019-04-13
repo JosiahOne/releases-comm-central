@@ -21,7 +21,6 @@
 #include "nsIMsgAccountManager.h"
 #include "nsIMsgWindow.h"
 #include "nsCOMPtr.h"
-#include "nsIRDFService.h"
 #include "nsMsgDBCID.h"
 #include "nsMsgUtils.h"
 #include "nsLocalUtils.h"
@@ -255,7 +254,7 @@ nsMsgLocalMailFolder::GetSubFolders(nsISimpleEnumerator **aResult)
     UpdateSummaryTotals(false);
   }
 
-  return aResult ? NS_NewArrayEnumerator(aResult, mSubFolders) : NS_ERROR_NULL_POINTER;
+  return aResult ? NS_NewArrayEnumerator(aResult, mSubFolders, NS_GET_IID(nsIMsgFolder)) : NS_ERROR_NULL_POINTER;
 }
 
 nsresult nsMsgLocalMailFolder::GetDatabase()
@@ -481,7 +480,7 @@ NS_IMETHODIMP nsMsgLocalMailFolder::GetFolderURL(nsACString& aUrl)
 
 NS_IMETHODIMP nsMsgLocalMailFolder::CreateStorageIfMissing(nsIUrlListener* aUrlListener)
 {
-  nsresult rv;
+  nsresult rv = NS_OK;
   nsCOMPtr<nsIMsgFolder> msgParent;
   GetParent(getter_AddRefs(msgParent));
 
@@ -498,16 +497,7 @@ NS_IMETHODIMP nsMsgLocalMailFolder::CreateStorageIfMissing(nsIUrlListener* aUrlL
       // If there is a hierarchy, there is a parent.
       // Don't strip off slash if it's the first character
       parentName.SetLength(leafPos);
-      // get the corresponding RDF resource
-      // RDF will create the folder resource if it doesn't already exist
-      nsCOMPtr<nsIRDFService> rdf = do_GetService("@mozilla.org/rdf/rdf-service;1", &rv);
-      NS_ENSURE_SUCCESS(rv,rv);
-
-      nsCOMPtr<nsIRDFResource> resource;
-      rv = rdf->GetResource(parentName, getter_AddRefs(resource));
-      NS_ENSURE_SUCCESS(rv,rv);
-
-      msgParent = do_QueryInterface(resource, &rv);
+      rv = GetOrCreateFolder(parentName, getter_AddRefs(msgParent));
       NS_ENSURE_SUCCESS(rv,rv);
     }
   }
@@ -643,8 +633,6 @@ NS_IMETHODIMP nsMsgLocalMailFolder::EmptyTrash(nsIMsgWindow *msgWindow,
   if (NS_SUCCEEDED(rv))
   {
     uint32_t flags;
-    nsCString trashUri;
-    trashFolder->GetURI(trashUri);
     trashFolder->GetFlags(&flags);
     int32_t totalMessages = 0;
     rv = trashFolder->GetTotalMessages(true, &totalMessages);
@@ -737,43 +725,6 @@ nsresult nsMsgLocalMailFolder::IsChildOfTrash(bool *result)
 
     thisFolder = parentFolder;
   }
-  return rv;
-}
-
-NS_IMETHODIMP nsMsgLocalMailFolder::Delete()
-{
-  nsresult rv;
-  nsCOMPtr<nsIMsgDBService> msgDBService = do_GetService(NS_MSGDB_SERVICE_CONTRACTID, &rv);
-  NS_ENSURE_SUCCESS(rv, rv);
-  msgDBService->CachedDBForFolder(this, getter_AddRefs(mDatabase));
-  if (mDatabase)
-  {
-    mDatabase->ForceClosed();
-    mDatabase = nullptr;
-  }
-
-  nsCOMPtr<nsIMsgIncomingServer> server;
-  rv = GetServer(getter_AddRefs(server));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  nsCOMPtr<nsIMsgPluggableStore> msgStore;
-
-  rv = server->GetMsgStore(getter_AddRefs(msgStore));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  nsCOMPtr <nsIFile> summaryFile;
-  rv = GetSummaryFile(getter_AddRefs(summaryFile));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  //Clean up .sbd folder if it exists.
-  // Remove summary file.
-  rv = summaryFile->Remove(false);
-  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "Could not delete msg summary file");
-
-  rv = msgStore->DeleteFolder(this);
-  if (rv == NS_ERROR_FILE_NOT_FOUND ||
-      rv == NS_ERROR_FILE_TARGET_DOES_NOT_EXIST)
-    rv = NS_OK; // virtual folders do not have a msgStore file
   return rv;
 }
 
@@ -916,7 +867,7 @@ NS_IMETHODIMP nsMsgLocalMailFolder::Rename(const nsAString& aNewName, nsIMsgWind
       newFolder->SetPrettyName(EmptyString());
       newFolder->SetPrettyName(aNewName);
       bool changed = false;
-      MatchOrChangeFilterDestination(newFolder, true /*caseInsenstive*/, &changed);
+      MatchOrChangeFilterDestination(newFolder, true /*case-insensitive*/, &changed);
       if (changed)
         AlertFilterChanged(msgWindow);
 
@@ -976,7 +927,7 @@ NS_IMETHODIMP nsMsgLocalMailFolder::RenameSubFolders(nsIMsgWindow *msgWindow, ns
     {
       newFolder->SetPrettyName(folderName);
       bool changed = false;
-      msgFolder->MatchOrChangeFilterDestination(newFolder, true /*caseInsenstive*/, &changed);
+      msgFolder->MatchOrChangeFilterDestination(newFolder, true /*case-insensitive*/, &changed);
       if (changed)
         msgFolder->AlertFilterChanged(msgWindow);
       newFolder->RenameSubFolders(msgWindow, msgFolder);
@@ -1177,8 +1128,14 @@ nsMsgLocalMailFolder::DeleteMessages(nsIArray *messages,
   if (!isMove && (deleteStorage || isTrashFolder))
   {
     nsCOMPtr<nsIMsgFolderNotificationService> notifier(do_GetService(NS_MSGNOTIFICATIONSERVICE_CONTRACTID));
-    if (notifier)
-        notifier->NotifyMsgsDeleted(messages);
+    if (notifier) {
+      if (listener)
+      {
+        listener->OnStartCopy();
+        listener->OnStopCopy(NS_OK);
+      }
+      notifier->NotifyMsgsDeleted(messages);
+    }
   }
 
   if (!deleteStorage && !isTrashFolder)
@@ -1420,7 +1377,7 @@ nsMsgLocalMailFolder::InitCopyState(nsISupports* aSupport,
   mCopyState->m_msgWindow = msgWindow;
   rv = messages->GetLength(&mCopyState->m_totalMsgCount);
   if (listener)
-    mCopyState->m_listener = do_QueryInterface(listener, &rv);
+    mCopyState->m_listener = listener;
   mCopyState->m_copyingMultipleMessages = false;
   mCopyState->m_wholeMsgInStream = false;
 
@@ -2009,6 +1966,7 @@ NS_IMETHODIMP nsMsgLocalMailFolder::GetNewMessages(nsIMsgWindow *aWindow, nsIUrl
   // XXX todo, move all this into nsILocalMailIncomingServer's GetNewMail
   // so that we don't have to have RSS foo here.
   nsCOMPtr<nsIRssIncomingServer> rssServer = do_QueryInterface(server, &rv);
+  mozilla::Unused << rssServer;
   if (NS_SUCCEEDED(rv))
     return localMailServer->GetNewMail(aWindow, aListener, this, nullptr);
 
@@ -2106,7 +2064,6 @@ nsresult nsMsgLocalMailFolder::WriteStartOfNewMessage()
 
 nsresult nsMsgLocalMailFolder::InitCopyMsgHdrAndFileStream()
 {
-  nsCOMPtr<nsIMsgPluggableStore> msgStore;
   nsresult rv = GetMsgStore(getter_AddRefs(mCopyState->m_msgStore));
   NS_ENSURE_SUCCESS(rv, rv);
   bool reusable;
@@ -2375,16 +2332,10 @@ NS_IMETHODIMP nsMsgLocalMailFolder::EndCopy(bool aCopySucceeded)
   nsCOMPtr <nsISeekableStream> seekableStream(do_QueryInterface(mCopyState->m_fileStream));
   if (seekableStream)
   {
-    if (mCopyState->m_dummyEnvelopeNeeded)
-    {
-      uint32_t bytesWritten;
-      seekableStream->Seek(nsISeekableStream::NS_SEEK_END, 0);
-      mCopyState->m_fileStream->Write(MSG_LINEBREAK, MSG_LINEBREAK_LEN, &bytesWritten);
-      if (mCopyState->m_parseMsgState)
-        mCopyState->m_parseMsgState->ParseAFolderLine(CRLF, MSG_LINEBREAK_LEN);
-    }
-    rv = mCopyState->m_msgStore->FinishNewMessage(mCopyState->m_fileStream,
-                                                  mCopyState->m_newHdr);
+    seekableStream->Seek(nsISeekableStream::NS_SEEK_END, 0);
+    rv = FinishNewLocalMessage(mCopyState->m_fileStream, mCopyState->m_newHdr,
+                               mCopyState->m_msgStore,
+                               mCopyState->m_parseMsgState);
     if (NS_SUCCEEDED(rv) && mCopyState->m_newHdr)
       mCopyState->m_newHdr->GetMessageKey(&mCopyState->m_curDstKey);
     if (multipleCopiesFinished)
@@ -2702,13 +2653,9 @@ NS_IMETHODIMP nsMsgLocalMailFolder::EndMessage(nsMsgKey key)
   nsCOMPtr <nsISeekableStream> seekableStream = do_QueryInterface(mCopyState->m_fileStream, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
   seekableStream->Seek(nsISeekableStream::NS_SEEK_END, 0);
-  uint32_t bytesWritten;
-  mCopyState->m_fileStream->Write(MSG_LINEBREAK, MSG_LINEBREAK_LEN, &bytesWritten);
-  if (mCopyState->m_parseMsgState)
-    mCopyState->m_parseMsgState->ParseAFolderLine(CRLF, MSG_LINEBREAK_LEN);
-
-  rv = mCopyState->m_msgStore->FinishNewMessage(mCopyState->m_fileStream,
-                                                mCopyState->m_newHdr);
+  rv = FinishNewLocalMessage(mCopyState->m_fileStream, mCopyState->m_newHdr,
+                             mCopyState->m_msgStore,
+                             mCopyState->m_parseMsgState);
   mCopyState->m_fileStream->Close();
   mCopyState->m_fileStream = nullptr; // all done with the file stream
 
@@ -2829,7 +2776,7 @@ nsresult nsMsgLocalMailFolder::CopyMessageTo(nsISupports *message,
   nsCOMPtr<nsIMsgDBHdr> msgHdr(do_QueryInterface(message, &rv));
   NS_ENSURE_SUCCESS(rv, NS_ERROR_NO_INTERFACE);
 
-  mCopyState->m_message = do_QueryInterface(msgHdr, &rv);
+  mCopyState->m_message = msgHdr;
 
   nsCOMPtr<nsIMsgFolder> srcFolder(do_QueryInterface(mCopyState->m_srcSupport, &rv));
   NS_ENSURE_SUCCESS(rv, NS_ERROR_NO_INTERFACE);
@@ -3285,6 +3232,7 @@ nsMsgLocalMailFolder::OnStopRunningUrl(nsIURI * aUrl, nsresult aExitCode)
   {
     // if we are the inbox and running pop url
     nsCOMPtr<nsIPop3URL> popurl = do_QueryInterface(aUrl, &rv);
+    mozilla::Unused << popurl;
     if (NS_SUCCEEDED(rv))
     {
       nsCOMPtr<nsIMsgIncomingServer> server;
@@ -3493,8 +3441,9 @@ nsMsgLocalMailFolder::OnMessageClassified(const char *aMsgURI,
           if (moveOnSpam)
           {
             nsCOMPtr<nsIMsgFolder> folder;
-            rv = GetExistingFolder(spamFolderURI, getter_AddRefs(folder));
-            if (NS_SUCCEEDED(rv) && folder)
+            rv = FindFolder(spamFolderURI, getter_AddRefs(folder));
+            NS_ENSURE_SUCCESS(rv, rv);
+            if (folder)
             {
               rv = folder->SetFlag(nsMsgFolderFlags::Junk);
               NS_ENSURE_SUCCESS(rv,rv);
@@ -3510,8 +3459,8 @@ nsMsgLocalMailFolder::OnMessageClassified(const char *aMsgURI,
               // NS_ENSURE_SUCCESS(rv,rv);
               // mSpamKeysToMove.AppendElement(msgKey);
               // willMoveMessage = true;
-              rv = GetOrCreateFolder(spamFolderURI, nullptr /* aListener */);
-              NS_ASSERTION(NS_SUCCEEDED(rv), "GetOrCreateFolder failed");
+              rv = GetOrCreateJunkFolder(spamFolderURI, nullptr /* aListener */);
+              NS_ASSERTION(NS_SUCCEEDED(rv), "GetOrCreateJunkFolder failed");
             }
           }
         }
@@ -3529,8 +3478,10 @@ nsMsgLocalMailFolder::OnMessageClassified(const char *aMsgURI,
     if (!mSpamKeysToMove.IsEmpty())
     {
       nsCOMPtr<nsIMsgFolder> folder;
-      if (!spamFolderURI.IsEmpty())
-        rv = GetExistingFolder(spamFolderURI, getter_AddRefs(folder));
+      if (!spamFolderURI.IsEmpty()) {
+        rv = FindFolder(spamFolderURI, getter_AddRefs(folder));
+        NS_ENSURE_SUCCESS(rv, rv);
+      }
       for (uint32_t keyIndex = 0; keyIndex < mSpamKeysToMove.Length(); keyIndex++)
       {
         // If an upstream filter moved this message, don't move it here.
@@ -3726,10 +3677,10 @@ nsMsgLocalMailFolder::AddMessageBatch(uint32_t aMessageCount,
       outFileStream->Write(aMessages[i], messageLen, &bytesWritten);
       newMailParser->BufferInput(aMessages[i], messageLen);
 
-      msgStore->FinishNewMessage(outFileStream, newHdr);
+      FinishNewLocalMessage(outFileStream, newHdr, msgStore, newMailParser);
       outFileStream->Close();
       outFileStream = nullptr;
-      newMailParser->OnStopRequest(nullptr, nullptr, NS_OK);
+      newMailParser->OnStopRequest(nullptr, NS_OK);
       newMailParser->EndMsgDownload();
       hdrArray->AppendElement(newHdr);
     }
@@ -3737,6 +3688,19 @@ nsMsgLocalMailFolder::AddMessageBatch(uint32_t aMessageCount,
   }
   ReleaseSemaphore(static_cast<nsIMsgLocalMailFolder*>(this));
   return rv;
+}
+
+nsresult
+nsMsgLocalMailFolder::FinishNewLocalMessage(nsIOutputStream *aOutputStream,
+                                            nsIMsgDBHdr *aNewHdr,
+                                            nsIMsgPluggableStore *aMsgStore,
+                                            nsParseMailMessageState *aParseMsgState)
+{
+  uint32_t bytesWritten;
+  aOutputStream->Write(MSG_LINEBREAK, MSG_LINEBREAK_LEN, &bytesWritten);
+  if (aParseMsgState)
+    aParseMsgState->ParseAFolderLine(MSG_LINEBREAK, MSG_LINEBREAK_LEN);
+  return aMsgStore->FinishNewMessage(aOutputStream, aNewHdr);
 }
 
 NS_IMETHODIMP

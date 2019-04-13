@@ -6,8 +6,8 @@
  * This test iterates over the test files in gTestFiles, and streams
  * each as a message and makes sure the streaming doesn't assert or crash.
  */
-ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
-ChromeUtils.import("resource:///modules/IOUtils.js");
+const {localAccountUtils} = ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
+var {IOUtils} = ChromeUtils.import("resource:///modules/IOUtils.js");
 
 var gTestFiles =[
   "../../../data/bug505221",
@@ -56,13 +56,13 @@ function streamMsg(msgHdr)
     true);
 }
 
-gStreamListener = {
+var gStreamListener = {
   QueryInterface: ChromeUtils.generateQI([Ci.nsIStreamListener]),
   _stream : null,
   // nsIRequestObserver part
-  onStartRequest: function (aRequest, aContext) {
+  onStartRequest: function (aRequest) {
   },
-  onStopRequest: function (aRequest, aContext, aStatusCode) {
+  onStopRequest: function (aRequest, aStatusCode) {
     doNextTest();
   },
 
@@ -70,7 +70,7 @@ gStreamListener = {
      converter is actually eating everything except the start and stop
      notification. */
   // nsIStreamListener part
-  onDataAvailable: function (aRequest,aContext,aInputStream,aOffset,aCount) {
+  onDataAvailable: function (aRequest, aInputStream, aOffset, aCount) {
     if (this._stream === null) {
       this._stream = Cc["@mozilla.org/scriptableinputstream;1"].
                     createInstance(Ci.nsIScriptableInputStream);

@@ -2,13 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "mouse-event-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers"];
 
-var EventUtils = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/EventUtils.js", EventUtils);
+var EventUtils = ChromeUtils.import("chrome://mozmill/content/stdlib/EventUtils.jsm");
 
 var fdh;
 
@@ -79,7 +80,7 @@ function synthesize_drag_start(aWindow, aDispatcher, aListener)
   let trapDrag = function(event) {
 
     if (!event.dataTransfer)
-      throw "no DataTransfer";
+      throw new Error("no DataTransfer");
 
     dt = event.dataTransfer;
 

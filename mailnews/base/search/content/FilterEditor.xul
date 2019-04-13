@@ -3,6 +3,7 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<?xml-stylesheet href="chrome://messenger/skin/textbox.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/filterDialog.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/folderPane.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
@@ -15,32 +16,26 @@
 ]>
 
 <dialog id="FilterEditor"
-  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
   title="&window.title;"
   style="&filterEditorDialog.dimensions;"
   windowtype="mailnews:filtereditor"
   persist="width height screenX screenY"
   buttons="accept,cancel"
   onload="filterEditorOnLoad();"
-  onunload="filterEditorOnUnload();"
-  ondialogaccept="return onAccept();">
+  onunload="filterEditorOnUnload();">
 
-  <dummy class="usesMailWidgets"/>
   <stringbundleset id="stringbundleset">
     <stringbundle id="bundle_messenger" src="chrome://messenger/locale/messenger.properties"/>
     <stringbundle id="bundle_filter" src="chrome://messenger/locale/filter.properties"/>
     <stringbundle id="bundle_search" src="chrome://messenger/locale/search.properties"/>
   </stringbundleset>
 
+  <script type="application/javascript" src="chrome://messenger/content/searchWidgets.js"/>
   <script type="application/javascript" src="chrome://messenger/content/mailWindowOverlay.js"/>
   <script type="application/javascript" src="chrome://messenger/content/mailCommands.js"/>
   <script type="application/javascript" src="chrome://messenger/content/FilterEditor.js"/>
-#ifndef MOZ_THUNDERBIRD
-  <script type="application/javascript" src="chrome://messenger/content/searchTermOverlay.js"/>
-#else
   <script type="application/javascript" src="chrome://messenger/content/searchTerm.js"/>
-#endif
   <script type="application/javascript" src="chrome://messenger/content/dateFormat.js"/>
 
   <commandset>
@@ -60,7 +55,7 @@
 
   <vbox flex="1">
     <groupbox>
-      <caption label="&contextDesc.label;"/>
+      <label class="header">&contextDesc.label;</label>
       <grid>
         <columns>
           <column/>
@@ -105,23 +100,26 @@
     </groupbox>
 
     <vbox id="searchTermListBox" flex="1">
-#include searchTerm.inc
+#include searchTerm.inc.xul
   </vbox>
 
-  <splitter id="gray_horizontal_splitter" persist="state"/>
+  <splitter id="gray_horizontal_splitter" persist="state" orient="vertical"/>
 
   <vbox flex="1">
     <label value="&filterActionDesc.label;"
            accesskey="&filterActionDesc.accesskey;"
            control="filterActionList"/>
-    <listbox id="filterActionList" flex="1" rows="4" minheight="35%"
-             onfocus="setLastActionFocus();" focusedAction="0">
-      <listcols>
-        <listcol flex="&filterActionTypeFlexValue;"/>
-        <listcol flex="&filterActionTargetFlexValue;"/>
-        <listcol class="filler"/>
-      </listcols>
-    </listbox>
+    <richlistbox id="filterActionList"
+                 flex="1"
+                 style="min-height: 100px;"
+                 onfocus="setLastActionFocus();"
+                 focusedAction="0">
+      <treecols hidden="true">
+        <treecol flex="&filterActionTypeFlexValue;"/>
+        <treecol flex="&filterActionTargetFlexValue;"/>
+        <treecol/>
+      </treecols>
+    </richlistbox>
   </vbox>
 
   <vbox id="statusbar" style="visibility: hidden;">
@@ -129,7 +127,8 @@
       <label>
         &filterActionOrderWarning.label;
       </label>
-      <label class="text-link" onclick="showActionsOrder();">&filterActionOrder.label;</label>
+      <label id="seeExecutionOrder" class="text-link"
+             onclick="showActionsOrder();">&filterActionOrder.label;</label>
     </hbox>
   </vbox>
 </dialog>

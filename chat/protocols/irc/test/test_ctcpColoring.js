@@ -1,7 +1,10 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-ChromeUtils.import("resource:///modules/ircUtils.jsm");
+var {
+  ctcpFormatToText,
+  ctcpFormatToHTML,
+} = ChromeUtils.import("resource:///modules/ircUtils.jsm");
 
 var input = [
   // From http://www.mirc.com/colors.html
@@ -39,7 +42,7 @@ function test_mIRCColoring() {
     "<b><font color=\"maroon\" background=\"blue\">colored <u>text and background</u></font><u>. You sure about this?</u></b>",
     "So a ,8 attribute is not valid and thus ignored.",
     "<font color=\"green\" background=\"maroon\">colored text and background <font color=\"yellow\">other colored text but same background</font></font>",
-    "<font color=\"green\" background=\"maroon\">colored text and background <font color=\"yellow\" background=\"orange\">other colored text and different background</font></font>"
+    "<font color=\"green\" background=\"maroon\">colored text and background <font color=\"yellow\" background=\"orange\">other colored text and different background</font></font>",
   ];
 
   for (let i = 0; i < input.length; i++)

@@ -17,9 +17,9 @@
 
 load("resources/glodaTestHelper.js");
 
-ChromeUtils.import("resource:///modules/MailUtils.js");
-ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {NetUtil} = ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 // Whether we can expect fulltext results
 var expectFulltextResults = true;
@@ -1019,7 +1019,7 @@ function* test_folder_nuking_message_deletion() {
 
 function get_nsIMsgFolder(aFolder) {
   if (!(aFolder instanceof Ci.nsIMsgFolder))
-    return MailUtils.getFolderForURI(aFolder);
+    return MailUtils.getOrCreateFolder(aFolder);
   else
     return aFolder;
 }

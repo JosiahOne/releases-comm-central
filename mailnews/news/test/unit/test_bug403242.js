@@ -1,7 +1,5 @@
 // Bug 403242 stems from invalid message ids
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-
 var daemon, localserver, server;
 
 function run_test() {
@@ -15,12 +13,13 @@ function run_test() {
 
   let folder = localserver.rootFolder.getChildNamed("test1");
   folder.getNewMessages(null, {
-    OnStopRunningUrl: function () { localserver.closeCachedConnections(); }});
+    OnStopRunningUrl() { localserver.closeCachedConnections(); },
+  });
   server.performTest();
 
   // Fetch the message
   let uri = folder.generateMessageURI(1);
-  var msgService = Cc['@mozilla.org/messenger/messageservice;1?type=news']
+  var msgService = Cc["@mozilla.org/messenger/messageservice;1?type=news"]
                      .getService(Ci.nsIMsgMessageService);
 
   // Does the URL lie to us?
@@ -46,5 +45,4 @@ function run_test() {
   let transaction = server.playTransaction();
   do_check_transaction(transaction[transaction.length - 1],
     ["MODE READER", "GROUP test1", "ARTICLE 1"]);
-
 }

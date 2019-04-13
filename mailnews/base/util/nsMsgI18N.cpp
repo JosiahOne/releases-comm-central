@@ -72,20 +72,32 @@ nsresult nsMsgI18NConvertToUnicode(const nsACString& aCharset,
     outString.Truncate();
     return NS_OK;
   }
-  else if (aCharset.IsEmpty()) {
+  if (aCharset.IsEmpty()) {
     // Despite its name, it also works for Latin-1.
     CopyASCIItoUTF16(inString, outString);
     return NS_OK;
   }
-  else if (aCharset.Equals("UTF-7", nsCaseInsensitiveCStringComparator())) {
-    // Special treatment for decoding UTF-7 since it's not handled by encoding_rs.
-    return CopyUTF7toUTF16(inString, outString);
-  }
-  else if (aCharset.Equals("UTF-8", nsCaseInsensitiveCStringComparator())) {
+
+  if (aCharset.Equals("UTF-8", nsCaseInsensitiveCStringComparator())) {
     return UTF_8_ENCODING->DecodeWithBOMRemoval(inString, outString);
   }
 
-  auto encoding = mozilla::Encoding::ForLabelNoReplacement(aCharset);
+  // Look up Thunderbird's special aliases from charsetalias.properties.
+  nsresult rv;
+  nsCOMPtr<nsICharsetConverterManager> ccm =
+    do_GetService(NS_CHARSETCONVERTERMANAGER_CONTRACTID, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsCString newCharset;
+  rv = ccm->GetCharsetAlias(PromiseFlatCString(aCharset).get(), newCharset);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (newCharset.Equals("UTF-7", nsCaseInsensitiveCStringComparator())) {
+    // Special treatment for decoding UTF-7 since it's not handled by encoding_rs.
+    return CopyUTF7toUTF16(inString, outString);
+  }
+
+  auto encoding = mozilla::Encoding::ForLabelNoReplacement(newCharset);
   if (!encoding)
     return NS_ERROR_UCONV_NOCONV;
   return encoding->DecodeWithoutBOMHandlingAndWithoutReplacement(inString,
@@ -99,7 +111,7 @@ nsresult CopyUTF7toUTF16(const nsACString& aSrc, nsAString& aDest)
   nsUTF7ToUnicode converter;
   int32_t inLen = aSrc.Length();
   int32_t outLen = inLen;
-  aDest.SetCapacity(outLen);
+  aDest.SetLength(outLen);
   converter.ConvertNoBuff(aSrc.BeginReading(), &inLen, aDest.BeginWriting(), &outLen);
   MOZ_ASSERT(inLen == (int32_t)aSrc.Length(), "UTF-7 should not produce a longer output");
   aDest.SetLength(outLen);
@@ -136,7 +148,7 @@ nsresult CopyMUTF7toUTF16(const nsACString& aSrc, nsAString& aDest)
   nsMUTF7ToUnicode converter;
   int32_t inLen = aSrc.Length();
   int32_t outLen = inLen;
-  aDest.SetCapacity(outLen);
+  aDest.SetLength(outLen);
   converter.ConvertNoBuff(aSrc.BeginReading(), &inLen, aDest.BeginWriting(), &outLen);
   MOZ_ASSERT(inLen == (int32_t)aSrc.Length(), "UTF-7 should not produce a longer output");
   aDest.SetLength(outLen);
@@ -166,9 +178,9 @@ void nsMsgI18NTextFileCharset(nsACString& aCharset)
 char * nsMsgI18NEncodeMimePartIIStr(const char *header, bool structured, const char *charset, int32_t fieldnamelen, bool usemime)
 {
   // No MIME, convert to the outgoing mail charset.
-  if (false == usemime) {
+  if (!usemime) {
     nsAutoCString convertedStr;
-    if (NS_SUCCEEDED(nsMsgI18NConvertFromUnicode(nsDependentCString(charset),
+    if (NS_SUCCEEDED(nsMsgI18NConvertFromUnicode(charset ? nsDependentCString(charset) : EmptyCString(),
                                                  NS_ConvertUTF8toUTF16(header),
                                                  convertedStr)))
       return PL_strdup(convertedStr.get());
@@ -237,7 +249,7 @@ bool nsMsgI18Ncheck_data_in_charset_range(const char *charset, const char16_t* i
       // All converted successfully.
       break;
     } else if (result != mozilla::kOutputFull) {
-      // Didn't use all the input but the outout isn't full, hence
+      // Didn't use all the input but the output isn't full, hence
       // there was an unencodable character.
       res = false;
       break;

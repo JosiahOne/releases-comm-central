@@ -1,8 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function AboutRedirector() {}
 AboutRedirector.prototype = {
@@ -30,20 +30,20 @@ AboutRedirector.prototype = {
   /**
    * Gets the module name from the given URI.
    */
-  _getModuleName: function AboutRedirector__getModuleName(aURI) {
+  _getModuleName(aURI) {
     // Strip out the first ? or #, and anything following it
     let name = (/[^?#]+/.exec(aURI.pathQueryRef))[0];
     return name.toLowerCase();
   },
 
-  getURIFlags: function(aURI) {
+  getURIFlags(aURI) {
     let name = this._getModuleName(aURI);
     if (!(name in this._redirMap))
       throw Cr.NS_ERROR_ILLEGAL_VALUE;
     return this._redirMap[name].flags;
   },
 
-  newChannel: function(aURI, aLoadInfo) {
+  newChannel(aURI, aLoadInfo) {
     let name = this._getModuleName(aURI);
     if (!(name in this._redirMap))
       throw Cr.NS_ERROR_ILLEGAL_VALUE;
@@ -58,7 +58,7 @@ AboutRedirector.prototype = {
     }
 
     return channel;
-  }
+  },
 };
 
 var NSGetFactory = XPCOMUtils.generateNSGetFactory([AboutRedirector]);

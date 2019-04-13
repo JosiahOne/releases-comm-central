@@ -8,6 +8,8 @@
 
 // make SOLO_TEST=downloads/test-about-downloads.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-about-downloads";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -18,9 +20,8 @@ var MODULE_REQUIRES = [ 'attachment-helpers',
                         'prompt-helpers',
                         'window-helpers' ];
 
-var mozmill = {}; ChromeUtils.import("chrome://mozmill/content/modules/mozmill.js", mozmill);
-var elementslib = {}; ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elementslib);
-var downloads = {}; ChromeUtils.import("resource://gre/modules/Downloads.jsm", downloads);
+var elementslib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var downloads = ChromeUtils.import("resource://gre/modules/Downloads.jsm");
 
 var downloadsTab;
 
@@ -166,7 +167,8 @@ function test_save_attachment_files_in_list() {
 
   let length = attachmentFileNames.length;
   mc.waitFor(() => downloadsView.count == length,
-             "Timeout waiting for saving three attachment files; downloadsView.count=" + downloadsView.count);
+             () => ("Timeout waiting for saving three attachment files; " +
+                    "downloadsView.count=" + downloadsView.count));
 
   assert_equals(length, list.childNodes.length);
   assert_equals(downloadsView.count, list.childNodes.length);
@@ -192,7 +194,7 @@ function test_remove_file() {
   test_save_attachment_files_in_list();
 
   let list = content_tab_e(downloadsTab, "msgDownloadsRichListBox");
-  let firstElement = list.firstChild;
+  let firstElement = list.firstChild.nextSibling;
   let removingFileName = firstElement.getAttribute("displayName");
 
   // select first element
@@ -221,7 +223,7 @@ function test_remove_multiple_files() {
   test_save_attachment_files_in_list();
 
   let list = content_tab_e(downloadsTab, "msgDownloadsRichListBox");
-  let firstElement = list.firstChild;
+  let firstElement = list.firstChild.nextSibling;
   let secondElement = firstElement.nextSibling;
   let removingFileNames = [];
 

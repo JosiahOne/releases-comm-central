@@ -3,26 +3,130 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/activity/activityModules.js");
-ChromeUtils.import("resource:///modules/errUtils.js");
-ChromeUtils.import("resource:///modules/folderUtils.jsm");
-ChromeUtils.import("resource:///modules/IOUtils.js");
-ChromeUtils.import("resource:///modules/jsTreeSelection.js");
-ChromeUtils.import("resource:///modules/MailConsts.js");
-ChromeUtils.import("resource:///modules/mailInstrumentation.js");
-ChromeUtils.import("resource:///modules/mailnewsMigrator.js");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/msgDBCacheManager.js");
-ChromeUtils.import("resource:///modules/sessionStoreManager.js");
-ChromeUtils.import("resource:///modules/summaryFrameManager.js");
-ChromeUtils.import("resource:///modules/MailUtils.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
-ChromeUtils.import("resource://gre/modules/Color.jsm");
+/* import-globals-from ../../../../toolkit/modules/PageMenu.jsm */
+/* import-globals-from ../../../mailnews/base/prefs/content/accountUtils.js */
+/* import-globals-from ../../../mailnews/base/util/mailnewsMigrator.js */
+/* import-globals-from ../../components/newmailaccount/content/accountProvisionerTab.js */
+/* import-globals-from ../../components/preferences/preferencesTab.js */
+/* import-globals-from commandglue.js */
+/* import-globals-from folderDisplay.js */
+/* import-globals-from folderPane.js */
+/* import-globals-from glodaFacetTab.js */
+/* import-globals-from mail-compacttheme.js */
+/* import-globals-from mailTabs.js */
+/* import-globals-from mailWindow.js */
+/* import-globals-from quickFilterBar.js */
+/* import-globals-from searchBar.js */
+/* import-globals-from searchBar.js */
+/* import-globals-from specialTabs.js */
+/* import-globals-from toolbarIconColor.js */
+
+ChromeUtils.import("resource:///modules/activity/activityModules.jsm");
+var { logException } = ChromeUtils.import("resource:///modules/errUtils.js");
+var {IOUtils} = ChromeUtils.import("resource:///modules/IOUtils.js");
+var { JSTreeSelection } = ChromeUtils.import("resource:///modules/jsTreeSelection.js");
+var {MailConsts} = ChromeUtils.import("resource:///modules/MailConsts.jsm");
+var {MailInstrumentation} = ChromeUtils.import("resource:///modules/MailInstrumentation.jsm");
+var {migrateMailnews} = ChromeUtils.import("resource:///modules/mailnewsMigrator.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {msgDBCacheManager} = ChromeUtils.import("resource:///modules/msgDBCacheManager.js");
+var {SessionStoreManager} = ChromeUtils.import("resource:///modules/SessionStoreManager.jsm");
+var {SummaryFrameManager} = ChromeUtils.import("resource:///modules/SummaryFrameManager.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var {Color} = ChromeUtils.import("resource://gre/modules/Color.jsm");
+var {TagUtils} = ChromeUtils.import("resource:///modules/TagUtils.jsm");
+
 
 XPCOMUtils.defineLazyModuleGetters(this, {
   LightweightThemeManager: "resource://gre/modules/LightweightThemeManager.jsm",
 });
+
+XPCOMUtils.defineLazyGetter(this, "PopupNotifications", function() {
+  let {PopupNotifications} = ChromeUtils.import("resource:///modules/GlobalPopupNotifications.jsm");
+  try {
+    // Hide all notifications while the URL is being edited and the address bar
+    // has focus, including the virtual focus in the results popup.
+    // We also have to hide notifications explicitly when the window is
+    // minimized because of the effects of the "noautohide" attribute on Linux.
+    // This can be removed once bug 545265 and bug 1320361 are fixed.
+    let shouldSuppress = () => window.windowState == window.STATE_MINIMIZED;
+    return new PopupNotifications(document.getElementById("tabmail"),
+                                  document.getElementById("notification-popup"),
+                                  document.getElementById("notification-popup-box"),
+                                  { shouldSuppress });
+  } catch (ex) {
+    Cu.reportError(ex);
+    return null;
+  }
+});
+
+// Copied from M-C's TelemetryEnvironment.jsm
+ChromeUtils.defineModuleGetter(this, "ctypes",
+                               "resource://gre/modules/ctypes.jsm");
+/**
+ * Gets the service pack and build information on Windows platforms. The initial version
+ * was copied from nsUpdateService.js.
+ *
+ * @return An object containing the service pack major and minor versions, along with the
+ *         build number.
+ */
+function getWindowsVersionInfo() {
+  const UNKNOWN_VERSION_INFO = {servicePackMajor: null, servicePackMinor: null, buildNumber: null};
+
+  if (AppConstants.platform !== "win") {
+    return UNKNOWN_VERSION_INFO;
+  }
+
+  const BYTE = ctypes.uint8_t;
+  const WORD = ctypes.uint16_t;
+  const DWORD = ctypes.uint32_t;
+  const WCHAR = ctypes.char16_t;
+  const BOOL = ctypes.int;
+
+  // This structure is described at:
+  // http://msdn.microsoft.com/en-us/library/ms724833%28v=vs.85%29.aspx
+  const SZCSDVERSIONLENGTH = 128;
+  const OSVERSIONINFOEXW = new ctypes.StructType("OSVERSIONINFOEXW",
+    [
+      {dwOSVersionInfoSize: DWORD},
+      {dwMajorVersion: DWORD},
+      {dwMinorVersion: DWORD},
+      {dwBuildNumber: DWORD},
+      {dwPlatformId: DWORD},
+      {szCSDVersion: ctypes.ArrayType(WCHAR, SZCSDVERSIONLENGTH)},
+      {wServicePackMajor: WORD},
+      {wServicePackMinor: WORD},
+      {wSuiteMask: WORD},
+      {wProductType: BYTE},
+      {wReserved: BYTE},
+    ]);
+
+  let kernel32 = ctypes.open("kernel32");
+  try {
+    let GetVersionEx = kernel32.declare("GetVersionExW",
+                                        ctypes.winapi_abi,
+                                        BOOL,
+                                        OSVERSIONINFOEXW.ptr);
+    let winVer = OSVERSIONINFOEXW();
+    winVer.dwOSVersionInfoSize = OSVERSIONINFOEXW.size;
+
+    if (0 === GetVersionEx(winVer.address())) {
+      throw new Error("Failure in GetVersionEx (returned 0)");
+    }
+
+    return {
+      servicePackMajor: winVer.wServicePackMajor,
+      servicePackMinor: winVer.wServicePackMinor,
+      buildNumber: winVer.dwBuildNumber,
+    };
+  } catch (e) {
+    return UNKNOWN_VERSION_INFO;
+  } finally {
+    kernel32.close();
+  }
+}
 
 /* This is where functions related to the 3 pane window are kept */
 
@@ -64,64 +168,60 @@ var gSummaryFrameManager;
 
 // the folderListener object
 var folderListener = {
-    OnItemAdded: function(parentItem, item) { },
+  OnItemAdded(parentItem, item) {},
 
-    OnItemRemoved: function(parentItem, item) { },
+  OnItemRemoved(parentItem, item) {},
 
-    OnItemPropertyChanged: function(item, property, oldValue, newValue) { },
+  OnItemPropertyChanged(item, property, oldValue, newValue) {},
 
-    OnItemIntPropertyChanged: function(item, property, oldValue, newValue) {
-      if (item == gFolderDisplay.displayedFolder) {
-        if (property == "TotalMessages" || property == "TotalUnreadMessages") {
-          UpdateStatusMessageCounts(gFolderDisplay.displayedFolder);
-        }
+  OnItemIntPropertyChanged(item, property, oldValue, newValue) {
+    if (item == gFolderDisplay.displayedFolder) {
+      if (property == "TotalMessages" || property == "TotalUnreadMessages") {
+        UpdateStatusMessageCounts(gFolderDisplay.displayedFolder);
       }
-    },
+    }
+  },
 
-    OnItemBoolPropertyChanged: function(item, property, oldValue, newValue) { },
+  OnItemBoolPropertyChanged(item, property, oldValue, newValue) {},
 
-    OnItemUnicharPropertyChanged: function(item, property, oldValue, newValue) { },
-    OnItemPropertyFlagChanged: function(item, property, oldFlag, newFlag) { },
+  OnItemUnicharPropertyChanged(item, property, oldValue, newValue) {},
+  OnItemPropertyFlagChanged(item, property, oldFlag, newFlag) {},
 
-    OnItemEvent: function(folder, event) {
-      if (event == "ImapHdrDownloaded") {
-        if (folder) {
-          var imapFolder = folder.QueryInterface(Ci.nsIMsgImapMailFolder);
-          if (imapFolder) {
-            var hdrParser = imapFolder.hdrParser;
-            if (hdrParser) {
-              var msgHdr = hdrParser.GetNewMsgHdr();
-              if (msgHdr)
-              {
-                var hdrs = hdrParser.headers;
-                if (hdrs && hdrs.indexOf("X-attachment-size:") > 0) {
-                  msgHdr.OrFlags(Ci.nsMsgMessageFlags
-                                   .Attachment);
-                }
-                if (hdrs && hdrs.indexOf("X-image-size:") > 0) {
-                  msgHdr.setStringProperty("imageSize", "1");
-                }
+  OnItemEvent(folder, event) {
+    if (event == "ImapHdrDownloaded") {
+      if (folder) {
+        var imapFolder = folder.QueryInterface(Ci.nsIMsgImapMailFolder);
+        if (imapFolder) {
+          var hdrParser = imapFolder.hdrParser;
+          if (hdrParser) {
+            var msgHdr = hdrParser.GetNewMsgHdr();
+            if (msgHdr) {
+              var hdrs = hdrParser.headers;
+              if (hdrs && hdrs.indexOf("X-attachment-size:") > 0) {
+                msgHdr.OrFlags(Ci.nsMsgMessageFlags
+                                 .Attachment);
+              }
+              if (hdrs && hdrs.indexOf("X-image-size:") > 0) {
+                msgHdr.setStringProperty("imageSize", "1");
               }
             }
           }
         }
       }
-      else if (event == "JunkStatusChanged") {
-        HandleJunkStatusChanged(folder);
-      }
+    } else if (event == "JunkStatusChanged") {
+      HandleJunkStatusChanged(folder);
     }
-}
+  },
+};
 
-function ServerContainsFolder(server, folder)
-{
+function ServerContainsFolder(server, folder) {
   if (!folder || !server)
     return false;
 
   return server.equals(folder.server);
 }
 
-function SelectServer(server)
-{
+function SelectServer(server) {
   gFolderTreeView.selectFolder(server.rootFolder);
 }
 
@@ -129,54 +229,53 @@ function SelectServer(server)
 // alter the folder pane selection when a server is removed
 // or changed (currently, when the real username or real hostname change)
 var gThreePaneIncomingServerListener = {
-    onServerLoaded: function(server) {},
-    onServerUnloaded: function(server) {
-      let defaultServer;
-      try {
-        defaultServer = accountManager.defaultAccount.incomingServer;
-      } catch (e) {
-       // If there is no default server we have nothing to do.
-       return;
-      }
+  onServerLoaded(server) {},
+  onServerUnloaded(server) {
+    let defaultAccount = accountManager.defaultAccount;
+    if (!defaultAccount) {
+     // If there is no default server we have nothing to do.
+     return;
+    }
 
-      var selectedFolders = GetSelectedMsgFolders();
-      for (var i = 0; i < selectedFolders.length; i++) {
-        if (ServerContainsFolder(server, selectedFolders[i])) {
-          SelectServer(defaultServer);
-          // we've made a new selection, we're done
-          return;
-        }
-      }
-
-      // if nothing is selected at this point, better go select the default
-      // this could happen if nothing was selected when the server was removed
-      selectedFolders = GetSelectedMsgFolders();
-      if (selectedFolders.length == 0) {
+    let defaultServer = defaultAccount.incomingServer;
+    var selectedFolders = GetSelectedMsgFolders();
+    for (var i = 0; i < selectedFolders.length; i++) {
+      if (ServerContainsFolder(server, selectedFolders[i])) {
         SelectServer(defaultServer);
-      }
-    },
-    onServerChanged: function(server) {
-      // if the current selected folder is on the server that changed
-      // and that server is an imap or news server,
-      // we need to update the selection.
-      // on those server types, we'll be reconnecting to the server
-      // and our currently selected folder will need to be reloaded
-      // or worse, be invalid.
-      if (server.type != "imap" && server.type !="nntp")
+        // we've made a new selection, we're done
         return;
-
-      var selectedFolders = GetSelectedMsgFolders();
-      for (var i = 0; i < selectedFolders.length; i++) {
-        // if the selected item is a server, we don't have to update
-        // the selection
-        if (!(selectedFolders[i].isServer) && ServerContainsFolder(server, selectedFolders[i])) {
-          SelectServer(server);
-          // we've made a new selection, we're done
-          return;
-        }
       }
     }
-}
+
+    // if nothing is selected at this point, better go select the default
+    // this could happen if nothing was selected when the server was removed
+    selectedFolders = GetSelectedMsgFolders();
+    if (selectedFolders.length == 0) {
+      SelectServer(defaultServer);
+    }
+  },
+  onServerChanged(server) {
+    // if the current selected folder is on the server that changed
+    // and that server is an imap or news server,
+    // we need to update the selection.
+    // on those server types, we'll be reconnecting to the server
+    // and our currently selected folder will need to be reloaded
+    // or worse, be invalid.
+    if (server.type != "imap" && server.type != "nntp")
+      return;
+
+    var selectedFolders = GetSelectedMsgFolders();
+    for (var i = 0; i < selectedFolders.length; i++) {
+      // if the selected item is a server, we don't have to update
+      // the selection
+      if (!(selectedFolders[i].isServer) && ServerContainsFolder(server, selectedFolders[i])) {
+        SelectServer(server);
+        // we've made a new selection, we're done
+        return;
+      }
+    }
+  },
+};
 
 // aMsgWindowInitialized: false if we are calling from the onload handler, otherwise true
 function UpdateMailPaneConfig(aMsgWindowInitialized) {
@@ -221,6 +320,7 @@ function UpdateMailPaneConfig(aMsgWindowInitialized) {
     // doesn't fire when the element is removed from the document.  Manually
     // call destroy here to avoid a nasty leak.
     document.getElementById("messagepane").destroy();
+    document.getElementById("FindToolbar").destroy();
     let footerBox = desiredParent.lastChild;
     if (footerBox && footerBox.id == "msg-footer-notification-box") {
       desiredParent.insertBefore(messagePaneSplitter, footerBox);
@@ -235,8 +335,7 @@ function UpdateMailPaneConfig(aMsgWindowInitialized) {
     hdrToolbar.firstPermanentChild = firstPermanentChild;
     hdrToolbar.lastPermanentChild = lastPermanentChild;
     messagePaneSplitter.orient = desiredParent.orient;
-    if (aMsgWindowInitialized)
-    {
+    if (aMsgWindowInitialized) {
       messenger.setWindow(null, null);
       messenger.setWindow(window, msgWindow);
       ReloadMessage();
@@ -260,7 +359,7 @@ function UpdateMailPaneConfig(aMsgWindowInitialized) {
     //  may be insufficient to ensure we get enqueued after whatever triggers
     //  the layout discontinuity.  (We need to wait for a paint to happen to
     //  trigger the XBL binding, and then there may be more complexities...)
-    setTimeout(function UpdateMailPaneConfig_deferredFixup() {
+    setTimeout(function() {
       let threadPaneBox = document.getElementById("threadPaneBox");
       let overflowNodes =
         threadPaneBox.querySelectorAll("[onoverflow]");
@@ -272,8 +371,7 @@ function UpdateMailPaneConfig(aMsgWindowInitialized) {
           let e = document.createEvent("HTMLEvents");
           e.initEvent("overflow", false, false);
           node.dispatchEvent(e);
-        }
-        else if (node.onresize) {
+        } else if (node.onresize) {
           let e = document.createEvent("HTMLEvents");
           e.initEvent("resize", false, false);
           node.dispatchEvent(e);
@@ -284,14 +382,12 @@ function UpdateMailPaneConfig(aMsgWindowInitialized) {
 }
 
 var MailPrefObserver = {
-  observe: function(subject, topic, prefName) {
+  observe(subject, topic, prefName) {
     // verify that we're changing the mail pane config pref
-    if (topic == "nsPref:changed")
-    {
-      if (prefName == "mail.pane_config.dynamic")
+    if (topic == "nsPref:changed") {
+      if (prefName == "mail.pane_config.dynamic") {
         UpdateMailPaneConfig(true);
-      else if (prefName == "mail.showCondensedAddresses")
-      {
+      } else if (prefName == "mail.showCondensedAddresses") {
         var currentDisplayNameVersion;
         var threadTree = document.getElementById("threadTree");
 
@@ -301,25 +397,18 @@ var MailPrefObserver = {
         Services.prefs.setIntPref("mail.displayname.version",
                                   ++currentDisplayNameVersion);
 
-        //refresh the thread pane
-        threadTree.treeBoxObject.invalidate();
+        // refresh the thread pane
+        threadTree.invalidate();
       }
     }
-  }
+  },
 };
 
 /**
  * Called on startup if there are no accounts.
  */
-function AutoConfigWizard(okCallback)
-{
-  let suppressDialogs = false;
-
-  // Try to get the suppression pref that we stashed away in accountProvisionerTab.js.
-  // If it doesn't exist, nsIPrefBranch throws, so we eat it silently and move along.
-  try {
-    suppressDialogs = Services.prefs.getBoolPref("mail.provider.suppress_dialog_on_startup");
-  } catch(e) {};
+function AutoConfigWizard(okCallback) {
+  let suppressDialogs = Services.prefs.getBoolPref("mail.provider.suppress_dialog_on_startup", false);
 
   if (suppressDialogs) {
     // Looks like we were in the middle of filling out an account form. We
@@ -335,8 +424,9 @@ function AutoConfigWizard(okCallback)
 /**
  * Called on startup to initialize various parts of the main window
  */
-function OnLoadMessenger()
-{
+function OnLoadMessenger() {
+  TagUtils.loadTagsIntoCSS(document);
+
   migrateMailnews();
   // Rig up our TabsInTitlebar early so that we can catch any resize events.
   TabsInTitlebar.init();
@@ -349,27 +439,25 @@ function OnLoadMessenger()
     // On Win8 set an attribute when the window frame color is too dark for black text.
     if (window.matchMedia("(-moz-os-version: windows-win8)").matches &&
         window.matchMedia("(-moz-windows-default-theme)").matches) {
-      let windowFrameColor = new Color(...ChromeUtils.import("resource:///modules/Windows8WindowFrameColor.jsm", {})
-                                            .Windows8WindowFrameColor.get());
+      let {Windows8WindowFrameColor} = ChromeUtils.import("resource:///modules/Windows8WindowFrameColor.jsm");
+      let windowFrameColor = new Color(...Windows8WindowFrameColor.get());
       // Default to black for foreground text.
       if (!windowFrameColor.isContrastRatioAcceptable(new Color(0, 0, 0))) {
         document.documentElement.setAttribute("darkwindowframe", "true");
       }
+    } else if (AppConstants.isPlatformAndVersionAtLeast("win", "10")) {
+      // 17763 is the build number of Windows 10 version 1809
+      if (getWindowsVersionInfo().buildNumber < 17763) {
+        document.documentElement.setAttribute("always-use-accent-color-for-window-border", "");
+      }
     }
-  }
-
-  if (AppConstants.platform == "linux") {
-    let { WindowDraggingElement } =
-      ChromeUtils.import("resource://gre/modules/WindowDraggingUtils.jsm", {});
-    new WindowDraggingElement(document.getElementById("titlebar"));
   }
 
   ToolbarIconColor.init();
 
   // Set a sane starting width/height for all resolutions on new profiles.
   // Do this before the window loads.
-  if (!document.documentElement.hasAttribute("width"))
-  {
+  if (!document.documentElement.hasAttribute("width")) {
     // Prefer 1024xfull height.
     let defaultHeight = screen.availHeight;
     let defaultWidth = (screen.availWidth <= 1024) ? screen.availWidth : 1024;
@@ -396,8 +484,10 @@ function OnLoadMessenger()
 
   // This needs to be before we throw up the account wizard on first run.
   try {
-    mailInstrumentationManager.init();
-  } catch(ex) {logException(ex);}
+    MailInstrumentation.init();
+  } catch (ex) {
+    logException(ex);
+  }
 
   // - initialize tabmail system
   // Do this before LoadPostAccountWizard since that code selects the first
@@ -405,9 +495,8 @@ function OnLoadMessenger()
   //  that event chain.
   // Also, we definitely need to register the tab type prior to the call to
   //  specialTabs.openSpecialTabsOnStartup below.
-  let tabmail = document.getElementById('tabmail');
-  if (tabmail)
-  {
+  let tabmail = document.getElementById("tabmail");
+  if (tabmail) {
     // mailTabType is defined in mailTabs.js
     tabmail.registerTabType(mailTabType);
     // glodaFacetTab* in glodaFacetTab.js
@@ -417,19 +506,6 @@ function OnLoadMessenger()
     tabmail.registerTabMonitor(statusMessageCountsMonitor);
     tabmail.openFirstTab();
   }
-
-  // Install the light-weight theme handlers
-  let panelcontainer = document.getElementById("tabpanelcontainer");
-  if (panelcontainer) {
-    panelcontainer.addEventListener("InstallBrowserTheme",
-                                    LightWeightThemeWebInstaller, false, true);
-    panelcontainer.addEventListener("PreviewBrowserTheme",
-                                    LightWeightThemeWebInstaller, false, true);
-    panelcontainer.addEventListener("ResetBrowserThemePreview",
-                                    LightWeightThemeWebInstaller, false, true);
-  }
-
-  Services.obs.addObserver(gPluginHandler.pluginCrashed, "plugin-crashed");
 
   // This also registers the contentTabType ("contentTab")
   specialTabs.openSpecialTabsOnStartup();
@@ -450,8 +526,7 @@ function OnLoadMessenger()
   window.addEventListener("AppCommand", HandleAppCommandEvent, true);
 }
 
-function LoadPostAccountWizard()
-{
+function LoadPostAccountWizard() {
   InitMsgWindow();
   messenger.setWindow(window, msgWindow);
 
@@ -459,45 +534,40 @@ function LoadPostAccountWizard()
   MigrateJunkMailSettings();
   MigrateFolderViews();
   MigrateOpenMessageBehavior();
-  ChromeUtils.import("resource:///modules/mailMigrator.js");
+  const {MailMigrator} = ChromeUtils.import("resource:///modules/MailMigrator.jsm");
   MailMigrator.migratePostAccountWizard();
 
   accountManager.setSpecialFolders();
 
   try {
     accountManager.loadVirtualFolders();
-  } catch (e) {Cu.reportError(e);}
+  } catch (e) {
+    Cu.reportError(e);
+  }
   accountManager.addIncomingServerListener(gThreePaneIncomingServerListener);
 
   gPhishingDetector.init();
 
   AddToSession();
 
-  //need to add to session before trying to load start folder otherwise listeners aren't
-  //set up correctly.
+  // need to add to session before trying to load start folder otherwise listeners aren't
+  // set up correctly.
 
   let startFolderURI = null, startMsgHdr = null;
-  if ("arguments" in window && window.arguments.length > 0)
-  {
+  if ("arguments" in window && window.arguments.length > 0) {
     let arg0 = window.arguments[0];
     // If the argument is a string, it is either a folder URI or a feed URI
-    if (typeof arg0 == "string")
-    {
+    if (typeof arg0 == "string") {
       // filter our any feed urls that came in as arguments to the new window...
-      if (arg0.toLowerCase().startsWith("feed:"))
-      {
+      if (arg0.toLowerCase().startsWith("feed:")) {
         let feedHandler = Cc["@mozilla.org/newsblog-feed-downloader;1"]
           .getService(Ci.nsINewsBlogFeedDownloader);
         if (feedHandler)
           feedHandler.subscribeToFeed(arg0, null, msgWindow);
-      }
-      else
-      {
+      } else {
         startFolderURI = arg0;
       }
-    }
-    else if (arg0)
-    {
+    } else if (arg0) {
       // arg0 is an object
       if (("wrappedJSObject" in arg0) && arg0.wrappedJSObject)
         arg0 = arg0.wrappedJSObject;
@@ -511,15 +581,14 @@ function LoadPostAccountWizard()
     var nsIShellService = Ci.nsIShellService;
     if (nsIShellService) {
       var shellService;
-      var defaultAccount;
       try {
         shellService = Cc["@mozilla.org/mail/shell-service;1"].getService(nsIShellService);
-        defaultAccount = accountManager.defaultAccount;
       } catch (ex) {}
+      let defaultAccount = accountManager.defaultAccount;
 
       // Next, try loading the search integration module
       // We'll get a null SearchIntegration if we don't have one
-      ChromeUtils.import("resource:///modules/SearchIntegration.js");
+      var {SearchIntegration} = ChromeUtils.import("resource:///modules/SearchIntegration.jsm");
 
       // Show the default client dialog only if
       // EITHER: we have at least one account, and we aren't already the default
@@ -542,6 +611,7 @@ function LoadPostAccountWizard()
     }
     // All core modal dialogs are done, the user can now interact with the 3-pane window
     Services.obs.notifyObservers(window, "mail-startup-done");
+    Services.obs.notifyObservers(this, "marionette-startup-requested");
   }
 
   setTimeout(completeStartup, 0);
@@ -549,14 +619,14 @@ function LoadPostAccountWizard()
   // FIX ME - later we will be able to use onload from the overlay
   OnLoadMsgHeaderPane();
 
-  //Set focus to the Thread Pane the first time the window is opened.
+  // Set focus to the Thread Pane the first time the window is opened.
   SetFocusThreadPane();
 
   // initialize the customizeDone method on the customizeable toolbar
   var toolbox = document.getElementById("mail-toolbox");
   toolbox.customizeDone = function(aEvent) { MailToolboxCustomizeDone(aEvent, "CustomizeMailToolbar"); };
 
-  var toolbarset = document.getElementById('customToolbars');
+  var toolbarset = document.getElementById("customToolbars");
   toolbox.toolbarset = toolbarset;
 
   // XXX Do not select the folder until the window displays or the threadpane
@@ -571,21 +641,20 @@ function LoadPostAccountWizard()
     window.setTimeout(loadStartFolder, 0, startFolderURI);
 }
 
-function HandleAppCommandEvent(evt)
-{
+function HandleAppCommandEvent(evt) {
   evt.stopPropagation();
   switch (evt.command) {
     case "Back":
-      goDoCommand('cmd_goBack');
+      goDoCommand("cmd_goBack");
       break;
     case "Forward":
-      goDoCommand('cmd_goForward');
+      goDoCommand("cmd_goForward");
       break;
     case "Stop":
       msgWindow.StopUrls();
       break;
     case "Search":
-      goDoCommand('cmd_search');
+      goDoCommand("cmd_search");
       break;
     case "Bookmarks":
       toAddressBook();
@@ -600,10 +669,7 @@ function HandleAppCommandEvent(evt)
 /**
  * Look for another 3-pane window.
  */
-function FindOther3PaneWindow()
-{
-  // XXX We'd like to use getZOrderDOMWindowEnumerator here, but it doesn't work
-  // on Linux
+function FindOther3PaneWindow() {
   let enumerator = Services.wm.getEnumerator("mail:3pane");
   while (enumerator.hasMoreElements()) {
     let win = enumerator.getNext();
@@ -617,8 +683,7 @@ function FindOther3PaneWindow()
  * Called by messenger.xul:onunload, the 3-pane window inside of tabs window.
  *  It's being unloaded!  Right now!
  */
-function OnUnloadMessenger()
-{
+function OnUnloadMessenger() {
   Services.obs.notifyObservers(window, "mail-unloading-messenger");
   accountManager.removeIncomingServerListener(gThreePaneIncomingServerListener);
   Services.prefs.removeObserver("mail.pane_config.dynamic", MailPrefObserver);
@@ -630,7 +695,7 @@ function OnUnloadMessenger()
     gRightMouseButtonSavedSelection = null;
   }
 
-  sessionStoreManager.unloadingWindow(window);
+  SessionStoreManager.unloadingWindow(window);
 
   TabsInTitlebar.uninit();
 
@@ -645,8 +710,6 @@ function OnUnloadMessenger()
 
   gPhishingDetector.shutdown();
 
-  Services.obs.removeObserver(gPluginHandler.pluginCrashed, "plugin-crashed");
-
   // FIX ME - later we will be able to use onload from the overlay
   OnUnloadMsgHeaderPane();
 
@@ -654,17 +717,18 @@ function OnUnloadMessenger()
 
   OnMailWindowUnload();
   try {
-    mailInstrumentationManager.uninit();
-  } catch (ex) {logException(ex);}
+    MailInstrumentation.uninit();
+  } catch (ex) {
+    logException(ex);
+  }
 }
 
 /**
  * Called by the session store manager periodically and at shutdown to get
  * the state of this window for persistence.
  */
-function getWindowStateForSessionPersistence()
-{
-  let tabmail = document.getElementById('tabmail');
+function getWindowStateForSessionPersistence() {
+  let tabmail = document.getElementById("tabmail");
   let tabsState = tabmail.persistTabs();
   return { type: "3pane", tabs: tabsState };
 }
@@ -681,7 +745,7 @@ function getWindowStateForSessionPersistence()
  * @return true if the restoration was successful, false otherwise.
  */
 async function atStartupRestoreTabs(aDontRestoreFirstTab) {
-  let state = await sessionStoreManager.loadingWindow(window);
+  let state = await SessionStoreManager.loadingWindow(window);
   if (state) {
     let tabsState = state.tabs;
     let tabmail = document.getElementById("tabmail");
@@ -690,9 +754,9 @@ async function atStartupRestoreTabs(aDontRestoreFirstTab) {
 
   // it's now safe to load extra Tabs.
   setTimeout(loadExtraTabs, 0);
-  sessionStoreManager._restored = true;
+  SessionStoreManager._restored = true;
   Services.obs.notifyObservers(window, "mail-tabs-session-restored");
-  return state ? true : false;
+  return !!state;
 }
 
 /**
@@ -712,9 +776,7 @@ async function atStartupRestoreTabs(aDontRestoreFirstTab) {
  * }
  *
  */
-function loadExtraTabs()
-{
-
+function loadExtraTabs() {
   if (!("arguments" in window) || window.arguments.length < 2)
     return;
 
@@ -729,10 +791,8 @@ function loadExtraTabs()
 
   // we got no action, so suppose its "legacy" code
   if (!("action" in tab)) {
-
     if ("tabType" in tab)
       tabmail.openTab(tab.tabType, tab.tabParams);
-
     return;
   }
 
@@ -741,14 +801,12 @@ function loadExtraTabs()
 
   // this is used if a tab is detached to a new window.
   if (tab.action == "restore") {
-
     for (let i = 0; i < tab.tabs.length; i++)
       tabmail.restoreTab(tab.tabs[i]);
 
     // we currently do not support opening in background or opening a
     // special position. So select the last tab opened.
-    tabmail.switchToTab(tabmail.tabInfo[tabmail.tabInfo.length-1])
-
+    tabmail.switchToTab(tabmail.tabInfo[tabmail.tabInfo.length - 1]);
     return;
   }
 
@@ -756,10 +814,7 @@ function loadExtraTabs()
     for (let i = 0; i < tab.tabs.length; i++)
       if ("tabType" in tab.tabs[i])
         tabmail.openTab(tab.tabs[i].tabType, tab.tabs[i].tabParams);
-
-    return;
   }
-
 }
 
 /**
@@ -768,215 +823,187 @@ function loadExtraTabs()
  *
  * @param aStartMsgHdr The message header to load at window open
  */
-function loadStartMsgHdr(aStartMsgHdr)
-{
+function loadStartMsgHdr(aStartMsgHdr) {
   // We'll just clobber the default tab
   atStartupRestoreTabs(true);
 
   MsgDisplayMessageInFolderTab(aStartMsgHdr);
 }
 
-function loadStartFolder(initialUri)
-{
-    var defaultServer = null;
-    var startFolder;
-    var isLoginAtStartUpEnabled = false;
+function loadStartFolder(initialUri) {
+  var defaultServer = null;
+  var startFolder;
+  var isLoginAtStartUpEnabled = false;
 
-    // If a URI was explicitly specified, we'll just clobber the default tab
-    let loadFolder = !atStartupRestoreTabs(!!initialUri);
+  // If a URI was explicitly specified, we'll just clobber the default tab
+  let loadFolder = !atStartupRestoreTabs(!!initialUri);
 
-    if (initialUri)
-      loadFolder = true;
+  if (initialUri)
+    loadFolder = true;
 
-    //First get default account
-    try
-    {
-        if (initialUri)
-        {
-            startFolder = MailUtils.getFolderForURI(initialUri);
-        }
-        else
-        {
-            try {
-                var defaultAccount = accountManager.defaultAccount;
-            } catch (x) {
-                return; // exception caused by no default account, ignore it.
-            }
+  // First get default account
+  try {
+    if (initialUri) {
+        startFolder = MailUtils.getOrCreateFolder(initialUri);
+    } else {
+        let defaultAccount = accountManager.defaultAccount;
+        if (!defaultAccount)
+            return;
 
-            defaultServer = defaultAccount.incomingServer;
-            var rootMsgFolder = defaultServer.rootMsgFolder;
+        defaultServer = defaultAccount.incomingServer;
+        var rootMsgFolder = defaultServer.rootMsgFolder;
 
-            startFolder = rootMsgFolder;
+        startFolder = rootMsgFolder;
 
-            // Enable check new mail once by turning checkmail pref 'on' to bring
-            // all users to one plane. This allows all users to go to Inbox. User can
-            // always go to server settings panel and turn off "Check for new mail at startup"
-            if (!Services.prefs.getBoolPref(kMailCheckOncePrefName))
-            {
-                Services.prefs.setBoolPref(kMailCheckOncePrefName, true);
-                defaultServer.loginAtStartUp = true;
-            }
-
-            // Get the user pref to see if the login at startup is enabled for default account
-            isLoginAtStartUpEnabled = defaultServer.loginAtStartUp;
-
-            // Get Inbox only if login at startup is enabled.
-            if (isLoginAtStartUpEnabled)
-            {
-                //now find Inbox
-                var outNumFolders = new Object();
-                const kInboxFlag = Ci.nsMsgFolderFlags.Inbox;
-                var inboxFolder = rootMsgFolder.getFolderWithFlags(kInboxFlag);
-                if (!inboxFolder) return;
-
-                startFolder = inboxFolder;
-            }
+        // Enable check new mail once by turning checkmail pref 'on' to bring
+        // all users to one plane. This allows all users to go to Inbox. User can
+        // always go to server settings panel and turn off "Check for new mail at startup"
+        if (!Services.prefs.getBoolPref(kMailCheckOncePrefName)) {
+            Services.prefs.setBoolPref(kMailCheckOncePrefName, true);
+            defaultServer.loginAtStartUp = true;
         }
 
-        // it is possible we were given an initial uri and we need to subscribe or try to add
-        // the folder. i.e. the user just clicked on a news folder they aren't subscribed to from a browser
-        // the news url comes in here.
+        // Get the user pref to see if the login at startup is enabled for default account
+        isLoginAtStartUpEnabled = defaultServer.loginAtStartUp;
 
-        // Perform biff on the server to check for new mail, except for imap
-        // or a pop3 account that is deferred or deferred to,
-        // or the case where initialUri is non-null (non-startup)
-        if (!initialUri && isLoginAtStartUpEnabled
-            && !defaultServer.isDeferredTo &&
-            defaultServer.rootFolder == defaultServer.rootMsgFolder)
-          defaultServer.performBiff(msgWindow);
-        if (loadFolder) {
-          try {
-            gFolderTreeView.selectFolder(startFolder);
-          } catch(ex) {
-            // This means we tried to select a folder that isn't in the current
-            // view. Just select the first one in the view then.
-            if (gFolderTreeView._rowMap.length)
-              gFolderTreeView.selectFolder(gFolderTreeView._rowMap[0]._folder);
-          }
+        // Get Inbox only if login at startup is enabled.
+        if (isLoginAtStartUpEnabled) {
+            // now find Inbox
+            var inboxFolder = rootMsgFolder.getFolderWithFlags(Ci.nsMsgFolderFlags.Inbox);
+            if (!inboxFolder) return;
+
+            startFolder = inboxFolder;
         }
     }
-    catch(ex)
-    {
-      // this is the case where we're trying to auto-subscribe to a folder.
-      if (initialUri && !startFolder.parent)
-      {
-        // hack to force display of thread pane.
-        ShowingThreadPane();
-        messenger.loadURL(window, initialUri);
-        return;
-      }
 
-      Cu.reportError(ex);
-    }
+    // it is possible we were given an initial uri and we need to subscribe or try to add
+    // the folder. i.e. the user just clicked on a news folder they aren't subscribed to from a browser
+    // the news url comes in here.
 
-    MsgGetMessagesForAllServers(defaultServer);
-
-    if (MailOfflineMgr.isOnline()) {
-      // Check if we shut down offline, and restarted online, in which case
-      // we may have offline events to playback. Since this is not a pref
-      // the user should set, it's not in mailnews.js, so we need a try catch.
-      let playbackOfflineEvents = false;
+    // Perform biff on the server to check for new mail, except for imap
+    // or a pop3 account that is deferred or deferred to,
+    // or the case where initialUri is non-null (non-startup)
+    if (!initialUri && isLoginAtStartUpEnabled
+        && !defaultServer.isDeferredTo &&
+        defaultServer.rootFolder == defaultServer.rootMsgFolder)
+      defaultServer.performBiff(msgWindow);
+    if (loadFolder) {
       try {
-        playbackOfflineEvents = Services.prefs.getBoolPref("mailnews.playback_offline");
+        gFolderTreeView.selectFolder(startFolder);
+      } catch (ex) {
+        // This means we tried to select a folder that isn't in the current
+        // view. Just select the first one in the view then.
+        if (gFolderTreeView._rowMap.length)
+          gFolderTreeView.selectFolder(gFolderTreeView._rowMap[0]._folder);
       }
-      catch(ex) {}
-      if (playbackOfflineEvents)
-      {
-        Services.prefs.setBoolPref("mailnews.playback_offline", false);
-        MailOfflineMgr.offlineManager.goOnline(false, true, msgWindow);
-      }
-
-      // If appropriate, send unsent messages. This may end up prompting the user,
-      // so we need to get it out of the flow of the normal load sequence.
-      setTimeout(function checkUnsent() {
-        if (MailOfflineMgr.shouldSendUnsentMessages())
-          SendUnsentMessages();
-      }, 0);
     }
+  } catch (ex) {
+    // this is the case where we're trying to auto-subscribe to a folder.
+    if (initialUri && !startFolder.parent) {
+      // hack to force display of thread pane.
+      if (IsMessagePaneCollapsed) {
+        MsgToggleMessagePane();
+      }
+      messenger.loadURL(window, initialUri);
+      return;
+    }
+
+    Cu.reportError(ex);
+  }
+
+  MsgGetMessagesForAllServers(defaultServer);
+
+  if (MailOfflineMgr.isOnline()) {
+    // Check if we shut down offline, and restarted online, in which case
+    // we may have offline events to playback. Since this is not a pref
+    // the user should set, it's not in mailnews.js, so we need a try catch.
+    let playbackOfflineEvents = Services.prefs.getBoolPref("mailnews.playback_offline", false);
+    if (playbackOfflineEvents) {
+      Services.prefs.setBoolPref("mailnews.playback_offline", false);
+      MailOfflineMgr.offlineManager.goOnline(false, true, msgWindow);
+    }
+
+    // If appropriate, send unsent messages. This may end up prompting the user,
+    // so we need to get it out of the flow of the normal load sequence.
+    setTimeout(function() {
+      if (MailOfflineMgr.shouldSendUnsentMessages())
+        SendUnsentMessages();
+    }, 0);
+  }
 }
 
-function AddToSession()
-{
+function AddToSession() {
   var nsIFolderListener = Ci.nsIFolderListener;
   var notifyFlags = nsIFolderListener.intPropertyChanged | nsIFolderListener.event;
   MailServices.mailSession.AddFolderListener(folderListener, notifyFlags);
 }
 
-function InitPanes()
-{
+function InitPanes() {
   gFolderTreeView.load(document.getElementById("folderTree"),
                        "folderTree.json");
   var folderTree = document.getElementById("folderTree");
-  folderTree.addEventListener("click",FolderPaneOnClick,true);
-  folderTree.addEventListener("mousedown",TreeOnMouseDown,true);
+  folderTree.addEventListener("click", FolderPaneOnClick, true);
+  folderTree.addEventListener("mousedown", TreeOnMouseDown, true);
   var threadTree = document.getElementById("threadTree");
-  threadTree.addEventListener("click",ThreadTreeOnClick,true);
+  threadTree.addEventListener("click", ThreadTreeOnClick, true);
 
   OnLoadThreadPane();
   SetupCommandUpdateHandlers();
 }
 
-function UnloadPanes()
-{
+function UnloadPanes() {
   var threadTree = document.getElementById("threadTree");
-  threadTree.removeEventListener("click",ThreadTreeOnClick,true);
+  threadTree.removeEventListener("click", ThreadTreeOnClick, true);
   var folderTree = document.getElementById("folderTree");
-  folderTree.removeEventListener("click",FolderPaneOnClick,true);
-  folderTree.removeEventListener("mousedown",TreeOnMouseDown,true);
+  folderTree.removeEventListener("click", FolderPaneOnClick, true);
+  folderTree.removeEventListener("mousedown", TreeOnMouseDown, true);
   gFolderTreeView.unload("folderTree.json");
   UnloadCommandUpdateHandlers();
 }
 
-function OnLoadThreadPane()
-{
+function OnLoadThreadPane() {
   // Use an observer to watch the columns element so that we get a notification
   // whenever attributes on the columns change.
-  let observer = new MutationObserver(function handleMutations(mutations) {
+  let observer = new MutationObserver(function(mutations) {
     gFolderDisplay.hintColumnsChanged();
   });
   observer.observe(document.getElementById("threadCols"), {
     attributes: true,
     subtree: true,
-    attributeFilter: ["hidden", "ordinal"]
+    attributeFilter: ["hidden", "ordinal"],
   });
 }
 
 /* Functions for accessing particular parts of the window*/
-function GetMessagePane()
-{
+function GetMessagePane() {
   if (!gMessagePane)
     gMessagePane = document.getElementById("messagepanebox");
   return gMessagePane;
 }
 
-function GetMessagePaneWrapper()
-{
+function GetMessagePaneWrapper() {
   if (!gMessagePaneWrapper)
     gMessagePaneWrapper = document.getElementById("messagepaneboxwrapper");
   return gMessagePaneWrapper;
 }
 
-function GetMessagePaneFrame()
-{
+function GetMessagePaneFrame() {
   // We must use the message pane element directly here, as other tabs can
   // have browser elements as well (which could be set to content primary,
   // which would confuse things with a window.content return).
   return document.getElementById("messagepane").contentWindow;
 }
 
-function getMailToolbox()
-{
+function getMailToolbox() {
   return document.getElementById("mail-toolbox");
 }
 
-function FindInSidebar(currentWindow, id)
-{
+function FindInSidebar(currentWindow, id) {
   var item = currentWindow.document.getElementById(id);
   if (item)
     return item;
 
-  for (var i = 0; i < currentWindow.frames.length; ++i)
-  {
+  for (var i = 0; i < currentWindow.frames.length; ++i) {
     var frameItem = FindInSidebar(currentWindow.frames[i], id);
     if (frameItem)
       return frameItem;
@@ -985,26 +1012,22 @@ function FindInSidebar(currentWindow, id)
   return null;
 }
 
-function GetThreadAndMessagePaneSplitter()
-{
+function GetThreadAndMessagePaneSplitter() {
   if (!gThreadAndMessagePaneSplitter)
-    gThreadAndMessagePaneSplitter = document.getElementById('threadpane-splitter');
+    gThreadAndMessagePaneSplitter = document.getElementById("threadpane-splitter");
   return gThreadAndMessagePaneSplitter;
 }
 
-function IsMessagePaneCollapsed()
-{
+function IsMessagePaneCollapsed() {
   return document.getElementById("threadpane-splitter")
                  .getAttribute("state") == "collapsed";
 }
 
-function ClearThreadPaneSelection()
-{
+function ClearThreadPaneSelection() {
   gFolderDisplay.clearSelection();
 }
 
-function ClearMessagePane()
-{
+function ClearMessagePane() {
   // hide the message header view AND the message pane...
   HideMessageHeaderPane();
   gMessageNotificationBar.clearMsgNotifications();
@@ -1017,8 +1040,8 @@ function ClearMessagePane()
     // amount of work.  So do the check.
     if (messagePane.location.href != "about:blank")
       messagePane.location.href = "about:blank";
-  } catch(ex) {
-      logException(ex, false, "error clearing message pane");
+  } catch (ex) {
+    logException(ex, false, "error clearing message pane");
   }
 }
 
@@ -1038,17 +1061,10 @@ function ClearMessagePane()
  *     leave the selection as is.  If it is part of the selection and
  *     aSingleSelect then we create a transient single-row selection.
  */
-function ChangeSelectionWithoutContentLoad(event, tree, aSingleSelect)
-{
-  var treeBoxObj = tree.treeBoxObject;
-  if (!treeBoxObj) {
-    event.stopPropagation();
-    return;
-  }
+function ChangeSelectionWithoutContentLoad(event, tree, aSingleSelect) {
+  var treeSelection = tree.view.selection;
 
-  var treeSelection = treeBoxObj.view.selection;
-
-  var row = treeBoxObj.getRowAt(event.clientX, event.clientY);
+  var row = tree.getRowAt(event.clientX, event.clientY);
   // Only do something if:
   // - the row is valid
   // - it's not already selected (or we want a single selection)
@@ -1065,87 +1081,74 @@ function ChangeSelectionWithoutContentLoad(event, tree, aSingleSelect)
       }
     }
 
-    let transientSelection = new JSTreeSelection(treeBoxObj);
+    let transientSelection = new JSTreeSelection(tree);
     transientSelection.logAdjustSelectionForReplay();
 
     gRightMouseButtonSavedSelection = {
       // Need to clear out this reference later.
-      view: treeBoxObj.view,
+      view: tree.view,
       realSelection: treeSelection,
-      transientSelection: transientSelection
+      transientSelection,
     };
 
     var saveCurrentIndex = treeSelection.currentIndex;
 
     // tell it to log calls to adjustSelection
     // attach it to the view
-    treeBoxObj.view.selection = transientSelection;
+    tree.view.selection = transientSelection;
     // Don't generate any selection events! (we never set this to false, because
     //  that would generate an event, and we never need one of those from this
     //  selection object.
     transientSelection.selectEventsSuppressed = true;
     transientSelection.select(row);
     transientSelection.currentIndex = saveCurrentIndex;
-    treeBoxObj.ensureRowIsVisible(row);
+    tree.ensureRowIsVisible(row);
   }
   event.stopPropagation();
 }
 
-function TreeOnMouseDown(event)
-{
-    // Detect right mouse click and change the highlight to the row
-    // where the click happened without loading the message headers in
-    // the Folder or Thread Pane.
-    // Same for middle click, which will open the folder/message in a tab.
-    if (event.button == 2 || event.button == 1)
-    {
-      // We want a single selection if this is a middle-click (button 1)
-      ChangeSelectionWithoutContentLoad(event, event.target.parentNode,
-                                        event.button == 1);
-    }
+function TreeOnMouseDown(event) {
+  // Detect right mouse click and change the highlight to the row
+  // where the click happened without loading the message headers in
+  // the Folder or Thread Pane.
+  // Same for middle click, which will open the folder/message in a tab.
+  if (event.button == 2 || event.button == 1) {
+    // We want a single selection if this is a middle-click (button 1)
+    ChangeSelectionWithoutContentLoad(event, event.target.parentNode,
+                                      event.button == 1);
+  }
 }
 
-function FolderPaneContextMenuNewTab(event)
-{
+function FolderPaneContextMenuNewTab(event) {
   var bgLoad = Services.prefs.getBoolPref("mail.tabs.loadInBackground");
   if (event.shiftKey)
     bgLoad = !bgLoad;
   MsgOpenNewTabForFolder(bgLoad);
 }
 
-function FolderPaneOnClick(event)
-{
+function FolderPaneOnClick(event) {
   var folderTree = document.getElementById("folderTree");
 
   // Middle click on a folder opens the folder in a tab
   if (event.button == 1 && event.originalTarget.localName != "slider" &&
-      event.originalTarget.localName != "scrollbarbutton")
-  {
+      event.originalTarget.localName != "scrollbarbutton") {
     FolderPaneContextMenuNewTab(event);
     RestoreSelectionWithoutContentLoad(folderTree);
-  }
-  else if (event.button == 0)
-  {
-    var row = {};
-    var col = {};
-    var elt = {};
-    folderTree.treeBoxObject.getCellAt(event.clientX, event.clientY, row, col, elt);
-    if (row.value == -1) {
-      if (event.originalTarget.localName == "treecol")
-      {
+  } else if (event.button == 0) {
+    var treeCellInfo = folderTree.getCellAt(event.clientX, event.clientY);
+    if (treeCellInfo.row == -1) {
+      if (event.originalTarget.localName == "treecol") {
         // clicking on the name column in the folder pane should not sort
         event.stopPropagation();
       }
-    }
-    else if ((event.originalTarget.localName == "slider") ||
+    } else if ((event.originalTarget.localName == "slider") ||
              (event.originalTarget.localName == "scrollbarbutton")) {
       event.stopPropagation();
     }
   }
 }
 
-function OpenMessageInNewTab(event)
-{
+function OpenMessageInNewTab(event) {
   if (!gFolderDisplay.selectedMessage)
     return;
   var bgLoad = Services.prefs.getBoolPref("mail.tabs.loadInBackground");
@@ -1158,39 +1161,33 @@ function OpenMessageInNewTab(event)
        background: bgLoad});
 }
 
-function OpenContainingFolder()
-{
+function OpenContainingFolder() {
   if (!gFolderDisplay.selectedMessage)
     return;
 
   MailUtils.displayMessageInFolderTab(gFolderDisplay.selectedMessage);
 }
 
-function ThreadTreeOnClick(event)
-{
+function ThreadTreeOnClick(event) {
   var threadTree = document.getElementById("threadTree");
 
   // Middle click on a message opens the message in a tab
   if (event.button == 1 && event.originalTarget.localName != "slider" &&
-      event.originalTarget.localName != "scrollbarbutton")
-  {
+      event.originalTarget.localName != "scrollbarbutton") {
     OpenMessageInNewTab(event);
     RestoreSelectionWithoutContentLoad(threadTree);
   }
 }
 
-function GetSelectedMsgFolders()
-{
+function GetSelectedMsgFolders() {
   return gFolderTreeView.getSelectedFolders();
 }
 
-function SelectFolder(folderUri)
-{
-  gFolderTreeView.selectFolder(MailUtils.getFolderForURI(folderUri));
+function SelectFolder(folderUri) {
+  gFolderTreeView.selectFolder(MailUtils.getOrCreateFolder(folderUri));
 }
 
-function ReloadMessage()
-{
+function ReloadMessage() {
   if (!gFolderDisplay.selectedMessage)
     return;
 
@@ -1202,38 +1199,28 @@ function ReloadMessage()
 // Some of the per account junk mail settings have been
 // converted to global prefs. Let's try to migrate some
 // of those settings from the default account.
-function MigrateJunkMailSettings()
-{
+function MigrateJunkMailSettings() {
   var junkMailSettingsVersion = Services.prefs.getIntPref("mail.spam.version");
-  if (!junkMailSettingsVersion)
-  {
+  if (!junkMailSettingsVersion) {
     // Get the default account, check to see if we have values for our
     // globally migrated prefs.
-    var defaultAccount;
-    try {
-      defaultAccount = accountManager.defaultAccount;
-    } catch (ex) {}
-    if (defaultAccount && defaultAccount.incomingServer)
-    {
+    let defaultAccount = accountManager.defaultAccount;
+    if (defaultAccount) {
       // we only care about
       var prefix = "mail.server." + defaultAccount.incomingServer.key + ".";
-      if (Services.prefs.prefHasUserValue(prefix + "manualMark"))
-      {
+      if (Services.prefs.prefHasUserValue(prefix + "manualMark")) {
         Services.prefs.setBoolPref("mail.spam.manualMark",
           Services.prefs.getBoolPref(prefix + "manualMark"));
       }
-      if (Services.prefs.prefHasUserValue(prefix + "manualMarkMode"))
-      {
+      if (Services.prefs.prefHasUserValue(prefix + "manualMarkMode")) {
         Services.prefs.setIntPref("mail.spam.manualMarkMode",
           Services.prefs.getIntPref(prefix + "manualMarkMode"));
       }
-      if (Services.prefs.prefHasUserValue(prefix + "spamLoggingEnabled"))
-      {
+      if (Services.prefs.prefHasUserValue(prefix + "spamLoggingEnabled")) {
         Services.prefs.setBoolPref("mail.spam.logging.enabled",
           Services.prefs.getBoolPref(prefix + "spamLoggingEnabled"));
       }
-      if (Services.prefs.prefHasUserValue(prefix + "markAsReadOnSpam"))
-      {
+      if (Services.prefs.prefHasUserValue(prefix + "markAsReadOnSpam")) {
         Services.prefs.setBoolPref("mail.spam.markAsReadOnSpam",
           Services.prefs.getBoolPref(prefix + "markAsReadOnSpam"));
       }
@@ -1245,19 +1232,15 @@ function MigrateJunkMailSettings()
 
 // The first time a user runs a build that supports folder views, pre-populate the favorite folders list
 // with the existing INBOX folders.
-function MigrateFolderViews()
-{
+function MigrateFolderViews() {
   var folderViewsVersion = Services.prefs.getIntPref("mail.folder.views.version");
-  if (!folderViewsVersion)
-  {
+  if (!folderViewsVersion) {
      var servers = accountManager.allServers;
      var server;
      var inbox;
-     for (var index = 0; index < servers.length; index++)
-     {
+     for (var index = 0; index < servers.length; index++) {
        server = servers.queryElementAt(index, Ci.nsIMsgIncomingServer);
-       if (server)
-       {
+       if (server) {
          inbox = GetInboxFolder(server);
          if (inbox)
            inbox.setFlag(Ci.nsMsgFolderFlags.Favorite);
@@ -1270,26 +1253,21 @@ function MigrateFolderViews()
 // Do a one-time migration of the old mailnews.reuse_message_window pref to the
 // newer mail.openMessageBehavior. This does the migration only if the old pref
 // is defined.
-function MigrateOpenMessageBehavior()
-{
+function MigrateOpenMessageBehavior() {
   let openMessageBehaviorVersion = Services.prefs.getIntPref(
                                      "mail.openMessageBehavior.version");
-  if (!openMessageBehaviorVersion)
-  {
-    let reuseMessageWindow;
-    try {
-      reuseMessageWindow = Services.prefs.getBoolPref(
-                             "mailnews.reuse_message_window");
-    }
-    catch (e) {}
-
+  if (!openMessageBehaviorVersion) {
     // Don't touch this if it isn't defined
-    if (reuseMessageWindow === true)
-      Services.prefs.setIntPref("mail.openMessageBehavior",
-          MailConsts.OpenMessageBehavior.EXISTING_WINDOW);
-    else if (reuseMessageWindow === false)
-      Services.prefs.setIntPref("mail.openMessageBehavior",
-          MailConsts.OpenMessageBehavior.NEW_TAB);
+    if (Services.prefs.getPrefType("mailnews.reuse_message_window") ==
+        Ci.nsIPrefBranch.PREF_BOOL) {
+      if (Services.prefs.getBoolPref("mailnews.reuse_message_window")) {
+        Services.prefs.setIntPref("mail.openMessageBehavior",
+            MailConsts.OpenMessageBehavior.EXISTING_WINDOW);
+      } else {
+        Services.prefs.setIntPref("mail.openMessageBehavior",
+            MailConsts.OpenMessageBehavior.NEW_TAB);
+      }
+    }
 
     Services.prefs.setIntPref("mail.openMessageBehavior.version", 1);
   }
@@ -1301,7 +1279,7 @@ function ThreadPaneOnDragStart(aEvent) {
 
   let messageUris = gFolderDisplay.selectedMessageUris;
   if (!messageUris)
-     return;
+    return;
 
   gFolderDisplay.hintAboutToDeleteMessages();
   let messengerBundle = document.getElementById("bundle_messenger");
@@ -1337,8 +1315,7 @@ function ThreadPaneOnDragStart(aEvent) {
       if (!messages[msgFileNameLowerCase]) {
         messages[msgFileNameLowerCase] = 1;
         break;
-      }
-      else {
+      } else {
         let postfix = "-" + messages[msgFileNameLowerCase];
         messages[msgFileNameLowerCase]++;
         msgFileName = msgFileName + postfix;
@@ -1358,7 +1335,6 @@ function ThreadPaneOnDragStart(aEvent) {
                                      encodeURIComponent(msgFileName), index);
     aEvent.dataTransfer.mozSetDataAt("application/x-moz-file-promise",
                                      new messageFlavorDataProvider(), index);
-
   }
 
   aEvent.dataTransfer.effectAllowed = "copyMove";
@@ -1371,7 +1347,7 @@ function messageFlavorDataProvider() {
 messageFlavorDataProvider.prototype = {
   QueryInterface: ChromeUtils.generateQI([Ci.nsIFlavorDataProvider]),
 
-  getFlavorData : function(aTransferable, aFlavor, aData, aDataLen) {
+  getFlavorData(aTransferable, aFlavor, aData, aDataLen) {
     if (aFlavor !== "application/x-moz-file-promise") {
       return;
     }
@@ -1397,8 +1373,8 @@ messageFlavorDataProvider.prototype = {
     let messageUri = messageUriPrimitive.value.QueryInterface(Ci.nsISupportsString);
 
     messenger.saveAs(messageUri.data, true, null, decodeURIComponent(file.path), true);
-  }
-}
+  },
+};
 
 /**
  * Returns a new filename that is guaranteed to not be in the Set
@@ -1417,7 +1393,7 @@ function suggestUniqueFileName(aIdentifier, aType, aExistingNames) {
   let suffix = 1;
   let base = validateFileName(aIdentifier);
   let suggestion = base + aType;
-  while(true) {
+  while (true) {
     if (!aExistingNames.has(suggestion))
       break;
 
@@ -1459,194 +1435,6 @@ function ThreadPaneOnDrop(aEvent) {
         MailServices.copy.CopyFileMessage(extFile, gFolderDisplay.displayedFolder,
                                           null, false, 1, "", null, msgWindow);
     }
-  }
-}
-
-var LightWeightThemeWebInstaller = {
-  handleEvent: function (event) {
-    switch (event.type) {
-      case "InstallBrowserTheme":
-      case "PreviewBrowserTheme":
-      case "ResetBrowserThemePreview":
-        // ignore requests from background tabs
-        if (event.target.ownerDocument.defaultView.top != content)
-          return;
-    }
-    switch (event.type) {
-      case "InstallBrowserTheme":
-        this._installRequest(event);
-        break;
-      case "PreviewBrowserTheme":
-        this._preview(event);
-        break;
-      case "ResetBrowserThemePreview":
-        this._resetPreview(event);
-        break;
-      case "pagehide":
-        this._resetPreview();
-        break;
-    }
-  },
-
-  onTabTitleChanged: function (aTab) {
-  },
-
-  onTabSwitched: function (aTab, aOldTab) {
-    this._resetPreview();
-  },
-
-  get _manager () {
-    let temp = {};
-    ChromeUtils.import("resource://gre/modules/LightweightThemeManager.jsm", temp);
-    delete this._manager;
-    return this._manager = temp.LightweightThemeManager;
-  },
-
-  _installRequest: function (event) {
-    let node = event.target;
-    let data = this._getThemeFromNode(node);
-    if (!data)
-      return;
-
-    if (this._isAllowed(node)) {
-      this._install(data);
-      return;
-    }
-
-    let messengerBundle = document.getElementById("bundle_messenger");
-
-    let buttons = [{
-      label: messengerBundle.getString("lwthemeInstallRequest.allowButton"),
-      accessKey: messengerBundle.getString("lwthemeInstallRequest.allowButton.accesskey"),
-      callback: function () {
-        LightWeightThemeWebInstaller._install(data);
-      }
-    }];
-
-    this._removePreviousNotifications();
-
-    let message =
-      messengerBundle.getFormattedString("lwthemeInstallRequest.message",
-                                         [node.ownerDocument.location.host]);
-
-    let notificationBox = this._getNotificationBox();
-    let notificationBar =
-      notificationBox.appendNotification(message, "lwtheme-install-request", "",
-                                         notificationBox.PRIORITY_INFO_MEDIUM,
-                                         buttons);
-    notificationBar.persistence = 1;
-  },
-
-  _executeSoon: function (callback) {
-    Services.tm.dispatchToMainThread(callback);
-  },
-
-  _setTheme: function (theme) {
-    this._manager.currentTheme = theme;
-    return new Promise(this._executeSoon);
-  },
-
-  _install: async function (newTheme) {
-    let previousTheme = this._manager.currentTheme;
-    await this._setTheme(newTheme);
-    if (this._manager.currentTheme &&
-        this._manager.currentTheme.id == newTheme.id)
-      this._postInstallNotification(newTheme, previousTheme);
-  },
-
-  _postInstallNotification: function (newTheme, previousTheme) {
-    function text(id) {
-      return document.getElementById("bundle_messenger")
-                     .getString("lwthemePostInstallNotification." + id);
-    }
-
-    let buttons = [{
-      label: text("undoButton"),
-      accessKey: text("undoButton.accesskey"),
-      callback: function () {
-        LightWeightThemeWebInstaller._manager.forgetUsedTheme(newTheme.id);
-        LightWeightThemeWebInstaller._manager.currentTheme = previousTheme;
-      }
-    }, {
-      label: text("manageButton"),
-      accessKey: text("manageButton.accesskey"),
-      callback: function () {
-        openAddonsMgr("addons://list/theme");
-      }
-    }];
-
-    this._removePreviousNotifications();
-
-    let notificationBox = this._getNotificationBox();
-    let notificationBar =
-      notificationBox.appendNotification(text("message"),
-                                         "lwtheme-install-notification", "",
-                                         notificationBox.PRIORITY_INFO_MEDIUM,
-                                         buttons);
-    notificationBar.persistence = 1;
-    notificationBar.timeout = Date.now() + 20000; // 20 seconds
-  },
-
-  _removePreviousNotifications: function () {
-    let box = this._getNotificationBox();
-
-    ["lwtheme-install-request",
-     "lwtheme-install-notification"].forEach(function (value) {
-        var notification = box.getNotificationWithValue(value);
-        if (notification)
-          box.removeNotification(notification);
-      });
-  },
-
-  _previewWindow: null,
-  _preview: function (event) {
-    if (!this._isAllowed(event.target))
-      return;
-
-    let data = this._getThemeFromNode(event.target);
-    if (!data)
-      return;
-
-    this._resetPreview();
-
-    this._previewWindow = event.target.ownerDocument.defaultView;
-    this._previewWindow.addEventListener("pagehide", this, true);
-    document.getElementById('tabmail').registerTabMonitor(this);
-
-    this._manager.previewTheme(data);
-  },
-
-  _resetPreview: function (event) {
-    if (!this._previewWindow ||
-        event && !this._isAllowed(event.target))
-      return;
-
-    this._previewWindow.removeEventListener("pagehide", this, true);
-    this._previewWindow = null;
-    document.getElementById('tabmail').unregisterTabMonitor(this);
-
-    this._manager.resetPreview();
-  },
-
-  _isAllowed: function (node) {
-    let uri = node.ownerDocument.documentURIObject;
-    return Services.perms.testPermission(uri, "install") == Services.perms.ALLOW_ACTION;
-  },
-
-  _getNotificationBox: function () {
-    // Try and get the notification box for the selected tab.
-    let browser = document.getElementById('tabmail').getBrowserForSelectedTab();
-    // The messagepane doesn't have a notification bar yet.
-    if (browser && browser.parentNode.tagName == "notificationbox")
-      return browser.parentNode;
-
-    // Otherwise, default to the global notificationbox
-    return document.getElementById("mail-notification-box");
-  },
-
-  _getThemeFromNode: function (node) {
-    return this._manager.parseTheme(node.getAttribute("data-browsertheme"),
-                                    node.baseURI);
   }
 }
 
@@ -1693,6 +1481,8 @@ var TabsInTitlebar = {
 
     window.addEventListener("resolutionchange", this);
     window.addEventListener("resize", this);
+
+    gDragSpaceObserver.init();
 
     this._initialized = true;
     this.update();
@@ -1808,7 +1598,7 @@ var TabsInTitlebar = {
                   (Object.keys(this._disallowed)).length == 0;
 
     if (document.documentElement.getAttribute("chromehidden").includes("toolbar")) {
-      // Don't draw in titlebar in case of a popup window
+      // Don't draw in titlebar in case of a popup window.
       allowed = false;
     }
 
@@ -1840,6 +1630,16 @@ var TabsInTitlebar = {
 
     let titlebar = $("titlebar");
     let menubar = $("mail-toolbar-menubar2");
+
+    // Calculate the LW-backgroundBox height to place the images correctly.
+    let root = $("messengerWindow");
+    let bgBox = $("LW-background-box");
+    if (root.getAttribute("lwtheme-image")) {
+      let bgBoxHeight = rect($("navigation-toolbox")).height + rect($("mail-toolbox")).height;
+      bgBox.style.height = bgBoxHeight + "px";
+    } else {
+      bgBox.style.removeProperty("height");
+    }
 
     if (!drawInTitlebar) {
       if (AppConstants.platform == "macosx") {
@@ -1958,16 +1758,17 @@ var TabsInTitlebar = {
   },
 
   _sizePlaceholder(type, width) {
-    Array.forEach(document.querySelectorAll(".titlebar-placeholder[type='" + type + "']"),
-                  function(node) { node.style.width = width + "px"; });
+    document.querySelectorAll(".titlebar-placeholder[type='" + type + "']")
+            .forEach(function(node) { node.style.width = width + "px"; });
   },
 
   uninit() {
     this._initialized = false;
+    gDragSpaceObserver.uninit();
     Services.prefs.removeObserver(this._drawInTitlePref, this);
     Services.prefs.removeObserver(this._autoHidePref, this);
     this._menuObserver.disconnect();
-  }
+  },
 };
 
 /* Draw */
@@ -1977,3 +1778,27 @@ function onTitlebarMaxClick() {
   else
     window.maximize();
 }
+
+// Adds additional drag space to the window by listening to
+// the corresponding preference.
+var gDragSpaceObserver = {
+  pref: "mail.tabs.extraDragSpace",
+
+  init() {
+    Services.prefs.addObserver(this.pref, this);
+    this.observe();
+  },
+
+  uninit() {
+    Services.prefs.removeObserver(this.pref, this);
+  },
+
+  observe() {
+    if (Services.prefs.getBoolPref(this.pref)) {
+      document.documentElement.setAttribute("extradragspace", "true");
+    } else {
+      document.documentElement.removeAttribute("extradragspace");
+    }
+    TabsInTitlebar.update();
+  },
+};

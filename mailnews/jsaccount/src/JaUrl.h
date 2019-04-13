@@ -76,25 +76,27 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_MSGIOVERRIDE
 
-  NS_FORWARD_NSIMSGMESSAGEURL(DELEGATE_JS(nsIMsgMessageUrl, mJsIMsgMessageUrl)->)
-  NS_FORWARD_NSIINTERFACEREQUESTOR(DELEGATE_JS(nsIInterfaceRequestor, mJsIInterfaceRequestor)->)
+  NS_FORWARD_NSIMSGMESSAGEURL(DELEGATE_JS(mJsIMsgMessageUrl, mMethods,
+    (nsCOMPtr<nsIMsgMessageUrl>(do_QueryInterface(mCppBase))))->)
+  NS_FORWARD_NSIINTERFACEREQUESTOR(DELEGATE_JS(mJsIInterfaceRequestor, mMethods,
+    (nsCOMPtr<nsIInterfaceRequestor>(do_QueryInterface(mCppBase))))->)
 
   JaCppUrlDelegator();
 
   class Super : public nsIMsgMailNewsUrl,
-                public nsIURIWithPrincipal,
+                public nsIURIWithSpecialOrigin,
                 public nsIMsgMessageUrl,
                 public msgIJaUrl,
                 public nsIInterfaceRequestor,
                 public nsISupportsWeakReference
   {
     public:
-      Super(JaCppUrlDelegator *aFakeThis) {mFakeThis = aFakeThis;}
+      explicit Super(JaCppUrlDelegator *aFakeThis) {mFakeThis = aFakeThis;}
       NS_DECL_ISUPPORTS
       NS_FORWARD_NSIMSGMAILNEWSURL(mFakeThis->JaBaseCppUrl::)
       NS_FORWARD_NSIURI(mFakeThis->JaBaseCppUrl::)
       NS_FORWARD_NSIURL(mFakeThis->JaBaseCppUrl::)
-      NS_FORWARD_NSIURIWITHPRINCIPAL(mFakeThis->JaBaseCppUrl::)
+      NS_FORWARD_NSIURIWITHSPECIALORIGIN(mFakeThis->JaBaseCppUrl::)
       NS_FORWARD_NSIMSGMESSAGEURL(mFakeThis->JaBaseCppUrl::)
       NS_FORWARD_MSGIJAURL(mFakeThis->JaBaseCppUrl::)
       NS_FORWARD_NSIINTERFACEREQUESTOR(mFakeThis->JaBaseCppUrl::)

@@ -43,6 +43,17 @@ job-defaults:
             - comm/testing
             - comm/.taskcluster.yml
             - comm/AUTHORS
-            - comm/comm-confvars.sh
             - comm/moz.build
-            - comm/moz.configure
+    run:
+        mozconfig-variant:
+            by-release-type:
+                beta: release
+                release.*: release
+                default: nightly
+        # Note: These settings are only honored by nightly (i.e. shipping) builds
+        update-channel:
+            by-release-type:
+                nightly: nightly
+                beta: beta
+                release.*: release
+                default: null

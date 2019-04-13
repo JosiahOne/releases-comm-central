@@ -7,14 +7,14 @@
 #include "nsComponentManagerUtils.h"
 #include "nsNetCID.h"
 #include "nsString.h"
+#include "mozilla/dom/Document.h"
 #include "nsWMUtils.h"
-#include "nsIDocument.h"
 #include "nsINodeList.h"
 #include "nsContentList.h"
 #include "nsINode.h"
 #include "nsIFileStreams.h"
 #include "nsIFile.h"
-#include "nsISimpleEnumerator.h"
+#include "nsIDirectoryEnumerator.h"
 #include "ImportDebug.h"
 #include "prio.h"
 #include "mozilla/ErrorResult.h"
@@ -97,18 +97,15 @@ nsresult
 nsWMUtils::GetOEAccountFilesInFolder(nsIFile *aFolder,
                                      nsCOMArray<nsIFile> &aFileArray)
 {
-  nsCOMPtr<nsISimpleEnumerator> entries;
+  nsCOMPtr<nsIDirectoryEnumerator> entries;
   nsresult rv = aFolder->GetDirectoryEntries(getter_AddRefs(entries));
   if (NS_FAILED(rv) || !entries)
     return NS_ERROR_FAILURE;
 
   bool hasMore;
   while (NS_SUCCEEDED(entries->HasMoreElements(&hasMore)) && hasMore) {
-    nsCOMPtr<nsISupports> supports;
-    rv = entries->GetNext(getter_AddRefs(supports));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    nsCOMPtr<nsIFile> file = do_QueryInterface(supports);
+    nsCOMPtr<nsIFile> file;
+    rv = entries->GetNextFile(getter_AddRefs(file));
     NS_ENSURE_SUCCESS(rv, rv);
 
     bool isDirectory;
@@ -130,7 +127,7 @@ nsWMUtils::GetOEAccountFilesInFolder(nsIFile *aFolder,
 }
 
 nsresult
-nsWMUtils::MakeXMLdoc(nsIDocument **aXmlDoc,
+nsWMUtils::MakeXMLdoc(mozilla::dom::Document **aXmlDoc,
                       nsIFile *aFile)
 {
   nsresult rv;
@@ -146,7 +143,7 @@ nsWMUtils::MakeXMLdoc(nsIDocument **aXmlDoc,
   }
   int64_t filesize;
   aFile->GetFileSize(&filesize);
-  nsCOMPtr<nsIDocument> xmldoc =
+  nsCOMPtr<mozilla::dom::Document> xmldoc =
     parser->ParseFromStream(stream, EmptyString(), int32_t(filesize),
                             mozilla::dom::SupportedType::Application_xml, rv2);
   xmldoc.forget(aXmlDoc);
@@ -154,7 +151,7 @@ nsWMUtils::MakeXMLdoc(nsIDocument **aXmlDoc,
 }
 
 nsresult
-nsWMUtils::GetValueForTag(nsIDocument *aXmlDoc,
+nsWMUtils::GetValueForTag(mozilla::dom::Document *aXmlDoc,
                           const char *aTagName,
                           nsAString &aValue)
 {

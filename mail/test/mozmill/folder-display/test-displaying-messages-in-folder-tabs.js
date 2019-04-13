@@ -9,6 +9,8 @@
  * - displaying the message in an existing folder tab
  */
 
+"use strict";
+
 var MODULE_NAME = "test-displaying-messages-in-folder-tabs";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -310,7 +312,7 @@ function
   be_in_folder(folderA);
   set_mail_view(MailViewConstants.kViewItemAll, null);
 
-  // Now get back to folder B, and check that its state hasn't chaned
+  // Now get back to folder B, and check that its state hasn't changed
   be_in_folder(folderB);
   assert_mail_view(MailViewConstants.kViewItemTags, "$label3");
   // Reset folder B's state

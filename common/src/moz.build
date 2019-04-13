@@ -4,14 +4,24 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 EXTRA_JS_MODULES += [
+    'BootstrapLoader.jsm',
     'ChromeManifest.jsm',
-    'extensionSupport.jsm',
-    'Overlays.jsm'
+    'ExtensionSupport.jsm',
+    'Overlays.jsm',
+    'RDFDataSource.jsm',
+    'RDFManifestConverter.jsm',
 ]
 
 SOURCES += [
     'nsCommonModule.cpp',
-    'nsComponentManagerExtra.cpp'
+    'nsComponentManagerExtra.cpp',
+]
+
+LOCAL_INCLUDES += [
+    '/%s/netwerk/base' % CONFIG['mozreltopsrcdir']
 ]
 
 FINAL_LIBRARY = 'xul'
+
+if CONFIG['MOZ_CALENDAR']:
+    DEFINES['MOZ_CALENDAR'] = True

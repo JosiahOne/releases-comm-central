@@ -4,21 +4,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/ViewSourceBrowser.jsm");
+/* globals internalSave, goDoCommand */
 
-ChromeUtils.defineModuleGetter(this, "Services",
-  "resource://gre/modules/Services.jsm");
-ChromeUtils.defineModuleGetter(this, "CharsetMenu",
-  "resource://gre/modules/CharsetMenu.jsm");
-ChromeUtils.defineModuleGetter(this, "Deprecated",
-  "resource://gre/modules/Deprecated.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {ViewSourceBrowser} = ChromeUtils.import("resource://gre/modules/ViewSourceBrowser.jsm");
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {CharsetMenu} = ChromeUtils.import("resource://gre/modules/CharsetMenu.jsm");
+var {Deprecated} = ChromeUtils.import("resource://gre/modules/Deprecated.jsm");
 
 /* global gBrowser, gViewSourceBundle, gContextMenu */
 [
   ["gBrowser",          "content"],
   ["gViewSourceBundle", "viewSourceBundle"],
-  ["gContextMenu",      "viewSourceContextMenu"]
+  ["gContextMenu",      "viewSourceContextMenu"],
 ].forEach(function([name, id]) {
   Object.defineProperty(window, name, {
     configurable: true,
@@ -291,11 +290,10 @@ ViewSourceChrome.prototype = {
 
     if (!this.historyEnabled) {
       // Disable the BACK and FORWARD commands and hide the related menu items.
-      let viewSourceNavigation = document.getElementById("viewSourceNavigation");
-      if (viewSourceNavigation) {
-        viewSourceNavigation.setAttribute("disabled", "true");
-        viewSourceNavigation.setAttribute("hidden", "true");
-      }
+      document.querySelectorAll(".viewSourceNavigation").forEach(e => {
+        e.setAttribute("disabled", "true");
+        e.setAttribute("hidden", "true");
+      });
     }
 
     // We require the first argument to do any loading of source.
@@ -568,21 +566,21 @@ ViewSourceChrome.prototype = {
   },
 
   /**
-   * Updates any commands that are dependant on command broadcasters.
+   * Updates any applicable commands.
    */
   updateCommands() {
-    let backBroadcaster = document.getElementById("Browser:Back");
-    let forwardBroadcaster = document.getElementById("Browser:Forward");
+    let backCommand = document.getElementById("Browser:Back");
+    let forwardCommand = document.getElementById("Browser:Forward");
 
     if (this.webNav.canGoBack) {
-      backBroadcaster.removeAttribute("disabled");
+      backCommand.removeAttribute("disabled");
     } else {
-      backBroadcaster.setAttribute("disabled", "true");
+      backCommand.setAttribute("disabled", "true");
     }
     if (this.webNav.canGoForward) {
-      forwardBroadcaster.removeAttribute("disabled");
+      forwardCommand.removeAttribute("disabled");
     } else {
-      forwardBroadcaster.setAttribute("disabled", "true");
+      forwardCommand.setAttribute("disabled", "true");
     }
   },
 

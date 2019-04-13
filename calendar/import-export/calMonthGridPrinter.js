@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Prints a rough month-grid of events/tasks
@@ -88,8 +88,8 @@ calMonthPrinter.prototype = {
 
         // Stream out the resulting HTML
         let html = cal.xml.serializeDOM(document);
-        let convStream = Components.classes["@mozilla.org/intl/converter-output-stream;1"]
-                                   .createInstance(Components.interfaces.nsIConverterOutputStream);
+        let convStream = Cc["@mozilla.org/intl/converter-output-stream;1"]
+                           .createInstance(Ci.nsIConverterOutputStream);
         convStream.init(aStream, "UTF-8");
         convStream.writeString(html);
     },
@@ -121,7 +121,7 @@ calMonthPrinter.prototype = {
 
         // Find out if the end date is also shown in the last week of the
         // previous month. This also means we can spare a month printout.
-        lastDayOfPreviousMonth = endDate.clone();
+        let lastDayOfPreviousMonth = endDate.clone();
         lastDayOfPreviousMonth.month--;
         lastDayOfPreviousMonth = lastDayOfPreviousMonth.endOfMonth;
         if (cal.getWeekInfoService().getEndOfWeek(lastDayOfPreviousMonth).compare(endDate) >= 0) {
@@ -146,7 +146,7 @@ calMonthPrinter.prototype = {
         currentMonth.querySelector(".month-name").textContent = monthTitle;
 
         // Set up the weekday titles
-        let wkst = Preferences.get("calendar.week.start", 0);
+        let wkst = Services.prefs.getIntPref("calendar.week.start", 0);
         for (let i = 1; i <= 7; i++) {
             let dayNumber = ((i + wkst - 1) % 7) + 1;
             let dayTitle = currentMonth.querySelector(`.day${i}-title`);
@@ -203,7 +203,7 @@ calMonthPrinter.prototype = {
 
             let weekDay = currentDate.weekday;
             let dayOffPrefName = "calendar.week.d" + weekDay + weekdayMap[weekDay] + "soff";
-            if (Preferences.get(dayOffPrefName, false)) {
+            if (Services.prefs.getBoolPref(dayOffPrefName, false)) {
                 dayBox.className += " day-off";
             }
 

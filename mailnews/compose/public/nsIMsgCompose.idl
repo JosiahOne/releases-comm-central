@@ -254,11 +254,12 @@ interface nsIMsgCompose : nsIMsgSendListener {
   [noscript] void rememberQueuedDisposition();
 
   /* ... */
-  [noscript] void convertAndLoadComposeWindow(in nsStringRef aPrefix,
-                                              in nsStringRef aBuf,
-                                              in nsStringRef aSignature,
-                                              in boolean aQuoted,
-                                              in boolean aHTMLEditor);
+  [noscript]
+  void convertAndLoadComposeWindow(in nsStringRef aPrefix,
+                                   in nsStringRef aBuf,
+                                   in nsStringRef aSignature,
+                                   in boolean aQuoted,
+                                   in boolean aHTMLEditor);
 
   /* Tell the doc state listeners that the doc state has changed
    * aNotificationType is from nsIMsgComposeNotificationType
@@ -269,7 +270,8 @@ interface nsIMsgCompose : nsIMsgSendListener {
   readonly attribute nsIMsgProgress progress;
 
   /* ... */
-  [noscript] void buildBodyMessageAndSignature();
+  [noscript]
+  void buildBodyMessageAndSignature();
 
   /* ... */
   [noscript] void buildQuotedMessageAndSignature();

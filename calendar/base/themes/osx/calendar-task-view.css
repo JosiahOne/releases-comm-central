@@ -5,6 +5,8 @@
 @import url(chrome://calendar-common/skin/calendar-task-view.css);
 
 #calendar-task-details-container {
+    background-color: ButtonFace;
+    border-bottom-width: 0;
     padding-top: 2px;
     overflow: hidden;
 }
@@ -18,21 +20,12 @@
     border-bottom-color: #bebebe
 }
 
-.task-details-name {
-    color: #888a85; /* lower contrast */
-}
-
-#calendar-task-details-grid > rows > .item-date-row > .headline {
-    color: #888a85; /* lower contrast */
-}
-
-.task-details-value {
-    color: black;
-}
-
-#view-task-edit-field {
+/* Hide the search glass */
+.task-edit-field {
     margin-top: 0;
     margin-bottom: 0;
+    background-image: none;
+    padding-inline-start: 4px !important;
 }
 
 @media (-moz-mac-yosemite-theme) {

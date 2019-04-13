@@ -29,21 +29,19 @@
 #include "nsIMutableArray.h"
 #include "nsIPrefService.h"
 #include "nsIRelativeFilePref.h"
+#include "mozilla/nsRelativeFilePref.h"
 #include "nsIDocShell.h"
 #include "nsIAuthPrompt.h"
 #include "nsNetUtil.h"
 #include "nsIWindowWatcher.h"
 #include "nsIStringBundle.h"
 #include "nsIMsgHdr.h"
-#include "nsIRDFService.h"
-#include "nsRDFCID.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsIInterfaceRequestorUtils.h"
 #include "nsILoginInfo.h"
 #include "nsILoginManager.h"
 #include "nsIMsgAccountManager.h"
 #include "nsIMsgMdnGenerator.h"
-#include "nsMsgFolderFlags.h"
 #include "nsMsgUtils.h"
 #include "nsMsgMessageFlags.h"
 #include "nsIMsgSearchTerm.h"
@@ -54,6 +52,7 @@
 #include "nsIArray.h"
 #include "nsArrayUtils.h"
 #include "nsIObserverService.h"
+#include "mozilla/Unused.h"
 
 #define PORT_NOT_SET -1
 
@@ -238,9 +237,7 @@ NS_IMETHODIMP nsMsgIncomingServer::WriteToFolderCache(nsIMsgFolderCache *folderC
   nsresult rv = NS_OK;
   if (m_rootFolder)
   {
-    nsCOMPtr <nsIMsgFolder> msgFolder = do_QueryInterface(m_rootFolder, &rv);
-    if (NS_SUCCEEDED(rv) && msgFolder)
-      rv = msgFolder->WriteToFolderCache(folderCache, true /* deep */);
+    rv = m_rootFolder->WriteToFolderCache(folderCache, true /* deep */);
   }
   return rv;
 }
@@ -399,20 +396,9 @@ nsMsgIncomingServer::CreateRootFolder()
   nsCString serverUri;
   rv = GetServerURI(serverUri);
   NS_ENSURE_SUCCESS(rv, rv);
-
-  nsCOMPtr<nsIRDFService> rdf = do_GetService("@mozilla.org/rdf/rdf-service;1", &rv);
+  rv = GetOrCreateFolder(serverUri, getter_AddRefs(m_rootFolder));
   NS_ENSURE_SUCCESS(rv, rv);
-
-  // get the corresponding RDF resource
-  // RDF will create the server resource if it doesn't already exist
-  nsCOMPtr<nsIRDFResource> serverResource;
-  rv = rdf->GetResource(serverUri, getter_AddRefs(serverResource));
-  NS_ENSURE_SUCCESS(rv, rv);
-
-  // make incoming server know about its root server folder so we
-  // can find sub-folders given an incoming server.
-  m_rootFolder = do_QueryInterface(serverResource, &rv);
-  return rv;
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -490,13 +476,13 @@ nsMsgIncomingServer::GetFileValue(const char* aRelPrefName,
     if (NS_FAILED(rv))
       return rv;
 
-    rv = NS_NewRelativeFilePref(*aLocalFile,
-                                NS_LITERAL_CSTRING(NS_APP_USER_PROFILE_50_DIR),
-                                getter_AddRefs(relFilePref));
-    if (relFilePref)
-      rv = mPrefBranch->SetComplexValue(aRelPrefName,
-                                        NS_GET_IID(nsIRelativeFilePref),
-                                        relFilePref);
+    nsCOMPtr<nsIRelativeFilePref> relFilePref = new mozilla::nsRelativeFilePref();
+    mozilla::Unused << relFilePref->SetFile(*aLocalFile);
+    mozilla::Unused << relFilePref->SetRelativeToKey(NS_LITERAL_CSTRING(NS_APP_USER_PROFILE_50_DIR));
+
+    rv = mPrefBranch->SetComplexValue(aRelPrefName,
+                                      NS_GET_IID(nsIRelativeFilePref),
+                                      relFilePref);
   }
 
   return rv;
@@ -511,17 +497,16 @@ nsMsgIncomingServer::SetFileValue(const char* aRelPrefName,
     return NS_ERROR_NOT_INITIALIZED;
 
   // Write the relative path.
-  nsCOMPtr<nsIRelativeFilePref> relFilePref;
-  NS_NewRelativeFilePref(aLocalFile,
-                         NS_LITERAL_CSTRING(NS_APP_USER_PROFILE_50_DIR),
-                         getter_AddRefs(relFilePref));
-  if (relFilePref) {
-    nsresult rv = mPrefBranch->SetComplexValue(aRelPrefName,
-                                               NS_GET_IID(nsIRelativeFilePref),
-                                               relFilePref);
-    if (NS_FAILED(rv))
-      return rv;
-  }
+  nsCOMPtr<nsIRelativeFilePref> relFilePref = new mozilla::nsRelativeFilePref();
+  mozilla::Unused << relFilePref->SetFile(aLocalFile);
+  mozilla::Unused << relFilePref->SetRelativeToKey(NS_LITERAL_CSTRING(NS_APP_USER_PROFILE_50_DIR));
+
+  nsresult rv = mPrefBranch->SetComplexValue(aRelPrefName,
+                                             NS_GET_IID(nsIRelativeFilePref),
+                                             relFilePref);
+  if (NS_FAILED(rv))
+    return rv;
+
   return mPrefBranch->SetComplexValue(aAbsPrefName, NS_GET_IID(nsIFile), aLocalFile);
 }
 

@@ -3,6 +3,8 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from calendar-views.js -->
+
 <bindings id="calendar-multiday-view-bindings"
           xmlns="http://www.mozilla.org/xbl"
           xmlns:html="http://www.w3.org/1999/xhtml"
@@ -10,9 +12,6 @@
           xmlns:xbl="http://www.mozilla.org/xbl">
 
   <binding id="calendar-base-view">
-    <resources>
-      <stylesheet src="chrome://calendar-common/skin/calendar-alarms.css"/>
-    </resources>
     <implementation>
       <field name="mWeekStartOffset">0</field>
       <field name="mRangeStartDate">null</field>;
@@ -95,7 +94,11 @@
                                                          this.calView.queryEndDate,
                                                          {});
                   for (let occ of occs) {
-                      this.calView.doAddItem(occ);
+                      if (cal.item.isToDo(occ)) {
+                          this.calView.doAddItem(occ.QueryInterface(Ci.calITodo));
+                      } else {
+                          this.calView.doAddItem(occ.QueryInterface(Ci.calIEvent));
+                      }
                   }
               },
 
@@ -111,7 +114,11 @@
                                                             this.calView.queryEndDate,
                                                             {});
                       for (let occ of occs) {
-                          this.calView.doDeleteItem(occ);
+                          if (cal.item.isToDo(occ)) {
+                              this.calView.doDeleteItem(occ.QueryInterface(Ci.calITodo));
+                          } else {
+                              this.calView.doDeleteItem(occ.QueryInterface(Ci.calIEvent));
+                          }
                       }
                   }
                   if (cal.item.isToDo(aNewItem)) {
@@ -127,7 +134,11 @@
                                                         this.calView.queryEndDate,
                                                         {});
                   for (let occ of occs) {
-                      this.calView.doAddItem(occ);
+                      if (cal.item.isToDo(occ)) {
+                          this.calView.doAddItem(occ.QueryInterface(Ci.calITodo));
+                      } else {
+                          this.calView.doAddItem(occ.QueryInterface(Ci.calIEvent));
+                      }
                   }
               },
 
@@ -148,7 +159,11 @@
                                                          this.calView.queryEndDate,
                                                          {});
                   for (let occ of occs) {
-                      this.calView.doDeleteItem(occ);
+                      if (cal.item.isToDo(occ)) {
+                          this.calView.doDeleteItem(occ.QueryInterface(Ci.calITodo));
+                      } else {
+                          this.calView.doDeleteItem(occ.QueryInterface(Ci.calIEvent));
+                      }
                   }
               },
 
@@ -157,7 +172,7 @@
               onPropertyChanged: function(aCalendar, aName, aValue, aOldValue) {
                   switch (aName) {
                       case "suppressAlarms":
-                          if (!Preferences.get("calendar.alarms.indicator.show", true) ||
+                          if (!Services.prefs.getBoolPref("calendar.alarms.indicator.show", true) ||
                               aCalendar.getProperty("capabilities.alarms.popup.supported") === false) {
                               break;
                           }
@@ -222,10 +237,8 @@
       ]]></field>
 
       <constructor><![CDATA[
-          ChromeUtils.import("resource://gre/modules/Services.jsm");
-          ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-          ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-          ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+          const { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+          const { Log4Moz } = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 
           const kWorkdaysCommand = "calendar_toggle_workdays_only_command";
           const kTasksInViewCommand = "calendar_toggle_tasks_in_view_command";
@@ -242,8 +255,8 @@
                                   .getAttribute("checked") == "true");
 
           this.mTimezone = cal.dtz.defaultTimezone;
-          let alarmService = Components.classes["@mozilla.org/calendar/alarm-service;1"]
-                                       .getService(Components.interfaces.calIAlarmService);
+          let alarmService = Cc["@mozilla.org/calendar/alarm-service;1"]
+                               .getService(Ci.calIAlarmService);
           alarmService.addObserver(this.mObserver);
           this.setAttribute("type", this.type);
           this.mResizeHandler = () => {
@@ -252,7 +265,8 @@
           this.viewBroadcaster.addEventListener(this.getAttribute("type") + "viewresized", this.mResizeHandler, true);
           // add a preference observer to monitor changes
           Services.prefs.addObserver("calendar.", this.mPrefObserver);
-          this.weekStartOffset = Preferences.get("calendar.week.start", 0);
+          Services.obs.addObserver(this.mTimezoneObserver, "defaultTimezoneChanged");
+          this.weekStartOffset = Services.prefs.getIntPref("calendar.week.start", 0);
           this.updateDaysOffPrefs();
           this.mPendingRefreshJobs = new Map();
           this.mLog = Log4Moz.getConfiguredLogger("calBaseView");
@@ -260,16 +274,17 @@
       ]]></constructor>
 
       <destructor><![CDATA[
-          ChromeUtils.import("resource://gre/modules/Services.jsm");
+          const { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
           if (this.mCalendar) {
               this.mCalendar.removeObserver(this.mObserver);
           }
-          let alarmService = Components.classes["@mozilla.org/calendar/alarm-service;1"]
-                                       .getService(Components.interfaces.calIAlarmService);
+          let alarmService = Cc["@mozilla.org/calendar/alarm-service;1"]
+                               .getService(Ci.calIAlarmService);
           alarmService.removeObserver(this.mObserver);
           this.viewBroadcaster.removeEventListener(this.getAttribute("type") + "viewresized", this.mResizeHandler, true);
           Services.prefs.removeObserver("calendar.", this.mPrefObserver);
+          Services.obs.removeObserver(this.mTimezoneObserver, "defaultTimezoneChanged");
       ]]></destructor>
 
       <property name="type" readonly="true">
@@ -388,7 +403,7 @@
       </method>
 
       <!-- This function guarantees that the
-       labels are clipped in the instance that the overflow occurrs,
+       labels are clipped in the instance that the overflow occurs,
        avoiding horizontal scrollbars from showing up for a short period. -->
       <method name="adjustWeekdayLength">
         <parameter name="forceShortName"/>
@@ -485,7 +500,7 @@
                 cancel: function() {
                     this.calView.mLog.info("Refresh cancelled for calendar " + this.calId);
                     this.cancelled = true;
-                    let operation = cal.wrapInstance(this.operation, Components.interfaces.calIOperation);
+                    let operation = cal.wrapInstance(this.operation, Ci.calIOperation);
                     if (operation && operation.isPending) {
                         operation.cancel();
                         this.operation = null;
@@ -537,7 +552,7 @@
                                                            this.calView.startDate,
                                                            this.calView.queryEndDate,
                                                            this);
-                    operation = cal.wrapInstance(operation, Components.interfaces.calIOperation);
+                    operation = cal.wrapInstance(operation, Ci.calIOperation);
                     if (operation && operation.isPending) {
                         this.operation = operation;
                         this.calView.mPendingRefreshJobs.set(this.calId, this);
@@ -553,7 +568,7 @@
         <parameter name="aCalendar"/>
         <body><![CDATA[
             /* This method must be implemented in subclasses. */
-            throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+            throw Cr.NS_ERROR_NOT_IMPLEMENTED;
         ]]></body>
       </method>
 
@@ -632,10 +647,6 @@
                 case "calendar.week.d6saturdaysoff":
                     this.updateDaysOffPrefs();
                     break;
-                case "calendar.timezone.local":
-                    this.timezone = cal.dtz.defaultTimezone;
-                    this.refreshView();
-                    break;
                 case "calendar.alarms.indicator.show":
                     // Break here to ensure the view is refreshed
                     break;
@@ -666,7 +677,7 @@
             ];
             let daysOff = [];
             for (let i in prefNames) {
-                if (Preferences.get(weekPrefix + prefNames[i], defaults[i])) {
+                if (Services.prefs.getBoolPref(weekPrefix + prefNames[i], defaults[i])) {
                     daysOff.push(Number(i));
                 }
             }
@@ -729,6 +740,7 @@
         <parameter name="aDates"/>
         <body><![CDATA[
             let start = this.startDate.clone();
+            let dates = [];
             while (start.compare(this.endDate) <= 0) {
                 dates.push(start);
                 start.day++;
@@ -778,7 +790,8 @@
       ]]></handler>
       <handler event="wheel"><![CDATA[
           const pixelThreshold = 150;
-          if (event.shiftKey && Preferences.get("calendar.view.mousescroll", true)) {
+          if (event.shiftKey && Services.prefs.getBoolPref("calendar.view.mousescroll", true)) {
+              let deltaView = 0;
               if (event.deltaMode == event.DOM_DELTA_LINE) {
                   if (event.deltaY != 0) {
                       deltaView = event.deltaY < 0 ? -1 : 1;
@@ -847,84 +860,5 @@
           }
       ]]></handler>
     </handlers>
-  </binding>
-
-  <binding id="calendar-day-label" extends="xul:box">
-    <content flex="1" pack="center">
-      <xul:label anonid="longWeekdayName" class="calendar-day-label-name" xbl:inherits="selected,relation"/>
-      <xul:label anonid="shortWeekdayName" class="calendar-day-label-name" hidden="true" xbl:inherits="selected,relation"/>
-    </content>
-    <implementation>
-      <field name="mWeekday">-1</field>
-      <field name="longWeekdayPixels">0</field>
-      <field name="mDate">null</field>
-      <property name="longName" readonly="true"
-                onget="return document.getAnonymousElementByAttribute(this, 'anonid', 'longWeekdayName');"/>
-      <property name="shortName" readonly="true"
-                onget="return document.getAnonymousElementByAttribute(this, 'anonid', 'shortWeekdayName');"/>
-      <property name="weekDay">
-        <getter><![CDATA[
-            return this.mWeekday;
-        ]]></getter>
-        <setter><![CDATA[
-            this.mWeekday = val % 7;
-            this.longName.value = cal.getDateFormatter().dayName(val);
-            this.shortName.value = cal.getDateFormatter().shortDayName(val);
-            return this.mWeekday;
-        ]]></setter>
-      </property>
-
-      <property name="date">
-        <getter><![CDATA[
-            return this.mDate;
-        ]]></getter>
-        <setter><![CDATA[
-            this.mDate = val;
-            let dateFormatter = cal.getDateFormatter();
-            let label = cal.l10n.getCalString("dayHeaderLabel", [
-                dateFormatter.shortDayName(val.weekday),
-                dateFormatter.formatDateWithoutYear(val)
-            ]);
-            this.shortName.setAttribute("value", label);
-            label = cal.l10n.getCalString("dayHeaderLabel", [
-                dateFormatter.dayName(val.weekday),
-                dateFormatter.formatDateWithoutYear(val)
-            ]);
-            this.longName.setAttribute("value", label);
-            return val;
-        ]]></setter>
-      </property>
-
-      <property name="shortWeekNames">
-        <getter><![CDATA[
-        ]]></getter>
-        <setter><![CDATA[
-            // cache before change, in case we are switching to short
-            this.getLongWeekdayPixels();
-            setBooleanAttribute(this.longName, "hidden", val);
-            setBooleanAttribute(this.shortName, "hidden", !val);
-            return val;
-        ]]></setter>
-      </property>
-
-      <method name="getLongWeekdayPixels">
-        <body><![CDATA[
-            // Only do this if the long weekdays are visible and we haven't already cached.
-            let longNameWidth = this.longName.boxObject.width;
-            if (longNameWidth > 0) {
-                this.longWeekdayPixels = longNameWidth +
-                                         getSummarizedStyleValues(this.longName, ["margin-left", "margin-right"]);
-                this.longWeekdayPixels += getSummarizedStyleValues(this, [
-                    "border-left-width", "padding-left", "padding-right"
-                ]);
-                return this.longWeekdayPixels;
-            } else {
-                // in this case the weekdaypixels have not yet been layouted;
-                // by definition 0 is returned
-                return 0;
-            }
-        ]]></body>
-      </method>
-    </implementation>
   </binding>
 </bindings>

@@ -6,6 +6,12 @@
  *          focusSearch, toggleUnifinder
  */
 
+/* import-globals-from ../../../mail/base/content/utilityOverlay.js */
+/* import-globals-from ../../resources/content/mouseoverPreviews.js */
+/* import-globals-from ../src/calFilter.js */
+/* import-globals-from calendar-common-sets.js */
+/* import-globals-from calendar-views.js */
+
 /**
  * U N I F I N D E R
  *
@@ -16,9 +22,8 @@
  * window.
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 // Set this to true when the calendar event tree is clicked to allow for
 // multiple selection
@@ -27,7 +32,6 @@ var gCalendarEventTreeClicked = false;
 // Store the start and enddate, because the providers can't be trusted when
 // dealing with all-day events. So we need to filter later. See bug 306157
 
-var kDefaultTimezone;
 var gUnifinderNeedsRefresh = true;
 
 /**
@@ -78,6 +82,8 @@ var unifinderObserver = {
             // again.
             gUnifinderNeedsRefresh = true;
             unifinderTreeView.clearItems();
+        } else {
+            unifinderTreeView.sortItems();
         }
     },
 
@@ -169,13 +175,8 @@ var unifinderObserver = {
         unifinderTreeView.removeItems(items.filter(filter.isItemInFilters, filter));
     },
 
-    observe: function(aSubject, aTopic, aPrefName) {
-        switch (aPrefName) {
-            case "calendar.date.format":
-            case "calendar.timezone.local":
-                refreshEventTree();
-                break;
-        }
+    observe: function() {
+        refreshEventTree();
     }
 };
 
@@ -189,16 +190,14 @@ function prepareCalendarUnifinder() {
     let unifinderTree = document.getElementById("unifinder-search-results-tree");
 
     // Add pref observer
-    let branch = Services.prefs.getBranch("");
-    branch.addObserver("calendar.", unifinderObserver);
+    Services.prefs.addObserver("calendar.date.format", unifinderObserver);
+    Services.obs.addObserver(unifinderObserver, "defaultTimezoneChanged");
 
     // Check if this is not the hidden window, which has no UI elements
     if (unifinderTree) {
         // set up our calendar event observer
         let ccalendar = cal.view.getCompositeCalendar(window);
         ccalendar.addObserver(unifinderObserver);
-
-        kDefaultTimezone = cal.dtz.defaultTimezone;
 
         // Set up the filter
         unifinderTreeView.mFilter = new calFilter();
@@ -230,6 +229,9 @@ function prepareCalendarUnifinder() {
                 }
             }
         }
+
+        unifinderTreeView.ready = true;
+
         // Display something upon first load. onLoad doesn't work properly for
         // observers
         if (!isUnifinderHidden()) {
@@ -248,8 +250,8 @@ function finishCalendarUnifinder() {
     ccalendar.removeObserver(unifinderObserver);
 
     // Remove pref observer
-    let branch = Services.prefs.getBranch("");
-    branch.removeObserver("calendar.", unifinderObserver);
+    Services.prefs.removeObserver("calendar.date.format", unifinderObserver);
+    Services.obs.removeObserver(unifinderObserver, "defaultTimezoneChanged");
 
     let viewDeck = getViewDeck();
     if (viewDeck) {
@@ -293,7 +295,7 @@ function unifinderItemSelect(aEvent) {
  * @return              The passed date's formatted in the default timezone.
  */
 function formatUnifinderEventDateTime(aDatetime) {
-    return cal.getDateFormatter().formatDateTime(aDatetime.getInTimezone(kDefaultTimezone));
+    return cal.getDateFormatter().formatDateTime(aDatetime.getInTimezone(cal.dtz.defaultTimezone));
 }
 
 /**
@@ -398,6 +400,7 @@ var unifinderTreeView = {
         invalidate: function() {}
     },
 
+    ready: false,
     treeElement: null,
     doingSelection: false,
     mFilter: null,
@@ -441,18 +444,11 @@ var unifinderTreeView = {
      * Add an item to the unifinder tree.
      *
      * @param aItemArray        An array of items to add.
-     * @param aDontSort         If true, the items will only be appended.
      */
-    addItems: function(aItemArray, aDontSort) {
+    addItems: function(aItemArray) {
         this.eventArray = this.eventArray.concat(aItemArray);
         let newCount = (this.eventArray.length - aItemArray.length - 1);
         this.tree.rowCountChanged(newCount, aItemArray.length);
-
-        if (aDontSort) {
-            this.calculateIndexMap();
-        } else {
-            this.sortItems();
-        }
     },
 
     /**
@@ -510,16 +506,11 @@ var unifinderTreeView = {
      * Sets the items that should be in the unifinder. This removes all items
      * that were previously in the unifinder.
      */
-    setItems: function(aItemArray, aDontSort) {
+    setItems: function(aItemArray) {
         let oldCount = this.eventArray.length;
         this.eventArray = aItemArray.slice(0);
         this.tree.rowCountChanged(oldCount - 1, this.eventArray.length - oldCount);
-
-        if (aDontSort) {
-            this.calculateIndexMap();
-        } else {
-            this.sortItems();
-        }
+        this.sortItems();
     },
 
     /**
@@ -599,7 +590,8 @@ var unifinderTreeView = {
      * @param aItemArray        An array of items to select.
      */
     setSelectedItems: function(aItemArray) {
-        if (this.doingSelection || !this.tree || !this.tree.view) {
+        if (this.doingSelection || !this.tree || !this.tree.view ||
+            !("getSelectedItems" in currentView())) {
             return;
         }
 
@@ -826,6 +818,10 @@ var unifinderTreeView = {
  * applying the current filter.
  */
 function refreshEventTree() {
+    if (!unifinderTreeView.ready) {
+        return;
+    }
+
     let field = document.getElementById("unifinder-search-field");
     if (field) {
         unifinderTreeView.mFilter.filterText = field.value;

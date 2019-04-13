@@ -1,52 +1,14 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-  <prefpane id="panePrivacy" label="&panePrivacy.title;" onpaneload="gPrivacyPane.init();">
+  <prefpane id="panePrivacy" label="&panePrivacy.title;">
     <script type="application/javascript" src="chrome://messenger/content/preferences/privacy.js"/>
 
     <stringbundle id="bundlePreferences" src="chrome://messenger/locale/preferences/preferences.properties"/>
 
-    <preferences id="privacyPreferences">
-
-      <!-- XXX button prefs -->
-      <preference id="pref.privacy.disable_button.cookie_exceptions"
-                  name="pref.privacy.disable_button.cookie_exceptions"
-                  type="bool"/>
-      <preference id="pref.privacy.disable_button.view_cookies"
-                  name="pref.privacy.disable_button.view_cookies"
-                  type="bool"/>
-
-      <!-- Remote Content -->
-      <preference id="mailnews.message_display.disable_remote_image"
-                  name="mailnews.message_display.disable_remote_image"
-                  type="bool" inverted="true"
-                  onchange="gPrivacyPane.reloadMessageInOpener();"/>
-
-      <!-- History -->
-      <preference id="places.history.enabled"
-                  name="places.history.enabled"
-                  type="bool"/>
-
-      <!-- Cookies -->
-      <preference id="network.cookie.cookieBehavior"
-                  name="network.cookie.cookieBehavior"
-                  type="int"/>
-      <preference id="network.cookie.lifetimePolicy"
-                  name="network.cookie.lifetimePolicy"
-                  type="int"/>
-      <preference id="network.cookie.blockFutureCookies"
-                  name="network.cookie.blockFutureCookies"
-                  type="bool"/>
-
-      <!-- Tracking -->
-      <preference id="privacy.donottrackheader.enabled"
-                  name="privacy.donottrackheader.enabled"
-                  type="bool"/>
-    </preferences>
-
     <!-- Mail Content -->
     <groupbox id="mailContentGroup">
-      <caption label="&captionMailContent.label;"/>
+      <label><html:h2>&captionMailContent.label;</html:h2></label>
       <hbox id="remoteContentBox">
         <checkbox id="acceptRemoteContent"
                   preference="mailnews.message_display.disable_remote_image"
@@ -59,8 +21,7 @@
                 accesskey="&remoteContentExceptions.accesskey;"/>
       </hbox>
       <hbox>
-        <label id="acceptRemoteContentInfo"
-               class="text-link"
+        <label is="text-link" id="acceptRemoteContentInfo"
                href="https://support.mozilla.org/kb/remote-content-in-messages"
                value="&acceptRemoteContentInfo.label;"/>
         <spacer flex="1"/>
@@ -69,7 +30,7 @@
 
     <!-- Web Content -->
     <groupbox id="webContentGroup">
-      <caption label="&captionWebContent.label;"/>
+      <label><html:h2>&captionWebContent.label;</html:h2></label>
       <checkbox id="keepHistory"
                 preference="places.history.enabled"
                 label="&keepHistory.label;"
@@ -134,8 +95,7 @@
         <spacer flex="1"/>
       </hbox>
       <hbox>
-        <label id="doNotTrackInfo"
-               class="text-link"
+        <label is="text-link" id="doNotTrackInfo"
                href="https://www.mozilla.org/dnt"
                value="&doNotTrackInfo.label;"/>
         <spacer flex="1"/>

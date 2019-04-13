@@ -26,10 +26,7 @@
 #include "nsDirectoryServiceDefs.h"
 #include "nsIWindowsRegKey.h"
 #include "nsUnicharUtils.h"
-#include "nsIWinTaskbar.h"
-#include "nsISupportsPrimitives.h"
 #include "nsIURLFormatter.h"
-#include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
 #include "mozilla/WindowsVersion.h"
 #include "mozilla/dom/Element.h"
@@ -54,12 +51,10 @@
 #define REG_FAILED(val) \
   (val != ERROR_SUCCESS)
 
-#define NS_TASKBAR_CONTRACTID "@mozilla.org/windows-taskbar;1"
-
 using namespace mozilla;
 using namespace mozilla::gfx;
 
-NS_IMPL_ISUPPORTS(nsWindowsShellService, nsIWindowsShellService, nsIShellService)
+NS_IMPL_ISUPPORTS(nsWindowsShellService, nsIShellService)
 
 static nsresult
 OpenKeyForReading(HKEY aKeyRoot, const wchar_t* aKeyName, HKEY* aKey)
@@ -353,79 +348,6 @@ LaunchHelper(const nsString& aPath)
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsWindowsShellService::ShortcutMaintenance()
-{
-  nsresult rv;
-
-  // Launch helper.exe so it can update the application user model ids on
-  // shortcuts in the user's taskbar and start menu. This keeps older pinned
-  // shortcuts grouped correctly after major updates. Note, we also do this
-  // through the upgrade installer script, however, this is the only place we
-  // have a chance to trap links created by users who do control the install/
-  // update process of the browser.
-
-  nsCOMPtr<nsIWinTaskbar> taskbarInfo =
-    do_GetService(NS_TASKBAR_CONTRACTID);
-  if (!taskbarInfo) // If we haven't built with win7 sdk features, this fails.
-    return NS_OK;
-
-  // Avoid if this isn't Win7+
-  bool isSupported = false;
-  taskbarInfo->GetAvailable(&isSupported);
-  if (!isSupported)
-    return NS_OK;
-
-  nsAutoString appId;
-  if (NS_FAILED(taskbarInfo->GetDefaultGroupId(appId)))
-    return NS_ERROR_UNEXPECTED;
-
-  NS_NAMED_LITERAL_CSTRING(prefName, "browser.taskbar.lastgroupid");
-  nsCOMPtr<nsIPrefService> prefs =
-    do_GetService(NS_PREFSERVICE_CONTRACTID);
-  if (!prefs)
-    return NS_ERROR_UNEXPECTED;
-
-  nsCOMPtr<nsIPrefBranch> prefBranch;
-  prefs->GetBranch(nullptr, getter_AddRefs(prefBranch));
-  if (!prefBranch)
-    return NS_ERROR_UNEXPECTED;
-
-  nsCOMPtr<nsISupportsString> prefString;
-  rv = prefBranch->GetComplexValue(prefName.get(),
-                                   NS_GET_IID(nsISupportsString),
-                                   getter_AddRefs(prefString));
-  if (NS_SUCCEEDED(rv)) {
-    nsAutoString version;
-    prefString->GetData(version);
-    if (version.Equals(appId)) {
-      // We're all good, get out of here.
-      return NS_OK;
-    }
-  }
-  // Update the version in prefs
-  prefString = do_CreateInstance(NS_SUPPORTS_STRING_CONTRACTID, &rv);
-  if (NS_FAILED(rv))
-    return rv;
-
-  prefString->SetData(appId);
-  rv = prefBranch->SetComplexValue(prefName.get(),
-                                   NS_GET_IID(nsISupportsString),
-                                   prefString);
-  if (NS_FAILED(rv)) {
-    NS_WARNING("Couldn't set last user model id!");
-    return NS_ERROR_UNEXPECTED;
-  }
-
-  nsAutoString appHelperPath;
-  if (NS_FAILED(GetHelperPath(appHelperPath)))
-    return NS_ERROR_UNEXPECTED;
-
-  appHelperPath.AppendLiteral(" /UpdateShortcutAppUserModelIds");
-
-  return LaunchHelper(appHelperPath);
-}
-
 /* helper routine. Iterate over the passed in settings object,
    testing each key to see if we are handling it.
 */
@@ -524,12 +446,6 @@ nsWindowsShellService::IsDefaultClientVista(uint16_t aApps, bool* aIsDefaultClie
 NS_IMETHODIMP
 nsWindowsShellService::IsDefaultClient(bool aStartupCheck, uint16_t aApps, bool *aIsDefaultClient)
 {
-  // If this is the first application window, maintain internal state that we've
-  // checked this session (so that subsequent window opens don't show the
-  // default client dialog).
-  if (aStartupCheck)
-    mCheckedThisSessionClient = true;
-
   *aIsDefaultClient = true;
 
   // for each type, check if it is the default app
@@ -566,7 +482,7 @@ nsWindowsShellService::SetDefaultClient(bool aForAllUsers,
 {
   nsAutoString appHelperPath;
   if (NS_FAILED(GetHelperPath(appHelperPath)))
-    return NS_ERROR_UNEXPECTED;
+    return NS_ERROR_FAILURE;
 
   if (aForAllUsers)
     appHelperPath.AppendLiteral(" /SetAsDefaultAppGlobal");
@@ -582,71 +498,7 @@ nsWindowsShellService::SetDefaultClient(bool aForAllUsers,
       appHelperPath.AppendLiteral(" News");
    }
 
-  STARTUPINFOW si = {sizeof(si), 0};
-  PROCESS_INFORMATION pi = {0};
-
-  BOOL ok = CreateProcessW(nullptr, (LPWSTR)appHelperPath.get(), nullptr,
-                           nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
-
-  if (!ok)
-    return NS_ERROR_FAILURE;
-
-  CloseHandle(pi.hProcess);
-  CloseHandle(pi.hThread);
-
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsWindowsShellService::GetShouldCheckDefaultClient(bool* aResult)
-{
-  if (mCheckedThisSessionClient) {
-    *aResult = false;
-    return NS_OK;
-  }
-
-  nsresult rv;
-  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  return prefs->GetBoolPref(PREF_CHECKDEFAULTCLIENT, aResult);
-}
-
-
-
-NS_IMETHODIMP
-nsWindowsShellService::SetShouldCheckDefaultClient(bool aShouldCheck)
-{
-  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID));
-  NS_ENSURE_TRUE(prefs, NS_ERROR_FAILURE);
-  return prefs->SetBoolPref(PREF_CHECKDEFAULTCLIENT, aShouldCheck);
-}
-
-NS_IMETHODIMP
-nsWindowsShellService::GetShouldBeDefaultClientFor(uint16_t* aApps)
-{
-  nsresult rv;
-  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  int32_t result;
-  rv = prefs->GetIntPref("shell.checkDefaultApps", &result);
-  *aApps = result;
-  return rv;
-}
-
-NS_IMETHODIMP
-nsWindowsShellService::SetShouldBeDefaultClientFor(uint16_t aApps)
-{
-  nsresult rv;
-  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  return prefs->SetIntPref("shell.checkDefaultApps", aApps);
-}
-
-NS_IMETHODIMP
-nsWindowsShellService::GetCanSetDesktopBackground(bool* aResult)
-{
-  *aResult = true;
-  return NS_OK;
+  return LaunchHelper(appHelperPath);
 }
 
 static nsresult
@@ -739,7 +591,8 @@ WriteBitmap(nsIFile* aFile, imgIContainer* aImage)
 
 NS_IMETHODIMP
 nsWindowsShellService::SetDesktopBackground(dom::Element* aElement,
-                                            int32_t aPosition)
+                                            int32_t aPosition,
+                                            const nsACString& aImageName)
 {
   nsCOMPtr<nsIContent> content(do_QueryInterface(aElement));
   if (!aElement || !aElement->IsHTMLElement(nsGkAtoms::img)) {
@@ -776,9 +629,9 @@ nsWindowsShellService::SetDesktopBackground(dom::Element* aElement,
   NS_ENSURE_SUCCESS(rv, rv);
 
   // e.g. "Desktop Background.bmp"
-  nsString fileLeafName;
-  rv = shellBundle->GetStringFromName
-                      ("desktopBackgroundLeafNameWin", fileLeafName);
+  nsAutoString fileLeafName;
+  rv = shellBundle->GetStringFromName("desktopBackgroundLeafNameWin",
+                                      fileLeafName);
   NS_ENSURE_SUCCESS(rv, rv);
 
   // get the profile root directory

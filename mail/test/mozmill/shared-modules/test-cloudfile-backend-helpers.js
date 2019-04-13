@@ -2,12 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "cloudfile-backend-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["window-helpers"];
 
-ChromeUtils.import('resource://gre/modules/XPCOMUtils.jsm');
+var {cloudFileAccounts} = ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
 
 var kUserAuthRequested = "cloudfile:auth";
 var kUserDataRequested = "cloudfile:user";
@@ -32,7 +34,7 @@ function installInto(module) {
 }
 
 function setupModule(module) {
-  wh = collector.getModule('window-helpers');
+  wh = collector.getModule("window-helpers");
 }
 
 function SimpleRequestObserverManager() {
@@ -40,13 +42,13 @@ function SimpleRequestObserverManager() {
 }
 
 SimpleRequestObserverManager.prototype = {
-  create: function(aName) {
+  create(aName) {
     let obs = new SimpleRequestObserver(aName);
     this._observers.push(obs);
     return obs;
   },
 
-  check: function() {
+  check() {
     for (let observer of this._observers) {
       if (!observer.success)
         throw new Error("An observer named " + observer.name + " was leftover, "
@@ -55,19 +57,19 @@ SimpleRequestObserverManager.prototype = {
     }
   },
 
-  reset: function() {
+  reset() {
     this._observers = [];
-  }
-}
+  },
+};
 
 function SimpleRequestObserver(aName) {
   this.name = aName;
-};
+}
 
 SimpleRequestObserver.prototype = {
   success: null,
-  onStartRequest: function(aRequest, aContext) {},
-  onStopRequest: function(aRequest, aContext, aStatusCode) {
+  onStartRequest(aRequest) {},
+  onStopRequest(aRequest, aStatusCode) {
     if (Components.isSuccessCode(aStatusCode)) {
       this.success = true;
     } else {
@@ -76,7 +78,7 @@ SimpleRequestObserver.prototype = {
   },
   QueryInterface: ChromeUtils.generateQI([Ci.nsIRequestObserver,
                                           Ci.nsISupportsWeakReference]),
-}
+};
 
 /**
  * This function uploads one or more files, and then proceeds to cancel
@@ -95,14 +97,14 @@ function assert_can_cancel_uploads(aController, aProvider, aFiles) {
   for (let file of aFiles) {
     let mapping = {};
     mapping.listener = {
-      onStartRequest: function(aRequest, aContext) {
+      onStartRequest(aRequest) {
         mapping.started = true;
       },
-      onStopRequest: function(aRequest, aContext, aStatusCode) {
-        if (aStatusCode == Ci.nsIMsgCloudFileProvider.uploadCanceled)
+      onStopRequest(aRequest, aStatusCode) {
+        if (aStatusCode == cloudFileAccounts.constants.uploadCancelled)
           mapping.cancelled = true;
       },
-    }
+    };
 
     aProvider.uploadFile(file, mapping.listener);
     fileListenerMap.push(mapping);
@@ -113,13 +115,14 @@ function assert_can_cancel_uploads(aController, aProvider, aFiles) {
 
   // Go backwards through the file list, ensuring that we can cancel the
   // last file, all the way to the first.
-  for (let i = aFiles.length - 1; i >= 0; --i)
+  for (let i = aFiles.length - 1; i >= 0; --i) {
     aProvider.cancelFileUpload(aFiles[i]);
+  }
 
   aController.waitFor(function() {
     return fileListenerMap.length == aFiles.length &&
            fileListenerMap.every(function(aMapping) {
-             return aMapping.cancelled
-           })
+             return aMapping.cancelled;
+           });
   }, "Timed out waiting for cancellation to occur");
 }

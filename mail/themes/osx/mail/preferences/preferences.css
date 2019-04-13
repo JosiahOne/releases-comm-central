@@ -3,41 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 @import url("chrome://messenger/content/bindings.css");
-@import url("chrome://messenger/content/preferences/preferences.css");
 
 /* Global Styles */
-
-prefwindow {
-  -moz-appearance: dialog;
-  background-color: #ffffff;
-  color: -moz-DialogText;
-  font: -moz-dialog;
-  padding: 0;
-}
-
-prefwindow[type="child"] {
-  padding-top: 18px;
-  padding-bottom: 15px;
-  padding-inline-start: 18px;
-  padding-inline-end: 20px;
-}
-
-prefpane {
-  padding: 12px;
-}
-
-prefwindow[type="child"] > prefpane {
-  padding: 0;
-}
-
-.prefWindow-dlgbuttons {
-  margin: 0 12px 12px;
-  padding-top: 0 !important;
-}
-
-.paneButtonLabel {
-  margin: 0 !important;
-}
 
 .windowDialog {
   padding: 12px;
@@ -55,16 +22,8 @@ menulist > menupopup > menuitem {
   font: -moz-pull-down-menu;
 }
 
-prefwindow:not([type="child"]) {
-  padding: 0 !important;
-}
-
 /* Attachments Pane */
-#MailPreferences[animated="true"] #handlersView {
-  height: 17em;
-}
-
-#MailPreferences[animated="false"] #handlersView {
+#handlersView {
   -moz-box-flex: 1;
 }
 
@@ -78,14 +37,6 @@ prefwindow:not([type="child"]) {
 prefpane .groupbox-body {
   -moz-appearance: none;
   padding: 8px 4px 4px;
-}
-
-#paneTabs > groupbox {
-  margin: 0;
-}
-
-#paneTabs > vbox {
-  margin: 8px;
 }
 
 prefpane .groupbox-title {
@@ -136,11 +87,6 @@ tabpanels {
   color: HighlightText !important;
 }
 
-/* Chat */
-#timeBeforeAway {
-  width: 4em;
-}
-
 /* Quota meter in Folder Properties */
 
 #quotaPercentageBar {
@@ -155,10 +101,6 @@ tabpanels {
 }
 
 /* Attachments */
-
-body {
-  font-size: 12px;
-}
 
 a {
   color: -moz-nativehyperlinktext;
@@ -177,24 +119,31 @@ a {
   margin-right: 120px;
 }
 
-#provider-name h1 {
-  font-size: large;
-}
-
 #provider-name h2 {
-  font-size: 12px;
+  font-size: 1.2em;
 }
 
 #provider-terms {
   float: right;
-  width: 110px;
 }
 
 #provider-terms a {
-  font-size: small;
   display: block;
   margin-bottom: 5px;
   text-align: right;
+}
+#upgrade a,
+#provider-terms a,
+#provider-account-settings a {
+  color: #0a8dff;
+  text-decoration: none;
+}
+
+#upgrade a:hover,
+#provider-terms a:hover,
+#provider-account-settings a:hover {
+  color: #0060df;
+  text-decoration: underline;
 }
 
 #provider-space {
@@ -257,10 +206,13 @@ a {
 
 #provider-management {
   margin: 0 10px;
+  font-size: 1em;
 }
 
 #provider-name h1 {
   margin: 0;
+  font-size: 1.5em;
+  font-weight: 600;
 }
 
 /* Loading panel */

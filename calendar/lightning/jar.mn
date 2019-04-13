@@ -18,14 +18,6 @@ lightning.jar:
 % overlay chrome://mozapps/content/extensions/extensions.xul chrome://lightning/content/suite-overlay-addons.xul application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
 % overlay chrome://messenger/content/preferences/preferences.xul chrome://lightning/content/messenger-overlay-preferences.xul
 % overlay about:preferences chrome://lightning/content/messenger-overlay-preferences.xul
-% overlay chrome://messenger/content/preferences/preferences.xul chrome://calendar/content/preferences/alarms.xul
-% overlay about:preferences chrome://calendar/content/preferences/alarms.xul
-% overlay chrome://messenger/content/preferences/preferences.xul chrome://calendar/content/preferences/categories.xul
-% overlay about:preferences chrome://calendar/content/preferences/categories.xul
-% overlay chrome://messenger/content/preferences/preferences.xul chrome://calendar/content/preferences/general.xul
-% overlay about:preferences chrome://calendar/content/preferences/general.xul
-% overlay chrome://messenger/content/preferences/preferences.xul chrome://calendar/content/preferences/views.xul
-% overlay about:preferences chrome://calendar/content/preferences/views.xul
 % overlay chrome://lightning/content/messenger-overlay-sidebar.xul chrome://calendar/content/calendar-unifinder.xul
 % overlay chrome://lightning/content/messenger-overlay-sidebar.xul chrome://calendar/content/calendar-unifinder-todo.xul
 % overlay chrome://lightning/content/messenger-overlay-sidebar.xul chrome://calendar/content/calendar-task-view.xul
@@ -49,13 +41,12 @@ lightning.jar:
     content/lightning/lightning-toolbar.xul                (content/lightning-toolbar.xul)
     content/lightning/lightning-utils.js                   (content/lightning-utils.js)
     content/lightning/lightning-widgets.css                (content/lightning-widgets.css)
-    content/lightning/lightning-widgets.xml                (content/lightning-widgets.xml)
     content/lightning/messenger-overlay-accountCentral.xul (content/messenger-overlay-accountCentral.xul)
     content/lightning/messenger-overlay-messageWindow.xul  (content/messenger-overlay-messageWindow.xul)
     content/lightning/messenger-overlay-sidebar.js         (content/messenger-overlay-sidebar.js)
     content/lightning/messenger-overlay-sidebar.xul        (content/messenger-overlay-sidebar.xul)
     content/lightning/messenger-overlay-preferences.js     (content/messenger-overlay-preferences.js)
-    content/lightning/messenger-overlay-preferences.xul    (content/messenger-overlay-preferences.xul)
+*   content/lightning/messenger-overlay-preferences.xul    (content/messenger-overlay-preferences.xul)
     content/lightning/suite-overlay-addons.xul             (content/suite-overlay-addons.xul)
     content/lightning/suite-overlay-preferences.xul        (content/suite-overlay-preferences.xul)
     content/lightning/suite-overlay-sidebar.js             (content/suite-overlay-sidebar.js)
@@ -82,7 +73,6 @@ lightning.jar:
 % style chrome://calendar/content/calendar-event-dialog.xul chrome://communicator/skin/communicator.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
 % style chrome://messenger/content/customizeToolbar.xul chrome://lightning-common/skin/lightning.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
 % style chrome://messenger/content/customizeToolbar.xul chrome://calendar-common/skin/dialogs/calendar-event-dialog.css application={92650c4d-4b8e-4d2a-b7eb-24ecf4f6b63a}
-    ../skin/lightning-common/mode-switch-icons.png            (themes/common/images/mode-switch-icons.png)
     ../skin/lightning-common/todayButton-arrow.svg            (themes/common/images/todayButton-arrow.svg)
     ../skin/lightning-common/suite-accountCentral.css         (themes/common/suite-accountCentral.css)
 
@@ -91,29 +81,23 @@ lightning.jar:
     ../skin/linux/lightning/imip.css                          (themes/linux/imip.css)
     ../skin/linux/lightning/lightning.css                     (themes/linux/lightning.css)
     ../skin/linux/lightning/lightning-toolbar.css             (themes/linux/lightning-toolbar.css)
-    ../skin/linux/lightning/lightning-widgets.css             (themes/linux/lightning-widgets.css)
 
 # OS X theme files
     ../skin/osx/lightning/accountCentral.css                  (themes/osx/accountCentral.css)
     ../skin/osx/lightning/imip.css                            (themes/osx/imip.css)
     ../skin/osx/lightning/lightning.css                       (themes/osx/lightning.css)
     ../skin/osx/lightning/lightning-toolbar.css               (themes/osx/lightning-toolbar.css)
-    ../skin/osx/lightning/lightning-widgets.css               (themes/osx/lightning-widgets.css)
 
 # Windows theme files
     ../skin/windows/lightning/accountCentral.css              (themes/windows/accountCentral.css)
     ../skin/windows/lightning/imip.css                        (themes/windows/imip.css)
     ../skin/windows/lightning/lightning.css                   (themes/windows/lightning.css)
     ../skin/windows/lightning/lightning-toolbar.css           (themes/windows/lightning-toolbar.css)
-    ../skin/windows/lightning/lightning-widgets.css           (themes/windows/lightning-widgets.css)
-    ../skin/windows/lightning/mode-switch-icons-aero.png      (themes/windows/images/mode-switch-icons-aero.png)
-
 
 calendar.jar:
     content/calendar/calendarCreation.xul                  (../resources/content/calendarCreation.xul)
     content/calendar/calendarCreation.js                   (../resources/content/calendarCreation.js)
-    content/calendar/datetimepickers/datetimepickers.css   (../resources/content/datetimepickers/datetimepickers.css)
-    content/calendar/datetimepickers/datetimepickers.xml   (../resources/content/datetimepickers/datetimepickers.xml)
+    content/calendar/datetimepickers/datetimepickers.js    (../resources/content/datetimepickers/datetimepickers.js)
     content/calendar/mouseoverPreviews.js                  (../resources/content/mouseoverPreviews.js)
     content/calendar/publish.js                            (../resources/content/publish.js)
     content/calendar/publishDialog.js                      (../resources/content/publishDialog.js)

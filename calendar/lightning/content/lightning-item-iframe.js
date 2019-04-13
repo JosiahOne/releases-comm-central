@@ -3,33 +3,43 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /* exported onEventDialogUnload, changeUndiscloseCheckboxStatus,
+ *          categoryPopupHiding, categoryTextboxKeypress,
  *          toggleKeepDuration, dateTimeControls2State, onUpdateAllDay,
  *          openNewEvent, openNewTask, openNewMessage, openNewCardDialog,
  *          deleteAllAttachments, copyAttachment, attachmentLinkKeyPress,
  *          attachmentDblClick, attachmentClick, notifyUser,
  *          removeNotification, chooseRecentTimezone, showTimezonePopup,
- *          attendeeDblClick, attendeeClick, removeAttendee,
+ *          attendeeDblClick, setAttendeeContext, removeAttendee,
  *          removeAllAttendees, sendMailToUndecidedAttendees, checkUntilDate,
  *          applyValues
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from ../../base/content/calendar-ui-utils.js */
+/* import-globals-from ../../base/content/dialogs/calendar-dialog-utils.js */
+/* import-globals-from html-item-editing/react-code.js */
+/* globals gTimezonesEnabled, gShowLink */// Set by lightning-item-panel.js.
 
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {
+    recurrenceRule2String,
+    splitRecurrenceRules,
+    checkRecurrenceRule,
+    countOccurrences
+} = ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+var { PluralForm } = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+
+var cloudFileAccounts;
 try {
-    ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
+    let temp = ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
+    cloudFileAccounts = temp.cloudFileAccounts;
 } catch (e) {
-    // This will fail on Seamonkey, but thats ok since the pref for cloudfiles
+    // This will fail on Seamonkey, but that's ok since the pref for cloudfiles
     // is false, which means the UI will not be shown
 }
 
 // Flag for using new item UI code (HTML/React.js).
-const gNewItemUI = Preferences.get("calendar.item.useNewItemUI", false);
+const gNewItemUI = Services.prefs.getBoolPref("calendar.item.useNewItemUI", false);
 
 // the following variables are constructed if the jsContext this file
 // belongs to gets constructed. all those variables are meant to be accessed
@@ -65,8 +75,7 @@ var eventDialogQuitObserver = {
         // Check whether or not we want to veto the quit request (unless another
         // observer already did.
         if (aTopic == "quit-application-requested" &&
-            (aSubject instanceof Components.interfaces.nsISupportsPRBool) &&
-            !aSubject.data) {
+            (aSubject instanceof Ci.nsISupportsPRBool) && !aSubject.data) {
             aSubject.data = !onCancel();
         }
     }
@@ -84,7 +93,7 @@ var eventDialogCalendarObserver = {
             // The item has been modified outside the dialog. We only need to
             // prompt if there have been local changes also.
             if (isItemChanged()) {
-                let promptService = Components.interfaces.nsIPromptService;
+                let promptService = Ci.nsIPromptService;
                 let promptTitle = cal.l10n.getCalString("modifyConflictPromptTitle");
                 let promptMessage = cal.l10n.getCalString("modifyConflictPromptMessage");
                 let promptButton1 = cal.l10n.getCalString("modifyConflictPromptButton1");
@@ -156,7 +165,7 @@ var eventDialogCalendarObserver = {
  */
 function canNotifyAttendees(aCalendar, aItem) {
     try {
-        let calendar = aCalendar.QueryInterface(Components.interfaces.calISchedulingSupport);
+        let calendar = aCalendar.QueryInterface(Ci.calISchedulingSupport);
         return (calendar.canNotify("REQUEST", aItem) && calendar.canNotify("CANCEL", aItem));
     } catch (exc) {
         return false;
@@ -212,7 +221,7 @@ function receiveMessage(aEvent) {
             postponeTask(aEvent.data.value);
             break;
         case "toggleTimezoneLinks":
-            gTimezonesEnabled = aEvent.data.checked;
+            gTimezonesEnabled = aEvent.data.checked; // eslint-disable-line
             updateDateTime();
             /*
             // Not implemented in react-code.js yet
@@ -312,7 +321,7 @@ function onLoad() {
     // new items should have a non-empty title.
     if (item.isMutable && (!item.title || item.title.length <= 0)) {
         item.title = cal.l10n.getString("calendar-event-dialog",
-                                      cal.item.isEvent(item) ? "newEvent" : "newTask");
+                                        cal.item.isEvent(item) ? "newEvent" : "newTask");
     }
 
     window.onAcceptCallback = args.onOk;
@@ -326,6 +335,8 @@ function onLoad() {
     // store the initial date value for datepickers in New Task dialog
     window.initialStartDateValue = args.initialStartDateValue;
 
+    window.attendeeTabLabel = document.getElementById("event-grid-tab-attendees").label;
+    window.attachmentTabLabel = document.getElementById("event-grid-tab-attachments").label;
     // we store the array of attendees in the window.
     // clone each existing attendee since we still suffer
     // from the 'lost x-properties'-bug.
@@ -457,7 +468,7 @@ function onCommandCancel() {
         gTabmail.switchToTab(gTabInfoObject);
     }
 
-    let promptService = Components.interfaces.nsIPromptService;
+    let promptService = Ci.nsIPromptService;
 
     let promptTitle = cal.l10n.getCalString(
         cal.item.isEvent(window.calendarItem) ? "askSaveTitleEvent" : "askSaveTitleTask"
@@ -587,7 +598,6 @@ function loadDialog(aItem) {
         }
     } else {
         let calendarList = document.getElementById("item-calendar");
-        removeChildren(calendarList);
         let indexToSelect = appendCalendarItems(aItem, calendarList, aItem.calendar || window.arguments[0].calendar);
         if (indexToSelect > -1) {
             calendarList.selectedIndex = indexToSelect;
@@ -662,17 +672,17 @@ function loadDialog(aItem) {
         setElementValue("item-description", aItem.getProperty("DESCRIPTION"));
     }
 
-    // Task completed date
-    if (!gNewItemUI) {
-        if (aItem.completedDate) {
-            updateToDoStatus(aItem.status, cal.dtz.dateTimeToJsDate(aItem.completedDate));
-        } else {
-            updateToDoStatus(aItem.status);
-        }
-    }
-
-    // Task percent complete
     if (cal.item.isToDo(aItem)) {
+        // Task completed date
+        if (!gNewItemUI) {
+            if (aItem.completedDate) {
+                updateToDoStatus(aItem.status, cal.dtz.dateTimeToJsDate(aItem.completedDate));
+            } else {
+                updateToDoStatus(aItem.status);
+            }
+        }
+
+        // Task percent complete
         let percentCompleteInteger = 0;
         let percentCompleteProperty = aItem.getProperty("PERCENT-COMPLETE");
         if (percentCompleteProperty != null) {
@@ -747,7 +757,7 @@ function loadDialog(aItem) {
             let itemProp = aItem.getProperty("X-MOZ-SEND-INVITATIONS");
             notifyCheckbox.checked = (aItem.calendar.getProperty("imip.identity") &&
                                       ((itemProp === null)
-                                       ? Preferences.get("calendar.itip.notify", true)
+                                       ? Services.prefs.getBoolPref("calendar.itip.notify", true)
                                        : (itemProp == "TRUE")));
             let undiscloseProp = aItem.getProperty("X-MOZ-SEND-INVITATIONS-UNDISCLOSED");
             undiscloseCheckbox.checked = (undiscloseProp === null)
@@ -840,8 +850,42 @@ function changeUndiscloseCheckboxStatus() {
  * @param aItem     The item to load into the category panel
  */
 function loadCategories(aItem) {
-    let categoryPanel = document.getElementById("item-categories-panel");
-    categoryPanel.loadItem(aItem);
+    let itemCategories = aItem.getCategories({});
+    let categoryList = cal.category.fromPrefs();
+    for (let cat of itemCategories) {
+        if (!categoryList.includes(cat)) {
+            categoryList.push(cat);
+        }
+    }
+    cal.l10n.sortArrayByLocaleCollator(categoryList);
+
+    // Make sure the maximum number of categories is applied to the listbox
+    let calendar = getCurrentCalendar();
+    let maxCount = calendar.getProperty("capabilities.categories.maxCount");
+
+    let categoryPopup = document.getElementById("item-categories-popup");
+    if (maxCount == 1) {
+        let item = document.createElement("menuitem");
+        item.setAttribute("class", "menuitem-iconic");
+        item.setAttribute("label", cal.l10n.getCalString("None"));
+        item.setAttribute("type", "radio");
+        if (itemCategories.length === 0) {
+            item.setAttribute("checked", "true");
+        }
+        categoryPopup.appendChild(item);
+    }
+    for (let cat of categoryList) {
+        let item = document.createElement("menuitem");
+        item.setAttribute("class", "menuitem-iconic calendar-category");
+        item.setAttribute("label", cat);
+        item.setAttribute("value", cat);
+        item.setAttribute("type", (maxCount === null || maxCount > 1) ? "checkbox" : "radio");
+        if (itemCategories.includes(cat)) {
+            item.setAttribute("checked", "true");
+        }
+        categoryPopup.appendChild(item);
+    }
+
     updateCategoryMenulist();
 }
 
@@ -851,12 +895,11 @@ function loadCategories(aItem) {
  */
 function updateCategoryMenulist() {
     let categoryMenulist = document.getElementById("item-categories");
-    let categoryPanel = document.getElementById("item-categories-panel");
+    let categoryPopup = document.getElementById("item-categories-popup");
 
     // Make sure the maximum number of categories is applied to the listbox
     let calendar = getCurrentCalendar();
     let maxCount = calendar.getProperty("capabilities.categories.maxCount");
-    categoryPanel.maxCount = (maxCount === null ? -1 : maxCount);
 
     // Hide the categories listbox and label in case categories are not
     // supported
@@ -866,15 +909,100 @@ function updateCategoryMenulist() {
     setBooleanAttribute("item-calendar-aux-label", "hidden", (maxCount !== 0));
 
     let label;
-    let categoryList = categoryPanel.categories;
+    let categoryList = categoryPopup.querySelectorAll("menuitem.calendar-category[checked]");
     if (categoryList.length > 1) {
         label = cal.l10n.getCalString("multipleCategories");
     } else if (categoryList.length == 1) {
-        label = categoryList[0];
+        label = categoryList[0].getAttribute("label");
     } else {
         label = cal.l10n.getCalString("None");
     }
     categoryMenulist.setAttribute("label", label);
+}
+
+/**
+ * Updates the categories menulist label and decides if the popup should close
+ *
+ * @param aItem     The popuphiding event
+ * @return          Whether the popup should close
+ */
+function categoryPopupHiding(event) {
+    updateCategoryMenulist();
+    let calendar = getCurrentCalendar();
+    let maxCount = calendar.getProperty("capabilities.categories.maxCount");
+    if (maxCount === null || maxCount > 1) {
+        return event.explicitOriginalTarget.localName != "menuitem";
+    }
+    return true;
+}
+
+/**
+ * Prompts for a new category name, then adds it to the list
+ */
+function categoryTextboxKeypress(event) {
+    let category = event.target.value;
+    let categoryPopup = document.getElementById("item-categories-popup");
+    switch (event.key) {
+        case "Tab":
+        case "ArrowDown":
+        case "ArrowUp": {
+            event.target.blur();
+            event.preventDefault();
+
+            let code = event.key == "ArrowUp" ? KeyboardEvent.DOM_VK_UP : KeyboardEvent.DOM_VK_DOWN;
+            let keyEvent = document.createEvent("KeyboardEvent");
+            keyEvent.initKeyEvent("keydown", true, true, null, false, false, false, false, code, 0);
+            categoryPopup.dispatchEvent(keyEvent);
+            keyEvent.initKeyEvent("keyup", true, true, null, false, false, false, false, code, 0);
+            categoryPopup.dispatchEvent(keyEvent);
+            return;
+        }
+        case "Escape":
+            if (category) {
+                event.target.value = "";
+            } else {
+                categoryPopup.hidePopup();
+            }
+            event.preventDefault();
+            return;
+        case "Enter":
+            category = category.trim();
+            if (category != "") {
+                break;
+            }
+            return;
+        default:
+            return;
+    }
+    event.preventDefault();
+
+    let categoryList = categoryPopup.querySelectorAll("menuitem.calendar-category");
+    let categories = Array.from(categoryList, cat => cat.getAttribute("value"));
+
+    let newIndex = categories.indexOf(category);
+    if (newIndex > -1) {
+        categoryList[newIndex].setAttribute("checked", true);
+    } else {
+        let localeCollator = cal.l10n.createLocaleCollator();
+        let compare = localeCollator.compareString.bind(localeCollator, 0);
+        newIndex = cal.data.binaryInsert(categories, category, compare, true);
+
+        let calendar = getCurrentCalendar();
+        let maxCount = calendar.getProperty("capabilities.categories.maxCount");
+
+        let item = document.createElement("menuitem");
+        item.setAttribute("class", "menuitem-iconic calendar-category");
+        item.setAttribute("label", category);
+        item.setAttribute("value", category);
+        item.setAttribute("type", (maxCount === null || maxCount > 1) ? "checkbox" : "radio");
+        item.setAttribute("checked", true);
+        categoryPopup.insertBefore(item, categoryList[newIndex]);
+    }
+
+    event.target.value = "";
+    // By pushing this to the end of the event loop, the other checked items in the list
+    // are cleared, where only one category is allowed.
+    setTimeout(updateCategoryMenulist, 0);
 }
 
 /**
@@ -883,8 +1011,11 @@ function updateCategoryMenulist() {
  * @param aItem     The item to set the categories on
  */
 function saveCategories(aItem) {
-    let categoryPanel = document.getElementById("item-categories-panel");
-    let categoryList = categoryPanel.categories;
+    let categoryPopup = document.getElementById("item-categories-popup");
+    let categoryList = Array.from(
+        categoryPopup.querySelectorAll("menuitem.calendar-category[checked]"),
+        cat => cat.getAttribute("label")
+    );
     aItem.setCategories(categoryList.length, categoryList);
 }
 
@@ -1100,10 +1231,6 @@ function dateTimeControls2State(aStartDatepicker) {
             // changed the start date, it looks reasonable to restore a valid
             // until date equal to the start date.
             gUntilDate = gStartTime.clone();
-            // Update the rule.
-            let rrules = splitRecurrenceRules(window.recurrenceInfo);
-            recRule = rrules[0][0];
-            recRule.untilDate = gUntilDate.clone();
             // Update the until-date-picker. In case of "custom" rule, the
             // recurrence string is going to be changed by updateDateTime() below.
             let notCustomRule = document.getElementById("repeat-deck").selectedIndex == 0;
@@ -1258,7 +1385,7 @@ function getRepeatTypeAndUntilDate(aItem) {
             }
         }
         if (rules.length == 1) {
-            let rule = cal.wrapInstance(rules[0], Components.interfaces.calIRecurrenceRule);
+            let rule = cal.wrapInstance(rules[0], Ci.calIRecurrenceRule);
             if (rule) {
                 switch (rule.type) {
                     case "DAILY": {
@@ -1541,7 +1668,7 @@ function updateTitle() {
     } else if (cal.item.isToDo(window.calendarItem)) {
         strName = (window.mode == "new" ? "newTaskDialog" : "editTaskDialog");
     } else {
-        throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+        throw Cr.NS_ERROR_NOT_IMPLEMENTED;
     }
     let newTitle = cal.l10n.getCalString(strName) + ": " + getElementValue("item-title");
     sendMessage({ command: "updateTitle", argument: newTitle });
@@ -1593,7 +1720,7 @@ function updateAccept() {
         // For all-day events we are not interested in times and compare only
         // dates.
         if (isEvent && getElementValue("event-all-day", "checked")) {
-            // jsDateToDateTime returnes the values in UTC. Depending on the
+            // jsDateToDateTime returns the values in UTC. Depending on the
             // local timezone and the values selected in datetimepicker the date
             // in UTC might be shifted to the previous or next day.
             // For example: The user (with local timezone GMT+05) selected
@@ -1672,7 +1799,7 @@ function onUpdateAllDay() {
             // was an "All day" type, so we have to set default values.
             gStartTime.hour = cal.dtz.getDefaultStartDate(window.initialStartDateValue).hour;
             gEndTime.hour = gStartTime.hour;
-            gEndTime.minute += Preferences.get("calendar.event.defaultlength", 60);
+            gEndTime.minute += Services.prefs.getIntPref("calendar.event.defaultlength", 60);
             gOldStartTimezone = kDefaultTimezone;
             gOldEndTimezone = kDefaultTimezone;
         } else {
@@ -1769,7 +1896,7 @@ function editAttendees() {
             // by the 'invite attendee'-dialog.
             if (savedWindow.organizer) {
                 // The other case is that we already had an organizer object
-                // before we went throught the 'invite attendee'-dialog. In that
+                // before we went through the 'invite attendee'-dialog. In that
                 // case make sure we don't carry over attributes that have been
                 // set to their default values by the dialog but don't actually
                 // exist in the original organizer object.
@@ -1788,6 +1915,13 @@ function editAttendees() {
             }
             savedWindow.organizer = organizer;
         }
+
+        // if a participant was added or removed we switch to the attendee
+        // tab, so the user can see the change directly
+        let tabs = document.getElementById("event-grid-tabs");
+        let attendeeTab = document.getElementById("event-grid-tab-attendees");
+        tabs.selectedItem = attendeeTab;
+
         let duration = endTime.subtractDate(startTime);
         startTime = startTime.clone();
         endTime = endTime.clone();
@@ -1882,7 +2016,7 @@ function updateConfigState(aArg) {
  * Add menu items to the UI for attaching files using cloud providers.
  */
 function loadCloudProviders() {
-    let cloudFileEnabled = Preferences.get("mail.cloud_files.enabled", false);
+    let cloudFileEnabled = Services.prefs.getBoolPref("mail.cloud_files.enabled", false);
     let cmd = document.getElementById("cmd_attach_cloud");
     let message = {
         command: "setElementAttribute",
@@ -1897,14 +2031,14 @@ function loadCloudProviders() {
         return;
     }
 
-    let isHidden = cloudFileAccounts.accounts.length == 0;
+    let isHidden = cloudFileAccounts.configuredAccounts.length == 0;
     cmd.hidden = isHidden;
     message.argument.value = isHidden;
     sendMessage(message);
 
     let itemObjects = [];
 
-    for (let cloudProvider of cloudFileAccounts.accounts) {
+    for (let cloudProvider of cloudFileAccounts.configuredAccounts) {
         // Create a serializable object to pass in a message outside the iframe
         let itemObject = {};
         itemObject.displayName = cloudFileAccounts.getDisplayName(cloudProvider);
@@ -1918,7 +2052,7 @@ function loadCloudProviders() {
         itemObjects.push(itemObject);
 
         // Create a menu item from the serializable object
-        let item = createXULElement("menuitem");
+        let item = document.createXULElement("menuitem");
         item.setAttribute("label", itemObject.label);
         item.setAttribute("observes", "cmd_attach_cloud");
         item.setAttribute("oncommand", "attachFile(event.target.cloudProvider); event.stopPropagation();");
@@ -1959,6 +2093,11 @@ function attachURL() {
                 let attachment = cal.createAttachment();
                 attachment.uri = Services.io.newURI(result.value);
                 addAttachment(attachment);
+                // we switch to the attachment tab if it is not already displayed
+                // to allow the user to see the attachment was added
+                let tabs = document.getElementById("event-grid-tabs");
+                let attachTab = document.getElementById("event-grid-tab-attachments");
+                tabs.selectedItem = attachTab;
             } catch (e) {
                 // TODO We might want to show a warning instead of just not
                 // adding the file
@@ -1973,7 +2112,7 @@ function attachURL() {
  * @param {string} aAccountKey  The accountKey for a cloud provider
  */
 function attachFileByAccountKey(aAccountKey) {
-    for (let cloudProvider of cloudFileAccounts.accounts) {
+    for (let cloudProvider of cloudFileAccounts.configuredAccounts) {
         if (aAccountKey == cloudProvider.accountKey) {
             attachFile(cloudProvider);
             return;
@@ -1991,12 +2130,10 @@ function attachFile(cloudProvider) {
         cal.ERROR("[calendar-event-dialog] Could not attach file without cloud provider" + cal.STACK(10));
     }
 
-    const nsIFilePicker = Components.interfaces.nsIFilePicker;
-    let filePicker = Components.classes["@mozilla.org/filepicker;1"]
-                               .createInstance(nsIFilePicker);
+    let filePicker = Cc["@mozilla.org/filepicker;1"].createInstance(Ci.nsIFilePicker);
     filePicker.init(window,
                     cal.l10n.getString("calendar-event-dialog", "selectAFile"),
-                    nsIFilePicker.modeOpenMultiple);
+                    Ci.nsIFilePicker.modeOpenMultiple);
 
     // Check for the last directory
     let lastDir = lastDirectory();
@@ -2005,17 +2142,17 @@ function attachFile(cloudProvider) {
     }
 
     filePicker.open(rv => {
-        if (rv != nsIFilePicker.returnOK || !filePicker.files) {
+        if (rv != Ci.nsIFilePicker.returnOK || !filePicker.files) {
             return;
         }
         let files = filePicker.files;
 
         // Create the attachment
         while (files.hasMoreElements()) {
-            let file = files.getNext().QueryInterface(Components.interfaces.nsIFile);
+            let file = files.getNext().QueryInterface(Ci.nsIFile);
 
             let fileHandler = Services.io.getProtocolHandler("file")
-                                         .QueryInterface(Components.interfaces.nsIFileProtocolHandler);
+                                         .QueryInterface(Ci.nsIFileProtocolHandler);
             let uriSpec = fileHandler.getURLSpecFromFile(file);
 
             if (!(uriSpec in gAttachMap)) {
@@ -2048,8 +2185,8 @@ function lastDirectory(aFileUri) {
     if (aFileUri) {
         // Act similar to a setter, save the passed uri.
         let uri = Services.io.newURI(aFileUri);
-        let file = uri.QueryInterface(Components.interfaces.nsIFileURL).file;
-        lastDirectory.mValue = file.parent.QueryInterface(Components.interfaces.nsIFile);
+        let file = uri.QueryInterface(Ci.nsIFileURL).file;
+        lastDirectory.mValue = file.parent.QueryInterface(Ci.nsIFile);
     }
 
     // In any case, return the value
@@ -2084,7 +2221,7 @@ function makePrettyName(aUri) {
  * @param listItem          The listitem in attachment-link listbox to update.
  */
 function uploadCloudAttachment(attachment, cloudProvider, listItem) {
-    let file = attachment.uri.QueryInterface(Components.interfaces.nsIFileURL).file;
+    let file = attachment.uri.QueryInterface(Ci.nsIFileURL).file;
     listItem.attachLocalFile = file;
     listItem.attachCloudProvider = cloudProvider;
     cloudProvider.uploadFile(file, {
@@ -2092,7 +2229,7 @@ function uploadCloudAttachment(attachment, cloudProvider, listItem) {
             listItem.setAttribute("image", "chrome://global/skin/icons/loading.png");
         },
 
-        onStopRequest: function(aRequest, aContext, aStatusCode) {
+        onStopRequest: function(aRequest, aStatusCode) {
             if (Components.isSuccessCode(aStatusCode)) {
                 delete gAttachMap[attachment.hashId];
                 attachment.uri = Services.io.newURI(cloudProvider.urlForFile(file));
@@ -2140,31 +2277,32 @@ function addAttachment(attachment, cloudProvider) {
     // We currently only support uri attachments
     if (attachment.uri) {
         let documentLink = document.getElementById("attachment-link");
-        let listItem = createXULElement("listitem");
-
-        // Set listitem attributes
-        listItem.setAttribute("label", makePrettyName(attachment.uri));
-        listItem.setAttribute("crop", "end");
-        listItem.setAttribute("class", "listitem-iconic");
+        let listItem = document.createXULElement("richlistitem");
+        let image = document.createElement("image");
+        listItem.appendChild(image);
+        let label = document.createElement("label");
+        label.setAttribute("value", makePrettyName(attachment.uri));
+        label.setAttribute("crop", "end");
+        listItem.appendChild(label);
         listItem.setAttribute("tooltiptext", attachment.uri.spec);
         if (cloudProvider) {
             if (attachment.uri.schemeIs("file")) {
                 // Its still a local url, needs to be uploaded
-                listItem.setAttribute("image", "chrome://messenger/skin/icons/connecting.png");
+                image.setAttribute("src", "chrome://messenger/skin/icons/connecting.png");
                 uploadCloudAttachment(attachment, cloudProvider, listItem);
             } else {
                 let leafName = attachment.getParameter("FILENAME");
-                listItem.setAttribute("image", cloudProvider.iconClass);
+                image.setAttribute("src", cloudProvider.iconClass);
                 if (leafName) {
                     listItem.setAttribute("label", leafName);
                 }
             }
         } else if (attachment.uri.schemeIs("file")) {
-            listItem.setAttribute("image", "moz-icon://" + attachment.uri);
+            image.setAttribute("src", "moz-icon://" + attachment.uri.spec);
         } else {
             let leafName = attachment.getParameter("FILENAME");
             let providerType = attachment.getParameter("PROVIDER");
-            let cloudFileEnabled = Preferences.get("mail.cloud_files.enabled", false);
+            let cloudFileEnabled = Services.prefs.getBoolPref("mail.cloud_files.enabled", false);
 
             if (leafName) {
                 // TODO security issues?
@@ -2172,9 +2310,19 @@ function addAttachment(attachment, cloudProvider) {
             }
             if (providerType && cloudFileEnabled) {
                 let provider = cloudFileAccounts.getProviderForType(providerType);
-                listItem.setAttribute("image", provider.iconClass);
+                image.setAttribute("src", provider.iconClass);
             } else {
-                listItem.setAttribute("image", "moz-icon://dummy.html");
+                let iconSrc = attachment.uri.spec.length ? attachment.uri.spec : "dummy.html";
+                if (attachment.formatType) {
+                    iconSrc = "goat?contentType=" + attachment.formatType;
+                } else {
+                    // let's try to auto-detect
+                    let parts = iconSrc.substr(attachment.uri.scheme.length + 2).split("/");
+                    if (parts.length) {
+                        iconSrc = parts[parts.length - 1];
+                    }
+                }
+                image.setAttribute("src", "moz-icon://" + iconSrc);
             }
         }
 
@@ -2206,7 +2354,7 @@ function deleteAttachment() {
         try {
             item.attachCloudProvider.deleteFile(item.attachLocalFile, {
                 onStartRequest: function() {},
-                onStopRequest: function(aRequest, aContext, aStatusCode) {
+                onStopRequest: function(aRequest, aStatusCode) {
                     if (!Components.isSuccessCode(aStatusCode)) {
                         // TODO With a notification bar, we could actually show this error.
                         cal.ERROR("[calendar-event-dialog] Deleting cloud attachment " +
@@ -2259,10 +2407,10 @@ function deleteAllAttachments() {
 function openAttachment() {
     // Only one file has to be selected and we don't handle base64 files at all
     let documentLink = document.getElementById("attachment-link");
-    if (documentLink.selectedItems.length == 1) {
-        let attURI = documentLink.getSelectedItem(0).attachment.uri;
-        let externalLoader = Components.classes["@mozilla.org/uriloader/external-protocol-service;1"]
-                                       .getService(Components.interfaces.nsIExternalProtocolService);
+    if (documentLink.selectedItem) {
+        let attURI = documentLink.selectedItem.attachment.uri;
+        let externalLoader = Cc["@mozilla.org/uriloader/external-protocol-service;1"]
+                               .getService(Ci.nsIExternalProtocolService);
         // TODO There should be a nicer dialog
         externalLoader.loadURI(attURI);
     }
@@ -2273,10 +2421,12 @@ function openAttachment() {
  */
 function copyAttachment() {
     let documentLink = document.getElementById("attachment-link");
-    let attURI = documentLink.getSelectedItem(0).attachment.uri.spec;
-    let clipboard = Components.classes["@mozilla.org/widget/clipboardhelper;1"]
-                              .getService(Components.interfaces.nsIClipboardHelper);
-    clipboard.copyString(attURI);
+    if (documentLink.selectedItem) {
+        let attURI = documentLink.selectedItem.attachment.uri.spec;
+        let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"]
+                          .getService(Ci.nsIClipboardHelper);
+        clipboard.copyString(attURI);
+    }
 }
 
 /**
@@ -2292,6 +2442,7 @@ function attachmentLinkKeyPress(aEvent) {
             break;
         case "Enter":
             openAttachment();
+            aEvent.preventDefault();
             break;
     }
 }
@@ -2302,8 +2453,13 @@ function attachmentLinkKeyPress(aEvent) {
  * @param aEvent     The DOM event caused by the clicking.
  */
 function attachmentDblClick(aEvent) {
+    let item = aEvent.originalTarget;
+    while (item && item.localName != "richlistbox" && item.localName != "richlistitem") {
+        item = item.parentNode;
+    }
+
     // left double click on a list item
-    if (aEvent.originalTarget.localName == "listitem" && aEvent.button == 0) {
+    if (item.localName == "richlistitem" && aEvent.button == 0) {
         openAttachment();
     }
 }
@@ -2314,14 +2470,13 @@ function attachmentDblClick(aEvent) {
  * @param aEvent     The DOM event caused by the clicking.
  */
 function attachmentClick(aEvent) {
-    // we take only care about right clicks
-    if (aEvent.button != 2) {
-        return;
+    let item = document.popupNode;
+    while (item && item.localName != "richlistbox" && item.localName != "richlistitem") {
+        item = item.parentNode;
     }
-    let attachmentPopup = document.getElementById("attachment-popup");
-    for (let node of attachmentPopup.childNodes) {
-        if (aEvent.originalTarget.localName == "listitem" ||
-            node.id == "attachment-popup-attachPage") {
+
+    for (let node of aEvent.target.children) {
+        if (item.localName == "richlistitem" || node.id == "attachment-popup-attachPage") {
             showElement(node);
         } else {
             hideElement(node);
@@ -2413,7 +2568,11 @@ function updateCalendar() {
     if (gIsReadOnly) {
         let disableElements = document.getElementsByAttribute("disable-on-readonly", "true");
         for (let element of disableElements) {
-            element.setAttribute("disabled", "true");
+            if (element.namespaceURI == "http://www.w3.org/1999/xhtml") {
+                element.setAttribute("disabled", "disabled");
+            } else {
+                element.setAttribute("disabled", "true");
+            }
 
             // we mark link-labels with the hyperlink attribute, since we need
             // to remove their class in case they get disabled. TODO: it would
@@ -2436,7 +2595,7 @@ function updateCalendar() {
         for (let element of enableElements) {
             element.removeAttribute("disabled");
             if (element.hasAttribute("hyperlink")) {
-                element.setAttribute("class", "text-link");
+                element.classList.add("text-link");
             }
         }
 
@@ -2445,11 +2604,13 @@ function updateCalendar() {
             element.removeAttribute("collapsed");
         }
 
-        // Task completed date
-        if (item.completedDate) {
-            updateToDoStatus(item.status, cal.dtz.dateTimeToJsDate(item.completedDate));
-        } else {
-            updateToDoStatus(item.status);
+        if (cal.item.isToDo(item)) {
+            // Task completed date
+            if (item.completedDate) {
+                updateToDoStatus(item.status, cal.dtz.dateTimeToJsDate(item.completedDate));
+            } else {
+                updateToDoStatus(item.status);
+            }
         }
 
         // disable repeat menupopup if this is an occurrence
@@ -2483,7 +2644,7 @@ function updateCalendar() {
         updateAllDay();
     }
 
-    // Make sure capabilties are reflected correctly
+    // Make sure capabilities are reflected correctly
     updateCapabilities();
 }
 
@@ -2585,7 +2746,7 @@ function updateRepeat(aSuppressDialogs, aItemRepeatCall) {
             let rrules = splitRecurrenceRules(window.recurrenceInfo);
             let rule = rrules[0][0];
             gUntilDate = null;
-            if (!rule.isByCount && rule.isFinite) {
+            if (!rule.isByCount && rule.isFinite && rule.untilDate) {
                 gUntilDate = rule.untilDate.clone().getInTimezone(cal.dtz.defaultTimezone);
             }
         }
@@ -3014,8 +3175,8 @@ function onCommandSave(aIsClosing) {
         onGetResult: function() {}
     };
     let resp = document.getElementById("notify-attendees-checkbox").checked
-             ? Components.interfaces.calIItipItem.AUTO
-             : Components.interfaces.calIItipItem.NONE;
+             ? Ci.calIItipItem.AUTO
+             : Ci.calIItipItem.NONE;
     let extResponse = { responseMode: resp };
     window.onAcceptCallback(item, calendar, originalItem, listener, extResponse);
 }
@@ -3069,11 +3230,19 @@ function onCommandDeleteItem() {
         eventDialogCalendarObserver.cancel();
         if (window.calendarItem.parentItem.recurrenceInfo && window.calendarItem.recurrenceId) {
             // if this is a single occurrence of a recurring item
-            let newItem = window.calendarItem.parentItem.clone();
-            newItem.recurrenceInfo.removeOccurrenceAt(window.calendarItem.recurrenceId);
-
-            gMainWindow.doTransaction("modify", newItem, newItem.calendar,
-                                      window.calendarItem.parentItem, deleteListener);
+            if (countOccurrences(window.calendarItem) == 1) {
+                // this is the last occurrence, hence we delete the parent item
+                // to not leave a parent item without children in the calendar
+                gMainWindow.doTransaction("delete", window.calendarItem.parentItem,
+                                          window.calendarItem.calendar, null,
+                                          deleteListener);
+            } else {
+                // we just need to remove the occurrence
+                let newItem = window.calendarItem.parentItem.clone();
+                newItem.recurrenceInfo.removeOccurrenceAt(window.calendarItem.recurrenceId);
+                gMainWindow.doTransaction("modify", newItem, newItem.calendar,
+                                          window.calendarItem.parentItem, deleteListener);
+            }
         } else {
             gMainWindow.doTransaction("delete", window.calendarItem, window.calendarItem.calendar,
                                       null, deleteListener);
@@ -3188,7 +3357,7 @@ function showTimezonePopup(event, dateTime, editFunc) {
 
     // Fill in the new recent timezones
     for (let timezone of recentTimezones) {
-        let menuItem = createXULElement("menuitem");
+        let menuItem = document.createXULElement("menuitem");
         menuItem.setAttribute("value", timezone.tzid);
         menuItem.setAttribute("label", timezone.displayName);
         timezonePopup.insertBefore(menuItem, timezoneDefaultItem.nextSibling);
@@ -3456,6 +3625,21 @@ function updateAttachment() {
     if (!gNewItemUI) {
         setElementValue("cmd_attach_url", !hasAttachments && "true", "disabled");
     }
+
+    // update the attachment tab label to make the number of (uri) attachments visible
+    // even if another tab is displayed
+    let attachments = Object.values(gAttachMap).filter(aAtt => aAtt.uri);
+    let attachmentTab = document.getElementById("event-grid-tab-attachments");
+    if (attachments.length) {
+        attachmentTab.label = cal.l10n.getString(
+            "calendar-event-dialog",
+            "attachmentsTabLabel",
+            [attachments.length]
+        );
+    } else {
+        attachmentTab.label = window.attachmentTabLabel;
+    }
+
     sendMessage({
         command: "updateConfigState",
         argument: { attachUrlCommand: hasAttachments }
@@ -3483,9 +3667,9 @@ function showOrHideItemURL(aShow, aUrl) {
             // hideOrShow(false);
             return false;
         }
-        // Only show if its either an internal protcol handler, or its external
+        // Only show if its either an internal protocol handler, or its external
         // and there is an external app for the scheme
-        handler = cal.wrapInstance(handler, Components.interfaces.nsIExternalProtocolHandler);
+        handler = cal.wrapInstance(handler, Ci.nsIExternalProtocolHandler);
         return !handler || handler.externalAppExistsForScheme(uri.scheme);
     } else {
         // Hide if there is no url, or the menuitem was chosen so that the url
@@ -3527,11 +3711,14 @@ function updateAttendees() {
     // sending email invitations currently only supported for events
     let attendeeTab = document.getElementById("event-grid-tab-attendees");
     let attendeePanel = document.getElementById("event-grid-tabpanel-attendees");
+    let notifyOptions = document.getElementById("notify-options");
     if (cal.item.isEvent(window.calendarItem)) {
         attendeeTab.removeAttribute("collapsed");
         attendeePanel.removeAttribute("collapsed");
+        notifyOptions.removeAttribute("collapsed");
 
         if (window.organizer && window.organizer.id) {
+            let organizer = window.organizer;
             document.getElementById("item-organizer-row").removeAttribute("collapsed");
             let cell = document.querySelector(".item-organizer-cell");
             let icon = cell.querySelector("img:nth-of-type(1)");
@@ -3569,6 +3756,18 @@ function updateAttendees() {
             setBooleanAttribute("item-organizer-row", "collapsed", true);
         }
         setupAttendees();
+
+        // update the attendee tab label to make the number of attendees
+        // visible even if another tab is displayed
+        if (window.attendees.length) {
+            attendeeTab.label = cal.l10n.getString(
+                "calendar-event-dialog",
+                "attendeesTabLabel",
+                [window.attendees.length]
+            );
+        } else {
+            attendeeTab.label = window.attendeeTabLabel;
+        }
     } else {
         attendeeTab.setAttribute("collapsed", "true");
         attendeePanel.setAttribute("collapsed", "true");
@@ -3683,12 +3882,7 @@ function attendeeDblClick(aEvent) {
  *
  * @param aEvent         The popupshowing event
  */
-function attendeeClick(aEvent) {
-    // we need to handle right clicks only to display the context menu
-    if (aEvent.button != 2) {
-        return;
-    }
-
+function setAttendeeContext(aEvent) {
     if (window.attendees.length == 0) {
         // we just need the option to open the attendee dialog in this case
         let popup = document.getElementById("attendee-popup");
@@ -3761,7 +3955,7 @@ function removeAllAttendees() {
  * @param aAttendees    The attendees to check.
  */
 function sendMailToUndecidedAttendees(aAttendees) {
-    let targetAttendees = attendees.filter(isAttendeeUndecided);
+    let targetAttendees = aAttendees.filter(isAttendeeUndecided);
     sendMailToAttendees(targetAttendees);
 }
 
@@ -4032,7 +4226,7 @@ function formatCounterValue(aProperty) {
 }
 
 /**
- * Get a map of porperty names and labels of currently supported properties
+ * Get a map of property names and labels of currently supported properties
  *
  * @returns {Map}
  */
@@ -4056,9 +4250,9 @@ function applyValues(aType) {
     }
     let originalBtn = document.getElementById("counter-original-btn");
     if (originalBtn.disabled) {
-        // The button is disbled when opening the dialog/tab, which makes it more obvious to the
+        // The button is disabled when opening the dialog/tab, which makes it more obvious to the
         // user that he/she needs to apply the proposal values prior to saving & sending.
-        // Once that happened, we leave both options to the user without toogling the button states
+        // Once that happened, we leave both options to the user without toggling the button states
         // to avoid needing to listen to manual changes to do that correctly
         originalBtn.removeAttribute("disabled");
     }

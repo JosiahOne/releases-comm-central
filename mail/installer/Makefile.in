@@ -50,10 +50,6 @@ ifeq ($(MOZ_WIDGET_TOOLKIT),gtk3)
 DEFINES += -DMOZ_GTK=1
 endif
 
-ifdef _MSC_VER
-DEFINES += -D_MSC_VER=$(_MSC_VER)
-endif
-
 ifdef MOZ_SYSTEM_NSPR
 DEFINES += -DMOZ_SYSTEM_NSPR=1
 endif
@@ -135,7 +131,6 @@ MOZ_PACKAGER_MINIFY=1
 
 NON_OMNIJAR_FILES = defaults/messenger/mailViews.dat
 
-include $(moztopsrcdir)/toolkit/mozapps/installer/signing.mk
 include $(moztopsrcdir)/toolkit/mozapps/installer/packager.mk
 
 ifeq (bundle, $(MOZ_FS_LAYOUT))
@@ -198,3 +193,7 @@ PLATFORM_SOURCE_STAMP = $(firstword $(shell hg -R "$(moztopsrcdir)" parent --tem
 PLATFORM_SOURCE_REPO = $(shell hg -R "$(moztopsrcdir)" showconfig paths.default 2>/dev/null | sed -e "s/^ssh:/https:/")
 make-sourcestamp-file::
 	@echo "$(PLATFORM_SOURCE_REPO)/rev/$(PLATFORM_SOURCE_STAMP)" >> $(MOZ_SOURCESTAMP_FILE)
+
+ifdef ENABLE_MARIONETTE
+DEFINES += -DENABLE_MARIONETTE=1
+endif

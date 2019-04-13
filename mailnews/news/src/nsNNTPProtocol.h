@@ -142,14 +142,13 @@ public:
                  nsIMsgWindow *aMsgWindow);
 
   // stop binding is a "notification" informing us that the stream associated with aURL is going away.
-  NS_IMETHOD OnStopRequest(nsIRequest *request, nsISupports * aCtxt, nsresult aStatus) override;
+  NS_IMETHOD OnStopRequest(nsIRequest *request, nsresult aStatus) override;
 
   char * m_ProxyServer;    /* proxy server hostname */
 
   NS_IMETHOD Cancel(nsresult status) override;  // handle stop button
   NS_IMETHOD GetContentType(nsACString &aContentType) override;
-  NS_IMETHOD AsyncOpen(nsIStreamListener *listener, nsISupports *ctxt) override;
-  NS_IMETHOD AsyncOpen2(nsIStreamListener *listener) override;
+  NS_IMETHOD AsyncOpen(nsIStreamListener *listener) override;
   NS_IMETHOD GetOriginalURI(nsIURI* *aURI) override;
   NS_IMETHOD SetOriginalURI(nsIURI* aURI) override;
   void PostLoadAssertions();
@@ -202,7 +201,7 @@ private:
 
   nsCOMPtr<nsIAsyncInputStream> mDisplayInputStream;
   nsCOMPtr<nsIAsyncOutputStream> mDisplayOutputStream;
-  nsMsgLineStreamBuffer   * m_lineStreamBuffer; // used to efficiently extract lines from the incoming data stream
+  RefPtr<nsMsgLineStreamBuffer> m_lineStreamBuffer; // used to efficiently extract lines from the incoming data stream
   // the nsINntpURL that is currently running
   nsCOMPtr<nsINntpUrl> m_runningURL;
   bool        m_connectionBusy;
@@ -237,11 +236,10 @@ private:
 
   // Cancelation specific state. In particular, the headers that should be
   // used for the cancelation message.
-  // mscott: we can probably replace this stuff with nsString
-  char   *m_cancelFromHdr;
-  char     *m_cancelNewsgroups;
-  char     *m_cancelDistribution;
-  char     *m_cancelID;
+  nsCString m_cancelFromHdr;
+  nsCString m_cancelNewsgroups;
+  nsCString m_cancelDistribution;
+  nsCString m_cancelID;
   int32_t    m_cancelStatus;
 
   // variable for ReadNewsList

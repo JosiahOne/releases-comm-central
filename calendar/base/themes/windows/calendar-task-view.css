@@ -4,9 +4,14 @@
 
 @import url(chrome://calendar-common/skin/calendar-task-view.css);
 
-#calendar-task-view-splitter {
-    border: none;
-    min-height: 5px;
+:root[lwt-tree-brighttext] #calendar-task-details-container {
+    --toolbarbutton-hover-background: var(--lwt-toolbarbutton-hover-background, rgba(255, 255, 255, .25));
+    --toolbarbutton-hover-bordercolor: var(--lwt-toolbarbutton-hover-background, rgba(255, 255, 255, .5));
+    --toolbarbutton-header-bordercolor: var(--lwt-toolbarbutton-hover-background, rgba(255, 255, 255, .25));
+    --toolbarbutton-active-background: var(--lwt-toolbarbutton-active-background, rgba(255, 255, 255, .4));
+    --toolbarbutton-active-bordercolor: var(--lwt-toolbarbutton-active-background, rgba(255, 255, 255, .7));
+    --toolbarbutton-active-boxshadow: 0 0 0 1px var(--lwt-toolbarbutton-active-background, rgba(255, 255, 255, .4)) inset;
+    --toolbarbutton-checkedhover-backgroundcolor: var(--lwt-toolbarbutton-hover-background, rgba(255, 255, 255, .5));
 }
 
 #calendar-task-details-container {
@@ -19,20 +24,6 @@
 
 #other-actions-box {
     margin-inline-end: -2px;
-}
-
-.task-details-name {
-    color: windowtext;
-    opacity: 0.5; /* lower contrast */
-}
-
-#calendar-task-details-grid > rows > .item-date-row > .headline {
-    color: windowtext;
-    opacity: 0.5; /* lower contrast */
-}
-
-.task-details-value {
-    color: WindowText;
 }
 
 #task-text-filter-field {
@@ -66,7 +57,7 @@
 
 #calendar-task-box #calendar-task-view-splitter {
     border-width: 0;
-    border-bottom: 1px solid #A9B7C9;
+    border-bottom: 1px solid var(--splitter-color);
     min-height: 0;
     height: 5px;
     background-color: transparent;

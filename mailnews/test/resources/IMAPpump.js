@@ -1,6 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/. */
 
 /*
  * This file provides a simple interface to the imap fake server. Demonstration
@@ -12,19 +12,24 @@
  */
 
 var EXPORTED_SYMBOLS = [
-  'IMAPPump',
-  'setupIMAPPump',
-  'teardownIMAPPump'
+  "IMAPPump",
+  "setupIMAPPump",
+  "teardownIMAPPump",
 ];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
-ChromeUtils.import("resource://testing-common/mailnews/maild.js");
-ChromeUtils.import("resource://testing-common/mailnews/auth.js");
-ChromeUtils.import("resource://testing-common/mailnews/imapd.js");
-ChromeUtils.import("resource://testing-common/AppInfo.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {localAccountUtils} = ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
+var {gThreadManager, nsMailServer} = ChromeUtils.import("resource://testing-common/mailnews/maild.js");
+var {
+  AuthPLAIN,
+  AuthLOGIN,
+  AuthCRAM,
+} = ChromeUtils.import("resource://testing-common/mailnews/auth.js");
+var imapd = {};
+ChromeUtils.import("resource://testing-common/mailnews/imapd.js", imapd);
+var {updateAppInfo} = ChromeUtils.import("resource://testing-common/AppInfo.jsm");
 
 // define globals
 var IMAPPump = {
@@ -32,28 +37,27 @@ var IMAPPump = {
   server: null,         // the imap fake server
   incomingServer: null, // nsIMsgIncomingServer for the imap server
   inbox: null,          // nsIMsgFolder/nsIMsgImapMailFolder for imap inbox
-  mailbox: null         // imap fake server mailbox
+  mailbox: null,        // imap fake server mailbox
 };
 
-function setupIMAPPump(extensions)
-{
+function setupIMAPPump(extensions) {
   // Create Application info if we need it.
   updateAppInfo();
 
   // These are copied from imap's head_server.js to here so we can run
   //   this from any directory.
   function makeServer(daemon, infoString) {
-    if (infoString in configurations)
-      return makeServer(daemon, configurations[infoString].join(","));
+    if (infoString in imapd.configurations)
+      return makeServer(daemon, imapd.configurations[infoString].join(","));
 
     function createHandler(d) {
-      var handler = new IMAP_RFC3501_handler(d);
+      var handler = new imapd.IMAP_RFC3501_handler(d);
       if (!infoString)
         infoString = "RFC2195";
 
       var parts = infoString.split(/ *, */);
       for (var part of parts) {
-        mixinExtension(handler, eval("IMAP_" + part + "_extension"));
+        imapd.mixinExtension(handler, imapd["IMAP_" + part + "_extension"]);
       }
       return handler;
     }
@@ -71,7 +75,7 @@ function setupIMAPPump(extensions)
 
   // end copy from head_server.js
 
-  IMAPPump.daemon = new imapDaemon();
+  IMAPPump.daemon = new imapd.imapDaemon();
   IMAPPump.server = makeServer(IMAPPump.daemon, extensions);
 
   IMAPPump.incomingServer = createLocalIMAPServer();
@@ -85,13 +89,13 @@ function setupIMAPPump(extensions)
   localAccount.addIdentity(identity);
   localAccount.defaultIdentity = identity;
   localAccount.incomingServer = localAccountUtils.incomingServer;
-  MailServices.accounts.defaultAccount = localAccount;
 
   // Let's also have another account, using the same identity
   let imapAccount = MailServices.accounts.createAccount();
   imapAccount.addIdentity(identity);
   imapAccount.defaultIdentity = identity;
   imapAccount.incomingServer = IMAPPump.incomingServer;
+  MailServices.accounts.defaultAccount = imapAccount;
 
   // The server doesn't support more than one connection
   Services.prefs.setIntPref("mail.server.default.max_cached_connections", 1);
@@ -111,8 +115,7 @@ function setupIMAPPump(extensions)
 }
 
 // This will clear not only the imap accounts but also local accounts.
-function teardownIMAPPump()
-{
+function teardownIMAPPump() {
   // try to finish any pending operations
   let thread = gThreadManager.currentThread;
   while (thread.hasPendingEvents())
@@ -127,6 +130,5 @@ function teardownIMAPPump()
     IMAPPump.server.stop();
     MailServices.accounts.removeIncomingServer(IMAPPump.incomingServer, false);
     localAccountUtils.clearAll();
-  } catch (ex) {dump(ex);}
-
+  } catch (ex) { dump(ex); }
 }

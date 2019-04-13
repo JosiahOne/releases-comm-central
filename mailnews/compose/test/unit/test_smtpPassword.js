@@ -3,7 +3,7 @@
  * Authentication tests for SMTP.
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 load("../../../resources/passwordStorage.js");
 

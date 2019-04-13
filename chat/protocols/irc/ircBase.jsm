@@ -19,11 +19,19 @@
  */
 this.EXPORTED_SYMBOLS = ["ircBase"];
 
-ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm");
-ChromeUtils.import("resource:///modules/ircHandlers.jsm");
-ChromeUtils.import("resource:///modules/ircUtils.jsm");
-ChromeUtils.import("resource:///modules/jsProtoHelper.jsm");
+var {
+  setTimeout,
+  clearTimeout,
+  nsSimpleEnumerator,
+} = ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
+var {ircHandlers} = ChromeUtils.import("resource:///modules/ircHandlers.jsm");
+var {
+  _,
+  ctcpFormatToText,
+  conversationErrorMessage,
+  kListRefreshInterval,
+} = ChromeUtils.import("resource:///modules/ircUtils.jsm");
 
 function privmsg(aAccount, aMessage, aIsNotification) {
   let params = {incoming: true, tags: aMessage.tags};
@@ -37,7 +45,7 @@ function privmsg(aAccount, aMessage, aIsNotification) {
 
 // Display the message and remove them from the rooms they're in.
 function leftRoom(aAccount, aNicks, aChannels, aSource, aReason, aKicked) {
-  let msgId = "message." +  (aKicked ? "kicked" : "parted");
+  let msgId = "message." + (aKicked ? "kicked" : "parted");
   // If a part message was included, include it.
   let reason = aReason ? _(msgId + ".reason", aReason) : "";
   function __(aNick, aYou) {
@@ -286,8 +294,7 @@ var ircBase = {
         return true;
       }
       // Otherwise, the ping was from a user command.
-      else
-        return this.handlePingReply(aMessage.origin, pongTime);
+      return this.handlePingReply(aMessage.origin, pongTime);
     },
     "PRIVMSG": function(aMessage) {
       // PRIVMSG <msgtarget> <text to be sent>
@@ -804,7 +811,7 @@ var ircBase = {
       topic = topic ? topic.normalize() : "";
 
       this._channelList.set(name,
-                            {topic: topic, participantCount: participantCount});
+                            {topic, participantCount});
       this._currentBatch.push(name);
       // Give callbacks a batch of channels of length _channelsPerBatch.
       if (this._currentBatch.length == this._channelsPerBatch) {
@@ -877,7 +884,7 @@ var ircBase = {
                           _("message.summoned", aMessage.params[0]));
     },
     "346": function(aMessage) { // RPL_INVITELIST
-      // <chanel> <invitemask>
+      // <channel> <invitemask>
       // TODO what do we do?
       return false;
     },
@@ -1419,7 +1426,7 @@ var ircBase = {
       // TODO
       return false;
     },
-    "492": function(aMessage) { //ERR_NOSERVICEHOST
+    "492": function(aMessage) { // ERR_NOSERVICEHOST
       // Non-generic
       // TODO
       return false;
@@ -1432,6 +1439,6 @@ var ircBase = {
     "502": function(aMessage) { // ERR_USERSDONTMATCH
       // :Cannot change mode for other users
       return serverErrorMessage(this, aMessage, _("error.mode.wrongUser"));
-    }
-  }
+    },
+  },
 };

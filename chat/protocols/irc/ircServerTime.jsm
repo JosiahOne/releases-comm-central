@@ -9,7 +9,7 @@
 
 this.EXPORTED_SYMBOLS = ["capServerTime", "tagServerTime"];
 
-ChromeUtils.import("resource:///modules/ircHandlers.jsm");
+const {ircHandlers} = ChromeUtils.import("resource:///modules/ircHandlers.jsm");
 
 function handleServerTimeTag(aMsg) {
   if (aMsg.tagValue) {
@@ -27,8 +27,8 @@ var tagServerTime = {
 
   commands: {
     "time": handleServerTimeTag,
-    "znc.in/server-time-iso": handleServerTimeTag
-  }
+    "znc.in/server-time-iso": handleServerTimeTag,
+  },
 };
 
 var capServerTime = {
@@ -48,6 +48,6 @@ var capServerTime = {
         this.sendMessage("CAP", ["REQ", "znc.in/server-time-iso"]);
       }
       return true;
-    }
-  }
+    },
+  },
 };

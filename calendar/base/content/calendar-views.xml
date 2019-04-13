@@ -3,6 +3,8 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from calendar-views.js -->
+
 <bindings id="calendar-specific-view-bindings"
           xmlns="http://www.mozilla.org/xbl"
           xmlns:html="http://www.w3.org/1999/xhtml"
@@ -12,9 +14,6 @@
   <binding id="calendar-day-view"
            extends="chrome://calendar/content/calendar-multiday-view.xml#calendar-multiday-view">
     <implementation implements="calICalendarView">
-      <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-      ]]></constructor>
       <property name="observerID">
         <getter><![CDATA[
             return "day-view-observer";
@@ -56,8 +55,6 @@
            extends="chrome://calendar/content/calendar-multiday-view.xml#calendar-multiday-view">
     <implementation implements="calICalendarView">
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-
           // add a listener for the mode change
           this.mModeHandler = (event) => {
               if (event.attrName == "mode") {
@@ -122,9 +119,7 @@
   <binding id="calendar-multiweek-view" extends="chrome://calendar/content/calendar-month-view.xml#calendar-month-base-view">
     <implementation implements="calICalendarView">
       <constructor><![CDATA[
-          ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-          this.mWeeksInView = Preferences.get("calendar.weeks.inview", 4);
+          this.mWeeksInView = Services.prefs.getIntPref("calendar.weeks.inview", 4);
       ]]></constructor>
 
       <field name="mWeeksInView">4</field>
@@ -135,7 +130,7 @@
         ]]></getter>
         <setter><![CDATA[
             this.mWeeksInView = val;
-            Preferences.set("calendar.weeks.inview", Number(val));
+            Services.prefs.setIntPref("calendar.weeks.inview", Number(val));
             this.refreshView();
             return val;
         ]]></setter>
@@ -147,26 +142,26 @@
       <method name="zoomIn">
         <parameter name="aLevel"/>
         <body><![CDATA[
-            let visibleWeeks = Preferences.get("calendar.weeks.inview", 4);
+            let visibleWeeks = Services.prefs.getIntPref("calendar.weeks.inview", 4);
             visibleWeeks += (aLevel || 1);
 
-            Preferences.set("calendar.weeks.inview", Math.min(visibleWeeks, 6));
+            Services.prefs.setIntPref("calendar.weeks.inview", Math.min(visibleWeeks, 6));
         ]]></body>
       </method>
 
       <method name="zoomOut">
         <parameter name="aLevel"/>
         <body><![CDATA[
-            let visibleWeeks = Preferences.get("calendar.weeks.inview", 4);
+            let visibleWeeks = Services.prefs.getIntPref("calendar.weeks.inview", 4);
             visibleWeeks -= aLevel || 1;
 
-            Preferences.set("calendar.weeks.inview", Math.max(visibleWeeks, 2));
+            Services.prefs.setIntPref("calendar.weeks.inview", Math.max(visibleWeeks, 2));
         ]]></body>
       </method>
 
       <method name="zoomReset">
         <body><![CDATA[
-            Preferences.set("calendar.view.visiblehours", 4);
+            Services.prefs.setIntPref("calendar.view.visiblehours", 4);
         ]]></body>
       </method>
 
@@ -192,7 +187,7 @@
                 // adjusted for the day the week starts on and the number
                 // of previous weeks we're supposed to display.
                 let dayStart = cal.getWeekInfoService().getStartOfWeek(aDate);
-                dayStart.day -= 7 * Preferences.get("calendar.previousweeks.inview", 0);
+                dayStart.day -= 7 * Services.prefs.getIntPref("calendar.previousweeks.inview", 0);
                 // The last day we're supposed to show
                 let dayEnd = dayStart.clone();
                 dayEnd.day += (7 * this.mWeeksInView) - 1;
@@ -212,7 +207,7 @@
                 let savedSelectedDay = this.selectedDay.clone();
                 // aNumber only corresponds to the number of weeks to move
                 // make sure to compensate for previous weeks in view too
-                date.day += 7 * (aNumber + Preferences.get("calendar.previousweeks.inview", 4));
+                date.day += 7 * (aNumber + Services.prefs.getIntPref("calendar.previousweeks.inview", 4));
                 this.goToDay(date);
                 savedSelectedDay.day += 7 * aNumber;
                 this.selectedDay = savedSelectedDay;
@@ -228,10 +223,6 @@
 
   <binding id="calendar-month-view" extends="chrome://calendar/content/calendar-month-view.xml#calendar-month-base-view">
     <implementation implements="calICalendarView">
-      <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-      ]]></constructor>
-
       <property name="observerID">
         <getter><![CDATA[
             return "month-view-observer";
@@ -256,7 +247,7 @@
                                                  "calendar", "monthInYear");
             return cal.l10n.getCalString("monthInYear", [monthName, this.rangeStartDate.year]);
         ]]></body>
-       </method>
+      </method>
       <method name="moveView">
         <parameter name="aNumber"/>
         <body><![CDATA[

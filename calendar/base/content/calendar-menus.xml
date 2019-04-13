@@ -3,6 +3,8 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from calendar-task-tree.js -->
+
 <!DOCTYPE bindings SYSTEM "chrome://calendar/locale/calendar.dtd">
 
 <bindings id="calendar-menu-bindings"
@@ -10,14 +12,14 @@
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
           xmlns:xbl="http://www.mozilla.org/xbl">
 
-  <binding id="task-menupopup" extends="xul:menupopup">
+  <binding id="task-menupopup">
     <implementation>
       <field name="mType">null</field>;
       <field name="mPopupHandler">null</field>
       <field name="mParentMenuPopup">null</field>
 
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+          const { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
           this.mPopupHandler = () => { this.changeMenuByPropertyName(); };
           this.mParentMenuPopup = cal.view.getParentNodeOrThis(this, "menupopup");
@@ -44,9 +46,10 @@
                 }
             }
             let propertyValue;
+            // eslint-disable-next-line no-undef
             if (gTabmail && gTabmail.currentTabInfo.mode.type == "calendarTask") {
                 // We are in a task tab (editing a single task).
-                propertyValue = gConfig[this.mType];
+                propertyValue = gConfig[this.mType]; // eslint-disable-line no-undef
             } else {
                 // We are in the Tasks tab.
                 let tasks = getSelectedTasks();
@@ -83,7 +86,7 @@
         ]]></body>
       </method>
     </implementation>
-   </binding>
+  </binding>
 
   <binding id="task-progress-menupopup" extends="chrome://calendar/content/calendar-menus.xml#task-menupopup">
     <content>
@@ -125,7 +128,7 @@
           this.changeMenuByPropertyName();
       ]]></constructor>
     </implementation>
-   </binding>
+  </binding>
 
   <binding id="task-priority-menupopup" extends="chrome://calendar/content/calendar-menus.xml#task-menupopup">
     <content>
@@ -161,5 +164,5 @@
           this.changeMenuByPropertyName();
       ]]></constructor>
     </implementation>
-   </binding>
+  </binding>
 </bindings>

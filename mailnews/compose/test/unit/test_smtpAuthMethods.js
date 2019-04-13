@@ -5,7 +5,7 @@
  * Test code <copied from="test_pop3AuthMethods.js">
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var server;
 var kAuthSchemes;

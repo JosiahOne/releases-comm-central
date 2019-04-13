@@ -2,8 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var EXPECT_NONE = 0;
 var EXPECT_FIRED = 1;
@@ -75,6 +74,7 @@ var alarmObserver = {
 
         for (let expected of aExpectedArray) {
             let occ = aItem.recurrenceInfo.getNextOccurrence(date);
+            occ.QueryInterface(Ci.calIEvent);
             date = occ.startDate;
             this.expectResult(aCalendar, occ, aAlarm, expected);
         }
@@ -139,9 +139,7 @@ function run_test() {
 }
 
 function initializeAlarmService() {
-    alarmObserver.service = Components.classes["@mozilla.org/calendar/alarm-service;1"]
-                                       .getService(Components.interfaces.calIAlarmService)
-                                       .wrappedJSObject;
+    alarmObserver.service = Cc["@mozilla.org/calendar/alarm-service;1"].getService(Ci.calIAlarmService).wrappedJSObject;
     ok(!alarmObserver.service.mStarted);
     alarmObserver.service.startup(null);
     ok(alarmObserver.service.mStarted);

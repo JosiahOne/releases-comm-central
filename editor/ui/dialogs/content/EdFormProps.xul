@@ -5,6 +5,7 @@
 
 <?xml-stylesheet href="chrome://editor/skin/editor.css" type="text/css"?>
 <?xml-stylesheet href="chrome://editor/skin/EditorDialog.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/menulist.css" type="text/css"?>
 
 <!DOCTYPE dialog [
 <!ENTITY % edFormProperties SYSTEM "chrome://editor/locale/EditorFormProperties.dtd">
@@ -14,21 +15,20 @@
 ]>
 
 <dialog title="&windowTitle.label;"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="Startup();"
-        buttons="accept,cancel"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();">
+        buttons="accept,cancel">
 
   <!-- Methods common to all editor dialogs -->
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdDialogCommon.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdFormProps.js"/>
 
-  <broadcaster id="args" value=""/>
+  <script type="application/javascript" src="chrome://messenger/content/customElements.js"/>
+
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
 
-  <groupbox><caption label="&Settings.label;"/>
+  <groupbox><label class="header">&Settings.label;</label>
     <grid><columns><column/><column/></columns>
       <rows>
         <row align="center">
@@ -42,7 +42,7 @@
         <row align="center">
           <label control="FormMethod" value="&FormMethod.label;" accesskey="&FormMethod.accesskey;"/>
           <hbox>
-            <menulist id="FormMethod" editable="true" autoSelectMenuitem="true">
+            <menulist is="menulist-editable" id="FormMethod" editable="true" autoSelectMenuitem="true">
               <menupopup>
                 <menuitem label="GET"/>
                 <menuitem label="POST"/>
@@ -56,7 +56,7 @@
         <rows id="MoreSection">
           <row align="center">
             <label control="FormEncType" value="&FormEncType.label;" accesskey="&FormEncType.accesskey;"/>
-            <menulist id="FormEncType" editable="true" autoSelectMenuitem="true">
+            <menulist is="menulist-editable" id="FormEncType" editable="true" autoSelectMenuitem="true">
               <menupopup>
                 <menuitem label="application/x-www-form-urlencoded"/>
                 <menuitem label="multipart/form-data"/>
@@ -66,7 +66,7 @@
           </row>
           <row align="center">
             <label control="FormTarget" value="&FormTarget.label;" accesskey="&FormTarget.accesskey;"/>
-            <menulist id="FormTarget" editable="true" autoSelectMenuitem="true">
+            <menulist is="menulist-editable" id="FormTarget" editable="true" autoSelectMenuitem="true">
               <menupopup>
                 <menuitem label="_blank"/>
                 <menuitem label="_self"/>
@@ -92,5 +92,4 @@
             tooltiptext="&AdvancedEditButton.tooltip;"/>
   </hbox>
   <separator class="groove"/>
-
 </dialog>

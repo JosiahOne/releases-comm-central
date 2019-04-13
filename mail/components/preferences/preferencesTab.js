@@ -2,9 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/errUtils.js");
+// mail/base/content/specialTabs.js
+/* globals contentTabBaseType, DOMLinkHandler */
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {ExtensionParent} = ChromeUtils.import("resource://gre/modules/ExtensionParent.jsm");
 
 var gPrefTab = null;
 
@@ -30,15 +33,15 @@ var preferencesTabType = {
   modes: {
     preferencesTab: {
       type: "preferencesTab",
-    }
+    },
   },
 
-  initialize: function() {
+  initialize() {
     let tabmail = document.getElementById("tabmail");
     tabmail.registerTabType(this);
   },
 
-  shouldSwitchTo: function shouldSwitchTo(aArgs) {
+  shouldSwitchTo(aArgs) {
     if (!gPrefTab) {
       return -1;
     }
@@ -47,13 +50,13 @@ var preferencesTabType = {
     return document.getElementById("tabmail").tabInfo.indexOf(gPrefTab);
   },
 
-  closeTab: function(aTab) {
+  closeTab(aTab) {
     gPrefTab = null;
   },
 
-  openTab: function onTabOpened(aTab, aArgs) {
-    if (!"contentPage" in aArgs) {
-      throw("contentPage must be specified");
+  openTab(aTab, aArgs) {
+    if (!("contentPage" in aArgs)) {
+      throw new Error("contentPage must be specified");
     }
 
     // First clone the page and set up the basics.
@@ -63,14 +66,16 @@ var preferencesTabType = {
     clone.setAttribute("id", "preferencesTab" + this.lastBrowserId);
     clone.setAttribute("collapsed", false);
 
+    aTab.panel.setAttribute("id", "preferencesTabWrapper" + this.lastBrowserId);
     aTab.panel.appendChild(clone);
 
     // Start setting up the browser.
     aTab.browser = aTab.panel.querySelector("browser");
-
     aTab.browser.setAttribute("id", "preferencesTabBrowser" + this.lastBrowserId);
-
     aTab.browser.addEventListener("DOMLinkAdded", DOMLinkHandler);
+
+    aTab.findbar = aTab.panel.querySelector("findbar");
+    aTab.findbar.setAttribute("browserid", "preferencesTabBrowser" + this.lastBrowserId);
 
     // Default to reload being disabled.
     aTab.reloadEnabled = false;
@@ -87,14 +92,18 @@ var preferencesTabType = {
     // Wait for full loading of the tab and the automatic selecting of last tab.
     // Then run the given onload code.
     aTab.browser.addEventListener("paneSelected",
-      function _contentTab_onLoad(event) {
+      function(event) {
         aTab.pageLoading = false;
         aTab.pageLoaded = true;
 
         if ("onLoad" in aArgs) {
-          aArgs.onLoad(event, aTab.browser);
+          // Let selection of the initial pane complete before selecting another.
+          // Otherwise we can end up with two panes selected at once.
+          setTimeout(() => {
+            aArgs.onLoad(event, aTab.browser);
+          }, 0);
         }
-      }, {capture: true, once: true}
+      }, { once: true }
     );
 
 
@@ -105,13 +114,18 @@ var preferencesTabType = {
     // Now start loading the content.
     aTab.title = this.loadingTabString;
 
-    aTab.browser.loadURI(aArgs.contentPage, { postData: aArgs.postData || null });
+    ExtensionParent.apiManager.emit("extension-browser-inserted", aTab.browser);
+    let params = {
+      triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+      postData: aArgs.postData || null,
+    };
+    aTab.browser.loadURI(aArgs.contentPage, params);
 
     gPrefTab = aTab;
     this.lastBrowserId++;
   },
 
-  persistTab: function onPersistTab(aTab) {
+  persistTab(aTab) {
     if (aTab.browser.currentURI.spec == "about:blank")
       return null;
 
@@ -123,7 +137,7 @@ var preferencesTabType = {
     };
   },
 
-  restoreTab: function onRestoreTab(aTabmail, aPersistedState) {
+  restoreTab(aTabmail, aPersistedState) {
     aTabmail.openTab("preferencesTab", {
       contentPage: aPersistedState.tabURI,
       paneID: aPersistedState.paneID,

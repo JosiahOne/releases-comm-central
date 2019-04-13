@@ -4,7 +4,7 @@
 
 // This module exports XMPPAuthMechanisms, an object containing all
 // the supported SASL authentication mechanisms.
-// By default we currently support the PLAIN and the DIGEST-MD5 mechanisms.
+// By default we currently support the PLAIN and the SCRAM-SHA-1 mechanisms.
 // As this is only used by XMPPSession, it may seem like an internal
 // detail of the XMPP implementation, but exporting it is valuable so that
 // add-ons can add support for more auth mechanisms easily by adding them
@@ -12,12 +12,15 @@
 
 this.EXPORTED_SYMBOLS = ["XMPPAuthMechanisms"];
 
-ChromeUtils.import("resource://services-crypto/utils.js");
-ChromeUtils.import("resource:///modules/xmpp-xml.jsm");
+const {CommonUtils} = ChromeUtils.import("resource://services-common/utils.js");
+const {CryptoUtils} = ChromeUtils.import("resource://services-crypto/utils.js");
+const {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Stanza} = ChromeUtils.import("resource:///modules/xmpp-xml.jsm");
+XPCOMUtils.defineLazyGlobalGetters(this, ["crypto"]);
 
 // Handle PLAIN authorization mechanism.
 function* PlainAuth(aUsername, aPassword, aDomain) {
-  let data = "\0"+ aUsername + "\0" + aPassword;
+  let data = "\0" + aUsername + "\0" + aPassword;
 
   // btoa for Unicode, see https://developer.mozilla.org/en-US/docs/DOM/window.btoa
   let base64Data = btoa(unescape(encodeURIComponent(data)));
@@ -25,11 +28,11 @@ function* PlainAuth(aUsername, aPassword, aDomain) {
   let stanza = yield {
     send: Stanza.node("auth", Stanza.NS.sasl, {mechanism: "PLAIN"},
                       base64Data),
-    log: '<auth mechanism:="PLAIN"/> (base64 encoded username and password not logged)'
+    log: '<auth mechanism:="PLAIN"/> (base64 encoded username and password not logged)',
   };
 
   if (stanza.localName != "success")
-    throw "Didn't receive the expected auth success stanza.";
+    throw new Error("Didn't receive the expected auth success stanza.");
 }
 
 // Handle SCRAM-SHA-1 authorization mechanism.
@@ -228,7 +231,7 @@ const RFC3454 = {
 [\u{1d516}-\u{1d51c}]|[\u{1d51e}-\u{1d539}]|[\u{1d53b}-\u{1d53e}]|\
 [\u{1d540}-\u{1d544}]|\u{1d546}|[\u{1d54a}-\u{1d550}]|\
 [\u{1d552}-\u{1d6a3}]|[\u{1d6a8}-\u{1d7c9}]|[\u{20000}-\u{2a6d6}]|\
-[\u{2f800}-\u{2fa1d}]|[\u{f0000}-\u{ffffd}]|[\u{100000}-\u{10fffd}]"
+[\u{2f800}-\u{2fa1d}]|[\u{f0000}-\u{ffffd}]|[\u{100000}-\u{10fffd}]",
 };
 
 // Generates a random nonce and returns a base64 encoded string.
@@ -269,18 +272,18 @@ function saslPrep(aString) {
     "|" + RFC3454.C8 + "|" + RFC3454.C9 + "|" + RFC3454.A1;
   let match = new RegExp(matchStr, "u").test(retVal);
   if (match)
-    throw "String contains prohibited characters";
+    throw new Error("String contains prohibited characters");
 
   // RFC 4013 2.4: Bidirectional Characters.
   let r = new RegExp(RFC3454.D1, "u").test(retVal);
   let l = new RegExp(RFC3454.D2, "u").test(retVal);
   if (l && r)
-    throw "String must not contain LCat and RandALCat characters together";
+    throw new Error("String must not contain LCat and RandALCat characters together");
   else if (r) {
     let matchFirst = new RegExp("^(" + RFC3454.D1 + ")", "u").test(retVal);
     let matchLast = new RegExp("(" + RFC3454.D1 + ")$", "u").test(retVal);
     if (!matchFirst || !matchLast)
-      throw "A RandALCat character must be the first and the last character";
+      throw new Error("A RandALCat character must be the first and the last character");
   }
 
   return retVal;
@@ -291,9 +294,9 @@ function saslName(aName) {
   // RFC 5802 (5.1): the client SHOULD prepare the username using the "SASLprep".
   // The characters ’,’ or ’=’ in usernames are sent as ’=2C’ and
   // ’=3D’ respectively.
-  let saslName = saslPrep(aName).replace(/=/g,"=3D").replace(/,/g, "=2C");
+  let saslName = saslPrep(aName).replace(/=/g, "=3D").replace(/,/g, "=2C");
   if (!saslName)
-    throw "Name is not valid";
+    throw new Error("Name is not valid");
 
   return saslName;
 }
@@ -307,10 +310,35 @@ function bytesAndSHA1(aMessage) {
   return CryptoUtils.digestBytes(aMessage, hasher);
 }
 
-function* scramSHA1Auth(aUsername, aPassword, aDomain) {
+/**
+ * PBKDF2 password stretching with SHA-1 hmac.
+ *
+ * This is a copy of CryptoUtils.pbkdf2Generate, but using SHA-1 instead of
+ * SHA-256.
+ *
+ * @param {string} passphrase Passphrase as an octet string.
+ * @param {string} salt Salt as an octet string.
+ * @param {string} iterations Number of iterations, a positive integer.
+ * @param {string} len Desired output length in bytes.
+ */
+ async function pbkdf2Generate(passphrase, salt, iterations, len) {
+  passphrase = CommonUtils.byteStringToArrayBuffer(passphrase);
+  salt = CommonUtils.byteStringToArrayBuffer(salt);
+  const key = await crypto.subtle.importKey("raw", passphrase, {name: "PBKDF2"}, false, ["deriveBits"]);
+  const output = await crypto.subtle.deriveBits({
+      name: "PBKDF2",
+      hash: "SHA-1",
+      salt,
+      iterations,
+  }, key, len * 8);
+  return CommonUtils.arrayBufferToByteString(new Uint8Array(output));
+}
+
+function* scramSHA1Auth(aUsername, aPassword, aDomain, aNonce) {
   // RFC 5802 (5): SCRAM Authentication Exchange.
   const gs2Header = "n,,";
-  let cNonce = createNonce(32);
+  // If a hard-coded nonce was given (e.g. for testing), use it.
+  let cNonce = aNonce ? aNonce : createNonce(32);
 
   let clientFirstMessageBare =
     "n=" + saslName(aUsername) + ",r=" + cNonce;
@@ -318,11 +346,11 @@ function* scramSHA1Auth(aUsername, aPassword, aDomain) {
 
   let receivedStanza = yield {
     send: Stanza.node("auth", Stanza.NS.sasl, {mechanism: "SCRAM-SHA-1"},
-                      btoa(clientFirstMessage))
+                      btoa(clientFirstMessage)),
   };
 
   if (receivedStanza.localName != "challenge")
-    throw "Not authorized";
+    throw new Error("Not authorized");
 
   // RFC 5802 (3): SCRAM Algorithm Overview.
   let decodedChallenge = atob(receivedStanza.innerText);
@@ -332,14 +360,14 @@ function* scramSHA1Auth(aUsername, aPassword, aDomain) {
   // one (r).
   let attributes = parseChallenge(decodedChallenge);
   if (attributes.hasOwnProperty("e"))
-    throw "Authentication failed: " + attributes.e;
+    throw new Error("Authentication failed: " + attributes.e);
   else if (!attributes.hasOwnProperty("i") ||
            !attributes.hasOwnProperty("s") ||
            !attributes.hasOwnProperty("r")) {
-    throw "Unexpected response: " + decodedChallenge;
+    throw new Error("Unexpected response: " + decodedChallenge);
   }
   if (!attributes.r.startsWith(cNonce))
-    throw "Nonce is not correct";
+    throw new Error("Nonce is not correct");
 
   let clientFinalMessageWithoutProof =
     "c=" + btoa(gs2Header) + ",r=" + attributes.r;
@@ -349,67 +377,72 @@ function* scramSHA1Auth(aUsername, aPassword, aDomain) {
   // SaltedPassword := Hi(Normalize(password), salt, i)
   // Normalize using saslPrep.
   // dkLen MUST be equal to the SHA-1 digest size.
-  let saltedPassword =
-    CryptoUtils.pbkdf2Generate(saslPrep(aPassword), atob(attributes.s),
-                               parseInt(attributes.i), 20);
+  let passwordPromise = pbkdf2Generate(saslPrep(aPassword), atob(attributes.s),
+                                       parseInt(attributes.i), 20);
 
-  // ClientKey := HMAC(SaltedPassword, "Client Key")
-  let saltedPasswordHasher =
-    CryptoUtils.makeHMACHasher(Ci.nsICryptoHMAC.SHA1,
-                               CryptoUtils.makeHMACKey(saltedPassword));
-  let clientKey = CryptoUtils.digestBytes("Client Key", saltedPasswordHasher);
+  // The server signature is calculated below, but needs to escape back to the main scope.
+  let serverSignature;
 
-  // StoredKey := H(ClientKey)
-  let storedKey = bytesAndSHA1(clientKey);
+  // Once the promise resolves, continue with the handshake..
+  receivedStanza = yield passwordPromise.then((saltedPassword) => {
+    // ClientKey := HMAC(SaltedPassword, "Client Key")
+    let saltedPasswordHasher =
+      CryptoUtils.makeHMACHasher(Ci.nsICryptoHMAC.SHA1,
+                                 CryptoUtils.makeHMACKey(saltedPassword));
+    let clientKey = CryptoUtils.digestBytes("Client Key", saltedPasswordHasher);
 
-  let authMessage =
-    clientFirstMessageBare + "," + decodedChallenge + "," +
-    clientFinalMessageWithoutProof;
+    // StoredKey := H(ClientKey)
+    let storedKey = bytesAndSHA1(clientKey);
 
-  // ClientSignature := HMAC(StoredKey, AuthMessage)
-  let storedKeyHasher =
-    CryptoUtils.makeHMACHasher(Ci.nsICryptoHMAC.SHA1,
-                               CryptoUtils.makeHMACKey(storedKey));
-  let clientSignature = CryptoUtils.digestBytes(authMessage, storedKeyHasher);
+    let authMessage =
+      clientFirstMessageBare + "," + decodedChallenge + "," +
+      clientFinalMessageWithoutProof;
 
-  // ClientProof := ClientKey XOR ClientSignature
-  let clientProof = CryptoUtils.xor(clientKey, clientSignature);
+    // ClientSignature := HMAC(StoredKey, AuthMessage)
+    let storedKeyHasher =
+      CryptoUtils.makeHMACHasher(Ci.nsICryptoHMAC.SHA1,
+                                 CryptoUtils.makeHMACKey(storedKey));
+    let clientSignature = CryptoUtils.digestBytes(authMessage, storedKeyHasher);
 
-  // Calculate ServerSignature.
+    // ClientProof := ClientKey XOR ClientSignature
+    let clientProof = CryptoUtils.xor(clientKey, clientSignature);
 
-  // ServerKey := HMAC(SaltedPassword, "Server Key")
-  let serverKey = CryptoUtils.digestBytes("Server Key", saltedPasswordHasher);
+    // Calculate ServerSignature.
 
-  // ServerSignature := HMAC(ServerKey, AuthMessage)
-  let serverKeyHasher =
-    CryptoUtils.makeHMACHasher(Ci.nsICryptoHMAC.SHA1,
-                               CryptoUtils.makeHMACKey(serverKey));
-  let serverSignature = CryptoUtils.digestBytes(authMessage, serverKeyHasher);
+    // ServerKey := HMAC(SaltedPassword, "Server Key")
+    let serverKey = CryptoUtils.digestBytes("Server Key", saltedPasswordHasher);
 
-  let clientFinalMessage =
-    clientFinalMessageWithoutProof + ",p=" + btoa(clientProof);
+    // ServerSignature := HMAC(ServerKey, AuthMessage)
+    let serverKeyHasher =
+      CryptoUtils.makeHMACHasher(Ci.nsICryptoHMAC.SHA1,
+                                 CryptoUtils.makeHMACKey(serverKey));
+    serverSignature = CryptoUtils.digestBytes(authMessage, serverKeyHasher);
 
-  receivedStanza = yield {
-    send: Stanza.node("response", Stanza.NS.sasl, null, btoa(clientFinalMessage)),
-    log: '<response/> (base64 encoded SCRAM response containing password not logged)'
-  };
+    let clientFinalMessage =
+      clientFinalMessageWithoutProof + ",p=" + btoa(clientProof);
+
+    return {
+      send: Stanza.node("response", Stanza.NS.sasl, null, btoa(clientFinalMessage)),
+      log: "<response/> (base64 encoded SCRAM response containing password not logged)",
+    };
+  });
 
   // Only check server signature if we succeed to authenticate.
   if (receivedStanza.localName != "success")
-    throw "Didn't receive the expected auth success stanza.";
+    throw new Error("Didn't receive the expected auth success stanza.");
 
   let decodedResponse = atob(receivedStanza.innerText);
 
   // Expected to contain a base64-encoded ServerSignature (v).
   attributes = parseChallenge(decodedResponse);
   if (!attributes.hasOwnProperty("v"))
-    throw "Unexpected response: " + decodedResponse;
+    throw new Error("Unexpected response: " + decodedResponse);
 
   // Compare ServerSignature with our ServerSignature which we calculated in
   // _generateResponse.
   let serverSignatureResponse = atob(attributes.v);
   if (serverSignature != serverSignatureResponse)
-    throw "Server signature does not match";
+    throw new Error("Server signature does not match");
 }
 
 var XMPPAuthMechanisms = {"PLAIN": PlainAuth, "SCRAM-SHA-1": scramSHA1Auth};

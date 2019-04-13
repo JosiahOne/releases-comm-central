@@ -2,22 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "window-helpers";
 
-ChromeUtils.import('resource:///modules/iteratorUtils.jsm');
-ChromeUtils.import('resource://gre/modules/NetUtil.jsm');
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {NetUtil} = ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
-var mozmill = {};
-ChromeUtils.import("chrome://mozmill/content/modules/mozmill.js", mozmill);
-var controller = {};
-ChromeUtils.import("chrome://mozmill/content/modules/controller.js", controller);
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-var frame = {};
-ChromeUtils.import("chrome://mozmill/content/modules/frame.js", frame);
-var utils = {};
-ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
+var controller = ChromeUtils.import("chrome://mozmill/content/modules/controller.jsm");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var frame = ChromeUtils.import("chrome://mozmill/content/modules/frame.jsm");
+var utils = ChromeUtils.import("chrome://mozmill/content/modules/utils.jsm");
 
 /**
  * Timeout to use when waiting for the first window ever to load.  This is
@@ -89,6 +85,8 @@ function installInto(module) {
   module.plan_for_observable_event = plan_for_observable_event;
   module.wait_for_observable_event = wait_for_observable_event;
 
+  module.resize_to = resize_to;
+
   module.augment_controller = augment_controller;
 }
 
@@ -142,8 +140,7 @@ function getWindowTypeForXulWindow(aXULWindow, aBusyOk) {
     return windowType;
 
   // As a last resort, use the name given to the DOM window.
-  let domWindow = aXULWindow.docShell.QueryInterface(Ci.nsIInterfaceRequestor)
-                                     .getInterface(Ci.nsIDOMWindow);
+  let domWindow = aXULWindow.docShell.domWindow;
 
   return domWindow.name;
 }
@@ -198,7 +195,7 @@ var WindowWatcher = {
     // Another possible means of getting this info would be to observe
     //  "xul-window-visible", but it provides no context and may still require
     //  polling anyways.
-    mozmill.wm.addListener(this);
+    Services.wm.addListener(this);
 
     this._inited = true;
   },
@@ -232,9 +229,8 @@ var WindowWatcher = {
     //  window type yet.
     // because this iterates from old to new, this does the right thing in that
     //  side-effects of consider will pick the most recent window.
-    for (let xulWindow of fixIterator(
-                                 mozmill.wm.getXULWindowEnumerator(null),
-                                 Ci.nsIXULWindow)) {
+    for (let xulWindow of fixIterator(Services.wm.getXULWindowEnumerator(null),
+                                      Ci.nsIXULWindow)) {
       if (!this.consider(xulWindow))
         this.monitoringList.push(xulWindow);
     }
@@ -262,8 +258,7 @@ var WindowWatcher = {
 
     this.waitingForOpen = null;
     let xulWindow = this.waitingList.get(aWindowType);
-    let domWindow = xulWindow.docShell.QueryInterface(Ci.nsIInterfaceRequestor)
-                                      .getInterface(Ci.nsIDOMWindow);
+    let domWindow = xulWindow.docShell.domWindow;
     this.waitingList.delete(aWindowType);
     // spin the event loop to make sure any setTimeout 0 calls have gotten their
     //  time in the sun.
@@ -311,8 +306,7 @@ var WindowWatcher = {
     if (this.monitorizeOpen()) {
       // okay, the window is opened, and we should be in its event loop now.
       let xulWindow = this.waitingList.get(this.waitingForOpen);
-      let domWindow = xulWindow.docShell.QueryInterface(Ci.nsIInterfaceRequestor)
-                                        .getInterface(Ci.nsIDOMWindow);
+      let domWindow = xulWindow.docShell.domWindow;
       let troller = new controller.MozMillController(domWindow);
       augment_controller(troller, this.waitingForOpen);
 
@@ -517,8 +511,7 @@ var WindowWatcher = {
    *  so things like their windowtype are immediately available.
    */
   onCloseWindow: function WindowWatcher_onCloseWindow(aXULWindow) {
-    let domWindow = aXULWindow.docShell.QueryInterface(Ci.nsIInterfaceRequestor)
-                                       .getInterface(Ci.nsIDOMWindow);
+    let domWindow = aXULWindow.docShell.domWindow;
     let windowType = getWindowTypeOrId(domWindow.document.documentElement);
     mark_action("winhelp", "onCloseWindow",
                 [getWindowTypeForXulWindow(aXULWindow, true) +
@@ -762,9 +755,7 @@ function _wait_for_generic_load(aDetails, aURLOrPredicate) {
   // Lie to mozmill to convince it to not explode because these frames never
   // get a mozmillDocumentLoaded attribute (bug 666438).
   let contentWindow = aDetails.contentWindow;
-  let windowId = contentWindow.QueryInterface(Ci.nsIInterfaceRequestor)
-                              .getInterface(Ci.nsIDOMWindowUtils)
-                              .outerWindowID;
+  let windowId = contentWindow.windowUtils.outerWindowID;
   controller.windowMap.update(windowId, "loaded", true);
   let cwc = new controller.MozMillController(contentWindow);
   return augment_controller(cwc);
@@ -812,6 +803,25 @@ function wait_for_observable_event(aTopic) {
   }
 }
 
+/**
+ * Resize given window to new dimensions.
+ *
+ * @param aController  window controller
+ * @param aWidth       the requested window width
+ * @param aHeight      the requested window height
+ */
+function resize_to(aController, aWidth, aHeight) {
+  mark_action("test", "resize_to", [aWidth, "x", aHeight]);
+  aController.window.resizeTo(aWidth, aHeight);
+  // Give the event loop a spin in order to let the reality of an asynchronously
+  // interacting window manager have its impact. This still may not be
+  // sufficient.
+  aController.sleep(0);
+  aController.waitFor(() => (aController.window.outerWidth == aWidth) &&
+                            (aController.window.outerHeight == aHeight),
+                      "Timeout waiting for resize (is the screen resolution at least 1280 x 1024?)",
+                      10000, 50);
+}
 
 /**
  * Methods to augment every controller that passes through augment_controller.
@@ -963,8 +973,8 @@ var AugmentEverybodyWith = {
     click_menus_in_sequence: function _click_menus(aRootPopup, aActions, aKeepOpen) {
       if (aRootPopup.state != "open") { // handle "showing"
         utils.waitFor(() => aRootPopup.state == "open",
-                      "Popup never opened! id=" + aRootPopup.id +
-                      ", state=" + aRootPopup.state);
+                      () => ("Popup never opened! id=" + aRootPopup.id +
+                             ", state=" + aRootPopup.state));
       }
       // These popups sadly do not close themselves, so we need to keep track
       // of them so we can make sure they end up closed.
@@ -1035,9 +1045,9 @@ var AugmentEverybodyWith = {
         if (newPopup) {
           curPopup = newPopup;
           closeStack.push(curPopup);
-          utils.waitFor(function() { return curPopup.state == "open"; },
-                        "Popup never opened at action depth " + iAction +
-                        "; id=" + curPopup.id + ", state=" + curPopup.state,
+          utils.waitFor(() => curPopup.state == "open",
+                        () => ("Popup never opened at action depth " + iAction +
+                               "; id=" + curPopup.id + ", state=" + curPopup.state),
                         5000, 50);
         }
       }
@@ -1062,9 +1072,9 @@ var AugmentEverybodyWith = {
         let curPopup = aCloseStack.pop();
         if (curPopup.state == "open")
           this.keypress(new elib.Elem(curPopup), "VK_ESCAPE", {});
-        utils.waitFor(function() { return curPopup.state == "closed"; },
-                      "Popup did not close! id=" + curPopup.id +
-                      ", state=" +  curPopup.state, 5000, 50);
+        utils.waitFor(() => curPopup.state == "closed",
+                      () => ("Popup did not close! id=" + curPopup.id +
+                             ", state=" + curPopup.state), 5000, 50);
       }
     },
 
@@ -1487,8 +1497,7 @@ function describeEventElementInHierarchy(aNode) {
                     .getInterface(Ci.nsIWebNavigation)
                     .QueryInterface(Ci.nsIDocShellTreeItem);
   while (treeItem) {
-    win = treeItem.QueryInterface(Ci.nsIInterfaceRequestor)
-                  .getInterface(Ci.nsIDOMWindow);
+    win = treeItem.domWindow;
     // capture the window itself
     arr.push("in");
     arr.push(normalize_for_json(win));
@@ -1500,8 +1509,7 @@ function describeEventElementInHierarchy(aNode) {
       arr.push(normalize_for_json(win.frameElement));
     }
     else if (parentTreeItem) {
-      let parentWin = parentTreeItem.QueryInterface(Ci.nsIInterfaceRequestor)
-                        .getInterface(Ci.nsIDOMWindow);
+      let parentWin = parentTreeItem.domWindow;
       let frame = _findFrameElementForWindowInWindow(win, parentWin);
       arr.push("frame:");
       arr.push(normalize_for_json(frame));
@@ -1547,13 +1555,7 @@ function getWindowDescribeyFromEvent(event) {
   // assume it's a window if there's no ownerDocument attribute
   var win = ("ownerDocument" in target) ? target.ownerDocument.defaultView
                                         : target;
-  var owningWin =
-    win.QueryInterface(Ci.nsIInterfaceRequestor)
-       .getInterface(Ci.nsIWebNavigation)
-       .QueryInterface(Ci.nsIDocShellTreeItem)
-       .rootTreeItem
-       .QueryInterface(Ci.nsIInterfaceRequestor)
-       .getInterface(Ci.nsIDOMWindow);
+  var owningWin = win.docShell.rootTreeItem.domWindow;
   var docElem = owningWin.document.documentElement;
   return (getWindowTypeOrId(docElem) || "mysterious") +
          " (" + (UNIQUE_WINDOW_ID_ATTR in owningWin ?
@@ -1758,9 +1760,8 @@ function augment_controller(aController, aWindowType) {
       //  treadCols
       //   |- hbox                item 0
       //   |- treecolpicker   <-- item 1 this is the one we want
-      let treeColPicker = doc.getAnonymousNodes(treecols).item(1);
-      let popup = doc.getAnonymousElementByAttribute(treeColPicker,
-                                                     "anonid", "popup");
+      let treeColPicker = treecols.querySelector("treecolpicker");
+      let popup = treeColPicker.querySelector(`menupopup[anonid="popup"]`);
       popup.addEventListener("popupshowing", __popup_showing, true);
       popup.addEventListener("popupshown", __popup_shown, true);
       popup.addEventListener("popuphiding", __popup_hiding, true);

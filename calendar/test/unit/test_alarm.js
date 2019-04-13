@@ -89,7 +89,7 @@ function test_email_alarm() {
     equal(alarm.summary, "summary");
 
     // Set an offset of some sort
-    alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_START;
+    alarm.related = Ci.calIAlarm.ALARM_RELATED_START;
     alarm.offset = cal.createDuration();
 
     // Check for at least one attendee
@@ -118,6 +118,19 @@ function test_email_alarm() {
     alarm.clearAttendees();
     equal(alarm.getAttendees({}).length, 0);
 
+    // Make sure attendees are correctly folded/imported
+    alarm.icalString = dedent`
+        BEGIN:VALARM
+        ACTION:EMAIL
+        TRIGGER;VALUE=DURATION:-PT5M
+        ATTENDEE:mailto:test@example.com
+        ATTENDEE:mailto:test@example.com
+        ATTENDEE:mailto:test2@example.com
+        END:VALARM
+    `;
+    equal(alarm.icalString.match(/ATTENDEE:mailto:test@example.com/g).length, 1);
+    equal(alarm.icalString.match(/ATTENDEE:mailto:test2@example.com/g).length, 1);
+
     // TODO test attachments
     dump("Done\n");
 }
@@ -125,7 +138,7 @@ function test_email_alarm() {
 function test_audio_alarm() {
     dump("Testing AUDIO alarms...");
     let alarm = cal.createAlarm();
-    alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE;
+    alarm.related = Ci.calIAlarm.ALARM_RELATED_ABSOLUTE;
     alarm.alarmDate = cal.createDateTime();
     // Set ACTION to AUDIO, make sure this was not rejected
     alarm.action = "AUDIO";
@@ -186,6 +199,19 @@ function test_audio_alarm() {
     alarm.clearAttachments();
     addedAttachments = alarm.getAttachments({});
     equal(addedAttachments.length, 0);
+
+    // AUDIO alarms should only be allowing one attachment, and folding any with the same value
+    alarm.icalString = dedent`
+        BEGIN:VALARM
+        ACTION:AUDIO
+        TRIGGER;VALUE=DURATION:-PT5M
+        ATTACH:Basso
+        UID:28F8007B-FE56-442E-917C-1F4E48DD406A
+        X-APPLE-DEFAULT-ALARM:TRUE
+        ATTACH:Basso
+        END:VALARM
+    `;
+    equal(alarm.icalString.match(/ATTACH:Basso/g).length, 1);
 
     dump("Done\n");
 }
@@ -284,7 +310,7 @@ function test_repeat() {
 
     // Check repeatDate
     alarm = cal.createAlarm();
-    alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE;
+    alarm.related = Ci.calIAlarm.ALARM_RELATED_ABSOLUTE;
     alarm.alarmDate = cal.createDateTime();
     alarm.repeat = 1;
     alarm.repeatOffset = cal.createDuration();
@@ -408,7 +434,7 @@ function test_immutable() {
         try {
             alarm[prop] = propMap[prop];
         } catch (e) {
-            equal(e.result, Components.results.NS_ERROR_OBJECT_IS_IMMUTABLE);
+            equal(e.result, Cr.NS_ERROR_OBJECT_IS_IMMUTABLE);
             continue;
         }
         do_throw("Attribute " + prop + " was writable while item was immutable");
@@ -574,16 +600,16 @@ function test_strings() {
     // the string itself.
     let alarm = cal.createAlarm();
     alarm.action = "DISPLAY";
-    alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_ABSOLUTE;
+    alarm.related = Ci.calIAlarm.ALARM_RELATED_ABSOLUTE;
     alarm.alarmDate = cal.createDateTime();
     alarm.toString();
 
-    alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_START;
+    alarm.related = Ci.calIAlarm.ALARM_RELATED_START;
     alarm.offset = cal.createDuration();
     alarm.toString();
     alarm.toString(cal.createTodo());
 
-    alarm.related = Components.interfaces.calIAlarm.ALARM_RELATED_END;
+    alarm.related = Ci.calIAlarm.ALARM_RELATED_END;
     alarm.offset = cal.createDuration();
     alarm.toString();
     alarm.toString(cal.createTodo());

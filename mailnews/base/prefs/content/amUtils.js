@@ -3,10 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/MailUtils.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 function BrowseForLocalFolders()
 {
@@ -72,8 +72,12 @@ function checkJunkTargetFolder(aTargetURI, aIsServer)
 {
   try {
     // Does the target account exist?
-    let targetServer = MailUtils.getFolderForURI(aTargetURI + (aIsServer ? "/Junk" : ""),
-                                                 !aIsServer).server;
+    let targetServer;
+    if (aIsServer) {
+      targetServer = MailUtils.getOrCreateFolder(aTargetURI + "/Junk").server;
+    } else {
+      targetServer = MailUtils.getExistingFolder(aTargetURI).server;
+    }
 
     // If the target server has deferred storage, Junk can't be stored into it.
     if (targetServer.rootFolder != targetServer.rootMsgFolder)
@@ -99,7 +103,7 @@ function chooseJunkTargetFolder(aTargetURI, aIsServer)
   let server = null;
 
   if (aTargetURI) {
-    server = MailUtils.getFolderForURI(aTargetURI, false).server;
+    server = MailUtils.getOrCreateFolder(aTargetURI).server;
     if (!server.canCreateFoldersOnServer || !server.canSearchMessages ||
         (server.rootFolder != server.rootMsgFolder))
       server = null;

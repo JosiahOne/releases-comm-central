@@ -4,7 +4,25 @@
 
 /* exported gCalendarGeneralPane */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from ../../../lightning/content/messenger-overlay-preferences.js */
+/* globals labelLong, labelShort */// From general.xul.
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+
+Preferences.addAll([
+    { id: "calendar.date.format", type: "int" },
+    { id: "calendar.event.defaultlength", type: "int" },
+    { id: "calendar.timezone.local", type: "string" },
+    { id: "calendar.task.defaultstart", type: "string" },
+    { id: "calendar.task.defaultstartoffset", type: "int" },
+    { id: "calendar.task.defaultstartoffsetunits", type: "string" },
+    { id: "calendar.task.defaultdue", type: "string" },
+    { id: "calendar.task.defaultdueoffset", type: "int" },
+    { id: "calendar.task.defaultdueoffsetunits", type: "string" },
+    { id: "calendar.view.useSystemColors", type: "bool" },
+    { id: "calendar.agendaListbox.soondays", type: "int" },
+    { id: "calendar.item.editInTab", type: "bool" },
+]);
 
 /**
  * Global Object to hold methods for the general pref pane
@@ -15,8 +33,8 @@ var gCalendarGeneralPane = {
      * values set in prefs.
      */
     init: function() {
-        let formatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
-                                  .getService(Components.interfaces.calIDateTimeFormatter);
+        let formatter = Cc["@mozilla.org/calendar/datetime-formatter;1"]
+                          .getService(Ci.calIDateTimeFormatter);
 
         let dateFormattedLong = formatter.formatDateLong(cal.dtz.now());
         let dateFormattedShort = formatter.formatDateShort(cal.dtz.now());
@@ -54,7 +72,7 @@ var gCalendarGeneralPane = {
             addMenuItem(tzMenuPopup, displayName, tzids[displayName]);
         }
 
-        let prefValue = document.getElementById("calendar-timezone-local").value;
+        let prefValue = Preferences.get("calendar.timezone.local").value;
         if (!prefValue) {
             prefValue = cal.dtz.defaultTimezone.tzid;
         }
@@ -78,12 +96,6 @@ var gCalendarGeneralPane = {
         updateMenuLabelsPlural("default_task_due_offset_text", "default_task_due_offset_units");
     },
 
-    updateItemtypeDeck: function() {
-        let panelId = document.getElementById("defaults-itemtype-menulist").value;
-        let panel = document.getElementById(panelId);
-        document.getElementById("defaults-itemtype-deck").selectedPanel = panel;
-    },
-
     initializeTodaypaneMenu: function() {
         // Assign the labels for the menuitem
         let soondaysMenu = document.getElementById("soondays-menulist");
@@ -97,26 +109,19 @@ var gCalendarGeneralPane = {
             }
         }
 
-        let prefName = "calendar.agendaListbox.soondays";
-        let soonpref = Preferences.get(prefName, 5);
+        let pref = Preferences.get("calendar.agendaListbox.soondays");
+        let soonpref = pref.value || 5;
 
         // Check if soonDays preference has been edited with a wrong value.
         if (soonpref > 0 && soonpref <= 28) {
             if (soonpref % 7 != 0) {
                 let intSoonpref = Math.floor(soonpref / 7) * 7;
                 soonpref = (intSoonpref == 0 ? soonpref : intSoonpref);
-                Preferences.set(prefName, soonpref, "INT");
+                pref.value = soonpref;
             }
         } else {
             soonpref = soonpref > 28 ? 28 : 1;
-            Preferences.set(prefName, soonpref, "INT");
+            pref.value = soonpref;
         }
-
-        document.getElementById("soondays-menulist").value = soonpref;
-    },
-
-    updateTodaypaneMenu: function() {
-        let soonpref = Number(document.getElementById("soondays-menulist").value);
-        Preferences.set("calendar.agendaListbox.soondays", soonpref);
     }
 };

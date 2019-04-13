@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 
 function calSleepMonitor() {
@@ -31,8 +31,8 @@ calSleepMonitor.prototype = {
     start: function() {
         this.stop();
         this.expected = Date.now() + this.interval;
-        this.timer = Components.classes["@mozilla.org/timer;1"].createInstance(Components.interfaces.nsITimer);
-        this.timer.initWithCallback(this.callback.bind(this), this.interval, Components.interfaces.nsITimer.TYPE_REPEATING_PRECISE);
+        this.timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
+        this.timer.initWithCallback(this.callback.bind(this), this.interval, Ci.nsITimer.TYPE_REPEATING_PRECISE);
     },
     stop: function() {
         if (this.timer) {

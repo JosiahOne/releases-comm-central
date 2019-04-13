@@ -2,9 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "cal", "resource://calendar/modules/calUtils.jsm", "cal");
 
@@ -39,7 +38,7 @@ var caliterate = {
 
     /**
      * Runs the body() function once for each item in the iterator using the event queue to make
-     * sure other actions could run inbetween. When all iterations are done (and also when
+     * sure other actions could run in between. When all iterations are done (and also when
      * cal.iterate.forEach.BREAK is returned), calls the completed() function if passed.
      *
      * If you would like to break or continue inside the body(), return either
@@ -59,7 +58,7 @@ var caliterate = {
         function forEach(iterable, body, completed=null) {
             // This should be a const one day, lets keep it a pref for now though until we
             // find a sane value.
-            let LATENCY = Preferences.get("calendar.threading.latency", 250);
+            let LATENCY = Services.prefs.getIntPref("calendar.threading.latency", 250);
 
             if (typeof iterable == "object" && !iterable[Symbol.iterator]) {
                 iterable = Object.entries(iterable);

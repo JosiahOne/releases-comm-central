@@ -59,15 +59,17 @@ struct MimePartBufferData
                                                           run out of room in the head_buffer. */
   nsCOMPtr <nsIInputStream> input_file_stream;    /* A stream to it. */
   nsCOMPtr <nsIOutputStream> output_file_stream;  /* A stream to it. */
+  MimePartBufferData()
+    : part_buffer(nullptr)
+    , part_buffer_fp(0)
+    , part_buffer_size(0)
+  {}
 };
 
 MimePartBufferData *
 MimePartBufferCreate (void)
 {
-  MimePartBufferData *data = PR_NEW(MimePartBufferData);
-  if (!data) return 0;
-  memset(data, 0, sizeof(*data));
-  return data;
+  return new MimePartBufferData();
 }
 
 
@@ -126,7 +128,7 @@ MimePartBufferDestroy (MimePartBufferData *data)
   NS_ASSERTION(data, "MimePartBufferDestroy: no data");
   if (!data) return;
   MimePartBufferReset (data);
-  PR_Free(data);
+  delete data;
 }
 
 
@@ -168,7 +170,7 @@ MimePartBufferWrite (MimePartBufferData *data,
     nsCOMPtr <nsIFile> tmpFile;
     nsresult rv = nsMsgCreateTempFile("nsma", getter_AddRefs(tmpFile));
     NS_ENSURE_SUCCESS(rv, MIME_UNABLE_TO_OPEN_TMP_FILE);
-    data->file_buffer = do_QueryInterface(tmpFile);
+    data->file_buffer = tmpFile;
 
     rv = MsgNewBufferedFileOutputStream(getter_AddRefs(data->output_file_stream), data->file_buffer, PR_WRONLY | PR_CREATE_FILE, 00600);
     NS_ENSURE_SUCCESS(rv, MIME_UNABLE_TO_OPEN_TMP_FILE);
@@ -199,7 +201,7 @@ MimePartBufferWrite (MimePartBufferData *data,
         nsCOMPtr <nsIFile> tmpFile;
         rv = nsMsgCreateTempFile("nsma", getter_AddRefs(tmpFile));
         NS_ENSURE_SUCCESS(rv, MIME_UNABLE_TO_OPEN_TMP_FILE);
-        data->file_buffer = do_QueryInterface(tmpFile);
+        data->file_buffer = tmpFile;
 
       }
 

@@ -6,15 +6,16 @@
  * Tests that opening an .eml file with empty subject works.
  */
 
+"use strict";
+
 var MODULE_NAME = "test-eml-subject";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers"];
 
-var os = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/os.js", os);
-ChromeUtils.import("resource:///modules/StringBundle.js");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var os = ChromeUtils.import("chrome://mozmill/content/stdlib/os.jsm");
+var {StringBundle} = ChromeUtils.import("resource:///modules/StringBundle.js");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 var setupModule = function(module) {
   let fdh = collector.getModule("folder-display-helpers");

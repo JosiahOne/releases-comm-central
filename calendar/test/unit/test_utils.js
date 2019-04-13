@@ -17,8 +17,8 @@ function really_run_test() {
 }
 
 function test_recentzones() {
-    let oldDefaultTz = Preferences.get("calendar.timezone.local", "");
-    Preferences.set("calendar.timezone.local", "floating");
+    let oldDefaultTz = Services.prefs.getStringPref("calendar.timezone.local", "");
+    Services.prefs.setStringPref("calendar.timezone.local", "floating");
 
     equal(cal.dtz.getRecentTimezones().length, 0);
     equal(cal.dtz.getRecentTimezones(true).length, 0);
@@ -48,7 +48,7 @@ function test_recentzones() {
     equal(cal.dtz.getRecentTimezones().length, 3);
     equal(cal.dtz.getRecentTimezones(true).length, 2);
 
-    Preferences.set("calendar.timezone.local", oldDefaultTz);
+    Services.prefs.setStringPref("calendar.timezone.local", oldDefaultTz);
 }
 
 function test_formatcss() {
@@ -120,7 +120,7 @@ function test_OperationGroup() {
 
     ok(group.isEmpty);
     ok(group.id.endsWith("-0"));
-    equal(group.status, Components.results.NS_OK);
+    equal(group.status, Cr.NS_OK);
     equal(group.isPending, true);
 
     let completedOp = { isPending: false };
@@ -152,7 +152,7 @@ function test_OperationGroup() {
 
     group.cancel();
 
-    equal(group.status, Components.interfaces.calIErrors.OPERATION_CANCELLED);
+    equal(group.status, Ci.calIErrors.OPERATION_CANCELLED);
     ok(!group.isPending);
     ok(cancelCalled);
     ok(pendingOp2.cancelCalled);

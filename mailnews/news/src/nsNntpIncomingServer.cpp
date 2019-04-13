@@ -31,7 +31,7 @@
 #include "mozilla/Services.h"
 #include "mozilla/dom/Element.h"
 #include "mozilla/ErrorResult.h"
-#include "nsITreeBoxObject.h"
+#include "mozilla/dom/XULTreeElement.h"
 #include "mozilla/dom/DataTransfer.h"
 
 #define INVALID_VERSION         0
@@ -1166,22 +1166,14 @@ nsNntpIncomingServer::Unsubscribe(const char16_t *aUnicharName)
   rv = GetRootMsgFolder(getter_AddRefs(serverFolder));
   if (NS_FAILED(rv))
     return rv;
-
   if (!serverFolder)
     return NS_ERROR_FAILURE;
 
-  // to handle non-ASCII newsgroup names, we store them internally as escaped.
-  // so we need to escape and encode the name, in order to find it.
-  nsAutoCString escapedName;
-  rv = NS_MsgEscapeEncodeURLPath(nsDependentString(aUnicharName), escapedName);
-
-  nsCOMPtr <nsIMsgFolder> newsgroupFolder;
-  rv = serverFolder->FindSubFolder(escapedName,
+  nsCOMPtr<nsIMsgFolder> newsgroupFolder;
+  rv = serverFolder->GetChildNamed(nsDependentString(aUnicharName),
                                    getter_AddRefs(newsgroupFolder));
-
   if (NS_FAILED(rv))
     return rv;
-
   if (!newsgroupFolder)
     return NS_ERROR_FAILURE;
 
@@ -1330,12 +1322,12 @@ nsNntpIncomingServer::GetFirstChildURI(const nsACString &path, nsACString &aResu
 }
 
 NS_IMETHODIMP
-nsNntpIncomingServer::GetChildren(const nsACString &aPath,
-                                  nsISimpleEnumerator **aResult)
+nsNntpIncomingServer::GetChildURIs(const nsACString &aPath,
+                                   nsIUTF8StringEnumerator **aResult)
 {
   nsresult rv = EnsureInner();
   NS_ENSURE_SUCCESS(rv,rv);
-  return mInner->GetChildren(aPath, aResult);
+  return mInner->GetChildURIs(aPath, aResult);
 }
 
 NS_IMETHODIMP
@@ -1877,14 +1869,13 @@ nsNntpIncomingServer::GetCellText(int32_t row, nsTreeColumn* col, nsAString& _re
 }
 
 NS_IMETHODIMP
-nsNntpIncomingServer::SetTree(nsITreeBoxObject *tree)
+nsNntpIncomingServer::SetTree(mozilla::dom::XULTreeElement *tree)
 {
   mTree = tree;
   if (!tree)
     return NS_OK;
 
-  RefPtr<nsTreeColumns> cols;
-  tree->GetColumns(getter_AddRefs(cols));
+  RefPtr<nsTreeColumns> cols = tree->GetColumns();
   if (!cols)
     return NS_OK;
 
@@ -1930,7 +1921,7 @@ nsNntpIncomingServer::CycleHeader(nsTreeColumn* col)
 }
 
 NS_IMETHODIMP
-nsNntpIncomingServer::SelectionChanged()
+nsNntpIncomingServer::SelectionChangedXPCOM()
 {
   return NS_ERROR_NOT_IMPLEMENTED;
 }
@@ -1943,13 +1934,6 @@ nsNntpIncomingServer::CycleCell(int32_t row, nsTreeColumn* col)
 
 NS_IMETHODIMP
 nsNntpIncomingServer::IsEditable(int32_t row, nsTreeColumn* col, bool *_retval)
-{
-  *_retval = false;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsNntpIncomingServer::IsSelectable(int32_t row, nsTreeColumn* col, bool *_retval)
 {
   *_retval = false;
   return NS_OK;

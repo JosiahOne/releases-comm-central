@@ -42,7 +42,6 @@ interface nsIMsgFolder : nsISupports {
   attribute AString name;
   attribute AString prettyName;
   readonly attribute AString abbreviatedName;
-  /* @deprecated */ readonly attribute AString prettiestName;
 
   attribute nsIMsgFolder parent;
 
@@ -119,7 +118,7 @@ interface nsIMsgFolder : nsISupports {
    *
    * Note that this does not persist the filter list. To change the contents
    * of the existing filters, use getFilterList and mutate the values as
-   * appopriate.
+   * appropriate.
    *
    * @param aFilterList The new list of filters.
    */
@@ -695,9 +694,6 @@ interface nsIMsgFolder : nsISupports {
   void NotifyItemRemoved(in nsISupports item);
 
   void NotifyFolderEvent(in ACString event);
-
-  //  void NotifyFolderLoaded();
-  //  void NotifyDeleteOrMoveMessagesCompleted(in nsIMsgFolder folder);
 
   // Gets all descendants, not just first level children.
   readonly attribute nsIArray descendants;

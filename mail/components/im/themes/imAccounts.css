@@ -11,7 +11,7 @@
 }
 
 %ifndef XP_MACOSX
-notification > hbox {
+xbl-notification > hbox {
   border: none !important;
   border-bottom: 1px solid ThreeDShadow !important;
 }
@@ -148,19 +148,12 @@ richlistitem[dragover="up"] {
   height: 16px;
 }
 
-richlistitem[state="connected"] .accountStateIcon {
-  list-style-image: url("chrome://chat/skin/available-16.png");
-}
-richlistitem[state="disconnected"] .accountStateIcon {
-  list-style-image: url("chrome://chat/skin/offline-16.png");
-}
 richlistitem[state="connecting"] .accountStateIcon {
   list-style-image: url("chrome://global/skin/icons/loading.png");
 }
 richlistitem[error="true"] .accountStateIcon {
-  list-style-image: url("chrome://global/skin/icons/warning-16.png");
+  list-style-image: url("chrome://global/skin/icons/warning.svg");
 }
-
 
 #statusArea {
   margin: 0 0;
@@ -187,9 +180,12 @@ richlistitem[error="true"] .accountStateIcon {
 }
 
 #userIcon[src=""] {
-  background-image: url("chrome://messenger/skin/userIcon.png");
+  background-image: url("chrome://messenger/skin/icons/userIcon.svg");
   background-size: contain;
   background-repeat: no-repeat;
+  -moz-context-properties: fill, fill-opacity;
+  fill: #000;
+  fill-opacity: 0.25;
 }
 
 #userIcon:hover {
@@ -225,24 +221,3 @@ richlistitem[error="true"] .accountStateIcon {
   border: none;
 }
 %endif
-
-#statusTypeIcon[status="available"],
-#statusTypeAvailable {
-  list-style-image: url('chrome://chat/skin/available-16.png');
-}
-
-#statusTypeIcon[status="unavailable"],
-#statusTypeIcon[status="away"],
-#statusTypeUnavailable {
-  list-style-image: url('chrome://chat/skin/away-16.png');
-}
-
-#statusTypeIcon[status="offline"],
-#statusTypeIcon[status="invisible"],
-#statusTypeOffline {
-  list-style-image: url('chrome://chat/skin/offline-16.png');
-}
-
-#statusTypeIcon[status="idle"] {
-  list-style-image: url('chrome://chat/skin/idle-16.png');
-}

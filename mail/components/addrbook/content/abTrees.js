@@ -2,14 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../../../mailnews/addrbook/content/abDragDrop.js */
+/* import-globals-from abCommon.js */
+
 /**
  * This file contains our implementation for various addressbook trees.  It
  * depends on jsTreeView.js being loaded before this script is loaded.
  */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/IOUtils.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {IOUtils} = ChromeUtils.import("resource:///modules/IOUtils.js");
 
 // Tree Sort helper methods.
 var AB_ORDER = ["aab", "pab", "mork", "ldap", "mapi+other", "anyab", "cab"];
@@ -78,7 +81,7 @@ function abDirTreeItem(aDirectory) {
 }
 
 abDirTreeItem.prototype = {
-  getText: function atv_getText() {
+  getText() {
     return this._directory.dirName;
   },
 
@@ -109,7 +112,7 @@ abDirTreeItem.prototype = {
       while (myEnum.hasMoreElements()) {
         var abItem = new abDirTreeItem(myEnum.getNext()
                                        .QueryInterface(Ci.nsIAbDirectory));
-        if (gDirectoryTreeView&&
+        if (gDirectoryTreeView &&
             this.id == kAllDirectoryRoot + "?" &&
             getDirectoryValue(abItem, "ab_type") == "ldap")
           gDirectoryTreeView.hasRemoteAB = true;
@@ -124,7 +127,7 @@ abDirTreeItem.prototype = {
     return this._children;
   },
 
-  getProperties: function atv_getProps() {
+  getProperties() {
     let properties = [];
     if (this._directory.isMailList)
       properties.push("IsMailList-true");
@@ -133,7 +136,7 @@ abDirTreeItem.prototype = {
     if (this._directory.isSecure)
       properties.push("IsSecure-true");
     return properties.join(" ");
-  }
+  },
 };
 
 /**
@@ -145,7 +148,7 @@ directoryTreeView.prototype = {
 
   hasRemoteAB: false,
 
-  init: function dtv_init(aTree, aJSONFile) {
+  init(aTree, aJSONFile) {
     if (aJSONFile) {
       // Parse our persistent-open-state json file
       let data = IOUtils.loadFileToString(aJSONFile);
@@ -157,7 +160,7 @@ directoryTreeView.prototype = {
     aTree.view = this;
   },
 
-  shutdown: function dtv_shutdown(aJSONFile) {
+  shutdown(aJSONFile) {
     // Write out the persistOpenMap to our JSON file
     if (aJSONFile) {
       // Write out our json file...
@@ -167,22 +170,22 @@ directoryTreeView.prototype = {
   },
 
   // Override the dnd methods for those functions in abDragDrop.js
-  canDrop: function dtv_canDrop(aIndex, aOrientation, dataTransfer) {
+  canDrop(aIndex, aOrientation, dataTransfer) {
     return abDirTreeObserver.canDrop(aIndex, aOrientation, dataTransfer);
   },
 
-  drop: function dtv_drop(aRow, aOrientation, dataTransfer) {
+  drop(aRow, aOrientation, dataTransfer) {
     abDirTreeObserver.onDrop(aRow, aOrientation, dataTransfer);
   },
 
-  getDirectoryAtIndex: function dtv_getDirForIndex(aIndex) {
+  getDirectoryAtIndex(aIndex) {
     return this._rowMap[aIndex]._directory;
   },
 
   // Override jsTreeView's isContainer, since we want to be able
   // to react to drag-drop events for all items in the directory
   // tree.
-  isContainer: function dtv_isContainer(aIndex) {
+  isContainer(aIndex) {
     return true;
   },
 
@@ -191,11 +194,9 @@ directoryTreeView.prototype = {
    *       Callers should take care to re-select a desired row after calling
    *       this function.
    */
-  _rebuild: function dtv__rebuild() {
+  _rebuild() {
     var oldCount = this._rowMap.length;
     this._rowMap = [];
-
-    var dirEnum = MailServices.ab.directories;
 
     // Make an entry for All Address Books.
     let rootAB = MailServices.ab.getDirectory(kAllDirectoryRoot + "?");
@@ -211,7 +212,7 @@ directoryTreeView.prototype = {
     this._restoreOpenStates();
   },
 
-  getIndexForId: function(aId) {
+  getIndexForId(aId) {
     for (let i = 0; i < this._rowMap.length; i++) {
       if (this._rowMap[i].id == aId)
         return i;
@@ -221,10 +222,10 @@ directoryTreeView.prototype = {
   },
 
   // nsIAbListener interfaces
-  onItemAdded: function dtv_onItemAdded(aParent, aItem) {
+  onItemAdded(aParent, aItem) {
     if (!(aItem instanceof Ci.nsIAbDirectory))
       return;
-    //xxx we can optimize this later
+    // XXX we can optimize this later
     this._rebuild();
 
     if (!this._tree)
@@ -239,10 +240,10 @@ directoryTreeView.prototype = {
     }
   },
 
-  onItemRemoved: function dtv_onItemRemoved(aParent, aItem) {
+  onItemRemoved(aParent, aItem) {
     if (!(aItem instanceof Ci.nsIAbDirectory))
       return;
-    //xxx we can optimize this later
+    // XXX we can optimize this later
     this._rebuild();
 
     if (!this._tree)
@@ -264,17 +265,17 @@ directoryTreeView.prototype = {
     }
   },
 
-  onItemPropertyChanged: function dtv_onItemProp(aItem, aProp, aOld, aNew) {
+  onItemPropertyChanged(aItem, aProp, aOld, aNew) {
     if (!(aItem instanceof Ci.nsIAbDirectory))
       return;
 
-    for (var i in this._rowMap)  {
+    for (let i in this._rowMap) {
       if (this._rowMap[i]._directory == aItem) {
         this._tree.invalidateRow(i);
         break;
       }
     }
-  }
+  },
 };
 
 var gDirectoryTreeView = new directoryTreeView();

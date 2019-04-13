@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /*
  * Localization and locale functions
@@ -31,19 +31,48 @@ function _getString(aComponent, aBundleName, aStringName, aParams=[]) {
         }
         let props = _getString._bundleCache[propName];
 
-        if (aParams.length) {
+        if (aParams && aParams.length) {
             return props.formatStringFromName(aStringName, aParams, aParams.length);
         } else {
             return props.GetStringFromName(aStringName);
         }
     } catch (ex) {
         let msg = `Failed to read '${aStringName}' from ${propName}.`;
-        Components.utils.reportError(`${msg} Error: ${ex}`);
+        Cu.reportError(`${msg} Error: ${ex}`);
         return aStringName;
     }
 }
 _getString._bundleCache = {};
 
+/**
+ * Provides locale dependent parameters for displaying calendar views
+ *
+ * @param {String}  aLocale      The locale to get the info for, e.g. "en-US",
+ *                                 "de-DE" or null for the current locale
+ * @param {Bollean} aResetCache  Whether to reset the internal cache - for test
+ *                                 purposes only don't use it otherwise atm
+ * @return {Object}              The getCalendarInfo object from mozIMozIntl
+ */
+function _calendarInfo(aLocale=null, aResetCache=false) {
+    if (aResetCache) {
+        _calendarInfo._startup = {};
+    }
+    // we cache the result to prevent updates at runtime except for test
+    // purposes since changing intl.regional_prefs.use_os_locales preference
+    // would provide different result when called without aLocale and we
+    // need to investigate whether this is wanted or chaching more selctively.
+    // when starting to use it to deteremine the first week of a year, we would
+    // need to at least reset that cached properties on pref change.
+    if (!("firstDayOfWeek" in _calendarInfo._startup) || aLocale) {
+        let info = Services.intl.getCalendarInfo(aLocale);
+        if (aLocale) {
+            return info;
+        }
+        _calendarInfo._startup = info;
+    }
+    return _calendarInfo._startup;
+}
+_calendarInfo._startup = {};
 
 var call10n = {
     /**
@@ -97,7 +126,7 @@ var call10n = {
     /**
      * Gets the month name string in the right form depending on a base string.
      *
-     * @param {Number} aMonthNum     The month numer to get, 1-based.
+     * @param {Number} aMonthNum     The month number to get, 1-based.
      * @param {String} aBundleName   The Bundle to get the string from
      * @param {String} aStringBase   The base string name, .monthFormat will be appended
      * @return {String}              The formatted month name
@@ -119,9 +148,9 @@ var call10n = {
      * @return {nsICollation}       A new locale collator
      */
     createLocaleCollator: function() {
-        return Components.classes["@mozilla.org/intl/collation-factory;1"]
-                         .getService(Components.interfaces.nsICollationFactory)
-                         .CreateCollation();
+        return Cc["@mozilla.org/intl/collation-factory;1"]
+                 .getService(Ci.nsICollationFactory)
+                 .CreateCollation();
     },
 
     /**
@@ -134,5 +163,14 @@ var call10n = {
         let collator = call10n.createLocaleCollator();
         aStringArray.sort((a, b) => collator.compareString(0, a, b));
         return aStringArray;
-    }
+    },
+
+    /**
+     * Provides locale dependent parameters for displaying calendar views
+     *
+     * @param {String} aLocale     The locale to get the info for, e.g. "en-US",
+     *                               "de-DE" or null for the current locale
+     * @return {Object}            The getCalendarInfo object from mozIMozIntl
+     */
+    calendarInfo: _calendarInfo
 };

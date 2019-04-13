@@ -10,11 +10,10 @@
 <dialog id="addDirectory"
         style="width: &newDirectoryWidth;"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         onload="Startup();"
         onunload="onUnload();"
-        buttons="accept,cancel"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();">
+        buttons="accept,cancel">
 
   <script type="application/javascript" src="chrome://messenger/content/addressbook/pref-directory-add.js"/>
   <stringbundle id="bundle_addressBook" src="chrome://messenger/locale/addressbook/addressBook.properties"/>
@@ -68,7 +67,7 @@
                                 control="port"/>
                          <hbox>
                              <textbox id="port" type="number" size="5" min="1"
-                                       max="65535" hidespinbuttons="true"
+                                       max="65535"
                                        disableiflocked="true"/>
                          </hbox>
                      </row>
@@ -95,7 +94,7 @@
               <description id="downloadWarningMsg" hidden="true" class="error"/>
               <description id="replicationProgressText" hidden="true"/>
 
-              <progressmeter id="replicationProgressMeter" mode="normal" value="0" hidden="true"/>
+              <html:progress id="replicationProgressMeter" value="0" max="100" hidden="hidden"/>
           </vbox>
           <grid>
              <columns>
@@ -127,7 +126,7 @@
                  <label value="&searchFilter.label;"
                         accesskey="&searchFilter.accesskey;"
                         control="search"/>
-                 <textbox id="search" multiline="true" flex="1" disableiflocked="true"/>
+                 <html:textarea id="search" flex="1" disableiflocked="true"/>
               </row>
               <row align="center">
                 <label value="&saslMechanism.label;" control="saslMechanism" accesskey="&saslMechanism.accesskey;"/>
@@ -149,4 +148,3 @@
   </vbox>
 
 </dialog>
-

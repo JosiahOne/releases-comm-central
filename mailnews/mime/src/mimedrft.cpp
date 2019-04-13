@@ -349,7 +349,7 @@ CreateCompositionFields(const char        *from,
 
   if (from) {
     nsMsgI18NConvertRawBytesToUTF16(nsDependentCString(from),
-                                    nsDependentCString(charset),
+                                    charset ? nsDependentCString(charset) : EmptyCString(),
                                     outString);
     cFields->SetFrom(outString);
   }
@@ -361,28 +361,28 @@ CreateCompositionFields(const char        *from,
 
   if (reply_to) {
     nsMsgI18NConvertRawBytesToUTF16(nsDependentCString(reply_to),
-                                    nsDependentCString(charset),
+                                    charset ? nsDependentCString(charset) : EmptyCString(),
                                     outString);
     cFields->SetReplyTo(outString);
   }
 
   if (to) {
     nsMsgI18NConvertRawBytesToUTF16(nsDependentCString(to),
-                                    nsDependentCString(charset),
+                                    charset ? nsDependentCString(charset) : EmptyCString(),
                                     outString);
     cFields->SetTo(outString);
   }
 
   if (cc) {
     nsMsgI18NConvertRawBytesToUTF16(nsDependentCString(cc),
-                                    nsDependentCString(charset),
+                                    charset ? nsDependentCString(charset) : EmptyCString(),
                                     outString);
     cFields->SetCc(outString);
   }
 
   if (bcc) {
     nsMsgI18NConvertRawBytesToUTF16(nsDependentCString(bcc),
-                                    nsDependentCString(charset),
+                                    charset ? nsDependentCString(charset) : EmptyCString(),
                                     outString);
     cFields->SetBcc(outString);
   }
@@ -1509,7 +1509,7 @@ mime_parse_stream_complete(nsMIMESession *stream)
         int64_t fileSize;
         nsCOMPtr<nsIFile> tempFileCopy;
         mdd->messageBody->m_tmpFile->Clone(getter_AddRefs(tempFileCopy));
-        mdd->messageBody->m_tmpFile = do_QueryInterface(tempFileCopy);
+        mdd->messageBody->m_tmpFile = tempFileCopy;
         tempFileCopy = nullptr;
         mdd->messageBody->m_tmpFile->GetFileSize(&fileSize);
         uint32_t bodyLen = 0;
@@ -1686,8 +1686,10 @@ mime_parse_stream_complete(nsMIMESession *stream)
         // overwritten when saving the template again.
         // Note that always setting the draft ID here would cause drafts to be
         // overwritten when edited "as new", which is undesired.
-        if (msgComposeType == nsIMsgCompType::EditTemplate)
+        if (msgComposeType == nsIMsgCompType::EditTemplate) {
           fields->SetDraftId(mdd->url_name);
+          fields->SetTemplateId(mdd->url_name);  // Remember original template ID.
+        }
 
         if (convertToPlainText)
           fields->ConvertBodyToPlainText();
@@ -2063,7 +2065,7 @@ mime_decompose_file_init_fn(void *stream_closure, MimeHeaders *headers)
   if (!tmpFile)
     return MIME_OUT_OF_MEMORY;
 
-  mdd->tmpFile = do_QueryInterface(tmpFile);
+  mdd->tmpFile = tmpFile;
 
   newAttachment->m_tmpFile = mdd->tmpFile;
 

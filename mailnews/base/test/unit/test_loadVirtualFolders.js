@@ -5,7 +5,7 @@
 // Test loading of virtualFolders.dat, including verification of the search
 // scopes, i.e., folder uri's.
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 // As currently written, this test will only work with Berkeley store.
 Services.prefs.setCharPref("mail.serverDefaultStoreContractID",
@@ -13,8 +13,7 @@ Services.prefs.setCharPref("mail.serverDefaultStoreContractID",
 
 // main test
 
-function run_test()
-{
+function run_test() {
   let vfdat = do_get_file("../../../data/test_virtualFolders.dat");
 
   vfdat.copyTo(do_get_profile(), "virtualFolders.dat");

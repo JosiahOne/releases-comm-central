@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function run_test() {
     // Test the graceful handling of attendee ids for bug 1199942
@@ -59,8 +59,7 @@ function serializeEvent_test() {
     }
 
     // serialize the event again and check whether the attendees still are in shape
-    let serializer = Components.classes["@mozilla.org/calendar/ics-serializer;1"]
-                               .createInstance(Components.interfaces.calIIcsSerializer);
+    let serializer = Cc["@mozilla.org/calendar/ics-serializer;1"].createInstance(Ci.calIIcsSerializer);
     serializer.addItems([event], [event].length);
     let serialized = ics_unfoldline(serializer.serializeToString());
     for (let id of expectedIds) {

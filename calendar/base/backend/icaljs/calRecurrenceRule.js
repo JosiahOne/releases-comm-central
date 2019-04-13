@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/ical.js");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from calICALJSComponents.js */
+
+var { ICAL, unwrapSetter, unwrapSingle, wrapGetter } = ChromeUtils.import("resource://calendar/modules/ical.js");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function calRecurrenceRule(innerObject) {
     this.innerObject = innerObject || new ICAL.Recur();
@@ -12,14 +13,14 @@ function calRecurrenceRule(innerObject) {
 }
 
 var calRecurrenceRuleInterfaces = [
-    Components.interfaces.calIRecurrenceRule,
-    Components.interfaces.calIRecurrenceItem
+    Ci.calIRecurrenceRule,
+    Ci.calIRecurrenceItem
 ];
 var calRecurrenceRuleClassID = Components.ID("{df19281a-5389-4146-b941-798cb93a7f0d}");
 calRecurrenceRule.prototype = {
     QueryInterface: cal.generateQI(calRecurrenceRuleInterfaces),
     classID: calRecurrenceRuleClassID,
-    classInfo: XPCOMUtils.generateCI({
+    classInfo: cal.generateCI({
         contractID: "@mozilla.org/calendar/recurrence-rule;1",
         classDescription: "Calendar Recurrence Rule",
         classID: calRecurrenceRuleClassID,
@@ -47,7 +48,7 @@ calRecurrenceRule.prototype = {
         aRangeEnd = unwrapSingle(ICAL.Time, aRangeEnd);
 
         if (!aMaxCount && !aRangeEnd && this.count == 0 && this.until == null) {
-            throw Components.results.NS_ERROR_INVALID_ARG;
+            throw Cr.NS_ERROR_INVALID_ARG;
         }
 
         let occurrences = [];
@@ -120,7 +121,7 @@ calRecurrenceRule.prototype = {
 
     get count() {
         if (!this.isByCount) {
-            throw Components.results.NS_ERROR_FAILURE;
+            throw Cr.NS_ERROR_FAILURE;
         }
         return this.innerObject.count || -1;
     },

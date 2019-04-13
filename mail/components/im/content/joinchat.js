@@ -2,13 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource:///modules/imServices.jsm");
+var { fixIterator } = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var { Services } = ChromeUtils.import("resource:///modules/imServices.jsm");
 
 var autoJoinPref = "autoJoin";
 
 var joinChat = {
-  onload: function jc_onload() {
+  onload() {
     var accountList = document.getElementById("accountlist");
     for (let acc of fixIterator(Services.accounts.getAccounts())) {
       if (!acc.connected || !acc.canJoinChat)
@@ -21,12 +21,12 @@ var joinChat = {
     }
     if (!accountList.itemCount) {
       document.getElementById("joinChatDialog").cancelDialog();
-      throw "No connected MUC enabled account!";
+      throw new Error("No connected MUC enabled account!");
     }
     accountList.selectedIndex = 0;
   },
 
-  onAccountSelect: function jc_onAccountSelect() {
+  onAccountSelect() {
     let ab = document.getElementById("separatorRow1");
     while (ab.nextSibling && ab.nextSibling.id != "separatorRow2")
       ab.nextSibling.remove();
@@ -62,9 +62,9 @@ var joinChat = {
       let val = defaultValues.getValue(field.identifier);
       if (val)
         textbox.setAttribute("value", val);
-      if (field.type == Ci.prplIChatRoomField.TYPE_PASSWORD)
+      if (field.type == Ci.prplIChatRoomField.TYPE_PASSWORD) {
         textbox.setAttribute("type", "password");
-      else if (field.type == Ci.prplIChatRoomField.TYPE_INT) {
+      } else if (field.type == Ci.prplIChatRoomField.TYPE_INT) {
         textbox.setAttribute("type", "number");
         textbox.setAttribute("min", field.min);
         textbox.setAttribute("max", field.max);
@@ -81,21 +81,21 @@ var joinChat = {
 
       row.setAttribute("align", "baseline");
       sep.parentNode.insertBefore(row, sep);
-      joinChat._fields.push({field: field, textbox: textbox});
+      joinChat._fields.push({field, textbox});
     }
 
     window.sizeToContent();
   },
 
-  join: function jc_join() {
+  join() {
     let values = joinChat._values;
     for (let field of joinChat._fields) {
       let val = field.textbox.value.trim();
       if (!val && field.field.required) {
         field.textbox.focus();
-        //FIXME: why isn't the return false enough?
-        throw "Some required fields are empty!";
-        return false;
+        // FIXME: why isn't the return false enough?
+        throw new Error("Some required fields are empty!");
+        // return false;
       }
       if (val)
         values.setValue(field.field.identifier, val);
@@ -106,7 +106,7 @@ var joinChat = {
     let protoId = account.protocol.id;
     if (protoId != "prpl-irc" && protoId != "prpl-jabber" &&
         protoId != "prpl-gtalk")
-      return true;
+      return;
 
     let name;
     if (protoId == "prpl-irc")
@@ -122,7 +122,7 @@ var joinChat = {
       if (mailWindow) {
         mailWindow.focus();
         let tabmail = mailWindow.document.getElementById("tabmail");
-        tabmail.openTab("chat", {convType: "focus", conv: conv});
+        tabmail.openTab("chat", {convType: "focus", conv});
       }
     }
 
@@ -147,7 +147,7 @@ var joinChat = {
         prefBranch.setStringPref(autoJoinPref, autojoin.join(","));
       }
     }
-
-    return true;
-  }
+  },
 };
+
+document.addEventListener("dialogaccept", joinChat.join);

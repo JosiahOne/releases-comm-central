@@ -4,14 +4,14 @@
 
 this.EXPORTED_SYMBOLS = ['GlodaABIndexer', 'GlodaABAttrs'];
 
-ChromeUtils.import("resource:///modules/gloda/collection.js");
-ChromeUtils.import("resource:///modules/gloda/datastore.js");
-ChromeUtils.import("resource:///modules/gloda/gloda.js");
-ChromeUtils.import("resource:///modules/gloda/indexer.js");
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
-ChromeUtils.import("resource:///modules/gloda/noun_freetag.js");
-ChromeUtils.import("resource:///modules/gloda/utils.js");
-ChromeUtils.import("resource:///modules/mailServices.js");
+const {GlodaCollectionManager} = ChromeUtils.import("resource:///modules/gloda/collection.js");
+const {GlodaDatastore} = ChromeUtils.import("resource:///modules/gloda/datastore.js");
+const {Gloda} = ChromeUtils.import("resource:///modules/gloda/gloda.js");
+const {GlodaIndexer, IndexingJob} = ChromeUtils.import("resource:///modules/gloda/indexer.js");
+const {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+const {FreeTagNoun} = ChromeUtils.import("resource:///modules/gloda/noun_freetag.js");
+const {GlodaUtils} = ChromeUtils.import("resource:///modules/gloda/utils.js");
+const {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 
 var GlodaABIndexer = {

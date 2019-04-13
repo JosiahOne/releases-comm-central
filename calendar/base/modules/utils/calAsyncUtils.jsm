@@ -2,8 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/PromiseUtils.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { PromiseUtils } = ChromeUtils.import("resource://gre/modules/PromiseUtils.jsm");
 
 /*
  * Asynchronous tools for handling calendar operations
@@ -14,8 +13,8 @@ ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 this.EXPORTED_SYMBOLS = ["calasync"]; /* exported calasync */
 
-var cIOL = Components.interfaces.calIOperationListener;
-var cIC = Components.interfaces.calICalendar;
+var cIOL = Ci.calIOperationListener;
+var cIC = Ci.calICalendar;
 
 var promisifyProxyHandler = {
     promiseOperation: function(target, name, args) {
@@ -41,7 +40,7 @@ var promisifyProxyHandler = {
             case "deleteOfflineItem":
             case "getOfflineItemFlag":
             case "resetItemOfflineFlag": {
-                let offline = target.QueryInterface(Components.interfaces.calIOfflineStorage);
+                let offline = target.QueryInterface(Ci.calIOfflineStorage);
                 return (...args) => this.promiseOperation(offline, name, args);
             }
 
@@ -109,7 +108,7 @@ var calasync = {
         return {
             QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
             items: [],
-            itemStatus: Components.results.NS_OK,
+            itemStatus: Cr.NS_OK,
             onGetResult: function(aCalendar, aStatus, aItemType, aDetail,
                                   aCount, aItems) {
                 this.itemStatus = aStatus;

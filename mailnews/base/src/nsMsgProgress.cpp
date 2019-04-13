@@ -53,8 +53,6 @@ NS_IMETHODIMP nsMsgProgress::OpenProgressDialog(mozIDOMWindowProxy *parentDOMWin
   NS_ENSURE_ARG_POINTER(dialogURL);
   NS_ENSURE_ARG_POINTER(parentDOMWindow);
   nsCOMPtr<nsPIDOMWindowOuter> parent = nsPIDOMWindowOuter::From(parentDOMWindow);
-  parent = parent->GetOuterWindow();
-  NS_ENSURE_ARG_POINTER(parent);
 
   // Set up window.arguments[0]...
   nsCOMPtr<nsIMutableArray> array(do_CreateInstance(NS_ARRAY_CONTRACTID, &rv));
@@ -178,6 +176,13 @@ NS_IMETHODIMP nsMsgProgress::OnStatusChange(nsIWebProgress *aWebProgress, nsIReq
 
 /* void onSecurityChange (in nsIWebProgress aWebProgress, in nsIRequest aRequest, in unsigned long state); */
 NS_IMETHODIMP nsMsgProgress::OnSecurityChange(nsIWebProgress *aWebProgress, nsIRequest *aRequest, uint32_t state)
+{
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMsgProgress::OnContentBlockingEvent(nsIWebProgress *aWebProgress,
+                                      nsIRequest *aRequest, uint32_t aEvent)
 {
   return NS_OK;
 }

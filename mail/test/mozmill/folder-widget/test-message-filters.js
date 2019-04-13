@@ -5,6 +5,9 @@
 /*
  * Test various properties of the message filters.
  */
+
+"use strict";
+
 var MODULE_NAME = "test-message-filters";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -12,8 +15,7 @@ var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                        "nntp-helpers", "address-book-helpers",
                        "prompt-helpers"];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 var folderA;
 
 function setupModule(module)
@@ -28,18 +30,11 @@ function setupModule(module)
   // we need one message to select and open
   make_new_sets_in_folder(folderA, [{count: 1}]);
 
-  server = setupLocalServer(NNTP_PORT);
+  setupLocalServer(NNTP_PORT);
 
   // Note, the uri is for hostname "invalid" which is the original uri. See
   // setupProtocolTest parameters.
   var prefix = "news://invalid:"+NNTP_PORT+"/";
-
-  // Test - group subscribe listing
-  test = "news:*";
-
-  if (mc.mozmillModule.isMac) {
-    test_customize_toolbar_doesnt_double_get_mail_menu.__force_skip__ = true;
-  }
 }
 
 /*
@@ -56,7 +51,7 @@ function test_message_filter_shows_newsgroup_server()
   let filterc = wait_for_new_window("mailnews:filterlist");
   wait_for_window_focused(filterc.window);
 
-  popup = filterc.eid("serverMenuPopup");
+  let popup = filterc.eid("serverMenuPopup");
   filterc.assertNode(popup);
   filterc.click(popup);
 
@@ -94,18 +89,15 @@ function test_customize_toolbar_doesnt_double_get_mail_menu()
    */
   function check_getAllNewMsgMenu() {
     wait_for_window_focused(mc.window);
-    mc.click(mc.eid("menu_File"), 5, 5);
-    wait_for_popup_to_open(mc.e("menu_FilePopup"));
+    mc.click(mc.eid("button-appmenu"), 5, 5);
+    let popups = mc.click_menus_in_sequence(mc.e("appmenu-popup"),
+                                            [ { id: "appmenu_File" },
+                                              { id: "appmenu_getNewMsgFor" } ], true);
 
-    let menu = mc.eid("menu_getAllNewMsg");
-    mc.click(menu, 5, 5);
-    wait_for_popup_to_open(mc.e("menu_getAllNewMsgPopup"));
-
-    assert_equals(menu.node.itemCount, 5,
+    assert_equals(popups[popups.length - 1].children.length, 5,
                   "Incorrect number of items for GetNewMessages before customization");
 
-    close_popup(mc, mc.eid("menu_getAllNewMsgPopup"));
-    close_popup(mc, mc.eid("menu_FilePopup"));
+    mc.close_popup_sequence(popups);
   }
 
   check_getAllNewMsgMenu();
@@ -124,6 +116,7 @@ function test_customize_toolbar_doesnt_double_get_mail_menu()
 
   check_getAllNewMsgMenu();
 }
+test_customize_toolbar_doesnt_double_get_mail_menu.EXCLUDED_PLATFORMS = ["darwin"];
 
 /* A helper function that opens up the new filter dialog (assuming that the
  * main filters dialog is already open), creates a simple filter, and then
@@ -142,13 +135,13 @@ function create_simple_filter() {
     let filterName = fec.e("filterName");
     filterName.value = "A Simple Filter";
     let searchAttr = fec.e("searchAttr0");
-    let attrList = fec.window.document.getAnonymousNodes(searchAttr)[0];
+    let attrList = searchAttr.childNodes[0];
     attrList.value = Ci.nsMsgSearchAttrib.To;
     let searchOp = fec.e("searchOp0");
-    let opList = fec.window.document.getAnonymousNodes(searchOp)[0];
+    let opList = searchOp.childNodes[0];
     opList.value = Ci.nsMsgSearchOp.Is;
     let searchValList = fec.e("searchVal0");
-    let searchVal = fec.window.document.getAnonymousNodes(searchValList)[0];
+    let searchVal = searchValList.childNodes[0];
     searchVal.setAttribute("value", "test@foo.invalid");
 
     let filterActions = fec.e("filterActionList");
@@ -187,16 +180,16 @@ function test_address_books_appear_in_message_filter_dropdown()
   // has opened
   function filterEditorOpened(fec) {
     let searchAttr = fec.e("searchAttr0");
-    let attrList = fec.window.document.getAnonymousNodes(searchAttr)[0];
+    let attrList = searchAttr.childNodes[0];
     attrList.value = Ci.nsMsgSearchAttrib.To;
     let searchOp = fec.e("searchOp0");
-    let opList = fec.window.document.getAnonymousNodes(searchOp)[0];
+    let opList = searchOp.childNodes[0];
     opList.value = Ci.nsMsgSearchOp.IsInAB;
     let searchValue = fec.e("searchVal0");
 
     // The magic number "4" is because the address book list is the
-    // 4th child node of the searchvalue widget.
-    let abList = fec.window.document.getAnonymousNodes(searchValue)[4];
+    // 4th child node of the search-value widget.
+    let abList = searchValue.childNodes[4];
 
     // We should have 2 address books here - one for the Personal Address
     // Book, and one for Collected Addresses.  The LDAP address book should

@@ -10,10 +10,9 @@
 
 this.EXPORTED_SYMBOLS = ["ircCTCP", "ctcpBase"];
 
-ChromeUtils.import("resource:///modules/imServices.jsm");
-ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/ircHandlers.jsm");
-ChromeUtils.import("resource:///modules/ircUtils.jsm");
+const {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
+const {ircHandlers} = ChromeUtils.import("resource:///modules/ircHandlers.jsm");
+var {_} = ChromeUtils.import("resource:///modules/ircUtils.jsm");
 
 // Split into a CTCP message which is a single command and a single parameter:
 //   <command> " " <parameter>
@@ -27,7 +26,11 @@ function CTCPMessage(aMessage, aRawCTCPMessage) {
   // with \001 or \134, respectively. Any other character after \134 is replaced
   // with itself.
   let dequotedCTCPMessage = message.ctcp.rawMessage.replace(/\\(.|$)/g,
-    aStr => aStr[1] ? (aStr[1] == "a" ? "\x01" : aStr[1]) : "");
+    aStr => {
+      if (aStr[1])
+        return aStr[1] == "a" ? "\x01" : aStr[1];
+      return "";
+    });
 
   let separator = dequotedCTCPMessage.indexOf(" ");
   // If there's no space, then only a command is given.
@@ -54,8 +57,8 @@ var ircCTCP = {
   // CTCP uses only PRIVMSG and NOTICE commands.
   commands: {
     "PRIVMSG": ctcpHandleMessage,
-    "NOTICE": ctcpHandleMessage
-  }
+    "NOTICE": ctcpHandleMessage,
+  },
 };
 // Parse the message and call all CTCP handlers on the message.
 function ctcpHandleMessage(aMessage) {
@@ -69,6 +72,7 @@ function ctcpHandleMessage(aMessage) {
   // Split the raw message into the multiple CTCP messages and pull out the
   // command and parameters.
   let ctcpMessages = [];
+  // eslint-disable-next-line no-control-regex
   let otherMessage = rawCTCPParam.replace(/\x01([^\x01]*)\x01/g,
     function(aMatch, aMsg) {
       if (aMsg)
@@ -87,7 +91,7 @@ function ctcpHandleMessage(aMessage) {
     let message = aMessage;
     message.params.pop();
     message.params.push(otherMessage);
-    ircHandlers.handleMessage(message);
+    ircHandlers.handleMessage(this, message);
   }
 
   // Loop over each raw CTCP message.
@@ -136,7 +140,7 @@ var ctcpBase = {
     // supported CTCP parameters and this is not supported.
 
     // Returns the user's full name, and idle time.
-    //"FINGER": function(aMessage) { return false; },
+    // "FINGER": function(aMessage) { return false; },
 
     // Dynamic master index of what a client knows.
     "CLIENTINFO": function(aMessage) {
@@ -175,18 +179,17 @@ var ctcpBase = {
                              aMessage.ctcp.param);
         return true;
       }
-      else
-        return this.handlePingReply(aMessage.origin, aMessage.ctcp.param);
+      return this.handlePingReply(aMessage.origin, aMessage.ctcp.param);
     },
 
     // These are commented out since CLIENTINFO automatically returns the
     // supported CTCP parameters and this is not supported.
 
     // An encryption protocol between clients without any known reference.
-    //"SED": function(aMessage) { return false; },
+    // "SED": function(aMessage) { return false; },
 
     // Where to obtain a copy of a client.
-    //"SOURCE": function(aMessage) { return false; },
+    // "SOURCE": function(aMessage) { return false; },
 
     // Gets the local date and time from other clients.
     "TIME": function(aMessage) {
@@ -215,7 +218,7 @@ var ctcpBase = {
     // supported CTCP parameters and this is not supported.
 
     // A string set by the user (never the client coder)
-    //"USERINFO": function(aMessage) { return false; },
+    // "USERINFO": function(aMessage) { return false; },
 
     // The version and type of the client.
     "VERSION": function(aMessage) {
@@ -237,6 +240,6 @@ var ctcpBase = {
                           {system: true, tags: aMessage.tags});
       }
       return true;
-    }
-  }
+    },
+  },
 };

@@ -25,7 +25,6 @@ struct Token;
 class TokenEnumeration;
 class TokenAnalyzer;
 class nsIMsgWindow;
-class nsIMimeHeaders;
 class nsIUTF8StringEnumerator;
 struct BaseToken;
 struct CorpusToken;
@@ -38,7 +37,7 @@ struct CorpusToken;
  */
 class TokenEnumeration {
 public:
-    TokenEnumeration(PLDHashTable* table);
+    explicit TokenEnumeration(PLDHashTable* table);
     bool hasMoreTokens();
     BaseToken* nextToken();
 
@@ -94,7 +93,7 @@ public:
     BaseToken* add(const char* word);
 
 protected:
-    TokenHash(uint32_t entrySize);
+    explicit TokenHash(uint32_t entrySize);
     mozilla::ArenaAllocator<16384, 2> mWordPool;
     uint32_t mEntrySize;
     PLDHashTable mTokenTable;
@@ -261,7 +260,7 @@ public:
      *
      * @param aFromTraits array of trait ids used in aFile. If aFile contains
      *                    trait ids that are not in this array, they are not
-     *                    remapped, but assummed to be local trait ids.
+     *                    remapped, but assumed to be local trait ids.
      *
      * @param aToTraits   array of trait ids, corresponding to elements of
      *                    aFromTraits, that represent the local trait ids to be

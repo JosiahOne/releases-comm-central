@@ -4,22 +4,9 @@
 
 @import url("chrome://messenger/skin/shared/compacttheme.css");
 
-#tabs-toolbar,
-#mail-toolbar-menubar2 {
-  -moz-appearance: none !important;
-}
-
-#mail-menubar {
-  color: var(--chrome-color);
-}
-
-#mail-menubar > menu:not([open]) {
-  color: inherit;
-}
-
 /* Quick-Filter-Bar */
 #quick-filter-bar {
-  border-bottom-color: var(--toolbox-border-bottom-color);
+  border-bottom-color: var(--chrome-content-separator-color);
 }
 
 #MsgHeadersToolbar {

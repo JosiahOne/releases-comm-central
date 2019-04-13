@@ -15,6 +15,7 @@
 #include "nsString.h"
 #include "nsIMutableArray.h"
 #include "nsLDAPConnection.h"
+#include "nsIAuthModule.h"
 
 // 97a479d0-9a44-47c6-a17a-87f9b00294bb
 #define NS_LDAPOPERATION_CID \
@@ -36,6 +37,9 @@ class nsLDAPOperation : public nsILDAPOperation
      * used to break cycles
      */
     void Clear();
+
+    // Stores the request number for later check of the operation is still valid
+    uint32_t mRequestNum;
 
   private:
     virtual ~nsLDAPOperation();

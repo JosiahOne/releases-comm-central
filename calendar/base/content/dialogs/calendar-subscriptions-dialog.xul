@@ -18,13 +18,11 @@
   title="&calendar.subscriptions.dialog.title;"
   windowtype="Calendar:SubscriptionsDialog"
   buttons="accept,cancel"
-  ondialogaccept="return onAccept();"
-  ondialogcancel="return onCancel();"
   onload="return onLoad();"
   onunload="return onUnload();"
   onkeypress="onKeyPress(event);"
   persist="screenX screenY width height"
-  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <!-- Javascript includes -->
   <script type="application/javascript" src="chrome://calendar/content/calendar-subscriptions-dialog.js"/>
@@ -52,7 +50,7 @@
                  crop="end"/>
         </row>
         <row flex="1">
-          <calendar-subscriptions-richlistbox id="subscriptions-listbox" flex="1"/>
+          <richlistbox id="subscriptions-listbox" flex="1"/>
           <vbox>
             <button id="subscribe-button"
                     label="&calendar.subscriptions.dialog.subscribe.button.label;"

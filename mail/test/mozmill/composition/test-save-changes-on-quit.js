@@ -10,6 +10,8 @@
 
 // make SOLO_TEST=composition/test-save-changes-on-quit.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-save-changes-on-quit";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -19,7 +21,7 @@ var SAVE = 0
 var CANCEL = 1
 var DONT_SAVE = 2;
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var cwc = null; // compose window controller
 var folder = null;
@@ -126,7 +128,7 @@ function test_can_quit_on_changes() {
   // Trigger the quit-application-request notification
   Services.obs.notifyObservers(cancelQuit, "quit-application-requested");
 
-  promptState = gMockPromptService.promptState;
+  let promptState = gMockPromptService.promptState;
   assert_not_equals(null, promptState, "Expected a confirmEx prompt");
 
   assert_equals("confirmEx", promptState.method);

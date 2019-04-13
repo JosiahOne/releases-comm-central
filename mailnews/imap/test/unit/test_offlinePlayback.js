@@ -4,8 +4,8 @@
  * go back online.
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {PromiseTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 load("../../../resources/messageGenerator.js");
 
@@ -18,7 +18,7 @@ var gOfflineManager;
 var tests = [
   setupIMAPPump,
   function serverParms() {
-    ChromeUtils.import("resource://testing-common/mailnews/maild.js");
+    var {fsDebugAll} = ChromeUtils.import("resource://testing-common/mailnews/maild.js");
     IMAPPump.server.setDebugLevel(fsDebugAll);
   },
   setup,

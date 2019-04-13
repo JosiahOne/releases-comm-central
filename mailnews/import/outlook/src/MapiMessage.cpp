@@ -588,7 +588,7 @@ bool CMapiMessage::CheckBodyInCharsetRange(const char* charset)
       // All converted successfully.
       break;
     } else if (result != mozilla::kOutputFull) {
-      // Didn't use all the input but the outout isn't full, hence
+      // Didn't use all the input but the output isn't full, hence
       // there was an unencodable character.
       return false;
     }
@@ -838,7 +838,6 @@ bool CMapiMessage::GetTmpFile(/*out*/ nsIFile **aResult)
 
 bool CMapiMessage::CopyMsgAttachToFile(LPATTACH lpAttach, /*out*/ nsIFile **tmp_file)
 {
-  bool bResult = true;
   LPMESSAGE  lpMsg;
   HRESULT hr = lpAttach->OpenProperty(PR_ATTACH_DATA_OBJ, &IID_IMessage, 0, 0,
                                       reinterpret_cast<LPUNKNOWN *>(&lpMsg));
@@ -1016,7 +1015,7 @@ bool CMapiMessage::AddAttachment(DWORD aNum)
     if (bResult) {
       // Now we have the file; proceed to the other properties
 
-      data->encoding = NS_strdup(ENCODING_BINARY);
+      data->encoding = NS_xstrdup(ENCODING_BINARY);
 
       nsString fname, fext;
       pVal = CMapiApi::GetMapiProperty(lpAttach, PR_ATTACH_LONG_FILENAME_W);
@@ -1047,7 +1046,7 @@ bool CMapiMessage::AddAttachment(DWORD aNum)
       nsCString tmp;
        // We have converted it to the rfc822 document
       if (aMethod == ATTACH_EMBEDDED_MSG) {
-        data->type = NS_strdup(MESSAGE_RFC822);
+        data->type = NS_xstrdup(MESSAGE_RFC822);
       } else {
         pVal = CMapiApi::GetMapiProperty(lpAttach, PR_ATTACH_MIME_TAG_A);
         CMapiApi::GetStringFromProp(pVal, tmp);
@@ -1058,9 +1057,9 @@ bool CMapiMessage::AddAttachment(DWORD aNum)
             pType = CMimeTypes::GetMimeType(fext);
           }
           if (pType)
-            data->type = NS_strdup((PC_S8)pType);
+            data->type = NS_xstrdup((PC_S8)pType);
           else
-            data->type = NS_strdup(APPLICATION_OCTET_STREAM);
+            data->type = NS_xstrdup(APPLICATION_OCTET_STREAM);
         }
         else
           data->type = ToNewCString(tmp);
@@ -1274,9 +1273,11 @@ void CMapiMessageHeaders::CHeaderField::GetUnfoldedString(nsString& dest,
   if (m_fbody_utf8)
     CopyUTF8toUTF16(unfolded, dest);
   else
-    nsMsgI18NConvertToUnicode(nsDependentCString(fallbackCharset),
-                                                 unfolded,
-                                                 dest);
+    nsMsgI18NConvertToUnicode(fallbackCharset ?
+                                nsDependentCString(fallbackCharset) :
+                                EmptyCString(),
+                              unfolded,
+                              dest);
 }
 
 ////////////////////////////////////////
@@ -1301,7 +1302,7 @@ CMapiMessageHeaders::~CMapiMessageHeaders()
   ClearHeaderFields();
 }
 
-void Delete(void* p) { delete p; }
+void CMapiMessageHeaders::Delete(CHeaderField* p) { delete p; }
 
 void CMapiMessageHeaders::ClearHeaderFields()
 {

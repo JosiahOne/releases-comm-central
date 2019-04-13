@@ -3,70 +3,68 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-  /**
-   * Extract the href from the link click event.
-   * We look for HTMLAnchorElement, HTMLAreaElement, HTMLLinkElement,
-   * HTMLInputElement.form.action, and nested anchor tags.
-   * If the clicked element was a HTMLInputElement or HTMLButtonElement
-   * we return the form action.
-   *
-   * @return href for the url being clicked
-   */
+/* import-globals-from ../../../../toolkit/content/contentAreaUtils.js */
+/* import-globals-from mailWindow.js */
+/* import-globals-from utilityOverlay.js */
+/* import-globals-from phishingDetector.js */
 
-  ChromeUtils.import("resource://gre/modules/PlacesUtils.jsm");
-  ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {PlacesUtils} = ChromeUtils.import("resource://gre/modules/PlacesUtils.jsm");
 
-  function hRefForClickEvent(aEvent, aDontCheckInputElement)
-  {
-    var href;
-    var isKeyCommand = (aEvent.type == "command");
-    var target =
-      isKeyCommand ? document.commandDispatcher.focusedElement : aEvent.target;
+/**
+ * Extract the href from the link click event.
+ * We look for HTMLAnchorElement, HTMLAreaElement, HTMLLinkElement,
+ * HTMLInputElement.form.action, and nested anchor tags.
+ * If the clicked element was a HTMLInputElement or HTMLButtonElement
+ * we return the form action.
+ *
+ * @return [href, linkText] the url and the text for the link being clicked.
+ */
+function hRefForClickEvent(aEvent, aDontCheckInputElement) {
+  let target = (aEvent.type == "command") ?
+    document.commandDispatcher.focusedElement : aEvent.target;
 
-    if (target instanceof HTMLAnchorElement ||
-        target instanceof HTMLAreaElement   ||
-        target instanceof HTMLLinkElement)
-    {
-      if (target.hasAttribute("href"))
-        href = target.href;
-    }
-    else if (target instanceof HTMLImageElement &&
-             target.hasAttribute("overflowing"))
-    {
-      // Return if an image is zoomed, otherwise fall through to see if it has
-      // a link node.
-      return href;
-    }
-    else if (!aDontCheckInputElement && ((target instanceof HTMLInputElement) ||
-                                         (target instanceof HTMLButtonElement)))
-    {
-      if (target.form && target.form.action)
-        href = target.form.action;
-    }
-    else
-    {
-      // We may be nested inside of a link node.
-      var linkNode = aEvent.originalTarget;
-      while (linkNode && !(linkNode instanceof HTMLAnchorElement))
-        linkNode = linkNode.parentNode;
-
-      if (linkNode)
-        href = linkNode.href;
-    }
-
-    return href;
+  if (target instanceof HTMLImageElement &&
+      target.hasAttribute("overflowing")) { // Click on zoomed image.
+    return [null, null];
   }
 
-function messagePaneOnResize(aEvent)
-{
+  let href = null;
+  let linkText = null;
+  if (target instanceof HTMLAnchorElement ||
+      target instanceof HTMLAreaElement ||
+      target instanceof HTMLLinkElement) {
+    if (target.hasAttribute("href")) {
+      href = target.href;
+      linkText = gatherTextUnder(target);
+    }
+  } else if (!aDontCheckInputElement && ((target instanceof HTMLInputElement) ||
+                                         (target instanceof HTMLButtonElement))) {
+    if (target.form && target.form.action)
+      href = target.form.action;
+  } else {
+    // We may be nested inside of a link node.
+    let linkNode = aEvent.originalTarget;
+    while (linkNode && !(linkNode instanceof HTMLAnchorElement)) {
+      linkNode = linkNode.parentNode;
+    }
+
+    if (linkNode) {
+      href = linkNode.href;
+      linkText = gatherTextUnder(linkNode);
+    }
+  }
+  return [href, linkText];
+}
+
+function messagePaneOnResize(aEvent) {
   // Scale any overflowing images, exclude http content.
   let browser = getBrowser();
   let doc = browser && browser.contentDocument ? browser.contentDocument : null;
   if (!doc || doc.URL.startsWith("http") || !doc.images)
     return;
 
-  for (let img of doc.images)
-  {
+  for (let img of doc.images) {
     if (img.clientWidth - doc.body.offsetWidth >= 0 &&
         (img.clientWidth <= img.naturalWidth || !img.naturalWidth))
       img.setAttribute("overflowing", true);
@@ -82,8 +80,7 @@ function messagePaneOnResize(aEvent)
  * @param HTMLElement aTargetNode - the element node.
  * @return                        - true if link pointing to anchor.
  */
-function isLinkToAnchorOnPage(aTargetNode)
-{
+function isLinkToAnchorOnPage(aTargetNode) {
   let url = aTargetNode.ownerDocument.URL;
   if (!url.startsWith("http"))
     return false;
@@ -105,8 +102,7 @@ function isLinkToAnchorOnPage(aTargetNode)
 
 // Called whenever the user clicks in the content area,
 // should always return true for click to go through.
-function contentAreaClick(aEvent)
-{
+function contentAreaClick(aEvent) {
   let target = aEvent.target;
 
   // If we've loaded a web page url, and the element's or its ancestor's href
@@ -115,7 +111,7 @@ function contentAreaClick(aEvent)
   if (isLinkToAnchorOnPage(target))
     return true;
 
-  let href = hRefForClickEvent(aEvent);
+  let [href, linkText] = hRefForClickEvent(aEvent);
 
   if (!href && !aEvent.button) {
     // Is this an image that we might want to scale?
@@ -159,8 +155,16 @@ function contentAreaClick(aEvent)
   aEvent.preventDefault();
 
   // Let the phishing detector check the link.
-  if (!gPhishingDetector.warnOnSuspiciousLinkClick(href))
-    return false;
+  let urlPhishCheckResult = gPhishingDetector.warnOnSuspiciousLinkClick(href, linkText);
+  if (urlPhishCheckResult === 1) {
+    return false; // Block request
+  }
+
+  if (urlPhishCheckResult === 0) {
+    // Use linkText instead.
+    openLinkExternally(linkText);
+    return true;
+  }
 
   openLinkExternally(href);
   return true;
@@ -172,8 +176,7 @@ function contentAreaClick(aEvent)
  *
  * @param url  A url string or an nsIURI containing the url to open.
  */
-function openLinkExternally(url)
-{
+function openLinkExternally(url) {
   let uri = url;
   if (!(uri instanceof Ci.nsIURI))
     uri = Services.io.newURI(url);
@@ -183,7 +186,7 @@ function openLinkExternally(url)
     url, // accepts both string and nsIURI
     visits: [{
       date: new Date(),
-    }]
+    }],
   }).catch(Cu.reportError);
 
   Cc["@mozilla.org/uriloader/external-protocol-service;1"]

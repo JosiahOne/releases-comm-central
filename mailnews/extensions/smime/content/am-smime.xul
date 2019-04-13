@@ -7,18 +7,19 @@
 
 <!DOCTYPE page SYSTEM "chrome://messenger/locale/am-smime.dtd">
 
-<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         class="color-dialog"
-        onload="parent.onPanelLoaded('am-smime.xul');"
-        ondialogaccept="smimeOnAcceptEditor();">
+        onload="parent.onPanelLoaded('am-smime.xul');">
 
   <vbox flex="1" style="overflow: auto;">
     <script type="application/javascript" src="chrome://messenger/content/AccountManager.js"/>
     <script type="application/javascript" src="chrome://messenger/content/am-smime.js"/>
 
-    <dialogheader title="&securityTitle.label;"/>
+    <hbox class="dialogheader">
+      <label class="dialogheader-title" value="&securityTitle.label;"/>
+    </hbox>
 
-#include am-smime.inc
+#include am-smime.inc.xul
   </vbox>
 
 </page>

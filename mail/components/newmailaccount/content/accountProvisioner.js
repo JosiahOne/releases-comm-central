@@ -2,37 +2,34 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/NetUtil.jsm");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
-ChromeUtils.import("resource:///modules/StringBundle.js");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {PluralForm} = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+var {StringBundle} = ChromeUtils.import("resource:///modules/StringBundle.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var { Log4Moz } = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 
 // Get a configured logger for this component.
 // To debug, set mail.provider.logging.dump (or .console)="All"
 var gLog = Log4Moz.getConfiguredLogger("mail.provider");
 var stringBundle = new StringBundle("chrome://messenger/locale/newmailaccount/accountProvisioner.properties");
 
-var isOSX = (Services.appinfo.OS == 'Darwin');
-
 var RETRY_TIMEOUT = 5000; // 5 seconds
 var CONNECTION_TIMEOUT = 15000; // 15 seconds
 
-function isAccel (event) { return isOSX && event.metaKey || event.ctrlKey; }
+function isAccel(event) {
+  return AppConstants.platform == "macosx" ? event.metaKey : event.ctrlKey;
+}
 
 /**
- * Get the localstorage for this page in a way that works in chrome.
- *
- * Cribbed from
- *   mozilla/dom/tests/mochitest/localstorage/test_localStorageFromChrome.xhtml
+ * Get fixed localstorage.
  *
  * @param {String} page The page to get the localstorage for.
  * @return {nsIDOMStorage} The localstorage for this page.
  */
-function getLocalStorage(page) {
-  var url = "chrome://content/messenger/accountProvisionerStorage/" + page;
+function getLocalStorage() {
+  var url = "https://accountprovisioner.thunderbird.invalid";
 
   var uri = Services.io.newURI(url);
   var principal = Services.scriptSecurityManager.createCodebasePrincipal(uri, {});
@@ -47,8 +44,7 @@ function splitName(str) {
   let i = str.lastIndexOf(" ");
   if (i >= 1)
     return [str.substring(0, i), str.substring(i + 1)];
-  else
-    return [str, ""];
+  return [str, ""];
 }
 
 /**
@@ -62,7 +58,7 @@ function splitName(str) {
 function insertHTMLReplacement(aTextContainer, aTextNode, aPlaceholder, aReplacement) {
   if (aTextNode.textContent.includes(aPlaceholder)) {
     let placeIndex = aTextNode.textContent.indexOf(aPlaceholder);
-    let restNode = aTextNode.splitText(placeIndex+aPlaceholder.length);
+    let restNode = aTextNode.splitText(placeIndex + aPlaceholder.length);
     aTextContainer.insertBefore(aReplacement, restNode);
     let placeholderNode = aTextNode.splitText(placeIndex);
     placeholderNode.remove();
@@ -117,20 +113,20 @@ var EmailAccountProvisioner = {
    * Returns the language that the user currently accepts.
    */
   get userLanguage() {
-    return Services.locale.getRequestedLocale();
+    return Services.locale.requestedLocale;
   },
 
   /**
    * A helper function to enable or disable the Search button.
    */
-  searchButtonEnabled: function EAP_searchButtonEnabled(aVal) {
+  searchButtonEnabled(aVal) {
     document.getElementById("searchSubmit").disabled = !aVal;
   },
 
   /**
    * A setter for enabling / disabling the search fields.
    */
-  searchEnabled: function EAP_searchEnabled(aVal) {
+  searchEnabled(aVal) {
     document.getElementById("name").disabled = !aVal;
     for (let node of document.querySelectorAll(".providerCheckbox")) {
       node.disabled = !aVal;
@@ -141,7 +137,7 @@ var EmailAccountProvisioner = {
   /**
    * If aVal is true, show the spinner, else hide.
    */
-  spinning: function EAP_spinning(aVal) {
+  spinning(aVal) {
     let display = aVal ? "block" : "none";
     for (let node of document.querySelectorAll("#notifications .spinner")) {
       node.style.display = display;
@@ -152,7 +148,7 @@ var EmailAccountProvisioner = {
    * Sets the current window state to display the "success" page, with options
    * for composing messages, setting a signature, finding add-ons, etc.
    */
-  showSuccessPage: function EAP_showSuccessPage() {
+  showSuccessPage() {
     gLog.info("Showing the success page");
     let engine = Services.search.getEngineByName(window.arguments[0].search_engine);
     let account = window.arguments[0].account;
@@ -215,12 +211,12 @@ var EmailAccountProvisioner = {
    * Save the name inputted in the search field to localstorage, so we can
    * reconstitute it on respawn later.
    */
-  saveName: function EAP_saveName() {
+  saveName() {
     let name = document.getElementById("name").value.trim();
     this.storage.setItem("name", name);
   },
 
-  onSearchInputOrProvidersChanged: function EAP_onSearchInputOrProvidersChanged(event) {
+  onSearchInputOrProvidersChanged(event) {
     let emptyName = document.getElementById("name").value == "";
     EmailAccountProvisioner.searchButtonEnabled(!emptyName &&
       EmailAccountProvisioner.someProvidersChecked);
@@ -232,7 +228,7 @@ var EmailAccountProvisioner = {
    * the value for "this" is the actual window document, hence the need
    * to explicitly refer to EmailAccountProvisioner.
    */
-  init: function EAP_init() {
+  init() {
     // We can only init once, so bail out if we've been called again.
     if (EmailAccountProvisioner._inited)
       return;
@@ -288,18 +284,8 @@ var EmailAccountProvisioner = {
 
     // If we have a name stored in local storage from an earlier session,
     // populate the search field with it.
-    let name = EmailAccountProvisioner.storage.getItem("name") ||
-               nameElement.value;
-    if (!name) {
-      try {
-        let userInfo = Cc["@mozilla.org/userinfo;1"].getService(Ci.nsIUserInfo);
-        name = userInfo.fullname;
-      } catch(e) {
-        // nsIUserInfo may not be implemented on all platforms, and name might
-        // not be available even if it is.
-      }
-    }
-    nameElement.value = name;
+    nameElement.value = EmailAccountProvisioner.storage.getItem("name") ||
+                        nameElement.value;
     EmailAccountProvisioner.saveName();
 
     // Pretend like we've typed something into the search input to set the
@@ -348,7 +334,7 @@ var EmailAccountProvisioner = {
         resultsGroup = resultsGroup.parentElement;
       }
       if (!resultsGroup)
-        throw("Unexpected error finding resultsGroup.");
+        throw new Error("Unexpected error finding resultsGroup.");
 
       // Return if we're already expanded
       if (resultsGroup.classList.contains("expanded"))
@@ -420,7 +406,7 @@ var EmailAccountProvisioner = {
       let searchEngineCheck = document.getElementById("search_engine_check");
       if (window.arguments[0].search_engine && searchEngineCheck.checked) {
         let engine = Services.search.getEngineByName(window.arguments[0].search_engine);
-        Services.search.currentEngine = engine;
+        Services.search.defaultEngine = engine;
       }
     });
 
@@ -444,7 +430,7 @@ var EmailAccountProvisioner = {
    * Event handler for when the user submits the search request for their
    * name to the suggestFromName service.
    */
-  onSearchSubmit: function EAP_onSearchSubmit() {
+  onSearchSubmit() {
     for (let node of document.getElementById("notifications").children) {
       node.style.display = "none";
     }
@@ -472,7 +458,7 @@ var EmailAccountProvisioner = {
     let [firstname, lastname] = splitName(name);
     let selectedProviderList =
       [...document.querySelectorAll(".provider input:checked")];
-    let providerList = selectedProviderList.map(node => node.value).join(',');
+    let providerList = selectedProviderList.map(node => node.value).join(",");
 
     let request = new XMLHttpRequest();
     request.open("GET", EmailAccountProvisioner.suggestFromName +
@@ -480,11 +466,11 @@ var EmailAccountProvisioner = {
       "&last_name=" + encodeURIComponent(lastname) +
       "&providers=" + encodeURIComponent(providerList) +
       "&version=2");
-    request.onload = function () {
+    request.onload = function() {
       let data;
       try {
         data = JSON.parse(request.responseText);
-      } catch(e) {};
+      } catch (e) {}
       EmailAccountProvisioner.onSearchResults(data);
     };
     request.onerror = () => {
@@ -494,7 +480,7 @@ var EmailAccountProvisioner = {
     request.ontimeout = () => {
       gLog.info("Timeout of XMLHttpRequest fetching address data.");
       EmailAccountProvisioner.showSearchError();
-    }
+    };
     request.onloadend = function() {
       // Also called if we timeout.
       let firstAndLastName = document.getElementById("FirstAndLastName");
@@ -512,9 +498,9 @@ var EmailAccountProvisioner = {
    * tab for the address order form, and then closes the Account Provisioner
    * window.
    */
-  onAddressSelected: function EAP_onAddressSelected(aTarget) {
+  onAddressSelected(aTarget) {
     gLog.info("An address was selected by the user.");
-    let provider = EmailAccountProvisioner.providers[aTarget.dataset["provider"]];
+    let provider = EmailAccountProvisioner.providers[aTarget.dataset.provider];
 
     // Replace the variables in the url.
     let url = provider.api;
@@ -528,7 +514,7 @@ var EmailAccountProvisioner = {
     let data = storedData[provider.id];
     delete data.provider;
     for (let name in data) {
-      url += (url.indexOf("?") == -1 ? "?" : "&") +
+      url += (!url.includes("?") ? "?" : "&") +
               name + "=" + encodeURIComponent(data[name]);
     }
 
@@ -539,9 +525,9 @@ var EmailAccountProvisioner = {
     tabmail.openTab("accountProvisionerTab", {
       contentPage: url,
       realName: (firstName + " " + lastName).trim(),
-      email: email,
+      email,
       searchEngine: provider.search_engine,
-      onLoad: function (aEvent, aBrowser) {
+      onLoad(aEvent, aBrowser) {
         window.close();
       },
     });
@@ -558,7 +544,7 @@ var EmailAccountProvisioner = {
    * Attempt to fetch the provider list from the server.  If it fails,
    * display an error message, and queue for retry.
    */
-  tryToPopulateProviderList: function EAP_tryToPopulateProviderList() {
+  tryToPopulateProviderList() {
     // If we're already in the middle of getting the provider list, or
     // we already got it before, bail out.
     if (this._loadingProviders || this._loadedProviders)
@@ -568,7 +554,7 @@ var EmailAccountProvisioner = {
 
     // If there's a timeout ID for waking the account provisioner, clear it.
     if (this._loadProviderRetryId) {
-      window.clearTimeout(this._loadProviderRetryId)
+      window.clearTimeout(this._loadProviderRetryId);
       this._loadProviderRetryId = null;
     }
 
@@ -583,7 +569,7 @@ var EmailAccountProvisioner = {
       let data;
       try {
         data = JSON.parse(request.responseText);
-      } catch(e) {};
+      } catch (e) {}
       EmailAccountProvisioner.populateProviderList(data);
     };
     request.onerror = () => {
@@ -605,7 +591,7 @@ var EmailAccountProvisioner = {
     };
     request.timeout = CONNECTION_TIMEOUT;
     request.ontimeout = () => {
-      glog.info("Timeout of XMLHttpRequest fetching provider list.");
+      gLog.info("Timeout of XMLHttpRequest fetching provider list.");
       request.onError();
     };
     request.send(null);
@@ -614,7 +600,7 @@ var EmailAccountProvisioner = {
     gLog.info("We've kicked off a request for the provider list JSON file...");
   },
 
-  providerHasCorrectFields: function EAP_providerHasCorrectFields(provider) {
+  providerHasCorrectFields(provider) {
     let result = true;
 
     let required = ["id", "label", "paid", "languages", "api", "tos_url",
@@ -627,7 +613,7 @@ var EmailAccountProvisioner = {
       if (!fieldExists)
         gLog.error("A provider did not have the field " + aField
                    + ", and will be skipped.");
-    };
+    }
 
     return result;
   },
@@ -636,7 +622,7 @@ var EmailAccountProvisioner = {
    * Take the fetched providers, create checkboxes, icons and labels,
    * and insert them below the search input.
    */
-  populateProviderList: function EAP_populateProviderList(data) {
+  populateProviderList(data) {
     gLog.info("Populating the provider list");
 
     if (!data || !data.length) {
@@ -661,7 +647,7 @@ var EmailAccountProvisioner = {
       // Let's go through the array of languages for this provider, and
       // check to see if at least one of them matches the user's language.
       // If so, we'll show / select this provider by default.
-      let supportsSomeUserLang = provider.languages.some(function (x) {
+      let supportsSomeUserLang = provider.languages.some(function(x) {
         return x == "*" || x == EmailAccountProvisioner.userLanguage;
       });
 
@@ -701,8 +687,7 @@ var EmailAccountProvisioner = {
         providerCheckbox.setAttribute("checked", "true");
         providerEntry.style.display = "inline-block";
         providerList.appendChild(providerEntry);
-      }
-      else {
+      } else {
         providerEntry.classList.add("otherLanguage");
         otherLangProviders.push(providerEntry);
       }
@@ -736,7 +721,7 @@ var EmailAccountProvisioner = {
    * Go through each of the checked providers, and add the appropriate
    * ToS and privacy links to the disclaimer.
    */
-  populateTermsAndPrivacyLinks: function EAP_populateTOSandPrivacyLinks() {
+  populateTermsAndPrivacyLinks() {
     gLog.info("Refreshing terms and privacy links");
     // Empty the Terms of Service and Privacy links placeholder.
     let placeholder = document.querySelector(".commentary .placeholder");
@@ -773,7 +758,7 @@ var EmailAccountProvisioner = {
       a = document.createElement("a");
       a.setAttribute("href", provider.tos_url);
       a.setAttribute("class", "tos external " + provider.id);
-      a.appendChild(document.createTextNode(stringBundle.get('tos')));
+      a.appendChild(document.createTextNode(stringBundle.get("tos")));
       providerList.appendChild(a);
 
       span = document.createElement("span");
@@ -801,12 +786,12 @@ var EmailAccountProvisioner = {
    * Something went wrong during search.  Show a generic error.  In the future,
    * we might want to show something a bit more descriptive.
    */
-  showSearchError: function() {
+  showSearchError() {
     for (let node of document.getElementById("notifications").children) {
       node.style.display = "none";
     }
     for (let node of document.querySelectorAll("#notifications .error")) {
-      node.style.display = "block"
+      node.style.display = "block";
       node.getBoundingClientRect();
       node.classList.add("showWithFade");
     }
@@ -816,7 +801,7 @@ var EmailAccountProvisioner = {
    * Once we've received search results from the server, create some
    * elements to display those results, and inject them into the DOM.
    */
-  onSearchResults: function(data) {
+  onSearchResults(data) {
     gLog.info("Got back search results");
 
     // Empty any old results.
@@ -850,7 +835,7 @@ var EmailAccountProvisioner = {
         gLog.error("Got a result back for a provider that was not "
                    + "in the original providerList: " + aResult.provider);
 
-      let providerSelected = selectedProviders.indexOf(aResult.provider) != -1;
+      let providerSelected = selectedProviders.includes(aResult.provider);
 
       if (!providerSelected)
         gLog.error("Got a result back for a provider that the user did "
@@ -903,11 +888,11 @@ var EmailAccountProvisioner = {
         //   Or if the provider's price is 0, use "Free".
         let priceStr;
         if (address.price && address.price != "0")
-          priceStr = stringBundle.get("price", [address.price])
+          priceStr = stringBundle.get("price", [address.price]);
         else if (address.price && address.price == "0")
           priceStr = stringBundle.get("free");
         else if (provider.price && provider.price != "0")
-          priceStr = stringBundle.get("price", [provider.price])
+          priceStr = stringBundle.get("price", [provider.price]);
         else
           priceStr = stringBundle.get("free");
 
@@ -983,10 +968,10 @@ var EmailAccountProvisioner = {
    * If we cannot retrieve the provider list from the server, display a
    * message about connection problems, and disable the search fields.
    */
-  beOffline: function EAP_beOffline() {
+  beOffline() {
     let offlineMsg = stringBundle.get("cannotConnect");
     let element = document.getElementById("cannotConnectMessage");
-    if(!element.hasChildNodes()) {
+    if (!element.hasChildNodes()) {
       element.appendChild(document.createTextNode(offlineMsg));
     }
     element.style.display = "block";
@@ -999,18 +984,18 @@ var EmailAccountProvisioner = {
    * If we're suddenly able to get the provider list, hide the connection
    * error message and re-enable the search fields.
    */
-  beOnline: function EAP_beOnline() {
+  beOnline() {
     let element = document.getElementById("cannotConnectMessage");
     element.style.display = "none";
     element.textContent = "";
     this.searchEnabled(true);
     gLog.info("Email Account Provisioner is in online mode.");
-  }
-}
+  },
+};
 
 
 XPCOMUtils.defineLazyGetter(EmailAccountProvisioner, "storage", function() {
-  return getLocalStorage("accountProvisioner");
+  return getLocalStorage();
 });
 
 window.addEventListener("online",

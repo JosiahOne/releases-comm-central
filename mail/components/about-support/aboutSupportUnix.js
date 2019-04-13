@@ -5,7 +5,7 @@
 var EXPORTED_SYMBOLS = ["AboutSupportPlatform"];
 
 // JS ctypes are needed to get at the data we need
-ChromeUtils.import("resource://gre/modules/ctypes.jsm");
+var {ctypes} = ChromeUtils.import("resource://gre/modules/ctypes.jsm");
 var GFile = ctypes.StructType("GFile");
 var GFileInfo = ctypes.StructType("GFileInfo");
 var GError = ctypes.StructType("GError");
@@ -45,7 +45,7 @@ var AboutSupportPlatform = {
    * Given an nsIFile, gets the file system type. The type is returned as a
    * string. Possible values are "network", "local", "unknown" and null.
    */
-  getFileSystemType: function ASPUnix_getFileSystemType(aFile) {
+  getFileSystemType(aFile) {
     // Check if the libs exist.
     if (!gLibsExist)
       return "unknown";
@@ -109,10 +109,8 @@ var AboutSupportPlatform = {
         return "unknown";
       else if (kNetworkFilesystems.includes(fsType.readString()))
         return "network";
-      else
-        return "local";
-    }
-    finally {
+      return "local";
+    } finally {
       if (filePath)
         g_free(filePath);
       if (glibFile && !glibFile.isNull())

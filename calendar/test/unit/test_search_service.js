@@ -2,11 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-
-var HINT_EXACT_MATCH = Components.interfaces.calICalendarSearchProvider.HINT_EXACT_MATCH;
-var search = Components.classes["@mozilla.org/calendar/calendarsearch-service;1"]
-                       .getService(Components.interfaces.calICalendarSearchService);
+var HINT_EXACT_MATCH = Ci.calICalendarSearchProvider.HINT_EXACT_MATCH;
+var search = Cc["@mozilla.org/calendar/calendarsearch-service;1"].getService(Ci.calICalendarSearchService);
 
 function run_test() {
     test_found();
@@ -71,7 +68,7 @@ function test_failure() {
 
     let provider = {
         searchForCalendars: function(aStr, aHint, aMax, aListener) {
-            throw "error";
+            throw new Error("error");
         }
     };
 
@@ -104,7 +101,7 @@ function test_cancel() {
                     dump("Cancelling search...");
                     operation.cancel();
                 }
-            }, Components.interfaces.nsIEventTarget.DISPATCH_NORMAL);
+            }, Ci.nsIEventTarget.DISPATCH_NORMAL);
 
             // No listener call, we emulate a long running search
             // Do return the operation though
@@ -113,7 +110,7 @@ function test_cancel() {
 
         isPending: true,
         cancelCalled: false,
-        status: Components.results.NS_OK,
+        status: Cr.NS_OK,
         cancel: function() {
             this.cancelCalled = true;
         },

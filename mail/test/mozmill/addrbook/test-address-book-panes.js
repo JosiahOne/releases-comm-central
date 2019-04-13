@@ -6,10 +6,14 @@
  * Tests for the address book.
  */
 
+"use strict";
+
 var MODULE_NAME = "test-address-book-panes";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["address-book-helpers", "folder-display-helpers"];
+
+var abController;
 
 function setupModule(module) {
   // We need this to get mc which is needed in open_address_book_window.

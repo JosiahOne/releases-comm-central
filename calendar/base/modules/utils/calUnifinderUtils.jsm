@@ -2,8 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "cal", "resource://calendar/modules/calUtils.jsm", "cal");
 
@@ -195,8 +194,7 @@ const sortCompare = calunifinder.sortEntryComparer._sortCompare = {
             return -(a.length - b.length) * modifier;
         }
 
-        let collator = cal.l10n.createLocaleCollator();
-        return collator.compareString(0, a, b) * modifier;
+        return a.localeCompare(b, undefined, { numeric: true }) * modifier;
     },
 
     /**

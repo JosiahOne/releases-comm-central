@@ -3,6 +3,9 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from ../calendar-common-sets.js -->
+<!-- import-globals-from ../calendar-views.js -->
+
 <!DOCTYPE bindings SYSTEM "chrome://calendar/locale/calendar.dtd">
 
 <bindings id="calendar-list-tree-bindings"
@@ -16,10 +19,10 @@
       -->
     <implementation>
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
           let calMgr = cal.getCalendarManager();
           calMgr.addObserver(this.calMgrObserver);
 
+          this.dispatchEvent(new CustomEvent("bindingattached", { bubbles: false }));
       ]]></constructor>
       <destructor><![CDATA[
           let calMgr = cal.getCalendarManager();
@@ -33,7 +36,7 @@
         <getter><![CDATA[
             if (!this.mCompositeCalendar) {
                 throw Components.Exception("Calendar list has no composite calendar yet",
-                                           Components.results.NS_ERROR_NOT_INITIALIZED);
+                                           Cr.NS_ERROR_NOT_INITIALIZED);
             }
             return this.mCompositeCalendar;
         ]]></getter>
@@ -59,8 +62,8 @@
         <setter><![CDATA[
             // Setting calendars externally is not wanted. This is done internally
             // in the compositeCalendar setter.
-            throw Components.Exception("Seting calendars on type='full' is not supported",
-                                       Components.results.NS_ERROR_NOT_IMPLEMENTED);
+            throw Components.Exception("Setting calendars on type='full' is not supported",
+                                       Cr.NS_ERROR_NOT_IMPLEMENTED);
         ]]></setter>
       </property>
 
@@ -220,7 +223,6 @@
 
       <field name="mCalendarList">[]</field>
       <field name="mCompositeCalendar">null</field>
-      <field name="tree">null</field>
       <field name="treebox">null</field>
       <field name="ruleCache">null</field>
       <field name="mCachedSheet">null</field>
@@ -230,8 +232,7 @@
       <field name="cycleDebounce">200</field>
 
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-          ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+          customElements.upgrade(this.tree);
           this.tree.view = this;
           this.ruleCache = {};
           this.mCycleCalendarFlag = {};
@@ -363,9 +364,8 @@
       <property name="compositeCalendar">
         <getter><![CDATA[
             if (!this.mCompositeCalendar) {
-                this.mCompositeCalendar =
-                    Components.classes["@mozilla.org/calendar/calendar;1?type=composite"]
-                              .createInstance(Components.interfaces.calICompositeCalendar);
+                this.mCompositeCalendar = Cc["@mozilla.org/calendar/calendar;1?type=composite"]
+                                            .createInstance(Ci.calICompositeCalendar);
             }
 
             return this.mCompositeCalendar;
@@ -373,7 +373,7 @@
         <setter><![CDATA[
             if (this.mCompositeCalendar) {
                 throw Components.Exception("A composite calendar has already been set",
-                                           Components.results.NS_ERROR_ALREADY_INITIALIZED);
+                                           Cr.NS_ERROR_ALREADY_INITIALIZED);
             }
             this.mCompositeCalendar = val;
             this.mCompositeCalendar.addObserver(this.compositeObserver);
@@ -398,7 +398,6 @@
                 onset="return this.setAttribute('disabledstate', val);"/>
 
       <method name="sortOrderChanged">
-        <parameter name=""/>
         <body><![CDATA[
             if (this.mAddingFromComposite) {
                 return;
@@ -407,13 +406,6 @@
             event.initEvent("SortOrderChanged", true, false);
             event.sortOrder = this.sortOrder;
             this.dispatchEvent(event);
-
-            let handler = this.getAttribute("onSortOrderChanged");
-            if (handler) {
-                // Call the given code in a function
-                let func = new Function("event", handler);
-                func(event);
-            }
         ]]></body>
       </method>
       <method name="displayScrollbarSpacer">
@@ -602,9 +594,16 @@
                                          "::-moz-tree-cell(color-treecol, id-" +
                                          aCalendar.id + ", disabled) {}";
 
-                let ruleIndex = sheet.insertRule(ruleString, sheet.cssRules.length);
-                let disabledIndex = sheet.insertRule(disabledRuleString, sheet.cssRules.length);
-                this.ruleCache[aCalendar.id] = [sheet.cssRules[ruleIndex], sheet.cssRules[disabledIndex]];
+                try {
+                    let ruleIndex = sheet.insertRule(ruleString, sheet.cssRules.length);
+                    let disabledIndex = sheet.insertRule(disabledRuleString, sheet.cssRules.length);
+                    this.ruleCache[aCalendar.id] = [sheet.cssRules[ruleIndex], sheet.cssRules[disabledIndex]];
+                } catch (ex) {
+                    sheet.ownerNode.addEventListener("load",
+                                                     () => this.updateCalendarColor(aCalendar),
+                                                     { once: true });
+                    return;
+                }
             }
 
             let [enabledRule, disabledRule] = this.ruleCache[aCalendar.id];
@@ -642,11 +641,10 @@
                 // If we have a client point, get the row directly from the client
                 // point.
                 aRow = aRow || {};
-                this.treebox.getCellAt(event.clientX,
-                                       event.clientY,
-                                       aRow,
-                                       aCol || {},
-                                       {});
+                aCol = aCol || {};
+                let { col, row } = this.treebox.getCellAt(event.clientX, event.clientY);
+                aCol.value = col;
+                aRow.value = row;
             } else if (document.popupNode && document.popupNode.contextCalendar) {
                 // Otherwise, we can try to get the context calendar from the popupNode.
                 return document.popupNode.contextCalendar;
@@ -814,7 +812,7 @@
 
             let dragCalId = dataTransfer.getData("application/x-moz-calendarID");
 
-            return (aOrientation != Components.interfaces.nsITreeView.DROP_ON &&
+            return (aOrientation != Ci.nsITreeView.DROP_ON &&
                     dragCalId != null);
         ]]></body>
       </method>

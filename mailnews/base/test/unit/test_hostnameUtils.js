@@ -6,7 +6,14 @@
  * Tests for hostnameUtils.jsm.
  */
 
-ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
+var {
+  isLegalHostName,
+  isLegalHostNameOrIP,
+  isLegalIPAddress,
+  isLegalIPv4Address,
+  isLegalIPv6Address,
+  isLegalLocalIPAddress,
+} = ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
 
 /**
  * Checks if valid and invalid IPs are properly allowed or rejected.
@@ -91,7 +98,7 @@ function test_IPaddresses() {
     [ true, "0324.062477106",                             false,    false,    true,   "212.202.126.70" ],
 
     [ false, "0.0.1000",                                  false,    false,    true ],
-    [ false, "0324.06247710677",                          false,    false,    true ]
+    [ false, "0324.06247710677",                          false,    false,    true ],
   ];
 
   for (let item of kIPsToTest) {
@@ -166,7 +173,7 @@ function test_hostnames() {
     [ false, "append-strings-to-make-this-a-too-long-host-name.that-is-really-over-255-characters-long.invalid." +
              "append-strings-to-make-this-a-too-long-host-name.that-is-really-over-255-characters-long.invalid." +
              "append-strings-to-make-this-a-too-long-host-name.that-is-really-over-255-characters-long.invalid." +
-             "append-strings-to-make-this-a-too-long-host-name.that-is-really-over-255-characters-long.invalid" ]
+             "append-strings-to-make-this-a-too-long-host-name.that-is-really-over-255-characters-long.invalid" ],
   ];
 
   for (let item of kHostsToTest) {

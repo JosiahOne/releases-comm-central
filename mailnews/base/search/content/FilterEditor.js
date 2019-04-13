@@ -3,9 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/MailUtils.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
 // The actual filter that we're editing if it is a _saved_ filter or prefill;
 // void otherwise.
@@ -41,6 +41,8 @@ var nsMsgFilterAction = Ci.nsMsgFilterAction;
 var nsMsgFilterType   = Ci.nsMsgFilterType;
 var nsIMsgRuleAction  = Ci.nsIMsgRuleAction;
 var nsMsgSearchScope  = Ci.nsMsgSearchScope;
+
+document.addEventListener("dialogaccept", onAccept);
 
 function filterEditorOnLoad()
 {
@@ -124,8 +126,8 @@ function filterEditorOnLoad()
       else if ("copiedFilter" in args)
       {
         // we are copying a filter
-        var copiedFilter = args.copiedFilter;
-        var copiedName = gFilterBundle.getFormattedString("copyToNewFilterName",
+        let copiedFilter = args.copiedFilter;
+        let copiedName = gFilterBundle.getFormattedString("copyToNewFilterName",
           [copiedFilter.filterName]);
         let newFilter = gFilterList.createFilter(copiedName);
 
@@ -142,13 +144,15 @@ function filterEditorOnLoad()
           let searchTerm = copiedFilter.searchTerms.queryElementAt(i,
             Ci.nsIMsgSearchTerm);
 
-          var newTerm = newFilter.createTerm();
+          let newTerm = newFilter.createTerm();
           newTerm.attrib = searchTerm.attrib;
           newTerm.op = searchTerm.op;
           newTerm.booleanAnd = searchTerm.booleanAnd;
           newTerm.value = searchTerm.value;
           newFilter.appendTerm(newTerm);
-        };
+        }
+
+        newFilter.filterType = copiedFilter.filterType;
 
         gPreFillName = copiedName;
         gFilter = newFilter;
@@ -200,19 +204,24 @@ function onEnterInSearchTerm(event)
   }
 }
 
-function onAccept()
+function onAccept(event)
 {
   try {
-    if (!saveFilter())
-      return false;
-  } catch(e) {Cu.reportError(e); return false;}
+    if (!saveFilter()) {
+      event.preventDefault();
+      return;
+    }
+  } catch (e) {
+    Cu.reportError(e);
+    event.preventDefault();
+    return;
+  }
 
   // parent should refresh filter list..
   // this should REALLY only happen when some criteria changes that
   // are displayed in the filter dialog, like the filter name
   window.arguments[0].refresh = true;
   window.arguments[0].newFilter = gFilter;
-  return true;
 }
 
 // the folderListener object
@@ -383,7 +392,7 @@ function initializeDialog(filter)
   {
     let filterAction = filter.getActionAt(actionIndex);
 
-    var newActionRow = document.createElement('listitem');
+    let newActionRow = document.createElement("richlistitem");
     newActionRow.setAttribute('initialActionIndex', actionIndex);
     newActionRow.className = 'ruleaction';
     gFilterActionList.appendChild(newActionRow);
@@ -403,7 +412,7 @@ function ensureActionRow()
   // make sure we have at least one action row visible to the user
   if (!gFilterActionList.getRowCount())
   {
-    var newActionRow = document.createElement('listitem');
+    let newActionRow = document.createElement("richlistitem");
     newActionRow.className = 'ruleaction';
     gFilterActionList.appendChild(newActionRow);
     newActionRow.mRemoveButton.disabled = true;
@@ -639,7 +648,7 @@ function AssignMeaningfulName()
     // Assign a name based on the first search term.
     let searchValue = termRoot.searchvalue;
     let selIndex = searchValue.getAttribute( "selectedIndex" );
-    let children = document.getAnonymousNodes(searchValue);
+    let children = searchValue.childNodes;
     let activeItem = children[selIndex];
     let attribs = Ci.nsMsgSearchAttrib;
 
@@ -706,13 +715,13 @@ function GetFirstSelectedMsgFolder()
   if (!selectedFolder)
     return null;
 
-  var msgFolder = MailUtils.getFolderForURI(selectedFolder, true);
+  var msgFolder = MailUtils.getExistingFolder(selectedFolder);
   return msgFolder;
 }
 
 function SearchNewFolderOkCallback(name, uri)
 {
-  var msgFolder = MailUtils.getFolderForURI(uri, true);
+  var msgFolder = MailUtils.getExistingFolder(uri);
   var imapFolder = null;
   try
   {
@@ -745,7 +754,7 @@ function SearchNewFolderOkCallback(name, uri)
   if (!imapFolder)
   {
     var curFolder = uri+"/"+encodeURIComponent(name);
-    let folder = MailUtils.getFolderForURI(curFolder);
+    let folder = MailUtils.getOrCreateFolder(curFolder);
     gActionTargetElement.selectFolder(folder);
   }
 }

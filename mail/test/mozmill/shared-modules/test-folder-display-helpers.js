@@ -2,31 +2,28 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "folder-display-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
 // we need window-helpers for augment_controller
 var MODULE_REQUIRES = ["window-helpers"];
 
-var EventUtils = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/EventUtils.js", EventUtils);
-var controller = {};
-ChromeUtils.import("chrome://mozmill/content/modules/controller.js", controller);
-var frame = {};
-ChromeUtils.import("chrome://mozmill/content/modules/frame.js", frame);
-var os = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/os.js", os);
-var utils = {};
-ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
+var EventUtils = ChromeUtils.import("chrome://mozmill/content/stdlib/EventUtils.jsm");
+var controller = ChromeUtils.import("chrome://mozmill/content/modules/controller.jsm");
+var frame = ChromeUtils.import("chrome://mozmill/content/modules/frame.jsm");
+var os = ChromeUtils.import("chrome://mozmill/content/stdlib/os.jsm");
+var utils = ChromeUtils.import("chrome://mozmill/content/modules/utils.jsm");
 
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+var {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 
 var nsMsgViewIndex_None = 0xffffffff;
-ChromeUtils.import('resource:///modules/MailConsts.js');
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import('resource:///modules/MailUtils.js');
-ChromeUtils.import('resource:///modules/mailViewManager.js');
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailConsts} = ChromeUtils.import("resource:///modules/MailConsts.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+var {MailViewManager, MailViewConstants} = ChromeUtils.import("resource:///modules/MailViewManager.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var FILE_LOAD_PATHS = [
   "../",
@@ -89,6 +86,11 @@ var mark_failure;
 
 // the windowHelper module
 var windowHelper;
+
+
+// Default size of the main Thunderbird window in which the tests will run.
+var gDefaultWindowWidth = 1024;
+var gDefaultWindowHeight = 768;
 
 var initialized = false;
 function setupModule() {
@@ -162,7 +164,7 @@ function setupModule() {
   //  to be invoked after our specific named listener.)
   frame.events.addListener("fail", function(obj) {
       // normalize nsIExceptions so they look like JS exceptions...
-      rawex = obj.exception;
+      let rawex = obj.exception;
       if (obj.exception != null &&
           (obj.exception instanceof Ci.nsIException)) {
         obj.exception = {
@@ -257,13 +259,15 @@ function setupModule() {
 function installInto(module) {
   setupModule();
 
-  // force the window to be a nice size we all can love.
-  // note that we can't resize a window larger than the display it lives on!
+  // Force the window to be a nice size we all can love.
+  // Note that we can't resize a window larger than the display it lives on!
   // (I think the inner window is actually limited to the display size, so since
   // resizeTo operates on outerWidth/outerHeight, their limit is actually
-  // screen size + window border size)
-  if (mc.window.outerWidth != 1024 || mc.window.outerHeight != 768)
-    mc.window.resizeTo(1024, 768);
+  // screen size + window border size.)
+  if (mc.window.outerWidth != gDefaultWindowWidth ||
+      mc.window.outerHeight != gDefaultWindowHeight) {
+    restore_default_window_size();
+  }
 
   // now copy everything into the module they provided to us...
   let us = collector.getModule('folder-display-helpers');
@@ -952,16 +956,14 @@ function click_tree_row(aTree, aRowIndex, aController) {
 
   let selection = aTree.view.selection;
   selection.select(aRowIndex);
-  aTree.treeBoxObject.ensureRowIsVisible(aRowIndex);
+  aTree.ensureRowIsVisible(aRowIndex);
 
   // get cell coordinates
-  let x = {}, y = {}, width = {}, height = {};
   let column = aTree.columns[0];
-  aTree.treeBoxObject.getCoordsForCellItem(aRowIndex, column, "text",
-                                           x, y, width, height);
+  let coords = aTree.getCoordsForCellItem(aRowIndex, column, "text");
 
   aController.sleep(0);
-  EventUtils.synthesizeMouse(aTree.body, x.value + 4, y.value + 4,
+  EventUtils.synthesizeMouse(aTree.body, coords.x + 4, coords.y + 4,
                              {}, aTree.ownerDocument.defaultView);
   aController.sleep(0);
 }
@@ -1091,9 +1093,8 @@ function select_shift_click_row(aViewIndex, aController, aDoNotRequireLoad) {
 function _row_click_helper(aController, aTree, aViewIndex, aButton, aExtra) {
   // Force-focus the tree
   aTree.focus();
-  let treeBox = aTree.treeBoxObject;
   // very important, gotta be able to see the row
-  treeBox.ensureRowIsVisible(aViewIndex);
+  aTree.ensureRowIsVisible(aViewIndex);
   // coordinates of the upper left of the entire tree widget (headers included)
   let tx = aTree.boxObject.x, ty = aTree.boxObject.y;
   // coordinates of the row display region of the tree (below the headers)
@@ -1111,12 +1112,12 @@ function _row_click_helper(aController, aTree, aViewIndex, aButton, aExtra) {
     if (aExtra !== "toggle")
       rowX += 32;
   }
-  let rowY = treeBox.rowHeight * (aViewIndex - treeBox.getFirstVisibleRow()) +
-    treeBox.rowHeight / 2;
-  if (treeBox.getRowAt(x + rowX, y + rowY) != aViewIndex) {
+  let rowY = aTree.rowHeight * (aViewIndex - aTree.getFirstVisibleRow()) +
+    aTree.rowHeight / 2;
+  if (aTree.getRowAt(x + rowX, y + rowY) != aViewIndex) {
     throw new Error("Thought we would find row " + aViewIndex + " at " +
                     rowX + "," + rowY + " but we found " +
-                    treeBox.getRowAt(rowX, rowY));
+                    aTree.getRowAt(rowX, rowY));
   }
   // Generate a mouse-down for all click types; the transient selection
   // logic happens on mousedown which our tests assume is happening.  (If you
@@ -1182,10 +1183,10 @@ function middle_click_on_row(aViewIndex) {
  * Assert that the given row index is currently visible in the thread pane view.
  */
 function assert_row_visible(aViewIndex) {
-  let treeBox = mc.threadTree.treeBoxObject;
+  let tree = mc.threadTree;
 
-  if (treeBox.getFirstVisibleRow() > aViewIndex ||
-      treeBox.getLastVisibleRow() < aViewIndex)
+  if (tree.getFirstVisibleRow() > aViewIndex ||
+      tree.getLastVisibleRow() < aViewIndex)
     throw new Error("Row " + aViewIndex + " should currently be visible in " +
                     "the thread pane, but isn't.");
 }
@@ -1421,7 +1422,7 @@ function delete_via_popup() {
 function wait_for_popup_to_open(popupElem) {
   mark_action("fdh", "wait_for_popup_to_open", [popupElem]);
   utils.waitFor(() => popupElem.state == "open",
-                "Timeout waiting for popup to open, state=" + popupElem.state, 1000, 50);
+                () => ("Timeout waiting for popup to open, state=" + popupElem.state), 1000, 50);
 }
 
 /**
@@ -2220,12 +2221,12 @@ function assert_visible(aViewIndexOrMessage) {
     viewIndex = _normalize_view_index(aViewIndexOrMessage);
   else
     viewIndex = mc.dbView.findIndexOfMsgHdr(aViewIndexOrMessage, false);
-  let treeBox = mc.threadTree.boxObject.QueryInterface(Ci.nsITreeBoxObject);
-  if (viewIndex < treeBox.getFirstVisibleRow() ||
-      viewIndex > treeBox.getLastVisibleRow())
+  let tree = mc.threadTree;
+  if (viewIndex < tree.getFirstVisibleRow() ||
+      viewIndex > tree.getLastVisibleRow())
     throw new Error("View index " + viewIndex + " is not visible! (" +
-                    treeBox.getFirstVisibleRow() + "-" +
-                    treeBox.getLastVisibleRow() + " are visible)");
+                    tree.getFirstVisibleRow() + "-" +
+                    tree.getLastVisibleRow() + " are visible)");
 }
 
 /**
@@ -2828,9 +2829,10 @@ var kWideMailLayout = 1;
 var kVerticalMailLayout = 2;
 
 /**
- * Assert that the current mail pane layout is shown
+ * Assert that the expected mail pane layout is shown.
+ *
+ * @param aLayout  layout code
  */
-
 function assert_pane_layout(aLayout) {
   let actualPaneLayout = Services.prefs.getIntPref("mail.pane_config.dynamic");
   if (actualPaneLayout != aLayout)
@@ -2839,11 +2841,43 @@ function assert_pane_layout(aLayout) {
 }
 
 /**
- * Change that the current mail pane layout
+ * Change the current mail pane layout.
+ *
+ * @param aLayout  layout code
  */
-
 function set_pane_layout(aLayout) {
   Services.prefs.setIntPref("mail.pane_config.dynamic", aLayout);
+}
+
+/*
+ * Check window sizes of the main Tb window whether they are at the default values.
+ * Some tests change the window size so need to be sure what size they start with.
+ */
+function assert_default_window_size() {
+  assert_equals(mc.window.outerWidth, gDefaultWindowWidth,
+                "Main window didn't meet the expected width");
+  assert_equals(mc.window.outerHeight, gDefaultWindowHeight,
+                "Main window didn't meet the expected height");
+}
+
+/**
+ * Restore window to nominal dimensions; saving the size was not working out.
+ */
+function restore_default_window_size() {
+  windowHelper.resize_to(mc, gDefaultWindowWidth, gDefaultWindowHeight);
+}
+
+/**
+ * Toggle visibility of the Main menu bar.
+ *
+ * @param aEnabled {boolean}  Whether the menu should be shown or not.
+ */
+function toggle_main_menu(aEnabled = true) {
+  let menubar = mc.e("mail-toolbar-menubar2");
+  let state = menubar.getAttribute("autohide") != "true";
+  menubar.setAttribute("autohide", !aEnabled);
+  mc.sleep(0);
+  return state;
 }
 
 /** exported from messageInjection */
@@ -2859,7 +2893,7 @@ var SyntheticPartMultiRelated;
 
 /**
  * Load a file in its own 'module' based on the effective location of the staged copy of
- * test-folder-helpers.js - if you get an error in this function, probably an appropriate releative
+ * test-folder-helpers.js - if you get an error in this function, probably an appropriate relative
  * path in FILE_LOAD_PATHS is missing for your setup.
  *
  * @param aPath A path relative to the comm-central source path (can be just a file name)
@@ -2908,13 +2942,13 @@ function assert_not_equals(a, b, comment)
 }
 
 // something less sucky than do_check_true
-function assert_true(aBeTrue, aWhy) {
+function assert_true(aBeTrue, aWhy = "Expected value of expression is not 'true'") {
   if (!aBeTrue)
     throw new Error(aWhy);
 }
 
 // something less sucky than do_check_false
-function assert_false(aBeTrue, aWhy) {
+function assert_false(aBeTrue, aWhy = "Expected value of expression is not 'false'") {
   if (aBeTrue)
     throw new Error(aWhy);
 }

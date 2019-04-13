@@ -2,11 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/PromiseUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { PromiseUtils } = ChromeUtils.import("resource://gre/modules/PromiseUtils.jsm");
 
 var kHoursBetweenUpdates = 6;
 
@@ -15,8 +13,7 @@ function nowUTC() {
 }
 
 function newTimerWithCallback(aCallback, aDelay, aRepeating) {
-    let timer = Components.classes["@mozilla.org/timer;1"]
-                          .createInstance(Components.interfaces.nsITimer);
+    let timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
 
     timer.initWithCallback(aCallback,
                            aDelay,
@@ -29,10 +26,10 @@ function calAlarmService() {
 
     this.mLoadedCalendars = {};
     this.mTimerMap = {};
-    this.mObservers = new cal.data.ListenerSet(Components.interfaces.calIAlarmServiceObserver);
+    this.mObservers = new cal.data.ListenerSet(Ci.calIAlarmServiceObserver);
 
     this.calendarObserver = {
-        QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIObserver]),
+        QueryInterface: ChromeUtils.generateQI([Ci.calIObserver]),
         alarmService: this,
 
         // calIObserver:
@@ -77,7 +74,7 @@ function calAlarmService() {
     };
 
     this.calendarManagerObserver = {
-        QueryInterface: ChromeUtils.generateQI([Components.interfaces.calICalendarManagerObserver]),
+        QueryInterface: ChromeUtils.generateQI([Ci.calICalendarManagerObserver]),
         alarmService: this,
 
         onCalendarRegistered: function(aCalendar) {
@@ -91,15 +88,15 @@ function calAlarmService() {
             // dismissing those alarms may write data...
             this.alarmService.unobserveCalendar(aCalendar);
         },
-        onCalendarDeleting: function(aCalendar) {}
+        onCalendarDeleting: function(aCalendar) {
+            this.alarmService.unobserveCalendar(aCalendar);
+            delete this.alarmService.mLoadedCalendars[aCalendar.id];
+        }
     };
 }
 
 var calAlarmServiceClassID = Components.ID("{7a9200dd-6a64-4fff-a798-c5802186e2cc}");
-var calAlarmServiceInterfaces = [
-    Components.interfaces.calIAlarmService,
-    Components.interfaces.nsIObserver
-];
+var calAlarmServiceInterfaces = [Ci.calIAlarmService, Ci.nsIObserver];
 calAlarmService.prototype = {
     mRangeStart: null,
     mRangeEnd: null,
@@ -111,12 +108,12 @@ calAlarmService.prototype = {
 
     classID: calAlarmServiceClassID,
     QueryInterface: cal.generateQI(calAlarmServiceInterfaces),
-    classInfo: XPCOMUtils.generateCI({
+    classInfo: cal.generateCI({
         classID: calAlarmServiceClassID,
         contractID: "@mozilla.org/calendar/alarm-service;1",
         classDescription: "Calendar Alarm Service",
         interfaces: calAlarmServiceInterfaces,
-        flags: Components.interfaces.nsIClassInfo.SINGLETON
+        flags: Ci.nsIClassInfo.SINGLETON
     }),
 
     /**
@@ -225,11 +222,10 @@ calAlarmService.prototype = {
         Services.obs.addObserver(this, "xpcom-shutdown");
         Services.obs.addObserver(this, "wake_notification");
 
-        /* Tell people that we're alive so they can start monitoring alarms.
-         */
-        let notifier = Components.classes["@mozilla.org/embedcomp/appstartup-notifier;1"]
-                                 .getService(Components.interfaces.nsIObserver);
-        notifier.observe(null, "alarm-service-startup", null);
+        // Make sure the alarm monitor is alive so it's observing the notification.
+        Cc["@mozilla.org/calendar/alarm-monitor;1"].getService(Ci.calIAlarmServiceObserver);
+        // Tell people that we're alive so they can start monitoring alarms.
+        Services.obs.notifyObservers(null, "alarm-service-startup");
 
         cal.getCalendarManager().addObserver(this.calendarManagerObserver);
 
@@ -252,11 +248,11 @@ calAlarmService.prototype = {
                     // a month ahead of an event, or doesn't start Lightning
                     // for a month, they'll miss some, but that's a slim chance
                     start = now.clone();
-                    start.month -= Components.interfaces.calIAlarmService.MAX_SNOOZE_MONTHS;
+                    start.month -= Ci.calIAlarmService.MAX_SNOOZE_MONTHS;
                     this.alarmService.mRangeStart = start.clone();
                 }
                 let until = now.clone();
-                until.month += Components.interfaces.calIAlarmService.MAX_SNOOZE_MONTHS;
+                until.month += Ci.calIAlarmService.MAX_SNOOZE_MONTHS;
 
                 // We don't set timers for every future alarm, only those within 6 hours
                 let end = now.clone();
@@ -279,10 +275,8 @@ calAlarmService.prototype = {
             return;
         }
 
-        /* tell people that we're no longer running */
-        let notifier = Components.classes["@mozilla.org/embedcomp/appstartup-notifier;1"]
-                                 .getService(Components.interfaces.nsIObserver);
-        notifier.observe(null, "alarm-service-shutdown", null);
+        // Tell people that we're no longer running.
+        Services.obs.notifyObservers(null, "alarm-service-shutdown");
 
         if (this.mUpdateTimer) {
             this.mUpdateTimer.cancel();
@@ -322,7 +316,7 @@ calAlarmService.prototype = {
             return;
         }
 
-        let showMissed = Preferences.get("calendar.alarms.showmissed", true);
+        let showMissed = Services.prefs.getBoolPref("calendar.alarms.showmissed", true);
 
         let alarms = aItem.getAlarms({});
         for (let alarm of alarms) {
@@ -350,7 +344,7 @@ calAlarmService.prototype = {
                 snoozeDate = aItem.parentItem.getProperty("X-MOZ-SNOOZE-TIME-" + aItem.recurrenceId.nativeTime);
             }
 
-            if (snoozeDate && !(snoozeDate instanceof Components.interfaces.calIDateTime)) {
+            if (snoozeDate && !(snoozeDate instanceof Ci.calIDateTime)) {
                 snoozeDate = cal.createDateTime(snoozeDate);
             }
 
@@ -371,7 +365,7 @@ calAlarmService.prototype = {
                 // Delay is in msec, so don't forget to multiply
                 let timeout = alarmDate.subtractDate(now).inSeconds * 1000;
 
-                // No sense in keeping an extra timeout for an alarm thats past
+                // No sense in keeping an extra timeout for an alarm that's past
                 // our range.
                 let timeUntilRefresh = this.mRangeEnd.subtractDate(now).inSeconds * 1000;
                 if (timeUntilRefresh < timeout) {
@@ -494,7 +488,7 @@ calAlarmService.prototype = {
 
     findAlarms: function(aCalendars, aStart, aUntil) {
         let getListener = {
-            QueryInterface: ChromeUtils.generateQI([Components.interfaces.calIOperationListener]),
+            QueryInterface: ChromeUtils.generateQI([Ci.calIOperationListener]),
             alarmService: this,
             addRemovePromise: PromiseUtils.defer(),
             batchCount: 0,
@@ -507,7 +501,7 @@ calAlarmService.prototype = {
                     // notify observers that the alarms for the calendar have been loaded
                     this.alarmService.mObservers.notify("onAlarmsLoaded", [aCalendar]);
                 }, (aReason) => {
-                    Components.utils.reportError("Promise was rejected: " + aReason);
+                    Cu.reportError("Promise was rejected: " + aReason);
                     this.alarmService.mLoadedCalendars[aCalendar.id] = true;
                     this.alarmService.mObservers.notify("onAlarmsLoaded", [aCalendar]);
                 });
@@ -537,7 +531,7 @@ calAlarmService.prototype = {
             }
         };
 
-        const calICalendar = Components.interfaces.calICalendar;
+        const calICalendar = Ci.calICalendar;
         let filter = calICalendar.ITEM_FILTER_COMPLETED_ALL |
                      calICalendar.ITEM_FILTER_CLASS_OCCURRENCES |
                      calICalendar.ITEM_FILTER_TYPE_ALL;
@@ -571,8 +565,8 @@ calAlarmService.prototype = {
         // for a month, they'll miss some, but that's a slim chance
         let start = nowUTC();
         let until = start.clone();
-        start.month -= Components.interfaces.calIAlarmService.MAX_SNOOZE_MONTHS;
-        until.month += Components.interfaces.calIAlarmService.MAX_SNOOZE_MONTHS;
+        start.month -= Ci.calIAlarmService.MAX_SNOOZE_MONTHS;
+        until.month += Ci.calIAlarmService.MAX_SNOOZE_MONTHS;
         this.findAlarms(aCalendars, start, until);
     },
 
@@ -586,7 +580,7 @@ calAlarmService.prototype = {
 
     get isLoading() {
         for (let calId in this.mLoadedCalendars) {
-            // we need to exclude calendars which failed to load explicitely to
+            // we need to exclude calendars which failed to load explicitly to
             // prevent the alaram dialog to stay opened after dismissing all
             // alarms if there is a network calendar that failed to load
             let currentStatus = cal.getCalendarManager()

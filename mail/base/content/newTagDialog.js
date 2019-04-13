@@ -4,8 +4,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+
+document.addEventListener("dialogaccept", onOKNewTag);
 
 var dialog;
 
@@ -13,8 +15,7 @@ var dialog;
  * Pass in keyToEdit as a window argument to turn this dialog into an edit
  * tag dialog.
  */
-function onLoad()
-{
+function onLoad() {
   let windowArgs = window.arguments[0];
 
   dialog = {};
@@ -34,8 +35,7 @@ function onLoad()
 /**
  * Turn the new tag dialog into an edit existing tag dialog
  */
-function initializeForEditing(aTagKey)
-{
+function initializeForEditing(aTagKey) {
   dialog.editTagKey = aTagKey;
 
   // Change the title of the dialog
@@ -46,24 +46,21 @@ function initializeForEditing(aTagKey)
   document.documentElement.setAttribute("ondialogaccept", "return onOKEditTag();");
 
   // extract the color and name for the current tag
-  document.getElementById("tagColorPicker").color = MailServices.tags.getColorForKey(aTagKey);
+  document.getElementById("tagColorPicker").value = MailServices.tags.getColorForKey(aTagKey);
   dialog.nameField.value = MailServices.tags.getTagForKey(aTagKey);
 }
 
 /**
  * on OK handler for editing a new tag.
  */
-function onOKEditTag()
-{
+function onOKEditTag() {
   // get the tag name of the current key we are editing
   let existingTagName = MailServices.tags.getTagForKey(dialog.editTagKey);
 
   // it's ok if the name didn't change
-  if (existingTagName != dialog.nameField.value)
-  {
+  if (existingTagName != dialog.nameField.value) {
     // don't let the user edit a tag to the name of another existing tag
-    if (MailServices.tags.getKeyForTag(dialog.nameField.value))
-    {
+    if (MailServices.tags.getKeyForTag(dialog.nameField.value)) {
       alertForExistingTag();
       return false; // abort the OK
     }
@@ -71,7 +68,7 @@ function onOKEditTag()
     MailServices.tags.setTagForKey(dialog.editTagKey, dialog.nameField.value);
   }
 
-  MailServices.tags.setColorForKey(dialog.editTagKey, document.getElementById("tagColorPicker").color);
+  MailServices.tags.setColorForKey(dialog.editTagKey, document.getElementById("tagColorPicker").value);
   return dialog.okCallback();
 }
 
@@ -79,30 +76,29 @@ function onOKEditTag()
  * on OK handler for creating a new tag. Alerts the user if a tag with
  * the name already exists.
  */
-function onOKNewTag()
-{
+function onOKNewTag(event) {
   var name = dialog.nameField.value;
 
-  if (MailServices.tags.getKeyForTag(name))
-  {
+  if (MailServices.tags.getKeyForTag(name)) {
     alertForExistingTag();
-    return false;
+    event.preventDefault();
+    return;
   }
-  return dialog.okCallback(name, document.getElementById("tagColorPicker").color);
+  if (!dialog.okCallback(name, document.getElementById("tagColorPicker").value)) {
+    event.preventDefault();
+  }
 }
 
 /**
  * Alerts the user that they are trying to create a tag with a name that
  * already exists.
  */
-function alertForExistingTag()
-{
+function alertForExistingTag() {
   var messengerBundle = document.getElementById("bundle_messenger");
   var alertText = messengerBundle.getString("tagExists");
   Services.prompt.alert(window, document.title, alertText);
 }
 
-function doEnabling()
-{
+function doEnabling() {
   dialog.OKButton.disabled = !dialog.nameField.value;
 }

@@ -3,8 +3,8 @@
  * Test for bug 235432
  */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var testmail = do_get_file("data/message1.eml");
 var expectedTemporaryFile;

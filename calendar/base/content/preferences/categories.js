@@ -4,10 +4,15 @@
 
 /* exported gCategoriesPane */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+/* import-globals-from ../../../lightning/content/messenger-overlay-preferences.js */
+// From categories.xul.
+/* globals noneLabel, newTitle, editTitle, overwrite, overwriteTitle, noBlankCategories */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { AppConstants } = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+
+Preferences.add({ id: "calendar.categories.names", type: "string" });
 
 var gCategoryList;
 var categoryPrefBranch = Services.prefs.getBranch("calendar.category.color.");
@@ -42,12 +47,12 @@ var gCategoriesPane = {
             parent.backupPrefList = [];
         }
 
-        let categories = document.getElementById("calendar.categories.names").value;
+        let categories = Preferences.get("calendar.categories.names").value;
 
         // If no categories are configured load a default set from properties file
         if (!categories) {
             categories = cal.category.setupDefaultCategories();
-            document.getElementById("calendar.categories.names").value = categories;
+            Preferences.get("calendar.categories.names").value = categories;
         }
 
         gCategoryList = cal.category.stringToArray(categories);
@@ -71,7 +76,7 @@ var gCategoriesPane = {
 
     updatePrefs: function() {
         cal.l10n.sortArrayByLocaleCollator(gCategoryList);
-        document.getElementById("calendar.categories.names").value =
+        Preferences.get("calendar.categories.names").value =
             cal.category.arrayToString(gCategoryList);
     },
 
@@ -83,17 +88,20 @@ var gCategoriesPane = {
         this.updateButtons();
 
 
-        while (listbox.lastChild.id != "categoryColumns") {
+        while (listbox.lastChild) {
             listbox.lastChild.remove();
         }
 
         for (let i = 0; i < gCategoryList.length; i++) {
-            let newListItem = document.createElement("listitem");
-            let categoryName = document.createElement("listcell");
+            let newListItem = document.createElement("richlistitem");
+            let categoryName = document.createElement("label");
             categoryName.setAttribute("id", gCategoryList[i]);
-            categoryName.setAttribute("label", gCategoryList[i]);
+            categoryName.setAttribute("flex", "1");
+            categoryName.setAttribute("value", gCategoryList[i]);
             let categoryNameFix = cal.view.formatStringForCSSRule(gCategoryList[i]);
-            let categoryColor = document.createElement("listcell");
+
+            let categoryColor = document.createElement("box");
+            categoryColor.setAttribute("width", "150");
             try {
                 let colorCode = categoryPrefBranch.getCharPref(categoryNameFix);
                 categoryColor.setAttribute("id", colorCode);

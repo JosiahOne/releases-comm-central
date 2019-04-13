@@ -41,6 +41,7 @@
 #include "mozilla/Services.h"
 #include "mozilla/SlicedInputStream.h"
 #include "nsContentSecurityManager.h"
+#include "nsPrintfCString.h"
 
 #undef PostMessage // avoid to collision with WinUser.h
 
@@ -294,19 +295,24 @@ nsresult nsMsgProtocol::SendData(const char * dataBuffer, bool aSuppressLogging)
 
 // Whenever data arrives from the connection, core netlib notifices the protocol by calling
 // OnDataAvailable. We then read and process the incoming data from the input stream.
-NS_IMETHODIMP nsMsgProtocol::OnDataAvailable(nsIRequest *request, nsISupports *ctxt, nsIInputStream *inStr, uint64_t sourceOffset, uint32_t count)
+NS_IMETHODIMP nsMsgProtocol::OnDataAvailable(nsIRequest *request, nsIInputStream *inStr, uint64_t sourceOffset, uint32_t count)
 {
   // right now, this really just means turn around and churn through the state machine
-  nsCOMPtr<nsIURI> uri = do_QueryInterface(ctxt);
+  nsCOMPtr <nsIURI> uri;
+  GetURI(getter_AddRefs(uri));
+
   return ProcessProtocolState(uri, inStr, sourceOffset, count);
 }
 
-NS_IMETHODIMP nsMsgProtocol::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
+NS_IMETHODIMP nsMsgProtocol::OnStartRequest(nsIRequest *request)
 {
   nsresult rv = NS_OK;
-  nsCOMPtr <nsIMsgMailNewsUrl> aMsgUrl = do_QueryInterface(ctxt, &rv);
-  if (NS_SUCCEEDED(rv) && aMsgUrl)
+  nsCOMPtr <nsIURI> uri;
+  GetURI(getter_AddRefs(uri));
+
+  if (uri)
   {
+    nsCOMPtr<nsIMsgMailNewsUrl> aMsgUrl = do_QueryInterface(uri);
     rv = aMsgUrl->SetUrlState(true, NS_OK);
     if (m_loadGroup)
       m_loadGroup->AddRequest(static_cast<nsIRequest *>(this), nullptr /* context isupports */);
@@ -318,8 +324,8 @@ NS_IMETHODIMP nsMsgProtocol::OnStartRequest(nsIRequest *request, nsISupports *ct
   if (!mSuppressListenerNotifications && m_channelListener)
   {
     if (!m_channelContext)
-      m_channelContext = do_QueryInterface(ctxt);
-    rv = m_channelListener->OnStartRequest(this, m_channelContext);
+      m_channelContext = uri;
+    rv = m_channelListener->OnStartRequest(this);
   }
 
   nsCOMPtr<nsISocketTransport> strans = do_QueryInterface(m_transport);
@@ -353,32 +359,33 @@ void nsMsgProtocol::ShowAlertMessage(nsIMsgMailNewsUrl *aMsgUrl, nsresult aStatu
   case NS_ERROR_NET_INTERRUPT:
      errorString = u"netInterruptError";
      break;
+  case NS_ERROR_OFFLINE:
+     // Don't alert when offline as that is already displayed in the UI.
+     return;
   default:
-     // Leave the string as nullptr.
-     break;
+     nsPrintfCString msg("Unexpected status passed to ShowAlertMessage: %" PRIx32,
+                         static_cast<uint32_t>(aStatus));
+     NS_WARNING(msg.get());
+     return;
   }
 
-  NS_ASSERTION(errorString, "unknown error, but don't alert user.");
-  if (errorString)
+  nsString errorMsg;
+  errorMsg.Adopt(FormatStringWithHostNameByName(errorString, aMsgUrl));
+  if (errorMsg.IsEmpty())
   {
-    nsString errorMsg;
-    errorMsg.Adopt(FormatStringWithHostNameByName(errorString, aMsgUrl));
-    if (errorMsg.IsEmpty())
-    {
-      errorMsg.AssignLiteral(u"[StringID ");
-      errorMsg.Append(errorString);
-      errorMsg.AppendLiteral(u"?]");
-    }
-
-    nsCOMPtr<nsIMsgMailSession> mailSession =
-      do_GetService(NS_MSGMAILSESSION_CONTRACTID);
-    if (mailSession)
-      mailSession->AlertUser(errorMsg, aMsgUrl);
+    errorMsg.AssignLiteral(u"[StringID ");
+    errorMsg.Append(errorString);
+    errorMsg.AppendLiteral(u"?]");
   }
+
+  nsCOMPtr<nsIMsgMailSession> mailSession =
+    do_GetService(NS_MSGMAILSESSION_CONTRACTID);
+  if (mailSession)
+    mailSession->AlertUser(errorMsg, aMsgUrl);
 }
 
 // stop binding is a "notification" informing us that the stream associated with aURL is going away.
-NS_IMETHODIMP nsMsgProtocol::OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult aStatus)
+NS_IMETHODIMP nsMsgProtocol::OnStopRequest(nsIRequest *request, nsresult aStatus)
 {
   nsresult rv = NS_OK;
 
@@ -386,11 +393,14 @@ NS_IMETHODIMP nsMsgProtocol::OnStopRequest(nsIRequest *request, nsISupports *ctx
   // so pass in ourself as the channel and not the underlying socket or file channel the protocol
   // happens to be using
   if (!mSuppressListenerNotifications && m_channelListener)
-    rv = m_channelListener->OnStopRequest(this, m_channelContext, aStatus);
+    rv = m_channelListener->OnStopRequest(this, aStatus);
 
-  nsCOMPtr <nsIMsgMailNewsUrl> msgUrl = do_QueryInterface(ctxt, &rv);
-  if (NS_SUCCEEDED(rv) && msgUrl)
+  nsCOMPtr<nsIURI> uri;
+  GetURI(getter_AddRefs(uri));
+
+  if (uri)
   {
+    nsCOMPtr <nsIMsgMailNewsUrl> msgUrl = do_QueryInterface(uri);
     rv = msgUrl->SetUrlState(false, aStatus);  // Always returns NS_OK.
     if (m_loadGroup)
       m_loadGroup->RemoveRequest(static_cast<nsIRequest *>(this), nullptr, aStatus);
@@ -528,21 +538,20 @@ NS_IMETHODIMP nsMsgProtocol::GetURI(nsIURI* *aURI)
 
 NS_IMETHODIMP nsMsgProtocol::Open(nsIInputStream **_retval)
 {
-  return NS_ImplementChannelOpen(this, _retval);
-}
-
-NS_IMETHODIMP nsMsgProtocol::Open2(nsIInputStream **_retval)
-{
   nsCOMPtr<nsIStreamListener> listener;
   nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
   NS_ENSURE_SUCCESS(rv, rv);
-  return Open(_retval);
+  return NS_ImplementChannelOpen(this, _retval);
 }
 
-NS_IMETHODIMP nsMsgProtocol::AsyncOpen(nsIStreamListener *listener, nsISupports *ctxt)
+NS_IMETHODIMP nsMsgProtocol::AsyncOpen(nsIStreamListener *aListener)
 {
+    nsCOMPtr<nsIStreamListener> listener = aListener;
+    nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
+    NS_ENSURE_SUCCESS(rv, rv);
+
     int32_t port;
-    nsresult rv = m_url->GetPort(&port);
+    rv = m_url->GetPort(&port);
     if (NS_FAILED(rv))
         return rv;
 
@@ -557,17 +566,14 @@ NS_IMETHODIMP nsMsgProtocol::AsyncOpen(nsIStreamListener *listener, nsISupports 
         return rv;
 
     // set the stream listener and then load the url
-    m_channelContext = ctxt;
+    m_channelContext = nullptr;
+    nsCOMPtr<nsIChannel> channel;
+    nsCOMPtr<nsIURI> uri;
+    GetURI(getter_AddRefs(uri));
+    m_channelContext = uri;
+
     m_channelListener = listener;
     return LoadUrl(m_url, nullptr);
-}
-
-NS_IMETHODIMP nsMsgProtocol::AsyncOpen2(nsIStreamListener *aListener)
-{
-    nsCOMPtr<nsIStreamListener> listener = aListener;
-    nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
-    NS_ENSURE_SUCCESS(rv, rv);
-    return AsyncOpen(listener, nullptr);
 }
 
 NS_IMETHODIMP nsMsgProtocol::GetLoadFlags(nsLoadFlags *aLoadFlags)
@@ -860,8 +866,7 @@ nsresult nsMsgProtocol::DoGSSAPIStep1(const char *service, const char *username,
 #endif
 
     // if this fails, then it means that we cannot do GSSAPI SASL.
-    m_authModule = do_CreateInstance(NS_AUTH_MODULE_CONTRACTID_PREFIX "sasl-gssapi", &rv);
-    NS_ENSURE_SUCCESS(rv,rv);
+    m_authModule = nsIAuthModule::CreateInstance("sasl-gssapi");
 
     m_authModule->Init(service, nsIAuthModule::REQ_DEFAULT, nullptr, NS_ConvertUTF8toUTF16(username).get(), nullptr);
 
@@ -939,7 +944,7 @@ nsresult nsMsgProtocol::DoGSSAPIStep2(nsCString &commandResponse, nsCString &res
                 rv = NS_ERROR_OUT_OF_MEMORY;
         }
         else
-            response.Adopt((char *)nsMemory::Clone("",1));
+            response.Adopt((char *)moz_xmemdup("",1));
     }
 
 #ifdef DEBUG_BenB
@@ -952,13 +957,10 @@ nsresult nsMsgProtocol::DoNtlmStep1(const nsACString &username, const nsAString 
 {
     nsresult rv;
 
-    m_authModule = do_CreateInstance(NS_AUTH_MODULE_CONTRACTID_PREFIX "ntlm", &rv);
-    // if this fails, then it means that we cannot do NTLM auth.
-    if (NS_FAILED(rv) || !m_authModule)
-        return rv;
+    m_authModule = nsIAuthModule::CreateInstance("ntlm");
 
     m_authModule->Init(nullptr, 0, nullptr, NS_ConvertUTF8toUTF16(username).get(),
-                       nsPromiseFlatString(password).get());
+                       PromiseFlatString(password).get());
 
     void *outBuf;
     uint32_t outBufLen;
@@ -1095,7 +1097,7 @@ public:
 protected:
   virtual ~nsMsgProtocolStreamProvider() {}
 
-  nsCOMPtr<nsIWeakReference> mMsgProtocol;
+  nsWeakPtr mMsgProtocol;
   nsCOMPtr<nsIInputStream>  mInStream;
 };
 
@@ -1117,7 +1119,7 @@ public:
 protected:
   virtual ~nsMsgFilePostHelper() {}
   nsCOMPtr<nsIOutputStream> mOutStream;
-  nsCOMPtr<nsIWeakReference> mProtInstance;
+  nsWeakPtr mProtInstance;
 };
 
 NS_IMPL_ISUPPORTS(nsMsgFilePostHelper, nsIStreamListener, nsIRequestObserver)
@@ -1143,12 +1145,12 @@ nsresult nsMsgFilePostHelper::Init(nsIOutputStream * aOutStream, nsMsgAsyncWrite
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMsgFilePostHelper::OnStartRequest(nsIRequest * aChannel, nsISupports *ctxt)
+NS_IMETHODIMP nsMsgFilePostHelper::OnStartRequest(nsIRequest * aChannel)
 {
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMsgFilePostHelper::OnStopRequest(nsIRequest * aChannel, nsISupports *ctxt, nsresult aStatus)
+NS_IMETHODIMP nsMsgFilePostHelper::OnStopRequest(nsIRequest * aChannel, nsresult aStatus)
 {
   nsMsgAsyncWriteProtocol *protInst = nullptr;
   nsCOMPtr<nsIStreamListener> callback = do_QueryReferent(mProtInstance);
@@ -1164,7 +1166,7 @@ NS_IMETHODIMP nsMsgFilePostHelper::OnStopRequest(nsIRequest * aChannel, nsISuppo
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMsgFilePostHelper::OnDataAvailable(nsIRequest * /* aChannel */, nsISupports *ctxt, nsIInputStream *inStr, uint64_t sourceOffset, uint32_t count)
+NS_IMETHODIMP nsMsgFilePostHelper::OnDataAvailable(nsIRequest * /* aChannel */, nsIInputStream *inStr, uint64_t sourceOffset, uint32_t count)
 {
   nsMsgAsyncWriteProtocol *protInst = nullptr;
   nsCOMPtr<nsIStreamListener> callback = do_QueryReferent(mProtInstance);

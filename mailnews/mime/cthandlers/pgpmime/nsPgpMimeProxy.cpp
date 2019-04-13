@@ -298,8 +298,6 @@ NS_IMPL_ISUPPORTS(nsPgpMimeProxy,
 // nsPgpMimeProxy implementation
 nsPgpMimeProxy::nsPgpMimeProxy()
   : mInitialized(false),
-    mDecryptor(nullptr),
-    mLoadGroup(nullptr),
     mLoadFlags(LOAD_NORMAL),
     mCancelStatus(NS_OK)
 {
@@ -327,12 +325,13 @@ nsPgpMimeProxy::SetMimeCallback(MimeDecodeCallbackFun outputFun,
   mOutputFun     = outputFun;
   mOutputClosure = outputClosure;
   mInitialized   = true;
+  mMessageURI    = myUri;
 
   mStreamOffset = 0;
   mByteBuf.Truncate();
 
   if (mDecryptor)
-    return mDecryptor->OnStartRequest((nsIRequest*) this, myUri);
+    return mDecryptor->OnStartRequest((nsIRequest*) this);
 
   return NS_OK;
 }
@@ -342,7 +341,7 @@ nsPgpMimeProxy::Init()
 {
   mByteBuf.Truncate();
 
-  // Create add-on supplied decrytion object.
+  // Create add-on supplied decryption object.
   nsresult rv;
   mDecryptor = do_CreateInstance(PGPMIME_JS_DECRYPTOR_CONTRACTID, &rv);
   if (NS_FAILED(rv))
@@ -359,10 +358,10 @@ nsPgpMimeProxy::Write(const char *buf, uint32_t buf_size)
   mByteBuf.Assign(buf, buf_size);
   mStreamOffset = 0;
 
-  // Pass data to the decrytion object for decryption.
+  // Pass data to the decryption object for decryption.
   // The result is returned via OutputDecryptedData().
   if (mDecryptor)
-    return mDecryptor->OnDataAvailable((nsIRequest*) this, nullptr, (nsIInputStream*) this,
+    return mDecryptor->OnDataAvailable((nsIRequest*) this, (nsIInputStream*) this,
                                       0, buf_size);
 
   return NS_OK;
@@ -373,7 +372,7 @@ nsPgpMimeProxy::Finish() {
   NS_ENSURE_TRUE(mInitialized, NS_ERROR_NOT_INITIALIZED);
 
   if (mDecryptor) {
-    return mDecryptor->OnStopRequest((nsIRequest*) this, nullptr, NS_OK);
+    return mDecryptor->OnStopRequest((nsIRequest*) this, NS_OK);
   }
   else {
 
@@ -381,7 +380,7 @@ nsPgpMimeProxy::Finish() {
       return NS_ERROR_FAILURE;
 
     nsCString temp;
-    temp.AppendLiteral("Content-Type: text/html\r\nCharset: UTF-8\r\n\r\n<html><body>");
+    temp.AppendLiteral("Content-Type: text/html; Charset=utf-8\r\n\r\n<html><body>");
     temp.AppendLiteral("<BR><text=\"#000000\" bgcolor=\"#FFFFFF\" link=\"#FF0000\" vlink=\"#800080\" alink=\"#0000FF\">");
     temp.AppendLiteral("<center><table BORDER=1 ><tr><td><CENTER>");
 
@@ -433,6 +432,15 @@ nsPgpMimeProxy::SetContentType(const nsACString &aContentType)
 
   return NS_OK;
 }
+
+
+NS_IMETHODIMP
+nsPgpMimeProxy::GetMessageURI(nsIURI **aMessageURI)
+{
+  NS_IF_ADDREF(*aMessageURI = mMessageURI);
+  return NS_OK;
+}
+
 
 NS_IMETHODIMP
 nsPgpMimeProxy::GetMimePart(nsACString &aMimePart)
@@ -633,14 +641,13 @@ nsPgpMimeProxy::Close()
 ///////////////////////////////////////////////////////////////////////////////
 
 NS_IMETHODIMP
-nsPgpMimeProxy::OnStartRequest(nsIRequest *aRequest, nsISupports *aContext)
+nsPgpMimeProxy::OnStartRequest(nsIRequest *aRequest)
 {
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsPgpMimeProxy::OnStopRequest(nsIRequest* aRequest, nsISupports* aContext,
-                             nsresult aStatus)
+nsPgpMimeProxy::OnStopRequest(nsIRequest* aRequest, nsresult aStatus)
 {
   return NS_OK;
 }
@@ -650,7 +657,7 @@ nsPgpMimeProxy::OnStopRequest(nsIRequest* aRequest, nsISupports* aContext,
 ///////////////////////////////////////////////////////////////////////////////
 
 NS_IMETHODIMP
-nsPgpMimeProxy::OnDataAvailable(nsIRequest* aRequest, nsISupports* aContext,
+nsPgpMimeProxy::OnDataAvailable(nsIRequest* aRequest,
                               nsIInputStream *aInputStream,
                               uint64_t aSourceOffset,
                               uint32_t aLength)

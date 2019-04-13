@@ -6,7 +6,7 @@
 
 "use strict";
 
-this.EXPORTED_SYMBOLS = [
+var EXPORTED_SYMBOLS = [
   "DownloadsCommon",
 ];
 
@@ -23,29 +23,22 @@ this.EXPORTED_SYMBOLS = [
  * Retrieves the list of past and completed downloads from the underlying
  * Downloads API data, and provides asynchronous notifications allowing
  * to build a consistent view of the available data.
- *
  */
 
 // Globals
-Cu.import("resource://gre/modules/XPCOMUtils.jsm");
-Cu.import("resource://gre/modules/Services.jsm");
+const {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+const {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
-XPCOMUtils.defineLazyModuleGetter(this, "NetUtil",
-                                  "resource://gre/modules/NetUtil.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "AppConstants",
-                                  "resource://gre/modules/AppConstants.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "DownloadHistory",
-                                  "resource://gre/modules/DownloadHistory.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "Downloads",
-                                  "resource://gre/modules/Downloads.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "DownloadUIHelper",
-                                  "resource://gre/modules/DownloadUIHelper.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "DownloadUtils",
-                                  "resource://gre/modules/DownloadUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "FileUtils",
-                                  "resource://gre/modules/FileUtils.jsm");
-XPCOMUtils.defineLazyModuleGetter(this, "OS",
-                                  "resource://gre/modules/osfile.jsm");
+XPCOMUtils.defineLazyModuleGetters(this, {
+  NetUtil: "resource://gre/modules/NetUtil.jsm",
+  PluralForm: "resource://gre/modules/PluralForm.jsm",
+  DownloadHistory: "resource://gre/modules/DownloadHistory.jsm",
+  Downloads: "resource://gre/modules/Downloads.jsm",
+  DownloadUIHelper: "resource://gre/modules/DownloadUIHelper.jsm",
+  DownloadUtils: "resource://gre/modules/DownloadUtils.jsm",
+  OS: "resource://gre/modules/osfile.jsm",
+});
 
 XPCOMUtils.defineLazyGetter(this, "DownloadsLogger", () => {
   let { ConsoleAPI } = Cu.import("resource://gre/modules/Console.jsm", {});
@@ -56,11 +49,25 @@ XPCOMUtils.defineLazyGetter(this, "DownloadsLogger", () => {
   return new ConsoleAPI(consoleOptions);
 });
 
+const kDownloadsStringBundleUrl =
+  "chrome://communicator/locale/downloads/downloadmanager.properties";
+
+// Currently not used. Keep for future updates.
+const kDownloadsStringsRequiringFormatting = {
+  fileExecutableSecurityWarning: true
+};
+
+// Currently not used. Keep for future updates.
+const kDownloadsStringsRequiringPluralForm = {
+  otherDownloads3: true
+};
+
 const kPartialDownloadSuffix = ".part";
 
 const kPrefBranch = Services.prefs.getBranch("browser.download.");
 
 const PREF_DM_BEHAVIOR = "browser.download.manager.behavior";
+const PROGRESS_DIALOG_URL = "chrome://communicator/content/downloads/progressDialog.xul";
 
 var PrefObserver = {
   QueryInterface: XPCOMUtils.generateQI([Ci.nsIObserver,
@@ -103,7 +110,7 @@ var PrefObserver = {
  * This object is exposed directly to the consumers of this JavaScript module,
  * and provides shared methods for all the instances of the user interface.
  */
-this.DownloadsCommon = {
+var DownloadsCommon = {
   // The following legacy constants are still returned by stateOfDownload, but
   // individual properties of the Download object should normally be used.
   DOWNLOAD_NOTSTARTED: -1,
@@ -121,6 +128,58 @@ this.DownloadsCommon = {
   ATTENTION_SUCCESS: "success",
   ATTENTION_WARNING: "warning",
   ATTENTION_SEVERE: "severe",
+
+  /**
+   * Returns an object whose keys are the string names from the downloads string
+   * bundle, and whose values are either the translated strings or functions
+   * returning formatted strings.
+   */
+  get strings() {
+    let strings = {};
+    let sb = Services.strings.createBundle(kDownloadsStringBundleUrl);
+    let enumerator = sb.getSimpleEnumeration();
+    while (enumerator.hasMoreElements()) {
+      let string = enumerator.getNext().QueryInterface(Ci.nsIPropertyElement);
+      let stringName = string.key;
+      if (stringName in kDownloadsStringsRequiringFormatting) {
+        strings[stringName] = function() {
+          // Convert "arguments" to a real array before calling into XPCOM.
+          return sb.formatStringFromName(stringName,
+                                         Array.slice(arguments, 0),
+                                         arguments.length);
+        };
+      } else if (stringName in kDownloadsStringsRequiringPluralForm) {
+        strings[stringName] = function(aCount) {
+          // Convert "arguments" to a real array before calling into XPCOM.
+          let formattedString = sb.formatStringFromName(stringName,
+                                         Array.slice(arguments, 0),
+                                         arguments.length);
+          return PluralForm.get(aCount, formattedString);
+        };
+      } else {
+        strings[stringName] = string.value;
+      }
+    }
+    delete this.strings;
+    return this.strings = strings;
+  },
+
+  /**
+   * Get access to one of the DownloadsData or HistoryDownloadsData objects
+   * depending on whether history downloads should be included.
+   *
+   * @param window
+   *        The browser window which owns the download button.
+   * @param [optional] history
+   *        True to include history downloads when the window is public.
+   */
+   // does not apply in SM
+  getData(window, history = false) {
+    if (history) {
+      return HistoryDownloadsData;
+    }
+    return DownloadsData;
+  },
 
   /**
    * Initializes the Downloads Manager common code.
@@ -159,6 +218,274 @@ this.DownloadsCommon = {
       return DownloadsCommon.DOWNLOAD_CANCELED;
     }
     return DownloadsCommon.DOWNLOAD_NOTSTARTED;
+  },
+
+  /**
+   * Returns the state as a string for the provided Download object.
+   */
+  stateOfDownloadText(download) {
+    // Don't duplicate the logic so just call stateOfDownload.
+    let state = this.stateOfDownload(download);
+    let s = DownloadsCommon.strings;
+    let title = s.unblockHeaderUnblock;
+    let verboseState;
+
+    switch (state) {
+      case DownloadsCommon.DOWNLOAD_PAUSED:
+        verboseState = s.statePaused;
+        break;
+      case DownloadsCommon.DOWNLOAD_DOWNLOADING:
+        verboseState = s.stateDownloading;
+        break;
+      case DownloadsCommon.DOWNLOAD_FINISHED:
+        verboseState = s.stateCompleted;
+        break;
+      case DownloadsCommon.DOWNLOAD_FAILED:
+        verboseState = s.stateFailed;
+        break;
+      case DownloadsCommon.DOWNLOAD_CANCELED:
+        verboseState = s.stateCanceled;
+        break;
+      // Security Zone Policy
+      case DownloadsCommon.DOWNLOAD_BLOCKED_PARENTAL:
+      // Security Zone Policy
+        verboseState = s.stateBlockedParentalControls;
+        break;
+      // Security Zone Policy
+      case DownloadsCommon.DOWNLOAD_BLOCKED_POLICY:
+        verboseState = s.stateBlockedPolicy;
+        break;
+      // possible virus/spyware
+      case DownloadsCommon.DOWNLOAD_DIRTY:
+        verboseState = s.stateDirty;
+        break;
+      // Currently not returned.
+      case DownloadsCommon.DOWNLOAD_UPLOADING:
+        verboseState = s.stateNotStarted;
+        break;
+      case DownloadsCommon.DOWNLOAD_NOTSTARTED:
+        verboseState = s.stateNotStarted;
+        break;
+      // Whoops!
+      default:
+        verboseState = s.stateUnknown;
+        break;
+    }
+
+    return verboseState;
+  },
+
+  /**
+   * Opens a downloaded file.
+   *
+   * @param aFile
+   *        the downloaded file to be opened.
+   * @param aMimeInfo
+   *        the mime type info object.  May be null.
+   * @param aOwnerWindow
+   *        the window with which this action is associated.
+   */
+  openDownloadedFile(aFile, aMimeInfo, aOwnerWindow) {
+    if (!(aFile instanceof Ci.nsIFile)) {
+      throw new Error("aFile must be a nsIFile object");
+    }
+    if (aMimeInfo && !(aMimeInfo instanceof Ci.nsIMIMEInfo)) {
+      throw new Error("Invalid value passed for aMimeInfo");
+    }
+    if (!(aOwnerWindow instanceof Ci.nsIDOMWindow)) {
+      throw new Error("aOwnerWindow must be a dom-window object");
+    }
+
+    let isWindowsExe = AppConstants.platform == "win" &&
+      aFile.leafName.toLowerCase().endsWith(".exe");
+
+    let promiseShouldLaunch;
+    // Don't prompt on Windows for .exe since there will be a native prompt.
+    if (aFile.isExecutable() && !isWindowsExe) {
+      // We get a prompter for the provided window here, even though anchoring
+      // to the most recently active window should work as well.
+      promiseShouldLaunch =
+        DownloadUIHelper.getPrompter(aOwnerWindow)
+                        .confirmLaunchExecutable(aFile.path);
+    } else {
+      promiseShouldLaunch = Promise.resolve(true);
+    }
+
+    promiseShouldLaunch.then(shouldLaunch => {
+      if (!shouldLaunch) {
+        return;
+      }
+
+      // Actually open the file.
+      try {
+        if (aMimeInfo && aMimeInfo.preferredAction == aMimeInfo.useHelperApp) {
+          aMimeInfo.launchWithFile(aFile);
+          return;
+        }
+      } catch (ex) { }
+
+      // If either we don't have the mime info, or the preferred action failed,
+      // attempt to launch the file directly.
+      try {
+        aFile.launch();
+      } catch (ex) {
+        // If launch fails, try sending it through the system's external "file:"
+        // URL handler.
+        Cc["@mozilla.org/uriloader/external-protocol-service;1"]
+          .getService(Ci.nsIExternalProtocolService)
+          .loadUrl(NetUtil.newURI(aFile));
+      }
+    }).catch(Cu.reportError);
+  },
+
+  /**
+   * Show a downloaded file in the system file manager.
+   *
+   * @param aFile
+   *        a downloaded file.
+   */
+  showDownloadedFile(aFile) {
+    if (!(aFile instanceof Ci.nsIFile)) {
+      throw new Error("aFile must be a nsIFile object");
+    }
+    try {
+      // Show the directory containing the file and select the file.
+      aFile.reveal();
+    } catch (ex) {
+      // If reveal fails for some reason (e.g., it's not implemented on unix
+      // or the file doesn't exist), try using the parent if we have it.
+      let parent = aFile.parent;
+      if (parent) {
+        this.showDirectory(parent);
+      }
+    }
+  },
+
+  /**
+   * Show the specified folder in the system file manager.
+   *
+   * @param aDirectory
+   *        a directory to be opened with system file manager.
+   */
+  showDirectory(aDirectory) {
+    if (!(aDirectory instanceof Ci.nsIFile)) {
+      throw new Error("aDirectory must be a nsIFile object");
+    }
+    try {
+      aDirectory.launch();
+    } catch (ex) {
+      // If launch fails (probably because it's not implemented), let
+      // the OS handler try to open the directory.
+      Cc["@mozilla.org/uriloader/external-protocol-service;1"]
+        .getService(Ci.nsIExternalProtocolService)
+        .loadUrl(NetUtil.newURI(aDirectory));
+    }
+  },
+
+  /**
+   * Displays an alert message box which asks the user if they want to
+   * unblock the downloaded file or not.
+   *
+   * @param options
+   *        An object with the following properties:
+   *        {
+   *          verdict:
+   *            The detailed reason why the download was blocked, according to
+   *            the "Downloads.Error.BLOCK_VERDICT_" constants. If an unknown
+   *            reason is specified, "Downloads.Error.BLOCK_VERDICT_MALWARE" is
+   *            assumed.
+   *          window:
+   *            The window with which this action is associated.
+   *          dialogType:
+   *            String that determines which actions are available:
+   *             - "unblock" to offer just "unblock".
+   *             - "chooseUnblock" to offer "unblock" and "confirmBlock".
+   *             - "chooseOpen" to offer "open" and "confirmBlock".
+   *        }
+   *
+   * @return {Promise}
+   * @resolves String representing the action that should be executed:
+   *            - "open" to allow the download and open the file.
+   *            - "unblock" to allow the download without opening the file.
+   *            - "confirmBlock" to delete the blocked data permanently.
+   *            - "cancel" to do nothing and cancel the operation.
+   */
+  async confirmUnblockDownload({ verdict, window,
+                                                  dialogType }) {
+    let s = DownloadsCommon.strings;
+
+    // All the dialogs have an action button and a cancel button, while only
+    // some of them have an additonal button to remove the file. The cancel
+    // button must always be the one at BUTTON_POS_1 because this is the value
+    // returned by confirmEx when using ESC or closing the dialog (bug 345067).
+    let title = s.unblockHeaderUnblock;
+    let firstButtonText = s.unblockButtonUnblock;
+    let firstButtonAction = "unblock";
+    let buttonFlags =
+        (Ci.nsIPrompt.BUTTON_TITLE_IS_STRING * Ci.nsIPrompt.BUTTON_POS_0) +
+        (Ci.nsIPrompt.BUTTON_TITLE_CANCEL * Ci.nsIPrompt.BUTTON_POS_1);
+
+    switch (dialogType) {
+      case "unblock":
+        // Use only the unblock action. The default is to cancel.
+        buttonFlags += Ci.nsIPrompt.BUTTON_POS_1_DEFAULT;
+        break;
+      case "chooseUnblock":
+        // Use the unblock and remove file actions. The default is remove file.
+        buttonFlags +=
+          (Ci.nsIPrompt.BUTTON_TITLE_IS_STRING * Ci.nsIPrompt.BUTTON_POS_2) +
+          Ci.nsIPrompt.BUTTON_POS_2_DEFAULT;
+        break;
+      case "chooseOpen":
+        // Use the unblock and open file actions. The default is open file.
+        title = s.unblockHeaderOpen;
+        firstButtonText = s.unblockButtonOpen;
+        firstButtonAction = "open";
+        buttonFlags +=
+          (Ci.nsIPrompt.BUTTON_TITLE_IS_STRING * Ci.nsIPrompt.BUTTON_POS_2) +
+          Ci.nsIPrompt.BUTTON_POS_0_DEFAULT;
+        break;
+      default:
+        Cu.reportError("Unexpected dialog type: " + dialogType);
+        return "cancel";
+    }
+
+    let message;
+    switch (verdict) {
+      case Downloads.Error.BLOCK_VERDICT_UNCOMMON:
+        message = s.unblockTypeUncommon2;
+        break;
+      case Downloads.Error.BLOCK_VERDICT_POTENTIALLY_UNWANTED:
+        message = s.unblockTypePotentiallyUnwanted2;
+        break;
+      default: // Assume Downloads.Error.BLOCK_VERDICT_MALWARE
+        message = s.unblockTypeMalware;
+        break;
+    }
+    message += "\n\n" + s.unblockTip2;
+
+    Services.ww.registerNotification(function onOpen(subj, topic) {
+      if (topic == "domwindowopened" && subj instanceof Ci.nsIDOMWindow) {
+        // Make sure to listen for "DOMContentLoaded" because it is fired
+        // before the "load" event.
+        subj.addEventListener("DOMContentLoaded", function() {
+          if (subj.document.documentURI ==
+              "chrome://global/content/commonDialog.xul") {
+            Services.ww.unregisterNotification(onOpen);
+            let dialog = subj.document.getElementById("commonDialog");
+            if (dialog) {
+              // Change the dialog to use a warning icon.
+              dialog.classList.add("alert-dialog");
+            }
+          }
+        }, {once: true});
+      }
+    });
+
+    let rv = Services.prompt.confirmEx(window, title, message, buttonFlags,
+                                       firstButtonText, null,
+                                       s.unblockButtonConfirmBlock, null, {});
+    return [firstButtonAction, "cancel", "confirmBlock"][rv];
   },
 };
 
@@ -219,6 +546,10 @@ DownloadsDataCtor.prototype = {
    */
   initializeDataLink() {},
 
+  /**
+   * Used by sound logic when download ends.
+   */
+  _sound: null,
   /**
    * Promise resolved with the underlying DownloadList object once we started
    * receiving events for current downloads.
@@ -282,10 +613,9 @@ DownloadsDataCtor.prototype = {
                      Services.prefs.getIntPref(PREF_DM_BEHAVIOR);
     switch (behavior) {
       case 0:
-        // TODO Better move this out of nsSuiteGlue.
         Cc["@mozilla.org/suite/suiteglue;1"]
           .getService(Ci.nsISuiteGlue)
-          .showDownloadManager(download);
+          .showDownloadManager(true);
         break;
       case 1:
         Services.ww.openWindow(null, PROGRESS_DIALOG_URL, null,
@@ -302,27 +632,21 @@ DownloadsDataCtor.prototype = {
     let newState = DownloadsCommon.stateOfDownload(download);
     this.oldDownloadStates.set(download, newState);
 
-    if (oldState != newState) {
-      if (download.succeeded ||
-          (download.canceled && !download.hasPartialData) ||
-          download.error) {
-        // Store the end time that may be displayed by the views.
-        download.endTime = Date.now();
+    if (oldState != newState &&
+        (download.succeeded ||
+         (download.canceled && !download.hasPartialData) ||
+          download.error)) {
+      // Store the end time that may be displayed by the views.
+      download.endTime = Date.now();
 
-        // This state transition code should actually be located in a Downloads
-        // API module (bug 941009).
-        DownloadHistory.updateMetaData(download);
+      // This state transition code should actually be located in a Downloads
+      // API module (bug 941009).
+      // This might end with an exception if it is an unsupported uri scheme.
+      DownloadHistory.updateMetaData(download);
+
+      if (download.succeeded) {
+        this.playDownloadSound();
       }
-
-      if (download.succeeded ||
-          (download.error && download.error.becauseBlocked)) {
-        this._notifyDownloadEvent("finish");
-      }
-    }
-
-    if (!download.newDownloadNotified) {
-      download.newDownloadNotified = true;
-      this._notifyDownloadEvent("start");
     }
   },
 
@@ -330,37 +654,46 @@ DownloadsDataCtor.prototype = {
     this.oldDownloadStates.delete(download);
   },
 
-  onDownloadChanged: function(aDownload) {
-    // This mighe be effective but the staement s*cks.
-    aDownload.state = DownloadsCommon.stateOfDownload(aDownload);
-    if (this._downloadsLoaded && (aDownload.succeeded || !aDownload.stopped))
-      aDownload.endTime = Date.now();
+  // Download summary
+  onSummaryChanged: function() {
+
+    if (!gTaskbarProgress)
+      return;
+
+    const nsITaskbarProgress = Ci.nsITaskbarProgress;
+    var currentBytes = gDownloadsSummary.progressCurrentBytes;
+    var totalBytes = gDownloadsSummary.progressTotalBytes;
+    var state = gDownloadsSummary.allHaveStopped ?
+                  currentBytes ? nsITaskbarProgress.STATE_PAUSED :
+                                 nsITaskbarProgress.STATE_NO_PROGRESS :
+                  currentBytes < totalBytes ? nsITaskbarProgress.STATE_NORMAL :
+                               nsITaskbarProgress.STATE_INDETERMINATE;
+    switch (state) {
+      case nsITaskbarProgress.STATE_NO_PROGRESS:
+      case nsITaskbarProgress.STATE_INDETERMINATE:
+        gTaskbarProgress.setProgressState(state, 0, 0);
+        break;
+      default:
+        gTaskbarProgress.setProgressState(state, currentBytes, totalBytes);
+        break;
+    }
   },
 
-  // Download summary
-  onSummaryChanged:  function() {
-
-  if (!gTaskbarProgress)
-    return;
-
-  const nsITaskbarProgress = Ci.nsITaskbarProgress;
-  var currentBytes = gDownloadsSummary.progressCurrentBytes;
-  var totalBytes = gDownloadsSummary.progressTotalBytes;
-  var state = gDownloadsSummary.allHaveStopped ?
-                currentBytes ? nsITaskbarProgress.STATE_PAUSED :
-                               nsITaskbarProgress.STATE_NO_PROGRESS :
-                currentBytes < totalBytes ? nsITaskbarProgress.STATE_NORMAL :
-                             nsITaskbarProgress.STATE_INDETERMINATE;
-  switch (state) {
-    case nsITaskbarProgress.STATE_NO_PROGRESS:
-    case nsITaskbarProgress.STATE_INDETERMINATE:
-      gTaskbarProgress.setProgressState(state, 0, 0);
-      break;
-    default:
-      gTaskbarProgress.setProgressState(state, currentBytes, totalBytes);
-      break;
-  }
-},
+  // Play a download sound.
+  playDownloadSound: function()
+  {
+    if (Services.prefs.getBoolPref("browser.download.finished_download_sound")) {
+      if (!this._sound)
+        this._sound = Cc["@mozilla.org/sound;1"].createInstance(Ci.nsISound);
+      try {
+        let url = Services.prefs.getComplexValue("browser.download.finished_sound_url",
+                                                 Ci.nsISupportsString);
+        this._sound.play(Services.io.newURI(url.data));
+      } catch (e) {
+        this._sound.beep();
+      }
+    }
+  },
 
   // Registration of views
 
@@ -387,7 +720,6 @@ DownloadsDataCtor.prototype = {
     this._promiseList.then(list => list.removeView(aView))
                      .catch(Cu.reportError);
   },
-
 };
 
 XPCOMUtils.defineLazyGetter(this, "HistoryDownloadsData", function() {
@@ -397,176 +729,3 @@ XPCOMUtils.defineLazyGetter(this, "HistoryDownloadsData", function() {
 XPCOMUtils.defineLazyGetter(this, "DownloadsData", function() {
   return new DownloadsDataCtor();
 });
-
-// DownloadsViewPrototype
-
-/**
- * A prototype for an object that registers itself with DownloadsData as soon
- * as a view is registered with it.
- */
-const DownloadsViewPrototype = {
-  /**
-   * Contains all the available Download objects and their current state value.
-   *
-   * SUBCLASSES MUST OVERRIDE THIS PROPERTY.
-   */
-  _oldDownloadStates: null,
-
-  // Registration of views
-
-  /**
-   * Array of view objects that should be notified when the available status
-   * data changes.
-   *
-   * SUBCLASSES MUST OVERRIDE THIS PROPERTY.
-   */
-  _views: null,
-
-  /**
-   * Adds an object to be notified when the available status data changes.
-   * The specified object is initialized with the currently available status.
-   *
-   * @param aView
-   *        View object to be added.  This reference must be
-   *        passed to removeView before termination.
-   */
-  addView(aView) {
-    // Start receiving events when the first of our views is registered.
-    if (this._views.length == 0) {
-      DownloadsData.addView(this);
-    }
-
-    this._views.push(aView);
-    this.refreshView(aView);
-  },
-
-  /**
-   * Updates the properties of an object previously added using addView.
-   *
-   * @param aView
-   *        View object to be updated.
-   */
-  refreshView(aView) {
-    // Update immediately even if we are still loading data asynchronously.
-    // Subclasses must provide these two functions!
-    this._refreshProperties();
-    this._updateView(aView);
-  },
-
-  /**
-   * Removes an object previously added using addView.
-   *
-   * @param aView
-   *        View object to be removed.
-   */
-  removeView(aView) {
-    let index = this._views.indexOf(aView);
-    if (index != -1) {
-      this._views.splice(index, 1);
-    }
-
-    // Stop receiving events when the last of our views is unregistered.
-    if (this._views.length == 0) {
-      DownloadsData.removeView(this);
-    }
-  },
-
-  // Callback functions from DownloadList
-
-  /**
-   * Indicates whether we are still loading downloads data asynchronously.
-   */
-  _loading: false,
-
-  /**
-   * Called before multiple downloads are about to be loaded.
-   */
-  onDownloadBatchStarting() {
-    this._loading = true;
-  },
-
-  /**
-   * Called after data loading finished.
-   */
-  onDownloadBatchEnded() {
-    this._loading = false;
-  },
-
-  /**
-   * Called when a new download data item is available, either during the
-   * asynchronous data load or when a new download is started.
-   *
-   * @param download
-   *        Download object that was just added.
-   *
-   * @note Subclasses should override this and still call the base method.
-   */
-  onDownloadAdded(download) {
-    this._oldDownloadStates.set(download,
-                                DownloadsCommon.stateOfDownload(download));
-  },
-
-  /**
-   * Called when the overall state of a Download has changed. In particular,
-   * this is called only once when the download succeeds or is blocked
-   * permanently, and is never called if only the current progress changed.
-   *
-   * The onDownloadChanged notification will always be sent afterwards.
-   *
-   * @note Subclasses should override this.
-   */
-  onDownloadStateChanged(download) {
-    throw Cr.NS_ERROR_NOT_IMPLEMENTED;
-  },
-
-  /**
-   * Called every time any state property of a Download may have changed,
-   * including progress properties.
-   *
-   * Note that progress notification changes are throttled at the Downloads.jsm
-   * API level, and there is no throttling mechanism in the front-end.
-   *
-   * @note Subclasses should override this and still call the base method.
-   */
-  onDownloadChanged(download) {
-    let oldState = this._oldDownloadStates.get(download);
-    let newState = DownloadsCommon.stateOfDownload(download);
-    this._oldDownloadStates.set(download, newState);
-
-    if (oldState != newState) {
-      this.onDownloadStateChanged(download);
-    }
-  },
-
-  /**
-   * Called when a data item is removed, ensures that the widget associated with
-   * the view item is removed from the user interface.
-   *
-   * @param download
-   *        Download object that is being removed.
-   *
-   * @note Subclasses should override this.
-   */
-  onDownloadRemoved(download) {
-    throw Cr.NS_ERROR_NOT_IMPLEMENTED;
-  },
-
-  /**
-   * Private function used to refresh the internal properties being sent to
-   * each registered view.
-   *
-   * @note Subclasses should override this.
-   */
-  _refreshProperties() {
-    throw Cr.NS_ERROR_NOT_IMPLEMENTED;
-  },
-
-  /**
-   * Private function used to refresh an individual view.
-   *
-   * @note Subclasses should override this.
-   */
-  _updateView() {
-    throw Cr.NS_ERROR_NOT_IMPLEMENTED;
-  },
-};

@@ -19,18 +19,11 @@
 #include "nsMsgSearchScopeTerm.h"
 #include "nsNetUtil.h"
 #include "nsIInputStream.h"
-#include "nsMsgI18N.h"
+#include "nsNativeCharsetUtils.h"
 #include "nsMemory.h"
 #include "prmem.h"
 #include "mozilla/ArrayUtils.h"
 #include <ctype.h>
-
-// unicode "%s" format string
-static const char16_t unicodeFormatter[] = {
-    (char16_t)'%',
-    (char16_t)'s',
-    (char16_t)0,
-};
 
 // Marker for EOF or failure during read
 #define EOF_CHAR -1
@@ -273,8 +266,7 @@ nsMsgFilterList::ApplyFiltersToHdr(nsMsgFilterTypeType filterType,
                                    nsIMsgDBHdr *msgHdr,
                                    nsIMsgFolder *folder,
                                    nsIMsgDatabase *db,
-                                   const char*headers,
-                                   uint32_t headersSize,
+                                   const nsACString& headers,
                                    nsIMsgFilterHitNotify *listener,
                                    nsIMsgWindow *msgWindow)
 {
@@ -304,7 +296,7 @@ nsMsgFilterList::ApplyFiltersToHdr(nsMsgFilterTypeType filterType,
         bool result;
 
         filter->SetScope(scope);
-        matchTermStatus = filter->MatchHdr(msgHdr, folder, db, headers, headersSize, &result);
+        matchTermStatus = filter->MatchHdr(msgHdr, folder, db, headers, &result);
         filter->SetScope(nullptr);
         if (NS_SUCCEEDED(matchTermStatus) && result && listener)
         {
@@ -561,23 +553,16 @@ nsresult nsMsgFilterList::LoadTextFilters(already_AddRefed<nsIInputStream> aStre
           break;
         }
         filter->SetFilterList(static_cast<nsIMsgFilterList*>(this));
+        nsAutoString unicodeStr;
         if (m_fileVersion == k45Version)
         {
-          nsAutoString unicodeStr;
-          err = nsMsgI18NConvertToUnicode(nsMsgI18NFileSystemCharset(),
-                                          value, unicodeStr);
-          if (NS_FAILED(err))
-              break;
-
+          NS_CopyNativeToUnicode(value, unicodeStr);
           filter->SetFilterName(unicodeStr);
         }
         else
         {
-          // ### fix me - this is silly.
-          nsString unicodeString;
-          nsTextFormatter::ssprintf(unicodeString, unicodeFormatter,
-                                    value.get());
-          filter->SetFilterName(unicodeString);
+          CopyUTF8toUTF16(value, unicodeStr);
+          filter->SetFilterName(unicodeStr);
         }
         m_curFilter = filter;
         m_filters.AppendElement(filter);
@@ -673,14 +658,8 @@ nsresult nsMsgFilterList::LoadTextFilters(already_AddRefed<nsIInputStream> aStre
         if (m_fileVersion == k45Version)
         {
           nsAutoString unicodeStr;
-          err = nsMsgI18NConvertToUnicode(nsMsgI18NFileSystemCharset(),
-                                          value, unicodeStr);
-          if (NS_FAILED(err))
-              break;
-
-          char *utf8 = ToNewUTF8String(unicodeStr);
-          value.Assign(utf8);
-          free(utf8);
+          NS_CopyNativeToUnicode(value, unicodeStr);
+          CopyUTF16toUTF8(unicodeStr, value);
         }
         err = ParseCondition(m_curFilter, value.get());
         if (err == NS_ERROR_INVALID_ARG)

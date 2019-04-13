@@ -29,6 +29,7 @@
 #include "nsThreadUtils.h"
 #include "nsAutoPtr.h"
 #include "mozilla/Services.h"
+#include "mozilla/dom/LoadURIOptionsBinding.h"
 
 // Interfaces Needed
 #include "nsIBaseWindow.h"
@@ -205,11 +206,19 @@ nsMsgPrintEngine::OnStatusChange(nsIWebProgress* aWebProgress,
 
 NS_IMETHODIMP
 nsMsgPrintEngine::OnSecurityChange(nsIWebProgress *aWebProgress,
-                      nsIRequest *aRequest,
-                      uint32_t state)
+                                   nsIRequest *aRequest,
+                                   uint32_t state)
 {
     MOZ_ASSERT_UNREACHABLE("notification excluded in AddProgressListener(...)");
     return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMsgPrintEngine::OnContentBlockingEvent(nsIWebProgress *aWebProgress,
+                                         nsIRequest *aRequest, uint32_t aEvent)
+{
+  MOZ_ASSERT_UNREACHABLE("notification excluded in AddProgressListener(...)");
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -229,8 +238,7 @@ nsMsgPrintEngine::SetWindow(mozIDOMWindowProxy *aWin)
 
   window->GetDocShell()->SetAppType(nsIDocShell::APP_TYPE_MAIL);
 
-  nsCOMPtr<nsIDocShellTreeItem> docShellAsItem =
-    do_QueryInterface(window->GetDocShell());
+  nsCOMPtr<nsIDocShellTreeItem> docShellAsItem =  window->GetDocShell();
   NS_ENSURE_TRUE(docShellAsItem, NS_ERROR_FAILURE);
 
   nsCOMPtr<nsIDocShellTreeItem> rootAsItem;
@@ -265,9 +273,8 @@ nsMsgPrintEngine::ShowWindow(bool aShow)
   NS_ENSURE_TRUE(mWindow, NS_ERROR_NOT_INITIALIZED);
 
   nsCOMPtr<nsPIDOMWindowOuter> window = nsPIDOMWindowOuter::From(mWindow);
-  nsCOMPtr <nsIDocShellTreeItem> treeItem =
-    do_QueryInterface(window->GetDocShell(), &rv);
-  NS_ENSURE_SUCCESS(rv,rv);
+  nsCOMPtr<nsIDocShellTreeItem> treeItem = window->GetDocShell();
+  NS_ENSURE_TRUE(treeItem, NS_ERROR_NULL_POINTER);
 
   nsCOMPtr <nsIDocShellTreeOwner> treeOwner;
   rv = treeItem->GetTreeOwner(getter_AddRefs(treeOwner));
@@ -356,7 +363,7 @@ nsMsgPrintEngine::ShowProgressDialog(bool aIsForPrinting, bool& aDoNotify)
     }
     if (mPrintPromptService)
     {
-      nsCOMPtr<mozIDOMWindowProxy> domWin(do_QueryInterface(mParentWindow));
+      nsCOMPtr<mozIDOMWindowProxy> domWin = mParentWindow;
       if (!domWin)
       {
         domWin = mWindow;
@@ -492,13 +499,11 @@ nsMsgPrintEngine::FireThatLoadOperation(const nsString& uri)
   else
   {
     nsCOMPtr<nsIWebNavigation> webNav(do_QueryInterface(mDocShell));
-    if (webNav)
-      rv = webNav->LoadURI(uri.get(),                        // URI string
-                           nsIWebNavigation::LOAD_FLAGS_NONE, // Load flags
-                           nullptr,                            // Referring URI
-                           nullptr,                            // Post data
-                           nullptr,                            // Extra headers
-                           nsContentUtils::GetSystemPrincipal());
+    if (webNav) {
+      mozilla::dom::LoadURIOptions loadURIOptions;
+      loadURIOptions.mTriggeringPrincipal = nsContentUtils::GetSystemPrincipal();
+      rv = webNav->LoadURI(uri, loadURIOptions);
+    }
   }
   return rv;
 }
@@ -651,7 +656,7 @@ nsMsgPrintEngine::PrintMsgWindow()
 class nsPrintMsgWindowEvent : public mozilla::Runnable
 {
 public:
-  nsPrintMsgWindowEvent(nsMsgPrintEngine *mpe)
+  explicit nsPrintMsgWindowEvent(nsMsgPrintEngine *mpe)
     : mozilla::Runnable("nsPrintMsgWindowEvent"), mMsgPrintEngine(mpe)
   {}
 
@@ -670,7 +675,7 @@ private:
 class nsStartNextPrintOpEvent : public mozilla::Runnable
 {
 public:
-  nsStartNextPrintOpEvent(nsMsgPrintEngine *mpe)
+  explicit nsStartNextPrintOpEvent(nsMsgPrintEngine *mpe)
     : mozilla::Runnable("nsStartNextPrintOpEvent"), mMsgPrintEngine(mpe)
   {}
 

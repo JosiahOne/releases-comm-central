@@ -8,13 +8,15 @@
 
 // make SOLO_TEST=composition/test-reply-signature.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-reply-signature";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "compose-helpers", "window-helpers",
                          "message-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var sig = "roses are red";
 var folder;
@@ -81,7 +83,7 @@ function test_sig_strip_false_nonff() {
 /**
  * Helper function to check signature stripping works as it should.
  * @param aRow the row index of the message to test
- * @param aShouldStrip true if the signature should be stipped
+ * @param aShouldStrip true if the signature should be stripped
  */
 function check_sig_strip_works(aRow, aShouldStrip) {
   be_in_folder(folder);

@@ -8,7 +8,7 @@
 }
 
 #tabs-toolbar:-moz-lwtheme {
-  --tabline-color: var(--tab-line-color, var(--lwt-accent-color));
+  --tabline-color: var(--tab-line-color, currentColor);
 }
 
 #tabs-toolbar {
@@ -30,9 +30,10 @@
   background-color: transparent;
   border-radius: 0;
   border-width: 0;
-  margin: 0;
-  margin-inline-end: 1px;
-  padding: 0;
+  /* override margin and padding from tabbox.css */
+  margin: 0 !important;
+  margin-inline-end: 1px !important;
+  padding: 0 !important;
   list-style-image: url("chrome://messenger/skin/icons/file-item.svg");
 }
 
@@ -115,11 +116,13 @@
   background-clip: padding-box;
 }
 
+:root[extradragspace],
 :root:not([tabsintitlebar]) #tabs-toolbar,
 #mail-toolbar-menubar2[toolbarname]:not([autohide=true]) ~ #tabs-toolbar {
   --tabs-top-border-width: 1px;
 }
 
+:root[extradragspace] .tab-background,
 :root:not([tabsintitlebar]) .tab-background,
 #mail-toolbar-menubar2[toolbarname]:not([autohide=true]) ~ #tabs-toolbar > #tabmail-tabs >
   .tabmail-tab > .tab-stack > .tab-background {
@@ -220,8 +223,10 @@
 .tabmail-tab:not([selected=true]):last-child:hover::after,
 .tabmail-tab:not([selected]) + .tabmail-tab:not([selected]):hover::before,
 .tabmail-tab:not([selected]):hover + .tabmail-tab:not([selected])::before,
-:root[tabsintitlebar] #mail-toolbar-menubar2[autohide=true] ~ #tabs-toolbar > #tabmail-tabs > .tabmail-tab::after,
-:root[tabsintitlebar] #mail-toolbar-menubar2[autohide=true] ~ #tabs-toolbar > #tabmail-tabs > .tabmail-tab::before {
+:root[tabsintitlebar]:not([extradragspace]) #mail-toolbar-menubar2[autohide=true] ~
+  #tabs-toolbar > #tabmail-tabs > .tabmail-tab::after,
+:root[tabsintitlebar]:not([extradragspace]) #mail-toolbar-menubar2[autohide=true] ~
+  #tabs-toolbar > #tabmail-tabs > .tabmail-tab::before {
   margin-top: var(--tabs-top-border-width);
   margin-bottom: var(--tab-toolbar-overlap);
 }
@@ -249,9 +254,9 @@
 .tabmail-arrowscrollbox > .scrollbutton-up,
 .tabmail-arrowscrollbox > stack > .scrollbutton-down {
   color: inherit;
-  list-style-image: url("chrome://messenger/skin/icons/arrow-left.svg");
+  list-style-image: url("chrome://messenger/skin/icons/arrow-left.svg") !important;
   -moz-context-properties: fill, fill-opacity;
-  fill: currentColor;
+  fill: var(--lwt-toolbarbutton-icon-fill, currentColor);
   fill-opacity: var(--toolbarbutton-icon-fill-opacity);
 }
 
@@ -349,8 +354,41 @@
   display: none;
 }
 
-.contentTabToolbar {
-  height: 0;
-  min-height: 0;
-  padding: 0;
+.contentTabSecurity {
+  height: 16px;
+  width: 16px;
+  margin: 2px;
+  margin-inline-end: 5px;
+  background-repeat: no-repeat;
+}
+
+.contentTabSecurity[level="high"] {
+  background-image: url("chrome://messenger/skin/icons/connection-secure.svg");
+  -moz-context-properties: fill;
+  fill: #12bc00;
+}
+
+.contentTabSecurity[level="broken"] {
+  background-image: url("chrome://messenger/skin/icons/connection-insecure.svg");
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+.contentTabSecurity[loading="true"] {
+  background-image: url("chrome://global/skin/icons/loading.png");
+}
+
+@media (min-resolution: 1.1ddpx) {
+  #security-button[loading="true"] {
+    background-image: url("chrome://global/skin/icons/loading@2x.png");
+    background-size: 16px;
+  }
+}
+
+.contentTabAddress * {
+  -moz-user-select: text;
+}
+
+.contentTabUrlbar {
+  margin: 0;
 }

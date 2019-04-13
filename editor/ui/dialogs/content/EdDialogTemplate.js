@@ -2,16 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
 
-//Cancel() is in EdDialogCommon.js
+// Cancel() is in EdDialogCommon.js
 var insertNew = true;
-var tagname = "TAG NAME"
+var tagname = "TAG NAME";
 
 // dialog initialization code
-function Startup()
-{
-  if (!GetCurrentEditor())
-  {
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+function Startup() {
+  if (!GetCurrentEditor()) {
     window.close();
     return;
   }
@@ -19,7 +23,7 @@ function Startup()
   // Set commonly-used widgets like this:
   gDialog.fooButton = document.getElementById("fooButton");
 
-  initDialog();
+  InitDialog();
 
   // Set window location relative to parent window (based on persisted attributes)
   SetWindowLocation();
@@ -28,17 +32,14 @@ function Startup()
   SetTextboxFocus(gDialog.fooButton);
 }
 
-function InitDialog()
-{
+function InitDialog() {
   // Initialize all dialog widgets here,
   // e.g., get attributes from an element for property dialog
 }
 
-function onAccept()
-{
+function onAccept() {
   // Validate all user data and set attributes and possibly insert new element here
   // If there's an error the user must correct, return false to keep dialog open.
 
   SaveWindowLocation();
-  return true; // do close the window
 }

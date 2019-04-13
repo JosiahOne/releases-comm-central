@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * A thin wrapper around the html list exporter for the list print format.
@@ -18,8 +18,8 @@ calListFormatter.prototype = {
     get name() { return cal.l10n.getCalString("formatListName"); },
 
     formatToHtml: function(aStream, aStart, aEnd, aCount, aItems, aTitle) {
-        let htmlexporter = Components.classes["@mozilla.org/calendar/export;1?type=htmllist"]
-                                     .createInstance(Components.interfaces.calIExporter);
+        let htmlexporter = Cc["@mozilla.org/calendar/export;1?type=htmllist"]
+                             .createInstance(Ci.calIExporter);
         htmlexporter.exportToStream(aStream, aCount, aItems, aTitle);
     }
 };

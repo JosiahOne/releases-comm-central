@@ -8,6 +8,8 @@
  * can be toggled properly.
  */
 
+"use strict";
+
 var MODULE_NAME = "test-mode-switching";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -23,7 +25,10 @@ var tree;
 var modeList_menu;
 var modeList_appmenu;
 var view_menu;
-var view_appmenu;
+var view_menupopup;
+var appmenu;
+var appmenu_popup;
+var menu_state;
 
 function setupModule(module) {
   for (let lib of MODULE_REQUIRES) {
@@ -40,7 +45,7 @@ function setupModule(module) {
   favoriteFolder = inboxFolder.getChildNamed("FavoriteFolder");
 
   make_new_sets_in_folder(unreadFolder, [{count: 1}]);
-  favoriteFolder.flags |= Ci.nsMsgFolderFlags.Favorite;
+  favoriteFolder.setFlag(Ci.nsMsgFolderFlags.Favorite);
 
   toggle_menu = mc.e("menu_compactFolderView");
   toggle_appmenu = mc.e("appmenu_compactFolderView");
@@ -51,11 +56,13 @@ function setupModule(module) {
   view_menu = mc.eid("menu_View");
   view_menupopup = mc.e("menu_View_Popup");
   appmenu = mc.eid("button-appmenu");
-  appmenupopup = mc.e("appmenu-popup");
+  appmenu_popup = mc.e("appmenu-popup");
 
   tree = mc.folderTreeView;
 
   select_no_folders();
+  // Main menu is needed for this whole test file.
+  menu_state = toggle_main_menu(true);
 }
 
 /**
@@ -82,6 +89,7 @@ function assert_mode_selected(aMode) {
   assert_equals(tree.mode, aMode);
   let baseMode = tree.baseMode();
   assert_compact_state(baseMode != tree.mode);
+  let popuplist;
   // We need to open the menu because only then the right mode is set in them.
   if (!mc.mozmillModule.isMac) {
     // On OS X the main menu seems not accessible for clicking from mozmill.
@@ -91,7 +99,7 @@ function assert_mode_selected(aMode) {
     mc.close_popup_sequence(popuplist);
   }
   mc.click(appmenu);
-  popuplist = mc.click_menus_in_sequence(appmenupopup, [ { id: modeList_appmenu.parentNode.id } ], true);
+  popuplist = mc.click_menus_in_sequence(appmenu_popup, [ { id: modeList_appmenu.parentNode.id } ], true);
   assert_true(modeList_menu.querySelector('[value="' + baseMode + '"]').hasAttribute("checked"));
   mc.close_popup_sequence(popuplist);
 }
@@ -103,8 +111,8 @@ function assert_mode_selected(aMode) {
  */
 function select_mode_in_menu(aMode) {
   mc.click(appmenu);
-  mc.click_menus_in_sequence(appmenupopup, [ { id: modeList_appmenu.parentNode.id },
-                                             { value: aMode } ]);
+  mc.click_menus_in_sequence(appmenu_popup, [ { id: modeList_appmenu.parentNode.id },
+                                              { value: aMode } ]);
 }
 
 /**
@@ -270,9 +278,11 @@ function test_toggling_modes() {
   subtest_switch_to_smart_folders(true);
   subtest_switch_to_all_folders(true);
 }
+test_toggling_modes.EXCLUDED_PLATFORMS = ["linux"];
 
 function teardownModule() {
   tree.mode = "all";
   inboxFolder.propagateDelete(unreadFolder, true, null);
   inboxFolder.propagateDelete(favoriteFolder, true, null);
+  toggle_main_menu(menu_state);
 }

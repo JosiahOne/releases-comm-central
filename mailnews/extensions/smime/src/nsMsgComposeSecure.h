@@ -7,7 +7,6 @@
 #define _nsMsgComposeSecure_H_
 
 #include "nsIMsgComposeSecure.h"
-#include "nsIMsgSMIMECompFields.h"
 #include "nsCOMPtr.h"
 #include "nsICMSEncoder.h"
 #include "nsIX509Cert.h"
@@ -25,20 +24,6 @@ namespace mailnews {
 class MimeEncoder;
 }
 }
-
-class nsMsgSMIMEComposeFields : public nsIMsgSMIMECompFields
-{
-public:
-  NS_DECL_ISUPPORTS
-  NS_DECL_NSIMSGSMIMECOMPFIELDS
-
-  nsMsgSMIMEComposeFields();
-
-private:
-  virtual ~nsMsgSMIMEComposeFields();
-  bool mSignMessage;
-  bool mAlwaysEncryptMessage;
-};
 
 typedef enum {
   mime_crypto_none,            /* normal unencapsulated MIME message */
@@ -58,9 +43,6 @@ public:
 
   void GetOutputStream(nsIOutputStream **stream) { NS_IF_ADDREF(*stream = mStream);}
   nsresult GetSMIMEBundleString(const char16_t *name, nsString &outString);
-  static nsresult
-  FindCertByEmailAddress(const nsACString& aEmailAddress,
-                         nsIX509Cert** _retval);
 
 private:
   virtual ~nsMsgComposeSecure();
@@ -77,6 +59,8 @@ private:
                                            nsAString& outString);
   nsresult ExtractEncryptionState(nsIMsgIdentity * aIdentity, nsIMsgCompFields * aComposeFields, bool * aSignMessage, bool * aEncrypt);
 
+  bool mSignMessage;
+  bool mAlwaysEncryptMessage;
   mimeDeliveryCryptoState mCryptoState;
   nsCOMPtr<nsIOutputStream> mStream;
   int16_t mHashType;

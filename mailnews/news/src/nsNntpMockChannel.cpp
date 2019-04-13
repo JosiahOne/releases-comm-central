@@ -277,32 +277,28 @@ nsNntpMockChannel::GetIsDocument(bool *aIsDocument)
 
 NS_IMETHODIMP nsNntpMockChannel::Open(nsIInputStream **_retval)
 {
-  return NS_ImplementChannelOpen(this, _retval);
-}
-
-NS_IMETHODIMP nsNntpMockChannel::Open2(nsIInputStream **_retval)
-{
   nsCOMPtr<nsIStreamListener> listener;
   nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
   NS_ENSURE_SUCCESS(rv, rv);
-  return Open(_retval);
+  return NS_ImplementChannelOpen(this, _retval);
 }
 
-NS_IMETHODIMP nsNntpMockChannel::AsyncOpen(nsIStreamListener *listener,
-                                           nsISupports *ctxt)
+NS_IMETHODIMP nsNntpMockChannel::AsyncOpen(nsIStreamListener *aListener)
 {
+  nsCOMPtr<nsIStreamListener> listener = aListener;
+  nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
+  NS_ENSURE_SUCCESS(rv, rv);
   m_channelState = CHANNEL_OPEN_WITH_ASYNC;
   m_channelListener = listener;
-  m_context = ctxt;
+  m_context = nullptr;
+  nsCOMPtr <nsIURI> uri;
+  nsCOMPtr<nsIChannel> channel;
+  QueryInterface(NS_GET_IID(nsIChannel), getter_AddRefs(channel));
+  if (channel) {
+    channel->GetURI(getter_AddRefs(uri));
+    m_context = uri;
+  }
   return NS_OK;
-}
-
-NS_IMETHODIMP nsNntpMockChannel::AsyncOpen2(nsIStreamListener *aListener)
-{
-    nsCOMPtr<nsIStreamListener> listener = aListener;
-    nsresult rv = nsContentSecurityManager::doContentSecurityCheck(this, listener);
-    NS_ENSURE_SUCCESS(rv, rv);
-    return AsyncOpen(listener, nullptr);
 }
 
 nsresult
@@ -321,6 +317,7 @@ nsNntpMockChannel::AttachNNTPConnection(nsNNTPProtocol &protocol)
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Variable fun
+  protocol.SetLoadInfo(m_loadInfo);
   protocol.SetLoadGroup(m_loadGroup);
   protocol.SetLoadFlags(m_loadFlags);
   protocol.SetOwner(m_owner);
@@ -339,7 +336,7 @@ nsNntpMockChannel::AttachNNTPConnection(nsNNTPProtocol &protocol)
     rv = protocol.LoadNewsUrl(m_url, m_context);
     break;
   case CHANNEL_OPEN_WITH_ASYNC:
-    rv = protocol.AsyncOpen(m_channelListener, m_context);
+    rv = protocol.AsyncOpen(m_channelListener);
     break;
   default:
     MOZ_ASSERT_UNREACHABLE("Unknown channel state got us here.");
@@ -350,7 +347,7 @@ nsNntpMockChannel::AttachNNTPConnection(nsNNTPProtocol &protocol)
   // essentially promised that we would load (by virtue of returning NS_OK to
   // AsyncOpen), we must now tell our listener the bad news.
   if (NS_FAILED(rv) && m_channelListener)
-    m_channelListener->OnStopRequest(this, m_context, rv);
+    m_channelListener->OnStopRequest(this, rv);
 
   // Returning a failure code is our way of telling the server that this URL
   // isn't going to run, so it should give the connection the next URL in the

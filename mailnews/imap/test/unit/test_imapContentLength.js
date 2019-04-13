@@ -14,7 +14,7 @@
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gMsgHdr = null;
 
@@ -50,7 +50,7 @@ function setup() {
   // Set up nsIMsgFolderListener to get the header when it's received
   MailServices.mfn.addListener(msgFolderListener, MailServices.mfn.msgAdded);
 
-  IMAPPump.inbox.flags &= ~Ci.nsMsgFolderFlags.Offline;
+  IMAPPump.inbox.clearFlag(Ci.nsMsgFolderFlags.Offline);
 }
 
 function verifyContentLength() {
@@ -65,22 +65,22 @@ function verifyContentLength() {
   let urlToRun = Services.io.newURI(neckoURL.value.spec);
 
   // Get a channel from this URI, and check its content length
-  let channel = Services.io.newChannelFromURI2(urlToRun,
-                                               null,
-                                               Services.scriptSecurityManager.getSystemPrincipal(),
-                                               null,
-                                               Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                               Ci.nsIContentPolicy.TYPE_OTHER);
+  let channel = Services.io.newChannelFromURI(urlToRun,
+                                              null,
+                                              Services.scriptSecurityManager.getSystemPrincipal(),
+                                              null,
+                                              Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                              Ci.nsIContentPolicy.TYPE_OTHER);
   Assert.equal(channel.contentLength, gFile.fileSize);
 
   // Now try an attachment. &part=1.2
   let attachmentURL = Services.io.newURI(neckoURL.value.spec + "&part=1.2");
-  let attachmentChannel = Services.io.newChannelFromURI2(attachmentURL,
-                                                         null,
-                                                         Services.scriptSecurityManager.getSystemPrincipal(),
-                                                         null,
-                                                         Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                                         Ci.nsIContentPolicy.TYPE_OTHER);
+  let attachmentChannel = Services.io.newChannelFromURI(attachmentURL,
+                                                        null,
+                                                        Services.scriptSecurityManager.getSystemPrincipal(),
+                                                        null,
+                                                        Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                                        Ci.nsIContentPolicy.TYPE_OTHER);
   // Currently attachments have their content length set to the length of the
   // entire message
   Assert.equal(attachmentChannel.contentLength, gFile.fileSize);

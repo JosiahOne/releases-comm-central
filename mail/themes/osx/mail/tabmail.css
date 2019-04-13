@@ -8,6 +8,10 @@
  * Tabmail Tabs
  */
 
+#tabs-toolbar {
+  padding-top: var(--space-above-tabbar);
+}
+
 #tabs-toolbar:not(:-moz-lwtheme) {
   color: #333;
   text-shadow: 0 1px rgba(255, 255, 255, 0.4);
@@ -71,12 +75,18 @@
   box-shadow: var(--focus-ring-box-shadow);
 }
 
+:root[tabsintitlebar][extradragspace] .tabmail-tab::after,
+:root[tabsintitlebar][extradragspace] .tabmail-tab::before {
+  margin-top: 0;
+  margin-bottom: var(--tab-toolbar-overlap);
+}
+
 #tabmail-tabs {
-  border: none;
-  -moz-box-pack: center;
-  -moz-box-align: center;
-  height: 23px;
+  -moz-box-align: stretch;
+  padding-left: 0;
+  padding-right: 0;
   margin-bottom: 0;
+  position: static;
 }
 
 tabmail > tabbox > tabpanels {
@@ -120,8 +130,8 @@ tabmail > tabbox > tabpanels {
 
 .tabmail-arrowscrollbox > .scrollbutton-up,
 .tabmail-arrowscrollbox > stack > .scrollbutton-down {
-  padding: 0 4px;
-  margin: 0 0 1px;
+  padding: 0 4px !important;
+  margin: 0 0 1px !important;
 }
 
 .tabmail-arrowscrollbox >
@@ -181,4 +191,9 @@ tabmail > tabbox > tabpanels {
   alltabs-item[busy] {
     list-style-image: url("chrome://global/skin/icons/loading@2x.png") !important;
   }
+}
+
+/* Content Tabs */
+.contentTabAddress {
+  height: 31px;
 }

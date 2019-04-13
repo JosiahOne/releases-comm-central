@@ -5,6 +5,10 @@
 var gEditor;
 
 // dialog initialization code
+
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
 function Startup()
 {
   gEditor = GetCurrentEditor();
@@ -48,8 +52,6 @@ function onAccept()
 {
   gEditor.snapToGridEnabled = gDialog.enableSnapToGrid.checked;
   gEditor.gridSize = gDialog.sizeInput.value;
-
-  return true;
 }
 
 function toggleSnapToGrid()

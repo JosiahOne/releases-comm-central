@@ -10,9 +10,9 @@
 
 this.EXPORTED_SYMBOLS = ["msgDBCacheManager"];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 var log = Log4Moz.getConfiguredLogger("mailnews.database.dbcache");
 
 /**

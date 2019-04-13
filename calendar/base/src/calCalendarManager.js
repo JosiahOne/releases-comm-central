@@ -2,10 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+/* import-globals-from calItemModule.js */
+
+var { AddonManager } = ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { Preferences } = ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 var REGISTRY_BRANCH = "calendar.registry.";
 var DB_SCHEMA_VERSION = 10;
@@ -14,25 +16,21 @@ var MIN_INT = -MAX_INT;
 
 function calCalendarManager() {
     this.wrappedJSObject = this;
-    this.mObservers = new cal.data.ListenerSet(Components.interfaces.calICalendarManagerObserver);
-    this.mCalendarObservers = new cal.data.ListenerSet(Components.interfaces.calIObserver);
+    this.mObservers = new cal.data.ListenerSet(Ci.calICalendarManagerObserver);
+    this.mCalendarObservers = new cal.data.ListenerSet(Ci.calIObserver);
 }
 
 var calCalendarManagerClassID = Components.ID("{f42585e7-e736-4600-985d-9624c1c51992}");
-var calCalendarManagerInterfaces = [
-    Components.interfaces.calICalendarManager,
-    Components.interfaces.calIStartupService,
-    Components.interfaces.nsIObserver,
-];
+var calCalendarManagerInterfaces = [Ci.calICalendarManager, Ci.calIStartupService, Ci.nsIObserver];
 calCalendarManager.prototype = {
     classID: calCalendarManagerClassID,
     QueryInterface: cal.generateQI(calCalendarManagerInterfaces),
-    classInfo: XPCOMUtils.generateCI({
+    classInfo: cal.generateCI({
         classID: calCalendarManagerClassID,
         contractID: "@mozilla.org/calendar/manager;1",
         classDescription: "Calendar Manager",
         interfaces: calCalendarManagerInterfaces,
-        flags: Components.interfaces.nsIClassInfo.SINGLETON
+        flags: Ci.nsIClassInfo.SINGLETON
     }),
 
     get networkCalendarCount() { return this.mNetworkCalendarCount; },
@@ -55,11 +53,11 @@ calCalendarManager.prototype = {
 
         // We only add the observer if the pref is set and only check for the
         // pref on startup to avoid checking for every http request
-        if (Preferences.get("calendar.network.multirealm", false)) {
+        if (Services.prefs.getBoolPref("calendar.network.multirealm", false)) {
             Services.obs.addObserver(this, "http-on-examine-response");
         }
 
-        aCompleteListener.onResult(null, Components.results.NS_OK);
+        aCompleteListener.onResult(null, Cr.NS_OK);
     },
 
     shutdown: function(aCompleteListener) {
@@ -77,11 +75,11 @@ calCalendarManager.prototype = {
         // Remove the observer if the pref is set. This might fail when the
         // user flips the pref, but we assume he is going to restart anyway
         // afterwards.
-        if (Preferences.get("calendar.network.multirealm", false)) {
+        if (Services.prefs.getBoolPref("calendar.network.multirealm", false)) {
             Services.obs.removeObserver(this, "http-on-examine-response");
         }
 
-        aCompleteListener.onResult(null, Components.results.NS_OK);
+        aCompleteListener.onResult(null, Cr.NS_OK);
     },
 
 
@@ -115,14 +113,14 @@ calCalendarManager.prototype = {
             }
             case "http-on-examine-response": {
                 try {
-                    let channel = aSubject.QueryInterface(Components.interfaces.nsIHttpChannel);
+                    let channel = aSubject.QueryInterface(Ci.nsIHttpChannel);
                     if (channel.notificationCallbacks) {
                         // We use the notification callbacks to get the calendar interface,
                         // which likely works for our requests since getInterface is called
                         // from the calendar provider context.
                         let authHeader = channel.getResponseHeader("WWW-Authenticate");
                         let calendar = channel.notificationCallbacks
-                                              .getInterface(Components.interfaces.calICalendar);
+                                              .getInterface(Ci.calICalendar);
                         if (calendar && !calendar.getProperty("capabilities.realmrewrite.disabled")) {
                             // The provider may choose to explicitly disable the
                             // rewriting, for example if all calendars on a
@@ -134,14 +132,14 @@ calCalendarManager.prototype = {
                         }
                     }
                 } catch (e) {
-                    if (e.result != Components.results.NS_NOINTERFACE &&
-                        e.result != Components.results.NS_ERROR_NOT_AVAILABLE) {
+                    if (e.result != Cr.NS_NOINTERFACE &&
+                        e.result != Cr.NS_ERROR_NOT_AVAILABLE) {
                         throw e;
                     }
                     // Possible reasons we got here:
                     // - Its not a http channel (wtf? Oh well)
                     // - The owner is not a calICalendar (looks like its not our deal)
-                    // - The WWW-Authenticate header is missing (thats ok)
+                    // - The WWW-Authenticate header is missing (that's ok)
                 }
                 break;
             }
@@ -150,12 +148,12 @@ calCalendarManager.prototype = {
                 // been removed. Calendar servers might still want to know what
                 // client is used for access, so add our UA String to each
                 // request.
-                let httpChannel = aSubject.QueryInterface(Components.interfaces.nsIHttpChannel);
+                let httpChannel = aSubject.QueryInterface(Ci.nsIHttpChannel);
                 try {
                     // NOTE: For some reason, this observer call doesn't have
                     // the "cal" namespace defined
                     let userAgent = httpChannel.getRequestHeader("User-Agent");
-                    let calUAString = Preferences.get("calendar.useragent.extra", "").trim();
+                    let calUAString = Services.prefs.getStringPref("calendar.useragent.extra", "").trim();
 
                     // Don't add an empty string or an already included token.
                     if (calUAString && !userAgent.includes(calUAString)) {
@@ -166,7 +164,7 @@ calCalendarManager.prototype = {
                                                      false);
                     }
                 } catch (e) {
-                    if (e.result != Components.results.NS_ERROR_NOT_AVAILABLE) {
+                    if (e.result != Cr.NS_ERROR_NOT_AVAILABLE) {
                         throw e;
                     }
                     // We swallow this error since it means the User Agent
@@ -263,8 +261,8 @@ calCalendarManager.prototype = {
 
             while (selectCalendars.executeStep()) {
                 let id = cal.getUUID(); // use fresh uuids
-                Preferences.set(getPrefBranchFor(id) + "type", selectCalendars.row.type);
-                Preferences.set(getPrefBranchFor(id) + "uri", selectCalendars.row.uri);
+                Services.prefs.setCharPref(getPrefBranchFor(id) + "type", selectCalendars.row.type);
+                Services.prefs.setCharPref(getPrefBranchFor(id) + "uri", selectCalendars.row.uri);
                 // the former id served as sort position:
                 sortOrder[selectCalendars.row.id] = id;
                 // move over prefs:
@@ -274,13 +272,13 @@ calCalendarManager.prototype = {
                     let value = selectPrefs.row.value;
                     switch (name) {
                         case "readonly":
-                            Preferences.set(getPrefBranchFor(id) + "readOnly", value == "true");
+                            Services.prefs.setBoolPref(getPrefBranchFor(id) + "readOnly", value == "true");
                             break;
                         case "relaxedmode":
-                            Preferences.set(getPrefBranchFor(id) + "relaxedMode", value == "true");
+                            Services.prefs.setBoolPref(getPrefBranchFor(id) + "relaxedMode", value == "true");
                             break;
                         case "suppressalarms":
-                            Preferences.set(getPrefBranchFor(id) + "suppressAlarms", value == "true");
+                            Services.prefs.setBoolPref(getPrefBranchFor(id) + "suppressAlarms", value == "true");
                             break;
                         case "disabled":
                         case "cache.supported":
@@ -288,15 +286,15 @@ calCalendarManager.prototype = {
                         case "cache.enabled":
                         case "calendar-main-in-composite":
                         case "calendar-main-default":
-                            Preferences.set(getPrefBranchFor(id) + name, value == "true");
+                            Services.prefs.setBoolPref(getPrefBranchFor(id) + name, value == "true");
                             break;
                         case "backup-time":
                         case "uniquenum":
                             // These preference names were migrated due to bug 979262.
-                            Preferences.set(getPrefBranchFor(id) + name + "2", "bignum:" + value);
+                            Services.prefs.setStringPref(getPrefBranchFor(id) + name + "2", "bignum:" + value);
                             break;
                         default: // keep as string
-                            Preferences.set(getPrefBranchFor(id) + name, value);
+                            Services.prefs.setStringPref(getPrefBranchFor(id) + name, value);
                             break;
                     }
                 }
@@ -307,7 +305,7 @@ calCalendarManager.prototype = {
             for (let id in sortOrder) {
                 sortOrderAr.push(sortOrder[id]);
             }
-            Preferences.set("calendar.list.sortOrder", sortOrderAr.join(" "));
+            Services.prefs.setStringPref("calendar.list.sortOrder", sortOrderAr.join(" "));
             flushPrefs();
         } finally {
             selectPrefs.reset();
@@ -316,11 +314,11 @@ calCalendarManager.prototype = {
     },
 
     checkAndMigrateDB: function() {
-        let storageSdb = Services.dirsvc.get("ProfD", Components.interfaces.nsIFile);
+        let storageSdb = Services.dirsvc.get("ProfD", Ci.nsIFile);
         storageSdb.append("storage.sdb");
         let db = Services.storage.openDatabase(storageSdb);
 
-        db.defaultTransactionType = Components.interfaces.mozIStorageConnection.TRANSACTION_EXCLUSIVE;
+        db.defaultTransactionType = Ci.mozIStorageConnection.TRANSACTION_EXCLUSIVE;
         db.beginTransaction();
         try {
             if (db.tableExists("cal_calendars_prefs")) {
@@ -387,11 +385,11 @@ calCalendarManager.prototype = {
                 stmt.reset();
             }
             cal.ERROR("++++++++++++ calMgrGetSchemaVersion() error: " + db.lastErrorString);
-            Components.utils.reportError("Error getting calendar schema version! DB Error: " + db.lastErrorString);
+            Cu.reportError("Error getting calendar schema version! DB Error: " + db.lastErrorString);
             throw e;
         }
 
-        throw table + " SELECT returned no results";
+        throw new Error(table + " SELECT returned no results");
     },
 
     //
@@ -426,8 +424,7 @@ calCalendarManager.prototype = {
         // Disable Lightning
         AddonManager.getAddonByID("{e2fda1a4-762b-4020-b5ad-a41df1933103}", (aAddon) => {
             aAddon.userDisabled = true;
-            Services.startup.quit(Components.interfaces.nsIAppStartup.eRestart |
-                Components.interfaces.nsIAppStartup.eForceQuit);
+            Services.startup.quit(Ci.nsIAppStartup.eRestart | Ci.nsIAppStartup.eForceQuit);
         });
     },
 
@@ -436,28 +433,28 @@ calCalendarManager.prototype = {
      */
     createCalendar: function(type, uri) {
         try {
-            if (!Components.classes["@mozilla.org/calendar/calendar;1?type=" + type]) {
+            if (!Cc["@mozilla.org/calendar/calendar;1?type=" + type]) {
                 // Don't notify the user with an extra dialog if the provider
                 // interface is missing.
                 return null;
             }
-            let calendar = Components.classes["@mozilla.org/calendar/calendar;1?type=" + type]
-                                     .createInstance(Components.interfaces.calICalendar);
+            let calendar = Cc["@mozilla.org/calendar/calendar;1?type=" + type]
+                             .createInstance(Ci.calICalendar);
             calendar.uri = uri;
             return calendar;
         } catch (ex) {
             let rc = ex;
             let uiMessage = ex;
-            if (ex instanceof Components.interfaces.nsIException) {
+            if (ex instanceof Ci.nsIException) {
                 rc = ex.result;
                 uiMessage = ex.message;
             }
             switch (rc) {
-                case Components.interfaces.calIErrors.STORAGE_UNKNOWN_SCHEMA_ERROR:
+                case Ci.calIErrors.STORAGE_UNKNOWN_SCHEMA_ERROR:
                     // For now we alert and quit on schema errors like we've done before:
                     this.alertAndQuit();
                     return null;
-                case Components.interfaces.calIErrors.STORAGE_UNKNOWN_TIMEZONES_ERROR:
+                case Ci.calIErrors.STORAGE_UNKNOWN_TIMEZONES_ERROR:
                     uiMessage = cal.l10n.getCalString("unknownTimezonesError", [uri.spec]);
                     break;
                 default:
@@ -468,8 +465,8 @@ calCalendarManager.prototype = {
             cal.ERROR(ex);
 
             // Log the possibly translated message via the UI.
-            let paramBlock = Components.classes["@mozilla.org/embedcomp/dialogparam;1"]
-                                       .createInstance(Components.interfaces.nsIDialogParamBlock);
+            let paramBlock = Cc["@mozilla.org/embedcomp/dialogparam;1"]
+                               .createInstance(Ci.nsIDialogParamBlock);
             paramBlock.SetNumberStrings(3);
             paramBlock.SetString(0, uiMessage);
             paramBlock.SetString(1, "0x" + rc.toString(0x10));
@@ -495,8 +492,8 @@ calCalendarManager.prototype = {
             calendar.id = cal.getUUID();
         }
 
-        Preferences.set(getPrefBranchFor(calendar.id) + "type", calendar.type);
-        Preferences.set(getPrefBranchFor(calendar.id) + "uri", calendar.uri.spec);
+        Services.prefs.setStringPref(getPrefBranchFor(calendar.id) + "type", calendar.type);
+        Services.prefs.setStringPref(getPrefBranchFor(calendar.id) + "uri", calendar.uri.spec);
 
         if ((calendar.getProperty("cache.supported") !== false) &&
             (calendar.getProperty("cache.enabled") ||
@@ -546,14 +543,13 @@ calCalendarManager.prototype = {
         this.clearRefreshTimer(aCalendar);
 
         if (refreshInterval > 0) {
-            this.mRefreshTimer[aCalendar.id] =
-                Components.classes["@mozilla.org/timer;1"]
-                          .createInstance(Components.interfaces.nsITimer);
+            this.mRefreshTimer[aCalendar.id] = Cc["@mozilla.org/timer;1"]
+                                                 .createInstance(Ci.nsITimer);
 
             this.mRefreshTimer[aCalendar.id]
                 .initWithCallback(new timerCallback(aCalendar),
                                   refreshInterval * 60000,
-                                  Components.interfaces.nsITimer.TYPE_REPEATING_SLACK);
+                                  Ci.nsITimer.TYPE_REPEATING_SLACK);
         }
     },
 
@@ -593,21 +589,8 @@ calCalendarManager.prototype = {
         this.clearRefreshTimer(calendar);
     },
 
-    // Delete this method for Lightning 4.7 at latest
-    deleteCalendar: function(calendar) {
-        if (!this.deleteCalendar.warningIssued) {
-            cal.WARN("Use of calICalendarManager::deleteCalendar is deprecated" +
-                     " and will be removed with the next release. Use" +
-                     " ::removeCalendar instead.\n" + cal.STACK(10));
-            this.deleteCalendar.warningIssued = true;
-        }
-
-        const cICM = Components.interfaces.calICalendarManager;
-        this.removeCalendar(calendar, cICM.REMOVE_NO_UNREGISTER);
-    },
-
     removeCalendar: function(calendar, mode=0) {
-        const cICM = Components.interfaces.calICalendarManager;
+        const cICM = Ci.calICalendarManager;
 
         let removeModes = new Set(calendar.getProperty("capabilities.removeModes") || ["unsubscribe"]);
         if (!removeModes.has("unsubscribe") && !removeModes.has("delete")) {
@@ -628,7 +611,7 @@ calCalendarManager.prototype = {
 
         // For deleting, we also call the deleteCalendar method from the provider.
         if (removeModes.has("delete") && (mode & cICM.REMOVE_NO_DELETE) == 0) {
-            let wrappedCalendar = cal.wrapInstance(calendar, Components.interfaces.calICalendarProvider);
+            let wrappedCalendar = cal.wrapInstance(calendar, Ci.calICalendarProvider);
             if (!wrappedCalendar) {
                 throw new Components.Exception("Calendar is missing a provider implementation for delete");
             }
@@ -668,8 +651,8 @@ calCalendarManager.prototype = {
 
             for (let calBranch in allCals) {
                 let id = calBranch.substring(REGISTRY_BRANCH.length);
-                let ctype = Preferences.get(calBranch + ".type", null);
-                let curi = Preferences.get(calBranch + ".uri", null);
+                let ctype = Services.prefs.getStringPref(calBranch + ".type", null);
+                let curi = Services.prefs.getStringPref(calBranch + ".uri", null);
 
                 try {
                     if (!ctype || !curi) { // sanity check
@@ -809,8 +792,8 @@ calMgrCalendarObserver.prototype = {
     calMgr: null,
 
     QueryInterface: ChromeUtils.generateQI([
-        Components.interfaces.nsIWindowMediatorListener,
-        Components.interfaces.calIObserver
+        Ci.nsIWindowMediatorListener,
+        Ci.calIObserver
     ]),
 
     // calIObserver:
@@ -849,7 +832,7 @@ calMgrCalendarObserver.prototype = {
     },
 
     changeCalendarCache: function(aCalendar, aName, aValue, aOldValue) {
-        const cICM = Components.interfaces.calICalendarManager;
+        const cICM = Ci.calICalendarManager;
         aOldValue = aOldValue || false;
         aValue = aValue || false;
 
@@ -864,7 +847,7 @@ calMgrCalendarObserver.prototype = {
 
         if (aOldValue != aValue) {
             // Try to find the current sort order
-            let sortOrderPref = Preferences.get("calendar.list.sortOrder", "").split(" ");
+            let sortOrderPref = Services.prefs.getStringPref("calendar.list.sortOrder", "").split(" ");
             let initialSortOrderPos = null;
             for (let i = 0; i < sortOrderPref.length; ++i) {
                 if (sortOrderPref[i] == aCalendar.id) {
@@ -916,8 +899,8 @@ calMgrCalendarObserver.prototype = {
 
     // Error announcer specific functions
     announceError: function(aCalendar, aErrNo, aMessage) {
-        let paramBlock = Components.classes["@mozilla.org/embedcomp/dialogparam;1"]
-                                   .createInstance(Components.interfaces.nsIDialogParamBlock);
+        let paramBlock = Cc["@mozilla.org/embedcomp/dialogparam;1"]
+                           .createInstance(Ci.nsIDialogParamBlock);
         let props = Services.strings.createBundle("chrome://calendar/locale/calendar.properties");
         let errMsg;
         paramBlock.SetNumberStrings(3);
@@ -935,7 +918,7 @@ calMgrCalendarObserver.prototype = {
         // When possible, change the error number into its name, to
         // make it slightly more readable.
         let errCode = "0x" + aErrNo.toString(16);
-        const calIErrors = Components.interfaces.calIErrors;
+        const calIErrors = Ci.calIErrors;
         // Check if it is worth enumerating all the error codes.
         if (aErrNo & calIErrors.ERROR_BASE) {
             for (let err in calIErrors) {
@@ -977,7 +960,7 @@ calMgrCalendarObserver.prototype = {
         // Log warnings in error console.
         // Report serious errors in both error console and in prompt window.
         if (aErrNo == calIErrors.MODIFICATION_FAILED) {
-            Components.utils.reportError(summary);
+            Cu.reportError(summary);
             this.announceParamBlock(paramBlock);
         } else {
             cal.WARN(summary);
@@ -998,7 +981,7 @@ calMgrCalendarObserver.prototype = {
                     return !equalMessage(msg, paramBlock);
                 });
             } catch (e) {
-                Components.utils.reportError(e);
+                Cu.reportError(e);
             }
         };
 

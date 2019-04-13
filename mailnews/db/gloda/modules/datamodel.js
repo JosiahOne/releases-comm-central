@@ -6,12 +6,13 @@ this.EXPORTED_SYMBOLS = ["GlodaAttributeDBDef", "GlodaAccount",
                     "GlodaConversation", "GlodaFolder", "GlodaMessage",
                     "GlodaContact", "GlodaIdentity", "GlodaAttachment"];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+const {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
+const {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+const {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 var LOG = Log4Moz.repository.getLogger("gloda.datamodel");
 
-ChromeUtils.import("resource:///modules/gloda/utils.js");
+const {GlodaUtils} = ChromeUtils.import("resource:///modules/gloda/utils.js");
 
 // Make it lazy.
 var gMessenger;
@@ -394,10 +395,7 @@ GlodaFolder.prototype = {
    */
   getXPCOMFolder: function gloda_folder_getXPCOMFolder(aActivity) {
     if (!this._xpcomFolder) {
-      let rdfService = Cc['@mozilla.org/rdf/rdf-service;1']
-                         .getService(Ci.nsIRDFService);
-      this._xpcomFolder = rdfService.GetResource(this.uri)
-                                    .QueryInterface(Ci.nsIMsgFolder);
+      this._xpcomFolder = MailUtils.getExistingFolder(this.uri);
     }
     switch (aActivity) {
       case this.kActivityIndexing:

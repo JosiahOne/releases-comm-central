@@ -6,9 +6,10 @@
  *          publishEntireCalendar, publishEntireCalendarDialogResponse
  */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+/* import-globals-from ../../base/content/calendar-views.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
  * publishCalendarData
@@ -37,7 +38,7 @@ function publishCalendarDataDialogResponse(CalendarPublishObject, aProgressDialo
  * publishEntireCalendar
  * Show publish dialog, ask for URL and publish all items from the calendar.
  *
- * @param aCalendar   (optional) The calendar that will be published. If ommitted
+ * @param aCalendar   (optional) The calendar that will be published. If omitted
  *                               the user will be prompted to select a calendar.
  */
 function publishEntireCalendar(aCalendar) {
@@ -98,7 +99,6 @@ function publishEntireCalendarDialogResponse(CalendarPublishObject, aProgressDia
         },
         onGetResult: function(aCalendar, aStatus, aItemType, aDetail, aCount, aItems) {
             if (!Components.isSuccessCode(aStatus)) {
-                aborted = true;
                 return;
             }
             if (aCount) {
@@ -112,7 +112,7 @@ function publishEntireCalendarDialogResponse(CalendarPublishObject, aProgressDia
     };
     aProgressDialog.onStartUpload();
     let oldCalendar = CalendarPublishObject.calendar;
-    oldCalendar.getItems(Components.interfaces.calICalendar.ITEM_FILTER_ALL_ITEMS,
+    oldCalendar.getItems(Ci.calICalendar.ITEM_FILTER_ALL_ITEMS,
                          0, null, null, getListener);
 }
 
@@ -123,12 +123,12 @@ function publishItemArray(aItemArray, aPath, aProgressDialog) {
 
     let icsURL = Services.io.newURI(aPath);
 
-    let channel = Services.io.newChannelFromURI2(icsURL,
-                                                 null,
-                                                 Services.scriptSecurityManager.getSystemPrincipal(),
-                                                 null,
-                                                 Components.interfaces.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                                 Components.interfaces.nsIContentPolicy.TYPE_OTHER);
+    let channel = Services.io.newChannelFromURI(icsURL,
+                                                null,
+                                                Services.scriptSecurityManager.getSystemPrincipal(),
+                                                null,
+                                                Ci.nsILoadInfo.SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                                Ci.nsIContentPolicy.TYPE_OTHER);
     if (icsURL.schemeIs("webcal")) {
         icsURL.scheme = "http";
     }
@@ -139,29 +139,27 @@ function publishItemArray(aItemArray, aPath, aProgressDialog) {
     switch (icsURL.scheme) {
         case "http":
         case "https":
-            channel = channel.QueryInterface(Components.interfaces.nsIHttpChannel);
+            channel = channel.QueryInterface(Ci.nsIHttpChannel);
             break;
         case "ftp":
-            channel = channel.QueryInterface(Components.interfaces.nsIFTPChannel);
+            channel = channel.QueryInterface(Ci.nsIFTPChannel);
             break;
         case "file":
-            channel = channel.QueryInterface(Components.interfaces.nsIFileChannel);
+            channel = channel.QueryInterface(Ci.nsIFileChannel);
             break;
         default:
             dump("No such scheme\n");
             return;
     }
 
-    let uploadChannel = channel.QueryInterface(Components.interfaces.nsIUploadChannel);
+    let uploadChannel = channel.QueryInterface(Ci.nsIUploadChannel);
     uploadChannel.notificationCallbacks = notificationCallbacks;
 
-    storageStream = Components.classes["@mozilla.org/storagestream;1"]
-                                  .createInstance(Components.interfaces.nsIStorageStream);
+    storageStream = Cc["@mozilla.org/storagestream;1"].createInstance(Ci.nsIStorageStream);
     storageStream.init(32768, 0xffffffff, null);
     outputStream = storageStream.getOutputStream(0);
 
-    let serializer = Components.classes["@mozilla.org/calendar/ics-serializer;1"]
-                               .createInstance(Components.interfaces.calIIcsSerializer);
+    let serializer = Cc["@mozilla.org/calendar/ics-serializer;1"].createInstance(Ci.calIIcsSerializer);
     serializer.addItems(aItemArray, aItemArray.length);
     // Outlook requires METHOD:PUBLISH property:
     let methodProp = cal.getIcsService().createIcalProperty("METHOD");
@@ -175,7 +173,7 @@ function publishItemArray(aItemArray, aPath, aProgressDialog) {
     uploadChannel.setUploadStream(inputStream,
                                   "text/calendar", -1);
     try {
-        channel.asyncOpen(publishingListener, aProgressDialog);
+        channel.asyncOpen(new PublishingListener(aProgressDialog));
     } catch (e) {
         Services.prompt.alert(null, cal.l10n.getCalString("genericErrorTitle"),
                               cal.l10n.getCalString("otherPutError", [e.message]));
@@ -186,32 +184,41 @@ function publishItemArray(aItemArray, aPath, aProgressDialog) {
 var notificationCallbacks = {
     // nsIInterfaceRequestor interface
     getInterface: function(iid, instance) {
-        if (iid.equals(Components.interfaces.nsIAuthPrompt)) {
+        if (iid.equals(Ci.nsIAuthPrompt)) {
             // use the window watcher service to get a nsIAuthPrompt impl
             return Services.ww.getNewAuthPrompter(null);
         }
 
-        throw Components.results.NS_ERROR_NO_INTERFACE;
+        throw Cr.NS_ERROR_NO_INTERFACE;
     }
 };
 
+/**
+ * Listener object to pass to `channel.asyncOpen()`. A reference to the current dialog window
+ * passed to the constructor provides access to the dialog once the request is done.
+ * @implements {nsIStreamListener}
+ */
+class PublishingListener {
+    constructor(progressDialog) {
+        this.progressDialog = progressDialog;
+    }
 
-var publishingListener = {
-    QueryInterface: ChromeUtils.generateQI([Ci.nsIStreamListener]),
+    QueryInterface(aIID) {
+        return cal.generateClassQI(this, aIID, [Ci.PublishingListener]);
+    }
 
-    onStartRequest: function(request, ctxt) {
-    },
+    onStartRequest(request) {}
 
-    onStopRequest: function(request, ctxt, status, errorMsg) {
-        ctxt.wrappedJSObject.onStopUpload();
+    onStopRequest(request, status) {
+        this.progressDialog.wrappedJSObject.onStopUpload();
 
         let channel;
         let requestSucceeded;
         try {
-            channel = request.QueryInterface(Components.interfaces.nsIHttpChannel);
+            channel = request.QueryInterface(Ci.nsIHttpChannel);
             requestSucceeded = channel.requestSucceeded;
         } catch (e) {
-            // Don't fail if it is not a http channel, will be handled below
+            // Don't fail if it is not an http channel, will be handled below.
         }
 
         if (channel && !requestSucceeded) {
@@ -224,8 +231,7 @@ var publishingListener = {
             let body = cal.l10n.getCalString("otherPutError", [request.status.toString(16)]);
             Services.prompt.alert(null, cal.l10n.getCalString("genericErrorTitle"), body);
         }
-    },
-
-    onDataAvailable: function(request, ctxt, inStream, sourceOffset, count) {
     }
-};
+
+    onDataAvailable(request, inStream, sourceOffset, count) {}
+}

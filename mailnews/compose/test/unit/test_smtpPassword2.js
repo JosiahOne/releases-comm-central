@@ -3,7 +3,7 @@
  * Extra tests for SMTP passwords (forgetPassword)
  */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 load("../../../resources/passwordStorage.js");
 

@@ -10,12 +10,10 @@
 
 <dialog title=""
     id="publishProgressDlg"
-    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
     buttons="cancel"
     buttonlabelclose="&closeButton.label;"
-    onload="Startup()"
-    ondialogaccept="return onEnterKey();"
-    ondialogcancel="return onClose();">
+    onload="Startup()">
 
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
   <script type="application/javascript" src="chrome://editor/content/publishprefs.js"/>
@@ -23,7 +21,6 @@
   <script type="application/javascript" src="chrome://editor/content/EditorPublishProgress.js"/>
 
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
-  <broadcaster id="args" value=""/>
 
   <groupbox>
     <caption><label id="PublishToSite"/></caption>

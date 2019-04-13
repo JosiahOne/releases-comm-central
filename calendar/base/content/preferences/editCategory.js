@@ -4,7 +4,9 @@
 
 /* exported editCategoryLoad, doOK, categoryNameChanged, clickColor, delay */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+
+document.addEventListener("dialogaccept", doOK);
 
 // Global variable, set to true if the user has picked a custom color.
 var customColorSelected = false;
@@ -36,7 +38,6 @@ function doOK() {
 
     let categoryName = document.getElementById("categoryName").value;
     window.opener.gCategoriesPane.saveCategory(categoryName, color);
-    return true;
 }
 
 /**

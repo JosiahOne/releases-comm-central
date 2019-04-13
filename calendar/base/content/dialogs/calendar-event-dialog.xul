@@ -6,11 +6,11 @@
 <?xml-stylesheet type="text/css" href="chrome://global/skin/global.css"?>
 <?xml-stylesheet type="text/css" href="chrome://messenger/content/bindings.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/calendar-alarms.css"?>
+<?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/widgets/minimonth.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/calendar-attendees.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar/content/widgets/calendar-widget-bindings.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar/skin/calendar-event-dialog.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar/content/calendar-event-dialog.css"?>
-<?xml-stylesheet type="text/css" href="chrome://calendar/content/datetimepickers/datetimepickers.css"?>
 <?xml-stylesheet type="text/css" href="chrome://messenger/skin/primaryToolbar.css"?>
 <?xml-stylesheet type="text/css" href="chrome://messenger/skin/messenger.css"?>
 
@@ -27,17 +27,14 @@
 
 <?xul-overlay href="chrome://lightning/content/lightning-item-toolbar.xul"?>
 
-<!-- Dialog id is changed during excution to allow different Window-icons
+<!-- Dialog id is changed during execution to allow different Window-icons
      on this dialog. document.loadOverlay() will not work on this one. -->
-<dialog id="calendar-event-dialog"
-        title="&event.title.label;"
+<dialog title="&event.title.label;"
         windowtype="Calendar:EventDialog"
         onload="onLoadLightningItemPanel();"
         onunload="onUnloadLightningItemPanel();"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();"
         persist="screenX screenY width height"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <!-- Javascript includes -->
   <script type="application/javascript"
@@ -576,14 +573,13 @@
 
   <!-- the iframe is inserted here dynamically in the "load" handler function -->
 
-  <statusbar class="chromeclass-status" id="status-bar">
-    <statusbarpanel id="status-text"
-                    flex="1"/>
-    <statusbarpanel id="status-privacy"
-                    align="center"
-                    flex="1"
-                    collapsed="true"
-                    pack="start">
+  <hbox id="status-bar" class="statusbar chromeclass-status">
+    <hbox id="status-privacy"
+          class="statusbarpanel"
+          align="center"
+          flex="1"
+          collapsed="true"
+          pack="start">
       <label value="&event.statusbarpanel.privacy.label;"/>
       <hbox id="status-privacy-public-box" privacy="PUBLIC">
         <label value="&event.menu.options.privacy.public.label;"/>
@@ -594,12 +590,13 @@
       <hbox id="status-privacy-private-box" privacy="PRIVATE">
         <label value="&event.menu.options.privacy.private.label;"/>
       </hbox>
-    </statusbarpanel>
-    <statusbarpanel id="status-priority"
-                    align="center"
-                    flex="1"
-                    collapsed="true"
-                    pack="start">
+    </hbox>
+    <hbox id="status-priority"
+          class="statusbarpanel"
+          align="center"
+          flex="1"
+          collapsed="true"
+          pack="start">
       <label value="&event.priority2.label;"/>
       <image id="image-priority-low"
              class="cal-statusbar-1"
@@ -613,12 +610,13 @@
              class="cal-statusbar-1"
              collapsed="true"
              value="high"/>
-    </statusbarpanel>
-    <statusbarpanel id="status-status"
-                    align="center"
-                    flex="1"
-                    collapsed="true"
-                    pack="start">
+    </hbox>
+    <hbox id="status-status"
+          class="statusbarpanel"
+          align="center"
+          flex="1"
+          collapsed="true"
+          pack="start">
       <label value="&task.status.label;"/>
       <label id="status-status-tentative-label"
              value="&newevent.status.tentative.label;"
@@ -629,13 +627,13 @@
       <label id="status-status-cancelled-label"
              value="&newevent.eventStatus.cancelled.label;"
              hidden="true"/>
-    </statusbarpanel>
-    <statusbarpanel id="status-freebusy"
-                    class="event-only"
-                    align="center"
-                    flex="1"
-                    collapsed="true"
-                    pack="start">
+    </hbox>
+    <hbox id="status-freebusy"
+          class="statusbarpanel event-only"
+          align="center"
+          flex="1"
+          collapsed="true"
+          pack="start">
       <label value="&event.statusbarpanel.freebusy.label;"/>
       <label id="status-freebusy-free-label"
              value="&event.freebusy.legend.free;"
@@ -643,6 +641,9 @@
       <label id="status-freebusy-busy-label"
              value="&event.freebusy.legend.busy;"
              hidden="true"/>
-    </statusbarpanel>
-  </statusbar>
+    </hbox>
+    <hbox class="statusbarpanel statusbar-resizerpanel">
+      <resizer dir="bottomend"/>
+    </hbox>
+  </hbox>
 </dialog>

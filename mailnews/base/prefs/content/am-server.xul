@@ -1,22 +1,18 @@
 <?xml version="1.0"?>
-
-<!--
-
- This Source Code Form is subject to the terms of the Mozilla Public
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
    - License, v. 2.0. If a copy of the MPL was not distributed with this
-   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+   - file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
 
 <?xml-stylesheet href="chrome://messenger/skin/accountManage.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/messenger.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
-<?xml-stylesheet href="chrome://messenger/content/charsetList.css" type="text/css"?>
 
 <!DOCTYPE page [
 <!ENTITY % trashDTD SYSTEM "chrome://messenger/locale/am-server-top.dtd">
 %trashDTD;
 ]>
 
-<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
       title="&serverSettings.label;"
       onload="parent.onPanelLoaded('am-server.xul');">
 
@@ -25,6 +21,7 @@
     <script type="application/javascript" src="chrome://messenger/content/am-server.js"/>
     <script type="application/javascript" src="chrome://messenger/content/am-prefs.js"/>
     <script type="application/javascript" src="chrome://messenger/content/amUtils.js"/>
+    <script type="application/javascript" src="chrome://messenger/content/menulist-charsetpicker.js"/>
     <stringbundle id="bundle_messenger" src="chrome://messenger/locale/messenger.properties"/>
 
     <label hidden="true" wsm_persist="true" id="server.type"/>
@@ -36,7 +33,9 @@
            genericattr="true"
            id="server.storeContractID"/>
 
-    <dialogheader title="&serverSettings.label;"/>
+    <hbox class="dialogheader">
+      <label class="dialogheader-title" value="&serverSettings.label;"/>
+    </hbox>
 
     <grid>
       <columns>
@@ -97,7 +96,7 @@
     <separator class="thin"/>
 
     <groupbox hidefor="movemail">
-      <caption label="&securitySettings.label;"/>
+      <label class="header">&securitySettings.label;</label>
 
       <grid flex="1">
         <columns>
@@ -150,7 +149,7 @@
     </groupbox>
 
     <groupbox>
-      <caption label="&serverSettings.label;"/>
+      <label class="header">&serverSettings.label;</label>
       <vbox align="start">
       <checkbox wsm_persist="true"
                 id="server.loginAtStartUp"
@@ -354,7 +353,7 @@
   <!-- take out for now - bug 45079
       <hbox flex="1" hidefor="pop3,imap,movemail">
         <groupbox>
-           <caption class="header" label="&abbreviate.label;"/>
+           <label class="header">&abbreviate.label;</label>
 
            <radiogroup wsm_persist="true" id="nntp.abbreviate">
              <radio value="true"
@@ -369,7 +368,7 @@
     </groupbox>
 
     <groupbox>
-      <caption label="&messageStorage.label;"/>
+      <label class="header">&messageStorage.label;</label>
 
       <hbox align="end">
         <vbox align="start" flex="1" id="exitHandlingBox=">
@@ -457,11 +456,10 @@
 
     <hbox hidefor="imap,pop3,movemail" align="center" valign="middle" iscontrolcontainer="true">
       <label value="&serverDefaultCharset2.label;" control="nntp.charset"/>
-      <menulist hidable="true"
-                type="charset"
+      <menulist is="menulist-charsetpicker-viewing" id="nntp.charset"
+                hidable="true"
                 hidefor="imap,pop3,movemail"
                 wsm_persist="true"
-                id="nntp.charset"
                 preftype="string"
                 prefstring="mail.server.%serverkey%.charset"/>
     </hbox>

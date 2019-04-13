@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/MailUtils.js");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
 var gFccRadioElemChoice, gDraftsRadioElemChoice, gArchivesRadioElemChoice, gTmplRadioElemChoice;
 var gFccRadioElemChoiceLocked, gDraftsRadioElemChoiceLocked, gArchivesRadioElemChoiceLocked, gTmplRadioElemChoiceLocked;
@@ -114,11 +114,11 @@ function SetFolderDisplay(pickerMode, disableMode,
     var rg = selectAccountRadioElem.radioGroup;
     var folderPickedElement = document.getElementById(folderPickedField);
     var uri = folderPickedElement.getAttribute("value");
-    // Get message folder from the given uri. Second argument (false) signifies
-    // that there is no need to check for the existence of special folders as
+    // Get message folder from the given uri.
+    // There is no need to check for the existence of special folders as
     // these folders are created on demand at runtime in case of imap accounts.
     // For POP3 accounts, special folders are created at the account creation time.
-    var msgFolder = MailUtils.getFolderForURI(uri, false);
+    var msgFolder = MailUtils.getOrCreateFolder(uri);
     InitFolderDisplay(msgFolder.server.rootFolder, accountPicker);
     InitFolderDisplay(msgFolder, folderPicker);
 
@@ -292,31 +292,35 @@ function SaveFolderSettings(radioElemChoice,
 // Check the Fcc Self item and setup associated picker state
 function setupFccItems()
 {
-    var broadcaster = document.getElementById("broadcaster_doFcc");
-
-    var checked = document.getElementById("identity.doFcc").checked;
+  let checked = document.getElementById("identity.doFcc").checked;
+  document.querySelectorAll(".depends-on-do-fcc").forEach(e => {
     if (checked) {
-        broadcaster.removeAttribute("disabled");
-        switch (gFccRadioElemChoice) {
-            case "0" :
-                if (!gFccRadioElemChoiceLocked)
-                    SetPickerEnabling("msgFccAccountPicker", "msgFccFolderPicker");
-                SetRadioButtons("fcc_selectAccount", "fcc_selectFolder");
-                break;
-
-            case "1" :
-                if (!gFccRadioElemChoiceLocked)
-                    SetPickerEnabling("msgFccFolderPicker", "msgFccAccountPicker");
-                SetRadioButtons("fcc_selectFolder", "fcc_selectAccount");
-                break;
-
-            default :
-                dump("Error in setting Fcc elements.\n");
-                break;
-        }
+      e.removeAttribute("disabled");
+    } else {
+      e.setAttribute("disabled", "true");
     }
-    else
-        broadcaster.setAttribute("disabled", "true");
+  });
+  if (!checked) {
+    return;
+  }
+
+  switch (gFccRadioElemChoice) {
+    case "0" :
+      if (!gFccRadioElemChoiceLocked)
+          SetPickerEnabling("msgFccAccountPicker", "msgFccFolderPicker");
+      SetRadioButtons("fcc_selectAccount", "fcc_selectFolder");
+      break;
+
+    case "1" :
+      if (!gFccRadioElemChoiceLocked)
+          SetPickerEnabling("msgFccFolderPicker", "msgFccAccountPicker");
+      SetRadioButtons("fcc_selectFolder", "fcc_selectAccount");
+      break;
+
+    default :
+      dump("Error in setting Fcc elements.\n");
+      break;
+  }
 }
 
 // Disable CC textbox if CC checkbox is not checked
@@ -426,36 +430,39 @@ function updateArchiveHierarchyButton(archiveFolder) {
  * Enable or disable (as appropriate) the controls for setting archive options
  */
 function setupArchiveItems() {
-  let broadcaster = document.getElementById("broadcaster_archiveEnabled");
   let checked = document.getElementById("identity.archiveEnabled").checked;
-  let archiveFolder;
-
-  if (checked) {
-    broadcaster.removeAttribute("disabled");
-    switch (gArchivesRadioElemChoice) {
-      case "0":
-        if (!gArchivesRadioElemChoiceLocked)
-          SetPickerEnabling("msgArchivesAccountPicker", "msgArchivesFolderPicker");
-        SetRadioButtons("archive_selectAccount", "archive_selectFolder");
-        updateArchiveHierarchyButton(document.getElementById(
-                                     "msgArchivesAccountPicker").folder);
-        break;
-
-      case "1":
-        if (!gArchivesRadioElemChoiceLocked)
-          SetPickerEnabling("msgArchivesFolderPicker", "msgArchivesAccountPicker");
-        SetRadioButtons("archive_selectFolder", "archive_selectAccount");
-        updateArchiveHierarchyButton(document.getElementById(
-                                     "msgArchivesFolderPicker").folder);
-        break;
-
-      default:
-        dump("Error in setting Archive elements.\n");
-        return;
+  document.querySelectorAll(".depends-on-archive").forEach(e => {
+    if (checked) {
+      e.removeAttribute("disabled");
+    } else {
+      e.setAttribute("disabled", "true");
     }
+  });
+  if (!checked) {
+    return;
   }
-  else
-    broadcaster.setAttribute("disabled", "true");
+
+  switch (gArchivesRadioElemChoice) {
+    case "0":
+      if (!gArchivesRadioElemChoiceLocked)
+        SetPickerEnabling("msgArchivesAccountPicker", "msgArchivesFolderPicker");
+      SetRadioButtons("archive_selectAccount", "archive_selectFolder");
+      updateArchiveHierarchyButton(document.getElementById(
+                                   "msgArchivesAccountPicker").folder);
+      break;
+
+    case "1":
+      if (!gArchivesRadioElemChoiceLocked)
+        SetPickerEnabling("msgArchivesFolderPicker", "msgArchivesAccountPicker");
+      SetRadioButtons("archive_selectFolder", "archive_selectAccount");
+      updateArchiveHierarchyButton(document.getElementById(
+                                   "msgArchivesFolderPicker").folder);
+      break;
+
+    default:
+      dump("Error in setting Archive elements.\n");
+      return;
+  }
 }
 
 /**

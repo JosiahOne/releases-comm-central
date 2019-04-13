@@ -10,19 +10,15 @@
 
 <!-- dialog containing a control requiring initial setup -->
 <dialog id="spellCheckDlg" buttons="cancel" title="&windowTitle.label;"
-    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
     persist="screenX screenY"
-    onload = "Startup()"
-    ondialogaccept="return doDefault();"
-    ondialogcancel="return CancelSpellCheck();">
+    onload="Startup()">
 
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdDialogCommon.js"/>
   <script type="application/javascript" src="chrome://communicator/content/utilityOverlay.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdSpellCheck.js"/>
   <script type="application/javascript" src="chrome://global/content/contentAreaUtils.js"/>
-
-  <broadcaster id="args" value=""/>
 
   <stringbundle id="languageBundle" src="chrome://global/locale/languageNames.properties"/>
   <stringbundle id="regionBundle" src="chrome://global/locale/regionNames.properties"/>
@@ -58,8 +54,10 @@
     <rows>
       <row flex="1">
         <!-- BUG! setting class="MinWidth20em" on tree doesn't work (width=0) -->
-        <listbox  rows="6" id="SuggestedList" onselect="SelectSuggestedWord()"
-                  ondblclick="if (gAllowSelectWord) Replace(event.target.getAttribute('label'));"/>
+        <richlistbox id="SuggestedList"
+                     class="theme-listbox"
+                     onselect="SelectSuggestedWord()"
+                     ondblclick="if (gAllowSelectWord) Replace(event.target.value);"/>
         <vbox>
           <grid>
             <columns><column class="spell-check" flex="1"/><column class="spell-check" flex="1"/></columns>

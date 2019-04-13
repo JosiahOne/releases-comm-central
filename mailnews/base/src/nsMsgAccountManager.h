@@ -29,8 +29,6 @@
 #include "nsAutoPtr.h"
 #include "nsTObserverArray.h"
 
-class nsIRDFService;
-
 class VirtualFolderChangeListener final : public nsIDBChangeListener
 {
 public:
@@ -140,6 +138,16 @@ private:
 
   nsresult GetLocalFoldersPrettyName(nsString &localFoldersName);
 
+  /**
+   * Check if the given account can be the set as the default account.
+   */
+  nsresult CheckDefaultAccount(nsIMsgAccount* aAccount, bool &aCanBeDefault);
+
+  /**
+   * Find a new account that can serve as default.
+   */
+  nsresult AutosetDefaultAccount();
+
   // sets the pref for the default server
   nsresult setDefaultAccountPref(nsIMsgAccount *aDefaultAccount);
 
@@ -176,11 +184,9 @@ private:
   // handle virtual folders
   static nsresult GetVirtualFoldersFile(nsCOMPtr<nsIFile>& file);
   static nsresult WriteLineToOutputStream(const char *prefix, const char * line, nsIOutputStream *outputStream);
-  void     ParseAndVerifyVirtualFolderScope(nsCString &buffer,
-                                            nsIRDFService *rdf);
+  void ParseAndVerifyVirtualFolderScope(nsCString &buffer);
   nsresult AddVFListenersForVF(nsIMsgFolder *virtualFolder,
                                const nsCString& srchFolderUris,
-                               nsIRDFService *rdf,
                                nsIMsgDBService *msgDBService);
 
   nsresult RemoveVFListenerForVF(nsIMsgFolder *virtualFolder,

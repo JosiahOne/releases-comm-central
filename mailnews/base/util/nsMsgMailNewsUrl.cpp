@@ -6,6 +6,7 @@
 #include "msgCore.h"
 #include "nsMsgMailNewsUrl.h"
 #include "nsMsgBaseCID.h"
+#include "nsMsgLocalCID.h"
 #include "nsIMsgAccountManager.h"
 #include "nsString.h"
 #include "nsILoadGroup.h"
@@ -26,8 +27,11 @@
 #include "nsMsgUtils.h"
 #include "mozilla/Services.h"
 #include "nsProxyRelease.h"
-#include "mozilla/BasePrincipal.h"
 #include "mozilla/Encoding.h"
+#include "nsDocShellLoadState.h"
+#include "nsContentUtils.h"
+#include "nsIObjectInputStream.h"
+#include "nsIObjectOutputStream.h"
 
 nsMsgMailNewsUrl::nsMsgMailNewsUrl()
 {
@@ -36,7 +40,7 @@ nsMsgMailNewsUrl::nsMsgMailNewsUrl()
   m_updatingFolder = false;
   m_msgIsInLocalCache = false;
   m_suppressErrorMsgs = false;
-  m_isPrincipalURL = false;
+  m_hasNormalizedOrigin = false;  // SetSpecInternal() will set this correctly.
   mMaxProgress = -1;
 }
 
@@ -71,55 +75,119 @@ nsMsgMailNewsUrl::~nsMsgMailNewsUrl()
 NS_IMPL_ADDREF(nsMsgMailNewsUrl)
 NS_IMPL_RELEASE(nsMsgMailNewsUrl)
 
-// We want part URLs to QI to nsIURIWithPrincipal so we can give
-// them a "normalised" origin. URLs that already have a "normalised"
-// origin should not QI to nsIURIWithPrincipal.
+// We want part URLs to QI to nsIURIWithSpecialOrigin so we can give
+// them a "normalized" origin. URLs that already have a "normalized"
+// origin should not QI to nsIURIWithSpecialOrigin.
 NS_INTERFACE_MAP_BEGIN(nsMsgMailNewsUrl)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIMsgMailNewsUrl)
   NS_INTERFACE_MAP_ENTRY(nsIMsgMailNewsUrl)
   NS_INTERFACE_MAP_ENTRY(nsIURL)
   NS_INTERFACE_MAP_ENTRY(nsIURI)
-  NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIURIWithPrincipal, !m_isPrincipalURL)
+  NS_INTERFACE_MAP_ENTRY(nsISerializable)
+  NS_INTERFACE_MAP_ENTRY(nsIClassInfo)
+  NS_INTERFACE_MAP_ENTRY_CONDITIONAL(nsIURIWithSpecialOrigin, m_hasNormalizedOrigin)
 NS_INTERFACE_MAP_END
 
-// Support for nsIURIWithPrincipal.
-NS_IMETHODIMP nsMsgMailNewsUrl::GetPrincipal(nsIPrincipal **aPrincipal)
-{
-  MOZ_ASSERT(!m_isPrincipalURL,
-    "nsMsgMailNewsUrl::GetPrincipal() can only be called for non-principal URLs");
+//--------------------------
+// Support for serialization
+//--------------------------
+// nsMsgMailNewsUrl is only partly serialized by serializing the "base URL"
+// which is an nsStandardURL, or by only serializing the Spec. This may
+// cause problems in the future. See bug 1512356 and bug 1515337 for details,
+// follow-up in bug 1512698.
 
-  if (!m_principal) {
+NS_IMETHODIMP_(void) nsMsgMailNewsUrl::Serialize(mozilla::ipc::URIParams &aParams) {
+  m_baseURL->Serialize(aParams);
+}
+
+//----------------------------
+// Support for nsISerializable
+//----------------------------
+NS_IMETHODIMP nsMsgMailNewsUrl::Read(nsIObjectInputStream *stream) {
+  nsAutoCString urlstr;
+  nsresult rv = NS_ReadOptionalCString(stream, urlstr);
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIIOService> ioService =
+    mozilla::services::GetIOService();
+  NS_ENSURE_TRUE(ioService, NS_ERROR_UNEXPECTED);
+  nsCOMPtr<nsIURI> url;
+  rv = ioService->NewURI(urlstr, nullptr, nullptr, getter_AddRefs(url));
+  NS_ENSURE_SUCCESS(rv, rv);
+  m_baseURL = do_QueryInterface(url);
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsMsgMailNewsUrl::Write(nsIObjectOutputStream *stream) {
+  nsAutoCString urlstr;
+  nsresult rv = m_baseURL->GetSpec(urlstr);
+  NS_ENSURE_SUCCESS(rv, rv);
+  return NS_WriteOptionalStringZ(stream, urlstr.get());
+}
+
+//-------------------------
+// Support for nsIClassInfo
+//-------------------------
+NS_IMETHODIMP nsMsgMailNewsUrl::GetInterfaces(nsTArray<nsIID> &array) {
+  array.Clear();
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsMsgMailNewsUrl::GetScriptableHelper(nsIXPCScriptable **_retval) {
+  *_retval = nullptr;
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsMsgMailNewsUrl::GetContractID(nsACString &aContractID) {
+  aContractID.SetIsVoid(true);
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsMsgMailNewsUrl::GetClassDescription(nsACString &aClassDescription) {
+  aClassDescription.SetIsVoid(true);
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsMsgMailNewsUrl::GetClassID(nsCID **aClassID) {
+  *aClassID = (nsCID *)moz_xmalloc(sizeof(nsCID));
+  return GetClassIDNoAlloc(*aClassID);
+}
+
+NS_IMETHODIMP nsMsgMailNewsUrl::GetFlags(uint32_t *aFlags) {
+  *aFlags = nsIClassInfo::MAIN_THREAD_ONLY;
+  return NS_OK;
+}
+
+static NS_DEFINE_CID(kNS_MSGMAILNEWSURL_CID, NS_MSGMAILNEWSURL_CID);
+NS_IMETHODIMP nsMsgMailNewsUrl::GetClassIDNoAlloc(nsCID *aClassIDNoAlloc) {
+  *aClassIDNoAlloc = kNS_MSGMAILNEWSURL_CID;
+  return NS_OK;
+}
+
+//------------------------------------
+// Support for nsIURIWithSpecialOrigin
+//------------------------------------
+NS_IMETHODIMP nsMsgMailNewsUrl::GetOrigin(nsIURI **aOrigin)
+{
+  MOZ_ASSERT(m_hasNormalizedOrigin,
+    "nsMsgMailNewsUrl::GetOrigin() can only be called for URLs with normalized spec");
+
+  if (!m_normalizedOrigin) {
     nsCOMPtr <nsIMsgMessageUrl> msgUrl;
     QueryInterface(NS_GET_IID(nsIMsgMessageUrl), getter_AddRefs(msgUrl));
 
     nsAutoCString spec;
-    if (!msgUrl || NS_FAILED(msgUrl->GetPrincipalSpec(spec))) {
-      MOZ_ASSERT(false, "Can't get principal spec");
+    if (!msgUrl || NS_FAILED(msgUrl->GetNormalizedSpec(spec))) {
+      MOZ_ASSERT(false, "Can't get normalized spec");
       // just use the normal spec.
       GetSpec(spec);
     }
 
-    nsCOMPtr<nsIURI> uri;
-    nsresult rv = NS_NewURI(getter_AddRefs(uri), spec);
+    nsresult rv = NS_NewURI(getter_AddRefs(m_normalizedOrigin), spec);
     NS_ENSURE_SUCCESS(rv, rv);
-    mozilla::OriginAttributes attrs;
-    m_principal = mozilla::BasePrincipal::CreateCodebasePrincipal(uri, attrs);
   }
 
-  NS_IF_ADDREF(*aPrincipal = m_principal);
+  NS_IF_ADDREF(*aOrigin = m_normalizedOrigin);
   return NS_OK;
-}
-
-NS_IMETHODIMP nsMsgMailNewsUrl::GetPrincipalUri(nsIURI **aPrincipalURI)
-{
-  NS_ENSURE_ARG_POINTER(aPrincipalURI);
-  if (!m_principal) {
-    nsCOMPtr<nsIPrincipal> p;
-    GetPrincipal(getter_AddRefs(p));
-  }
-  if (!m_principal)
-    return NS_ERROR_NULL_POINTER;
-  return m_principal->GetURI(aPrincipalURI);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -367,7 +435,7 @@ NS_IMETHODIMP nsMsgMailNewsUrl::IsUrlType(uint32_t type, bool *isType)
 NS_IMETHODIMP nsMsgMailNewsUrl::SetSearchSession(nsIMsgSearchSession *aSearchSession)
 {
   if (aSearchSession)
-    m_searchSession = do_QueryInterface(aSearchSession);
+    m_searchSession = aSearchSession;
   return NS_OK;
 }
 
@@ -390,6 +458,15 @@ NS_IMETHODIMP nsMsgMailNewsUrl::GetSearchSession(nsIMsgSearchSession **aSearchSe
 NS_IMETHODIMP nsMsgMailNewsUrl::GetSpec(nsACString &aSpec)
 {
   return m_baseURL->GetSpec(aSpec);
+}
+
+nsresult nsMsgMailNewsUrl::CreateURL(const nsACString& aSpec, nsIURL **aURL)
+{
+  nsCOMPtr<nsIURL> url;
+  nsresult rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(aSpec).Finalize(url);
+  NS_ENSURE_SUCCESS(rv, rv);
+  url.forget(aURL);
+  return NS_OK;
 }
 
 #define FILENAME_PART_LEN 10
@@ -416,19 +493,19 @@ nsresult nsMsgMailNewsUrl::SetSpecInternal(const nsACString &aSpec)
   }
 
   // Now, set the rest.
-  nsresult rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(aSpec).Finalize(m_baseURL);
+  nsresult rv = CreateURL(aSpec, getter_AddRefs(m_baseURL));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  // Check whether the URL is in normalised form.
+  // Check whether the URL is in normalized form.
   nsCOMPtr <nsIMsgMessageUrl> msgUrl;
   QueryInterface(NS_GET_IID(nsIMsgMessageUrl), getter_AddRefs(msgUrl));
 
-  nsAutoCString principalSpec;
-  if (!msgUrl || NS_FAILED(msgUrl->GetPrincipalSpec(principalSpec))) {
-    // If we can't get the principal spec, never QI this to nsIURIWithPrincipal.
-    m_isPrincipalURL = true;
+  nsAutoCString normalizedSpec;
+  if (!msgUrl || NS_FAILED(msgUrl->GetNormalizedSpec(normalizedSpec))) {
+    // If we can't get the normalized spec, never QI this to nsIURIWithSpecialOrigin.
+    m_hasNormalizedOrigin = false;
   } else {
-    m_isPrincipalURL = spec.Equals(principalSpec);
+    m_hasNormalizedOrigin = !spec.Equals(normalizedSpec);
   }
   return NS_OK;
 }
@@ -614,9 +691,8 @@ NS_IMETHODIMP nsMsgMailNewsUrl::SchemeIs(const char *aScheme, bool *_retval)
   return m_baseURL->SchemeIs(aScheme, _retval);
 }
 
-NS_IMETHODIMP
-nsMsgMailNewsUrl::CloneInternal(uint32_t aRefHandlingMode,
-                                const nsACString& newRef, nsIURI** _retval)
+nsresult
+nsMsgMailNewsUrl::Clone(nsIURI** _retval)
 {
   nsresult rv;
   nsAutoCString urlSpec;
@@ -638,33 +714,8 @@ nsMsgMailNewsUrl::CloneInternal(uint32_t aRefHandlingMode,
     msgMailNewsUrl->SetMsgWindow(msgWindow);
   }
 
-  if (aRefHandlingMode == nsIMsgMailNewsUrl::REPLACE_REF) {
-    rv = NS_MutateURI(newUri).SetRef(newRef).Finalize(newUri);
-    NS_ENSURE_SUCCESS(rv, rv);
-  } else if (aRefHandlingMode == nsIMsgMailNewsUrl::IGNORE_REF) {
-    rv = NS_MutateURI(newUri).SetRef(EmptyCString()).Finalize(newUri);
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
-
   newUri.forget(_retval);
   return rv;
-}
-
-nsresult nsMsgMailNewsUrl::Clone(nsIURI **_retval)
-{
-  return CloneInternal(nsIMsgMailNewsUrl::HONOR_REF, EmptyCString(), _retval);
-}
-
-NS_IMETHODIMP
-nsMsgMailNewsUrl::CloneIgnoringRef(nsIURI** _retval)
-{
-  return CloneInternal(nsIMsgMailNewsUrl::IGNORE_REF, EmptyCString(), _retval);
-}
-
-NS_IMETHODIMP
-nsMsgMailNewsUrl::CloneWithNewRef(const nsACString& newRef, nsIURI** _retval)
-{
-  return CloneInternal(nsIMsgMailNewsUrl::REPLACE_REF, newRef, _retval);
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::Resolve(const nsACString &relativePath, nsACString &result)
@@ -833,11 +884,15 @@ NS_IMETHODIMP nsMsgMailNewsUrl::SetMimeHeaders(nsIMimeHeaders *mimeHeaders)
 }
 
 NS_IMETHODIMP nsMsgMailNewsUrl::LoadURI(nsIDocShell* docShell,
-                                        nsIDocShellLoadInfo* loadInfo,
                                         uint32_t aLoadFlags)
 {
   NS_ENSURE_ARG_POINTER(docShell);
-  return docShell->LoadURI(this, loadInfo, aLoadFlags, false);
+  RefPtr<nsDocShellLoadState> loadState = new nsDocShellLoadState(this);
+  loadState->SetLoadFlags(aLoadFlags);
+  loadState->SetLoadType(MAKE_LOAD_TYPE(LOAD_NORMAL, aLoadFlags));
+  loadState->SetFirstParty(false);
+  loadState->SetTriggeringPrincipal(nsContentUtils::GetSystemPrincipal());
+  return docShell->LoadURI(loadState);
 }
 
 #define SAVE_BUF_SIZE FILE_IO_BUFFER_SIZE
@@ -877,13 +932,13 @@ nsMsgSaveAsListener::~nsMsgSaveAsListener()
 {
 }
 
-NS_IMETHODIMP nsMsgSaveAsListener::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
+NS_IMETHODIMP nsMsgSaveAsListener::OnStartRequest(nsIRequest *request)
 {
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsMsgSaveAsListener::OnStopRequest(nsIRequest *request, nsISupports * aCtxt, nsresult aStatus)
+nsMsgSaveAsListener::OnStopRequest(nsIRequest *request, nsresult aStatus)
 {
   if (m_outputStream)
   {
@@ -894,7 +949,6 @@ nsMsgSaveAsListener::OnStopRequest(nsIRequest *request, nsISupports * aCtxt, nsr
 }
 
 NS_IMETHODIMP nsMsgSaveAsListener::OnDataAvailable(nsIRequest* request,
-                                  nsISupports* aSupport,
                                   nsIInputStream* inStream,
                                   uint64_t srcOffset,
                                   uint32_t count)
@@ -910,7 +964,15 @@ NS_IMETHODIMP nsMsgSaveAsListener::OnDataAvailable(nsIRequest* request,
   }
 
   bool useCanonicalEnding = false;
-  nsCOMPtr <nsIMsgMessageUrl> msgUrl = do_QueryInterface(aSupport);
+  // We know the request is an nsIChannel we can get a URI from, but this is
+  // probably bad form. See Bug 1528662.
+  nsCOMPtr<nsIChannel> channel = do_QueryInterface(request, &rv);
+  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "error QI nsIRequest to nsIChannel failed");
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIURI> uri;
+  rv = channel->GetURI(getter_AddRefs(uri));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIMsgMessageUrl> msgUrl = do_QueryInterface(uri);
   if (msgUrl)
     msgUrl->GetCanonicalLineEnding(&useCanonicalEnding);
 

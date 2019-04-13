@@ -21,6 +21,7 @@ public:
   // nsIMsgMailNewsUrl override
   nsresult SetSpecInternal(const nsACString &aSpec) override;
   nsresult SetQuery(const nsACString &aQuery) override;
+  nsresult CreateURL(const nsACString& aSpec, nsIURL **aURL) override;
 
   // from nsIMailboxUrl:
   NS_IMETHOD SetMailboxParser(nsIStreamListener * aConsumer) override;
@@ -60,10 +61,8 @@ public:
 
   NS_IMETHOD GetFolder(nsIMsgFolder **msgFolder) override;
 
-  // nsIMsgMailNewsUrl override
-  NS_IMETHOD CloneInternal(uint32_t aRefHandlingMode,
-                           const nsACString& newRef,
-                           nsIURI **_retval) override;
+  // nsMsgMailNewsUrl override
+  nsresult Clone(nsIURI **_retval) override;
 
   // nsMailboxUrl
   nsMailboxUrl();

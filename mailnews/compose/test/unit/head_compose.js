@@ -1,14 +1,14 @@
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/IOUtils.js");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://testing-common/mailnews/mailTestUtils.js");
-ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {IOUtils} = ChromeUtils.import("resource:///modules/IOUtils.js");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {mailTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/mailTestUtils.js");
+var {localAccountUtils} = ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
 
 var CC = Components.Constructor;
 
 // WebApps.jsm called by ProxyAutoConfig (PAC) requires a valid nsIXULAppInfo.
-ChromeUtils.import("resource://testing-common/AppInfo.jsm");
+var {getAppInfo, newAppInfo, updateAppInfo} = ChromeUtils.import("resource://testing-common/AppInfo.jsm");
 updateAppInfo();
 
 // Ensure the profile directory is set up
@@ -20,11 +20,25 @@ var gDEPTH = "../../../../";
 load("../../../resources/abSetup.js");
 
 // Import the smtp server scripts
-ChromeUtils.import("resource://testing-common/mailnews/maild.js");
-ChromeUtils.import("resource://testing-common/mailnews/smtpd.js");
-ChromeUtils.import("resource://testing-common/mailnews/auth.js");
+var {
+  nsMailServer,
+  gThreadManager,
+  fsDebugNone,
+  fsDebugAll,
+  fsDebugRecv,
+  fsDebugRecvSend,
+} = ChromeUtils.import("resource://testing-common/mailnews/maild.js");
+var {
+  smtpDaemon,
+  SMTP_RFC2821_handler,
+} = ChromeUtils.import("resource://testing-common/mailnews/smtpd.js");
+var {
+  AuthPLAIN,
+  AuthLOGIN,
+  AuthCRAM,
+} = ChromeUtils.import("resource://testing-common/mailnews/auth.js");
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gDraftFolder;
 
@@ -107,6 +121,7 @@ var progressListener = {
   onLocationChange: function(aWebProgress, aRequest, aLocation, aFlags) {},
   onStatusChange: function(aWebProgress, aRequest, aStatus, aMessage) {},
   onSecurityChange: function(aWebProgress, aRequest, state) {},
+  onContentBlockingEvent: function(aWebProgress, aRequest, aEvent) {},
 
   QueryInterface: ChromeUtils.generateQI(["nsIWebProgressListener",
                                           "nsISupportsWeakReference"]),
@@ -148,7 +163,7 @@ function richCreateMessage(fields, attachments=[], identity=null,
   try {
     gDraftFolder = rootFolder.getChildNamed("Drafts");
   } catch (e) {
-    // we don't have to remove the folder because it doen't exist yet
+    // we don't have to remove the folder because it doesn't exist yet
     gDraftFolder = rootFolder.createLocalSubfolder("Drafts");
   }
   // Clear all messages

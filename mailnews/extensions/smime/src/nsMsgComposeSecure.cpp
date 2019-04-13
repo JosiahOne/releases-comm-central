@@ -26,7 +26,7 @@
 #include "nsNSSComponent.h"
 #include "nsServiceManagerUtils.h"
 #include "nspr.h"
-#include "pkix/Result.h"
+#include "mozpkix/Result.h"
 #include "nsNSSCertificate.h"
 
 using namespace mozilla::mailnews;
@@ -91,44 +91,6 @@ char
 
 // end of copied code which needs fixed....
 
-/////////////////////////////////////////////////////////////////////////////////////////
-// Implementation of nsMsgSMIMEComposeFields
-/////////////////////////////////////////////////////////////////////////////////////////
-
-NS_IMPL_ISUPPORTS(nsMsgSMIMEComposeFields, nsIMsgSMIMECompFields)
-
-nsMsgSMIMEComposeFields::nsMsgSMIMEComposeFields()
-:mSignMessage(false), mAlwaysEncryptMessage(false)
-{
-}
-
-nsMsgSMIMEComposeFields::~nsMsgSMIMEComposeFields()
-{
-}
-
-NS_IMETHODIMP nsMsgSMIMEComposeFields::SetSignMessage(bool value)
-{
-  mSignMessage = value;
-  return NS_OK;
-}
-
-NS_IMETHODIMP nsMsgSMIMEComposeFields::GetSignMessage(bool *_retval)
-{
-  *_retval = mSignMessage;
-  return NS_OK;
-}
-
-NS_IMETHODIMP nsMsgSMIMEComposeFields::SetRequireEncryptMessage(bool value)
-{
-  mAlwaysEncryptMessage = value;
-  return NS_OK;
-}
-
-NS_IMETHODIMP nsMsgSMIMEComposeFields::GetRequireEncryptMessage(bool *_retval)
-{
-  *_retval = mAlwaysEncryptMessage;
-  return NS_OK;
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Implementation of nsMsgComposeSecure
@@ -137,6 +99,7 @@ NS_IMETHODIMP nsMsgSMIMEComposeFields::GetRequireEncryptMessage(bool *_retval)
 NS_IMPL_ISUPPORTS(nsMsgComposeSecure, nsIMsgComposeSecure)
 
 nsMsgComposeSecure::nsMsgComposeSecure()
+:mSignMessage(false), mAlwaysEncryptMessage(false)
 {
   /* member initializers and constructor code */
   mMultipartSignedBoundary  = 0;
@@ -160,6 +123,31 @@ nsMsgComposeSecure::~nsMsgComposeSecure()
 
   PR_FREEIF(mMultipartSignedBoundary);
 }
+
+NS_IMETHODIMP nsMsgComposeSecure::SetSignMessage(bool value)
+{
+  mSignMessage = value;
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsMsgComposeSecure::GetSignMessage(bool *_retval)
+{
+  *_retval = mSignMessage;
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsMsgComposeSecure::SetRequireEncryptMessage(bool value)
+{
+  mAlwaysEncryptMessage = value;
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsMsgComposeSecure::GetRequireEncryptMessage(bool *_retval)
+{
+  *_retval = mAlwaysEncryptMessage;
+  return NS_OK;
+}
+
 
 NS_IMETHODIMP nsMsgComposeSecure::RequiresCryptoEncapsulation(nsIMsgIdentity * aIdentity, nsIMsgCompFields * aCompFields, bool * aRequiresEncryptionWork)
 {
@@ -278,36 +266,9 @@ nsresult nsMsgComposeSecure::ExtractEncryptionState(nsIMsgIdentity * aIdentity, 
   NS_ENSURE_ARG_POINTER(aSignMessage);
   NS_ENSURE_ARG_POINTER(aEncrypt);
 
-  nsCOMPtr<nsISupports> securityInfo;
-  if (aComposeFields)
-    aComposeFields->GetSecurityInfo(getter_AddRefs(securityInfo));
+  this->GetSignMessage(aSignMessage);
+  this->GetRequireEncryptMessage(aEncrypt);
 
-  if (securityInfo) // if we were given security comp fields, use them.....
-  {
-    nsCOMPtr<nsIMsgSMIMECompFields> smimeCompFields = do_QueryInterface(securityInfo);
-    if (smimeCompFields)
-    {
-      smimeCompFields->GetSignMessage(aSignMessage);
-      smimeCompFields->GetRequireEncryptMessage(aEncrypt);
-      return NS_OK;
-    }
-  }
-
-  // get the default info from the identity....
-  int32_t ep = 0;
-  nsresult testrv = aIdentity->GetIntAttribute("encryptionpolicy", &ep);
-  if (NS_FAILED(testrv)) {
-    *aEncrypt = false;
-  }
-  else {
-    *aEncrypt = (ep > 0);
-  }
-
-  testrv = aIdentity->GetBoolAttribute("sign_mail", aSignMessage);
-  if (NS_FAILED(testrv))
-  {
-    *aSignMessage = false;
-  }
   return NS_OK;
 }
 
@@ -897,7 +858,10 @@ nsresult nsMsgComposeSecure::MimeCryptoHackCerts(const char *aRecipients,
                                   certificateUsageEmailRecipient,
                                   mozilla::pkix::Now(),
                                   nullptr, nullptr,
-                                  builtChain) != mozilla::pkix::Success)) {
+                                  builtChain,
+                                  // Only local checks can run on the main thread.
+                                  CertVerifier::FLAG_LOCAL_ONLY)
+                       != mozilla::pkix::Success)) {
       // not suitable for encryption, so unset cert and clear pref
       mSelfEncryptionCert = nullptr;
       mEncryptionCertDBKey.Truncate();
@@ -915,7 +879,10 @@ nsresult nsMsgComposeSecure::MimeCryptoHackCerts(const char *aRecipients,
                                   certificateUsageEmailSigner,
                                   mozilla::pkix::Now(),
                                   nullptr, nullptr,
-                                  builtChain) != mozilla::pkix::Success)) {
+                                  builtChain,
+                                  // Only local checks can run on the main thread.
+                                  CertVerifier::FLAG_LOCAL_ONLY)
+                       != mozilla::pkix::Success)) {
       // not suitable for signing, so unset cert and clear pref
       mSelfSigningCert = nullptr;
       mSigningCertDBKey.Truncate();
@@ -961,7 +928,8 @@ nsresult nsMsgComposeSecure::MimeCryptoHackCerts(const char *aRecipients,
       nsCString mailbox_lowercase;
       ToLowerCase(mailboxes[i], mailbox_lowercase);
       nsCOMPtr<nsIX509Cert> cert;
-      res = FindCertByEmailAddress(mailbox_lowercase, getter_AddRefs(cert));
+      // TODO: allow user to override and go ahead with an invalid certificate
+      res = FindCertByEmailAddress(mailbox_lowercase, true, getter_AddRefs(cert));
       if (NS_FAILED(res)) {
         // Failure to find a valid encryption cert is fatal.
         // Here I assume that mailbox is ascii rather than utf8.
@@ -1185,9 +1153,10 @@ mime_nested_encoder_output_fn (const char *buf, int32_t size, void *closure)
   return state->MimeCryptoWriteBlock(bufWithNull.get(), size);
 }
 
-nsresult
+NS_IMETHODIMP
 nsMsgComposeSecure::FindCertByEmailAddress(const nsACString& aEmailAddress,
-                                                 nsIX509Cert** _retval)
+                                           bool aRequireValidCert,
+                                           nsIX509Cert** _retval)
 {
   nsresult rv = BlockUntilLoadableRootsLoaded();
   if (NS_FAILED(rv)) {
@@ -1214,7 +1183,6 @@ nsMsgComposeSecure::FindCertByEmailAddress(const nsACString& aEmailAddress,
   for (node = CERT_LIST_HEAD(certlist);
        !CERT_LIST_END(node, certlist);
        node = CERT_LIST_NEXT(node)) {
-
     UniqueCERTCertList unusedCertChain;
     mozilla::pkix::Result result =
       certVerifier->VerifyCert(node->cert, certificateUsageEmailRecipient,
@@ -1222,18 +1190,23 @@ nsMsgComposeSecure::FindCertByEmailAddress(const nsACString& aEmailAddress,
                                nullptr /*XXX pinarg*/,
                                nullptr /*hostname*/,
                                unusedCertChain,
+                               // Only local checks can run on the main thread.
                                CertVerifier::FLAG_LOCAL_ONLY);
     if (result == mozilla::pkix::Success) {
       break;
     }
   }
 
-  if (CERT_LIST_END(node, certlist)) {
-    // no valid cert found
-    return NS_ERROR_FAILURE;
+  if (CERT_LIST_END(node, certlist)) { // no valid cert found
+    if (aRequireValidCert)
+      return NS_ERROR_FAILURE;
+
+    // Get the first non-valid then.
+    node = CERT_LIST_HEAD(certlist);
   }
 
-  // node now contains the first valid certificate with correct usage
+  // |node| now contains the first valid (if aRequireValidCert true)
+  // certificate with correct usage.
   RefPtr<nsNSSCertificate> nssCert = nsNSSCertificate::Create(node->cert);
   if (!nssCert)
     return NS_ERROR_OUT_OF_MEMORY;

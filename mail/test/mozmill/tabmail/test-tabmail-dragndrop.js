@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+"use strict";
+
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /*
  * Test rearanging tabs via drag'n'drop.

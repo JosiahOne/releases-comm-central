@@ -75,6 +75,7 @@ nsCOMArray<msgIAddressObject> DecodedHeader(const nsAString &aHeader)
     return retval;
   }
   nsCOMPtr<nsIMsgHeaderParser> headerParser(services::GetHeaderParser());
+  NS_ENSURE_TRUE(headerParser, retval);
   msgIAddressObject **addresses = nullptr;
   uint32_t length;
   nsresult rv = headerParser->ParseDecodedHeader(aHeader, false,
@@ -94,10 +95,29 @@ nsCOMArray<msgIAddressObject> EncodedHeader(const nsACString &aHeader,
     return retval;
   }
   nsCOMPtr<nsIMsgHeaderParser> headerParser(services::GetHeaderParser());
+  NS_ENSURE_TRUE(headerParser, retval);
   msgIAddressObject **addresses = nullptr;
   uint32_t length;
   nsresult rv = headerParser->ParseEncodedHeader(aHeader, aCharset,
     false, &length, &addresses);
+  MOZ_ASSERT(NS_SUCCEEDED(rv), "This should never fail!");
+  if (NS_SUCCEEDED(rv) && length > 0 && addresses) {
+    retval.Adopt(addresses, length);
+  }
+  return retval;
+}
+
+nsCOMArray<msgIAddressObject> EncodedHeaderW(const nsAString &aHeader)
+{
+  nsCOMArray<msgIAddressObject> retval;
+  if (aHeader.IsEmpty()) {
+    return retval;
+  }
+  nsCOMPtr<nsIMsgHeaderParser> headerParser(services::GetHeaderParser());
+  NS_ENSURE_TRUE(headerParser, retval);
+  msgIAddressObject **addresses = nullptr;
+  uint32_t length;
+  nsresult rv = headerParser->ParseEncodedHeaderW(aHeader, &length, &addresses);
   MOZ_ASSERT(NS_SUCCEEDED(rv), "This should never fail!");
   if (NS_SUCCEEDED(rv) && length > 0 && addresses) {
     retval.Adopt(addresses, length);

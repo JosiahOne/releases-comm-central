@@ -10,14 +10,17 @@ var gNumLinksCalledBack = 0;
 var gStartedAllChecks = false;
 var gLinkCheckTimerID = 0;
 
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancelLinkChecker);
+
 // Implement nsIRequestObserver:
 var gRequestObserver =
 {
   // urichecker requires that we have an OnStartRequest even tho it's a nop.
-  onStartRequest: function(request, ctxt) { },
+  onStartRequest: function(request) { },
 
   // onStopRequest is where we really handle the status.
-  onStopRequest: function(request, ctxt, status)
+  onStopRequest: function(request, status)
   {
     var linkChecker = request.QueryInterface(Ci.nsIURIChecker);
     if (linkChecker)
@@ -178,16 +181,14 @@ function SetItemStatus(url, status)
 function onAccept()
 {
   SaveWindowLocation();
-  return true; // do close the window
 }
 
-function onCancelLinkChecker()
+function onCancelLinkChecker(event)
 {
   if (gLinkCheckTimerID)
     clearTimeout(gLinkCheckTimerID);
 
-/*
-  LinkCheckTimeOut();
-*/
-  return onCancel();
+  // LinkCheckTimeOut();
+
+  onCancel(event);
 }

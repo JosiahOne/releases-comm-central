@@ -5,16 +5,18 @@
 /* Test that the menubar can be set to "autohide". This should only have an
    effect on Windows. */
 
+"use strict";
+
 var MODULE_NAME = "test-autohide-menubar";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "address-book-helpers",
                        "compose-helpers"];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 
 var menuFolder;
+var menuState;
 
 function setupModule(module) {
   let fdh = collector.getModule("folder-display-helpers");
@@ -28,8 +30,7 @@ function setupModule(module) {
   make_new_sets_in_folder(menuFolder, [{count: 1}]);
 
   // Make the menubar not autohide by default.
-  let menubar = mc.e("mail-toolbar-menubar2");
-  menubar.setAttribute("autohide", false);
+  menuState = toggle_main_menu(true);
 }
 
 /**
@@ -108,3 +109,7 @@ function test_autohidden_menubar_address_book() {
   help_test_autohide(abc, menubar);
 }
 test_autohidden_menubar_address_book.EXCLUDED_PLATFORMS = ["darwin", "linux"];
+
+function teardownModule() {
+  toggle_main_menu(menuState);
+}

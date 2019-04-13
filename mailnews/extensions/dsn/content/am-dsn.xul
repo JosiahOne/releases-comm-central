@@ -10,18 +10,20 @@
 
 <!DOCTYPE page SYSTEM "chrome://messenger/locale/am-dsn.dtd">
 
-<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
       onload="parent.onPanelLoaded('am-dsn.xul');">
 
   <stringbundle id="bundle_smime" src="chrome://messenger/locale/am-dsn.properties"/>
   <script type="application/javascript" src="chrome://messenger/content/AccountManager.js"/>
   <script type="application/javascript" src="chrome://messenger/content/am-dsn.js"/>
 
-  <dialogheader title="&pane.title;"/>
+  <hbox class="dialogheader">
+    <label class="dialogheader-title" value="&pane.title;"/>
+  </hbox>
 
   <groupbox>
 
-    <caption label="&pane.title;"/>
+    <label class="header">&pane.title;</label>
 
     <hbox id="prefChoices" align="center">
       <radiogroup id="identity.dsn_use_custom_prefs"

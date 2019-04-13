@@ -16,37 +16,87 @@ db/**
 other-licenses/**
 testing/**
 
+# Temporarily disabled until the XUL parser is fixed.
+calendar/base/content/calendar-calendars-list.xul
+calendar/providers/gdata/content/gdata-calendar-creation.xul
+common/src/viewSource.xul
+
 # We ignore all these directories by default, until we get them enabled.
 # If you are enabling a directory, please add directory specific exclusions
 # below.
 build/**
-chat/**
-editor/**
-im/**
 ldap/**
-mailnews/**
 suite/**
 
-# mail exclusions
-mail/app/**
-mail/base/**
-mail/branding/**
-mail/config/**
-mail/extensions/**
-mail/installer/**
-mail/locales/**
-mail/test/**
-mail/themes/**
+# chat exclusions
+chat/chat-prefs.js
+# third-party code
+chat/modules/BigInteger.jsm
+chat/protocols/matrix/matrix-sdk/**
+chat/protocols/twitter/twitter-text.jsm
+# preprocessed files
+chat/content/imtooltip.xml
 
-# mail/components exclusions
-mail/components/*
-!mail/components/extensions
+# editor exclusions (most files not shipped with Thunderbird)
+editor/ui/composer.js
+editor/ui/composer/content/**
+!editor/ui/composer/content/editor.js
+!editor/ui/composer/content/editorUtilities.js
+!editor/ui/composer/content/ComposerCommands.js
+editor/ui/dialogs/content/EditConflict.js
+editor/ui/dialogs/content/EditConflict.xul
+editor/ui/dialogs/content/EditorPublish.js
+editor/ui/dialogs/content/EditorPublish.xul
+editor/ui/dialogs/content/EditorPublishOverlay.xul
+editor/ui/dialogs/content/EditorPublishProgress.js
+editor/ui/dialogs/content/EditorPublishProgress.xul
+editor/ui/dialogs/content/EditorPublishSettings.js
+editor/ui/dialogs/content/EditorPublishSettings.xul
+editor/ui/dialogs/content/EditorSaveAsCharset.js
+editor/ui/dialogs/content/EditorSaveAsCharset.xul
+editor/ui/dialogs/content/EdLinkChecker.js
+editor/ui/dialogs/content/EdLinkChecker.xul
+editor/ui/dialogs/content/EdSnapToGrid.js
+editor/ui/dialogs/content/EdSnapToGrid.xul
+editor/ui/texzilla/**
+
+# mailnews exclusions
+mailnews/mailnews.js
+mailnews/base/content/*
+mailnews/base/prefs/*
+mailnews/base/search/*
+mailnews/base/src/*
+mailnews/base/util/*
+mailnews/build/*
+mailnews/compose/*
+mailnews/db/*
+mailnews/imap/*
+mailnews/import/*
+mailnews/intl/*
+mailnews/jsaccount/*
+mailnews/mime/*
+
+# mailnews/extensions exclusions
+mailnews/extensions/*
+!mailnews/extensions/newsblog
+
+# mail exclusions
+mail/app/profile/all-thunderbird.js
+mail/app/profile/channel-prefs.js
+mail/app/profile/prefs.js
+mail/base/content/protovis-r2.6-modded.js
+mail/branding/nightly/thunderbird-branding.js
+mail/branding/thunderbird/thunderbird-branding.js
+mail/components/im/all-im.js
+mail/locales/en-US/all-l10n.js
+mail/test/mozmill/**
 
 # calendar/ exclusions
 
 # prefs files
 calendar/lightning/content/lightning.js
-calendar/locales/en-US/lightning-l10n.js
+calendar/providers/gdata/defaults/preferences.js
+calendar/timezones/preferences.js
 
 # third party library
 calendar/base/modules/ical.js

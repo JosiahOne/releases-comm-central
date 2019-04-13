@@ -45,7 +45,7 @@ void nsMAPIConfiguration::OpenConfiguration()
 }
 
 int16_t nsMAPIConfiguration::RegisterSession(uint32_t aHwnd,
-                const char16_t *aUserName, const char16_t *aPassword,
+                const nsCString& aUserName, const nsCString& aPassword,
                 bool aForceDownLoad, bool aNewSession,
                 uint32_t *aSession, const char *aIdKey)
 {
@@ -62,8 +62,8 @@ int16_t nsMAPIConfiguration::RegisterSession(uint32_t aHwnd,
     return -1;
   }
 
-  if (aUserName != nullptr && aUserName[0] != '\0')
-    m_ProfileMap.Get(nsDependentString(aUserName), &n_SessionId);
+  if (!aUserName.IsEmpty())
+    m_ProfileMap.Get(aUserName, &n_SessionId);
 
   // try to share a session; if not create a session
   if (n_SessionId > 0)
@@ -81,8 +81,7 @@ int16_t nsMAPIConfiguration::RegisterSession(uint32_t aHwnd,
   {
     // create a new session; if new session is specified OR there is no session
     nsMAPISession *pTemp = nullptr;
-    pTemp = new nsMAPISession(aHwnd, aUserName,
-                           aPassword, aForceDownLoad, aIdKey);
+    pTemp = new nsMAPISession(aHwnd, aUserName, aPassword, aForceDownLoad, aIdKey);
 
     if (pTemp != nullptr)
     {
@@ -94,8 +93,8 @@ int16_t nsMAPIConfiguration::RegisterSession(uint32_t aHwnd,
       if (session_generator == 0)
           session_generator++;
       m_SessionMap.Put(session_generator, pTemp);
-      if (aUserName != nullptr && aUserName[0] != '\0')
-        m_ProfileMap.Put(nsDependentString(aUserName), session_generator);
+      if (!aUserName.IsEmpty())
+        m_ProfileMap.Put(aUserName, session_generator);
       *aSession = session_generator;
       sessionCount++;
       nResult = 1;
@@ -233,7 +232,6 @@ HRESULT nsMAPIConfiguration::GetMAPIErrorFromNSError (nsresult res)
     case NS_ERROR_SMTP_AUTH_FAILURE :
     case NS_ERROR_SMTP_AUTH_GSSAPI :
     case NS_ERROR_SMTP_AUTH_MECH_NOT_SUPPORTED :
-    case NS_ERROR_SMTP_AUTH_NOT_SUPPORTED :
     case NS_ERROR_SMTP_AUTH_CHANGE_ENCRYPT_TO_PLAIN_NO_SSL :
     case NS_ERROR_SMTP_AUTH_CHANGE_ENCRYPT_TO_PLAIN_SSL :
     case NS_ERROR_SMTP_AUTH_CHANGE_PLAIN_TO_ENCRYPT :
@@ -247,9 +245,6 @@ HRESULT nsMAPIConfiguration::GetMAPIErrorFromNSError (nsresult res)
       break;
     case NS_ERROR_FILE_TARGET_DOES_NOT_EXIST :
       hr = MAPI_E_ATTACHMENT_NOT_FOUND;
-      break;
-    case NS_MSG_CANCELLING :
-      hr = MAPI_E_USER_ABORT;
       break;
     case NS_MSG_ERROR_WRITING_FILE :
     case NS_MSG_UNABLE_TO_SAVE_TEMPLATE :
@@ -265,17 +260,14 @@ HRESULT nsMAPIConfiguration::GetMAPIErrorFromNSError (nsresult res)
 }
 
 
-nsMAPISession::nsMAPISession(uint32_t aHwnd, const char16_t *aUserName,
-                             const char16_t *aPassword,
+nsMAPISession::nsMAPISession(uint32_t aHwnd, const nsCString& aUserName, const nsCString& aPassword,
                              bool aForceDownLoad, const char *aKey)
-: m_bIsForcedDownLoad(aForceDownLoad),
-  m_hAppHandle(aHwnd),
-  m_nShared(1),
+: m_nShared(1),
   m_pIdKey(aKey)
 {
   m_listContext = NULL;
-  m_pProfileName.Assign(aUserName);
-  m_pPassword.Assign(aPassword);
+  m_pProfileName = aUserName;
+  m_pPassword = aPassword;
 }
 
 nsMAPISession::~nsMAPISession()

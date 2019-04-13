@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 const WCCR_CONTRACTID = "@mozilla.org/embeddor.implemented/web-content-handler-registrar;1";
 const WCCR_CLASSID = Components.ID("{792a7e82-06a0-437c-af63-b2d12e808acc}");
@@ -219,11 +219,15 @@ WebContentConverterRegistrar.prototype = {
     if (handler) {
       request.cancel(Cr.NS_ERROR_FAILURE);
 
-      var webNavigation = channel.notificationCallbacks
+      let triggeringPrincipal = channel.loadInfo
+        ? channel.loadInfo.triggeringPrincipal
+        : Services.scriptSecurityManager.getSystemPrincipal();
+
+      let webNavigation = channel.notificationCallbacks
                                  .getInterface(Ci.nsIWebNavigation);
       webNavigation.loadURI(handler.getHandlerURI(channel.URI.spec),
                             Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
-                            null, null, null);
+                            null, null, null, triggeringPrincipal);
     }
   },
 

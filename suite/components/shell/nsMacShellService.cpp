@@ -5,7 +5,6 @@
 
 #include "nsDirectoryServiceDefs.h"
 #include "nsIImageLoadingContent.h"
-#include "nsIDocument.h"
 #include "nsIContent.h"
 #include "nsILocalFileMac.h"
 #include "nsIObserverService.h"
@@ -34,12 +33,6 @@ NS_IMPL_ISUPPORTS(nsMacShellService, nsIShellService, nsIWebProgressListener)
 NS_IMETHODIMP
 nsMacShellService::IsDefaultClient(bool aStartupCheck, uint16_t aApps, bool *aIsDefaultClient)
 {
-  // If this is the first window, maintain internal state that we've
-  // checked this session (so that subsequent window opens don't show the
-  // default client dialog).
-  if (aStartupCheck)
-    mCheckedThisSessionClient = true;
-
   *aIsDefaultClient = false;
 
   if (aApps & nsIShellService::BROWSER)
@@ -95,30 +88,6 @@ nsMacShellService::SetDefaultClient(bool aForAllUsers,
   return NS_OK;
 }
 
-NS_IMETHODIMP
-nsMacShellService::GetShouldCheckDefaultClient(bool* aResult)
-{
-  if (mCheckedThisSessionClient)
-  {
-    *aResult = false;
-    return NS_OK;
-  }
-
-  nsresult rv;
-  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  return prefs->GetBoolPref(PREF_CHECKDEFAULTCLIENT, aResult);
-}
-
-NS_IMETHODIMP
-nsMacShellService::SetShouldCheckDefaultClient(bool aShouldCheck)
-{
-  nsresult rv;
-  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  return prefs->SetBoolPref(PREF_CHECKDEFAULTCLIENT, aShouldCheck);
-}
-
 bool
 nsMacShellService::isDefaultHandlerForProtocol(CFStringRef aScheme)
 {
@@ -149,36 +118,9 @@ nsMacShellService::isDefaultHandlerForProtocol(CFStringRef aScheme)
 }
 
 NS_IMETHODIMP
-nsMacShellService::GetShouldBeDefaultClientFor(uint16_t* aApps)
-{
-  nsresult rv;
-  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  int32_t result;
-  rv = prefs->GetIntPref("shell.checkDefaultApps", &result);
-  *aApps = result;
-  return rv;
-}
-
-NS_IMETHODIMP
-nsMacShellService::SetShouldBeDefaultClientFor(uint16_t aApps)
-{
-  nsresult rv;
-  nsCOMPtr<nsIPrefBranch> prefs(do_GetService(NS_PREFSERVICE_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
-  return prefs->SetIntPref("shell.checkDefaultApps", aApps);
-}
-
-NS_IMETHODIMP
-nsMacShellService::GetCanSetDesktopBackground(bool* aResult)
-{
-  *aResult = true;
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 nsMacShellService::SetDesktopBackground(Element* aElement,
-                                        int32_t aPosition)
+                                        int32_t aPosition,
+                                        const nsACString& aImageName)
 {
   // Note: We don't support aPosition on OS X.
 
@@ -194,17 +136,6 @@ nsMacShellService::SetDesktopBackground(Element* aElement,
   if (!docURI)
     return NS_ERROR_FAILURE;
 
-  // Get the desired image file name:
-  nsCOMPtr<nsIURL> imageURL(do_QueryInterface(imageURI));
-  if (!imageURL)
-  {
-    // XXXmano (bug 300293): Non-URL images (e.g. the data: protocol) are not
-    // yet supported. What filename should we take here?
-    return NS_ERROR_NOT_IMPLEMENTED;
-  }
-
-  nsAutoCString fileName;
-  imageURL->GetFileName(fileName);
   nsCOMPtr<nsIProperties> fileLocator
     (do_GetService("@mozilla.org/file/directory_service;1", &rv));
   NS_ENSURE_SUCCESS(rv, rv);
@@ -216,7 +147,7 @@ nsMacShellService::SetDesktopBackground(Element* aElement,
     return NS_ERROR_OUT_OF_MEMORY;
 
   nsAutoString fileNameUnicode;
-  CopyUTF8toUTF16(fileName, fileNameUnicode);
+  CopyUTF8toUTF16(aImageName, fileNameUnicode);
 
   // and add the image file name itself:
   mBackgroundFile->Append(fileNameUnicode);
@@ -241,7 +172,7 @@ nsMacShellService::SetDesktopBackground(Element* aElement,
     loadContext = do_QueryInterface(docShell);
   }
 
-  return wbp->SaveURI(imageURI, 0,
+  return wbp->SaveURI(imageURI, aElement->NodePrincipal(), 0,
                       docURI, aElement->OwnerDoc()->GetReferrerPolicy(),
                       nullptr, nullptr,
                       mBackgroundFile, loadContext);
@@ -281,6 +212,13 @@ nsMacShellService::OnSecurityChange(nsIWebProgress* aWebProgress,
                                     nsIRequest* aRequest,
                                     uint32_t aState)
 {
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMacShellService::OnContentBlockingEvent(nsIWebProgress* aWebProgress,
+                                          nsIRequest* aRequest,
+                                          uint32_t aEvent) {
   return NS_OK;
 }
 

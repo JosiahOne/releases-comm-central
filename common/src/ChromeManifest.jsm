@@ -4,12 +4,13 @@
 
 this.EXPORTED_SYMBOLS = ["ChromeManifest"];
 
+const {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+
 /**
  * A parser for chrome.manifest files. Implements a subset of
  * https://developer.mozilla.org/en-US/docs/Mozilla/Chrome_Registration
  */
 class ChromeManifest {
-
   /**
    * Constucts the chrome.manifest parser
    *
@@ -36,7 +37,6 @@ class ChromeManifest {
     this.skin = new Map();
     this.resource = new Map();
     this.override = new Map();
-
   }
 
 
@@ -47,7 +47,7 @@ class ChromeManifest {
    * @param {String} base               The relative directory this file is expected to be in.
    * @return {Promise}                  Resolved when loading completes
    */
-  async parse(filename="chrome.manifest", base="") {
+  async parse(filename = "chrome.manifest", base = "") {
     await this.parseString(await this.loader(filename), base);
   }
 
@@ -58,11 +58,11 @@ class ChromeManifest {
    * @param {String} base               The relative directory this file is expected to be in.
    * @return {Promise}                  Resolved when loading completes
    */
-  async parseString(data, base="") {
+  async parseString(data, base = "") {
     let lines = data.split("\n");
     let extraManifests = [];
     for (let line of lines) {
-      let parts = line.split(/\s+/);
+      let parts = line.trim().split(/\s+/);
       let directive = parts.shift();
       switch (directive) {
         case "manifest":
@@ -93,6 +93,10 @@ class ChromeManifest {
    * @return {Boolean}              True, if the flags match the options provided in the constructor
    */
   _parseFlags(flags) {
+    if (flags.length == 0) {
+      return true;
+    }
+
     let matchString = (a, sign, b) => {
       if (sign != "=") {
         console.warn(`Invalid sign ${sign} in ${a}${sign}${b}, dropping manifest instruction`);
@@ -239,7 +243,7 @@ class ChromeManifest {
   }
 
   /**
-   * Parse the resource instruction, to set up resource uri subtitutions
+   * Parse the resource instruction, to set up resource uri substitutions
    *
    * @param {String} packagename    The resource package name, e.g. resource://packagename/
    * @param {String} url            The location for this content registration
@@ -304,7 +308,6 @@ class DefaultMap extends Map {
   constructor(_default, iterable) {
     super(iterable);
     this._default = _default;
-
   }
 
   /**
@@ -313,7 +316,7 @@ class DefaultMap extends Map {
    * @param {String} key            The key of the map to get
    * @param {Boolean} create        True, if the key should be created in case it doesn't exist.
    */
-  get(key, create=true) {
+  get(key, create = true) {
     if (this.has(key)) {
       return super.get(key);
     } else if (create) {

@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 # Global Variables
 var helpExternal;
@@ -174,9 +174,12 @@ function contentClick(event) {
   if (/^x-moz-url-link:/.test(uri))
     uri = Services.urlFormatter.formatURLPref(RegExp.rightContext);
 
-  const loadFlags = Ci.nsIWebNavigation.LOAD_FLAGS_IS_LINK;
   try {
-    helpExternal.webNavigation.loadURI(uri, loadFlags, null, null, null);
+    helpExternal.webNavigation
+                .loadURI(uri,
+                         Ci.nsIWebNavigation.LOAD_FLAGS_IS_LINK,
+                         null, null, null,
+                         Services.scriptSecurityManager.getSystemPrincipal());
   } catch (e) {}
   return false;
 }
@@ -431,8 +434,10 @@ function loadURI(uri) {
     if (uri.substr(0,7) != "chrome:") {
         uri = helpBaseURI + uri;
     }
-    getWebNavigation().loadURI(uri, Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
-        null, null, null);
+    getWebNavigation().loadURI(uri,
+        Ci.nsIWebNavigation.LOAD_FLAGS_NONE,
+        null, null, null,
+        Services.scriptSecurityManager.getSystemPrincipal());
 }
 
 function goBack() {
@@ -485,7 +490,7 @@ function FillHistoryMenu(aParent, aMenu)
           if ((index - 1) < end) return false;
           for (j = index - 1; j >= end; j--)
             {
-              entry = sessionHistory.getEntryAtIndex(j, false);
+              entry = sessionHistory.getEntryAtIndex(j);
               if (entry)
                 createMenuItem(aParent, j, entry.title);
             }
@@ -495,7 +500,7 @@ function FillHistoryMenu(aParent, aMenu)
           if ((index + 1) > end) return false;
           for (j = index + 1; j <= end; j++)
             {
-              entry = sessionHistory.getEntryAtIndex(j, false);
+              entry = sessionHistory.getEntryAtIndex(j);
               if (entry)
                 createMenuItem(aParent, j, entry.title);
             }

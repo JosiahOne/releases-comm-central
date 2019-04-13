@@ -70,7 +70,7 @@ nsFeedSniffer::ConvertEncodedData(nsIRequest* request,
                                               getter_AddRefs(converter));
       NS_ENSURE_SUCCESS(rv, rv);
 
-      converter->OnStartRequest(request, nullptr);
+      converter->OnStartRequest(request);
 
       nsCOMPtr<nsIStringInputStream> rawStream =
         do_CreateInstance(NS_STRINGINPUTSTREAM_CONTRACTID);
@@ -80,10 +80,10 @@ nsFeedSniffer::ConvertEncodedData(nsIRequest* request,
       rv = rawStream->SetData((const char*)data, length);
       NS_ENSURE_SUCCESS(rv, rv);
 
-      rv = converter->OnDataAvailable(request, nullptr, rawStream, 0, length);
+      rv = converter->OnDataAvailable(request, rawStream, 0, length);
       NS_ENSURE_SUCCESS(rv, rv);
 
-      converter->OnStopRequest(request, nullptr, NS_OK);
+      converter->OnStopRequest(request, NS_OK);
     }
   }
   return rv;
@@ -242,17 +242,6 @@ nsFeedSniffer::GetMIMETypeFromContent(nsIRequest* request,
   bool noSniff = contentType.EqualsLiteral(TYPE_RSS) ||
                    contentType.EqualsLiteral(TYPE_ATOM);
 
-  // Check to see if this was a feed request from the location bar or from
-  // the feed: protocol. This is also a reliable indication.
-  // The value of the header doesn't matter.
-  if (!noSniff) {
-    nsAutoCString sniffHeader;
-    nsresult foundHeader =
-      channel->GetRequestHeader(NS_LITERAL_CSTRING("X-Moz-Is-Feed"),
-                                sniffHeader);
-    noSniff = NS_SUCCEEDED(foundHeader);
-  }
-
   if (noSniff) {
     // check for an attachment after we have a likely feed.
     if(HasAttachmentDisposition(channel)) {
@@ -332,7 +321,7 @@ nsFeedSniffer::GetMIMETypeFromContent(nsIRequest* request,
 }
 
 NS_IMETHODIMP
-nsFeedSniffer::OnStartRequest(nsIRequest* request, nsISupports* context)
+nsFeedSniffer::OnStartRequest(nsIRequest* request)
 {
   return NS_OK;
 }
@@ -352,9 +341,8 @@ nsFeedSniffer::AppendSegmentToString(nsIInputStream* inputStream,
 }
 
 NS_IMETHODIMP
-nsFeedSniffer::OnDataAvailable(nsIRequest* request, nsISupports* context,
-                               nsIInputStream* stream, uint64_t offset,
-                               uint32_t count)
+nsFeedSniffer::OnDataAvailable(nsIRequest* request, nsIInputStream* stream,
+                               uint64_t offset, uint32_t count)
 {
   uint32_t read;
   return stream->ReadSegments(AppendSegmentToString, &mDecodedData, count,
@@ -362,8 +350,7 @@ nsFeedSniffer::OnDataAvailable(nsIRequest* request, nsISupports* context,
 }
 
 NS_IMETHODIMP
-nsFeedSniffer::OnStopRequest(nsIRequest* request, nsISupports* context,
-                             nsresult status)
+nsFeedSniffer::OnStopRequest(nsIRequest* request, nsresult status)
 {
   return NS_OK;
 }

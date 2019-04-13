@@ -8,7 +8,7 @@
 
 <!DOCTYPE page SYSTEM "chrome://messenger/locale/am-advanced.dtd">
 
-<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
       title="&smtpServer.label;"
       onload="gSmtpServerListWindow.onLoad();">
   <script type="application/javascript"
@@ -20,17 +20,20 @@
                 src="chrome://messenger/locale/messenger.properties"/>
 
   <vbox flex="1" style="overflow: auto;">
-    <dialogheader title="&smtpServer.label;"/>
+    <hbox class="dialogheader">
+      <label class="dialogheader-title" value="&smtpServer.label;"/>
+    </hbox>
 
     <label control="smtpList">&smtpDescription.label;</label>
     <separator class="thin"/>
 
     <hbox flex="1">
-      <listbox id="smtpList"
-               onselect="gSmtpServerListWindow.onSelectionChanged(event);"
-               ondblclick="gSmtpServerListWindow.onEditServer(event);"
-               seltype="single"
-               flex="1"/>
+      <richlistbox id="smtpList"
+                   class="theme-listbox"
+                   onselect="gSmtpServerListWindow.onSelectionChanged(event);"
+                   ondblclick="gSmtpServerListWindow.onEditServer(event);"
+                   seltype="single"
+                   flex="1"/>
 
       <vbox>
         <button id="addButton"
@@ -57,7 +60,7 @@
 
     <label class="header">&serverDetails.label;</label>
     <hbox id="smtpServerInfoBox">
-      <stack flex="1" class="inset">
+      <stack flex="1">
         <spacer id="backgroundBox"/>
         <grid>
           <columns>

@@ -17,6 +17,10 @@
 #include "nsCOMPtr.h"
 #include "nsMsgBaseCID.h"
 #include "nsImapUtils.h"
+#include "nsIImapMockChannel.h"
+#include "nsIImapMailFolderSink.h"
+#include "nsIImapMessageSink.h"
+#include "nsIImapServerSink.h"
 #include "nsIMAPNamespace.h"
 #include "nsICacheEntry.h"
 #include "nsIMsgFolder.h"
@@ -25,6 +29,7 @@
 #include "nsServiceManagerUtils.h"
 
 using namespace mozilla;
+extern LazyLogModule IMAPCache;  // defined in nsImapProtocol.cpp
 
 static NS_DEFINE_CID(kCImapHostSessionListCID, NS_IIMAPHOSTSESSIONLIST_CID);
 
@@ -1049,7 +1054,14 @@ NS_IMETHODIMP nsImapUrl::SetContentModified(nsImapContentModifiedType contentMod
       contentModifiedAnnotation = "Force Content Not Modified";
       break;
     }
+    MOZ_LOG(IMAPCache, LogLevel::Debug,
+      ("SetContentModified(): Set annotation to |%s|", contentModifiedAnnotation));
     cacheEntry->SetMetaDataElement("ContentModified", contentModifiedAnnotation);
+  }
+  else
+  {
+    MOZ_LOG(IMAPCache, LogLevel::Debug,
+      ("SetContentModified(): Set annotation FAILED -- no cacheEntry"));
   }
   return NS_OK;
 }
@@ -1155,12 +1167,9 @@ NS_IMETHODIMP nsImapUrl::GetAllowContentChange(bool *result)
   return NS_OK;
 }
 
-NS_IMETHODIMP nsImapUrl::CloneInternal(uint32_t aRefHandlingMode,
-                                       const nsACString& newRef,
-                                       nsIURI** _retval)
+nsresult nsImapUrl::Clone(nsIURI** _retval)
 {
-  nsresult rv =
-    nsMsgMailNewsUrl::CloneInternal(aRefHandlingMode, newRef, _retval);
+  nsresult rv = nsMsgMailNewsUrl::Clone(_retval);
   NS_ENSURE_SUCCESS(rv, rv);
   // also clone the mURI member, because GetUri below won't work if
   // mURI isn't set due to escaping issues.
@@ -1170,12 +1179,12 @@ NS_IMETHODIMP nsImapUrl::CloneInternal(uint32_t aRefHandlingMode,
   return rv;
 }
 
-NS_IMETHODIMP nsImapUrl::GetPrincipalSpec(nsACString& aPrincipalSpec)
+NS_IMETHODIMP nsImapUrl::GetNormalizedSpec(nsACString& aPrincipalSpec)
 {
   // URLs look like this:
   // imap://user@domain@server:port/fetch>UID>folder>nn
   // We simply strip any query part beginning with ? & or /;
-  // Normalised spec: imap://user@domain@server:port/fetch>UID>folder>nn
+  // Normalized spec: imap://user@domain@server:port/fetch>UID>folder>nn
   nsCOMPtr<nsIMsgMailNewsUrl> mailnewsURL;
   QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(mailnewsURL));
 

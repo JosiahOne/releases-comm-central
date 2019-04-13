@@ -15,18 +15,12 @@
   margin-inline-end: 0;
 }
 
-.typeIcon,
 .actionIcon {
-  margin: 0px 3px;
-}
-
-richlistitem label {
-  margin-inline-start: 1px;
-  margin-top: 2px;
+  margin: 0 3px;
 }
 
 richlistitem {
-  min-height: 22px;
+  min-height: 35px;
 }
 
 richlistitem[appHandlerIcon="ask"],
@@ -37,11 +31,6 @@ menuitem[appHandlerIcon="ask"] {
 richlistitem[appHandlerIcon="save"],
 menuitem[appHandlerIcon="save"] {
   list-style-image: url("chrome://messenger/skin/preferences/saveFile.png");
-}
-
-richlistitem[appHandlerIcon="plugin"],
-menuitem[appHandlerIcon="plugin"] {
-  list-style-image: url("chrome://mozapps/skin/plugins/pluginGeneric.svg");
 }
 
 .actionsMenu .menulist-icon {
@@ -57,39 +46,32 @@ menuitem[appHandlerIcon="plugin"] {
   padding-inline-start: 4px;
 }
 
-.shortDetails {
-  text-align: right;
-  color: GrayText;
-}
-
-richlistbox:focus .shortDetails.selected {
-  color: inherit;
-}
-
 /**
  * Used by the outgoing attachment manager
  */
 
-.cloudfileAccount[state="connecting"],
-.cloudfileAccount[state="waiting-to-connect"] {
-  list-style-image: url("chrome://global/skin/icons/loading.png") !important;
-}
-
-.cloudfileAccount[state="auth-error"],
-.cloudfileAccount[state="no-connection"] {
-  list-style-image: url("chrome://global/skin/icons/error-16.png") !important;
-}
-
 .cloudfileAccount .typeIcon {
   max-height: 16px;
   max-width: 16px;
-  margin-top: 3px;
-  margin-bottom: 3px;
+}
+
+.cloudfileAccount > label {
+  margin-top: initial;
+  margin-bottom: initial;
+}
+.cloudfileAccount:not([selected]) > label {
+  pointer-events: none;
+}
+
+.cloudfileAccount > textbox {
+  min-height: unset;
+  margin: 0;
+  padding-inline-start: 4px;
 }
 
 #authMessage {
   text-align: center;
-  padding: 0px 80px;
+  padding: 0 80px;
 }
 
 #authImage {
@@ -106,4 +88,10 @@ richlistbox:focus .shortDetails.selected {
   width: 16px;
   height: 16px;
   list-style-image: url("chrome://global/skin/icons/loading.png");
+}
+
+@media (min-resolution: 1.1dppx) {
+  #cloudFileLoadingSpinner {
+    list-style-image: url("chrome://global/skin/icons/loading@2x.png");
+  }
 }

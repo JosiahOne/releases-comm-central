@@ -21,7 +21,7 @@
 #include "nsIMsgWindow.h"
 #include "nsIDocShell.h"
 #include "nsPIDOMWindow.h"
-#include "nsIDocument.h"
+#include "mozilla/dom/Document.h"
 #include "nsIXULWindow.h"
 #include "nsIWindowMediator.h"
 #include "nsIDocShellTreeItem.h"
@@ -49,7 +49,6 @@
 #include "nsIArray.h"
 #include "nsArrayUtils.h"
 #include "nsIURIMutator.h"
-#include "mozilla/Unused.h"
 
 #ifdef MSGCOMP_TRACE_PERFORMANCE
 #include "mozilla/Logging.h"
@@ -63,7 +62,7 @@
 #include "nsMsgUtils.h"
 #include "nsIPrincipal.h"
 
-#ifdef XP_WIN32
+#ifdef XP_WIN
 #include <windows.h>
 #include <shellapi.h>
 #include "nsIWidget.h"
@@ -241,7 +240,7 @@ nsMsgComposeService::DetermineComposeHTML(nsIMsgIdentity *aIdentity, MSG_Compose
   return NS_OK;
 }
 
-nsresult
+MOZ_CAN_RUN_SCRIPT_FOR_DEFINITION nsresult
 nsMsgComposeService::GetOrigWindowSelection(MSG_ComposeType type, nsIMsgWindow *aMsgWindow, nsACString& aSelHTML)
 {
   nsresult rv;
@@ -326,10 +325,9 @@ nsMsgComposeService::GetOrigWindowSelection(MSG_ComposeType type, nsIMsgWindow *
   rv = docShell->GetContentViewer(getter_AddRefs(contentViewer));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIDocument> domDocument(contentViewer->GetDocument());
+  nsCOMPtr<mozilla::dom::Document> domDocument(contentViewer->GetDocument());
 
-  nsCOMPtr<nsIDocumentEncoder> docEncoder(do_CreateInstance(NS_HTMLCOPY_ENCODER_CONTRACTID, &rv));
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIDocumentEncoder> docEncoder = do_createHTMLCopyEncoder();
 
   rv = docEncoder->Init(domDocument, NS_LITERAL_STRING("text/html"), 0);
   NS_ENSURE_SUCCESS(rv, rv);
@@ -360,7 +358,7 @@ nsMsgComposeService::GetOrigWindowSelection(MSG_ComposeType type, nsIMsgWindow *
   return rv;
 }
 
-NS_IMETHODIMP
+MOZ_CAN_RUN_SCRIPT_FOR_DEFINITION NS_IMETHODIMP
 nsMsgComposeService::OpenComposeWindow(const char *msgComposeWindowURL, nsIMsgDBHdr *origMsgHdr, const char *originalMsgURI,
   MSG_ComposeType type, MSG_ComposeFormat format, nsIMsgIdentity * aIdentity, nsIMsgWindow *aMsgWindow)
 {
@@ -617,7 +615,7 @@ nsMsgComposeService::GetDefaultIdentity(nsIMsgIdentity **_retval)
   rv = accountManager->GetDefaultAccount(getter_AddRefs(defaultAccount));
   NS_ENSURE_SUCCESS(rv, rv);
 
-  return defaultAccount->GetDefaultIdentity(_retval);
+  return defaultAccount ? defaultAccount->GetDefaultIdentity(_retval) : NS_OK;
 }
 
 /* readonly attribute boolean logComposePerformance; */
@@ -776,14 +774,13 @@ NS_IMETHODIMP nsMsgTemplateReplyHelper::OnStopRunningUrl(nsIURI *aUrl, nsresult 
 }
 
 NS_IMETHODIMP
-nsMsgTemplateReplyHelper::OnStartRequest(nsIRequest* request, nsISupports* aSupport)
+nsMsgTemplateReplyHelper::OnStartRequest(nsIRequest* request)
 {
   return NS_OK;
 }
 
 NS_IMETHODIMP
-nsMsgTemplateReplyHelper::OnStopRequest(nsIRequest* request, nsISupports* aSupport,
-                                nsresult status)
+nsMsgTemplateReplyHelper::OnStopRequest(nsIRequest* request, nsresult status)
 {
   if (NS_SUCCEEDED(status))
   {
@@ -795,7 +792,6 @@ nsMsgTemplateReplyHelper::OnStopRequest(nsIRequest* request, nsISupports* aSuppo
 
 NS_IMETHODIMP
 nsMsgTemplateReplyHelper::OnDataAvailable(nsIRequest* request,
-                                  nsISupports* aSupport,
                                   nsIInputStream* inStream,
                                   uint64_t srcOffset,
                                   uint32_t count)
@@ -1186,9 +1182,9 @@ nsMsgComposeService::RegisterComposeDocShell(nsIDocShell *aDocShell,
   nsresult rv;
 
   // add the msg compose / dom window mapping to our hash table
-  nsCOMPtr<nsIWeakReference> weakDocShell = do_GetWeakReference(aDocShell, &rv);
+  nsWeakPtr weakDocShell = do_GetWeakReference(aDocShell, &rv);
   NS_ENSURE_SUCCESS(rv,rv);
-  nsCOMPtr<nsIWeakReference> weakMsgComposePtr = do_GetWeakReference(aComposeObject);
+  nsWeakPtr weakMsgComposePtr = do_GetWeakReference(aComposeObject);
   NS_ENSURE_SUCCESS(rv,rv);
   mOpenComposeWindows.Put(weakDocShell, weakMsgComposePtr);
 
@@ -1201,7 +1197,7 @@ nsMsgComposeService::UnregisterComposeDocShell(nsIDocShell *aDocShell)
   NS_ENSURE_ARG_POINTER(aDocShell);
 
   nsresult rv;
-  nsCOMPtr<nsIWeakReference> weakDocShell = do_GetWeakReference(aDocShell, &rv);
+  nsWeakPtr weakDocShell = do_GetWeakReference(aDocShell, &rv);
   NS_ENSURE_SUCCESS(rv,rv);
 
   mOpenComposeWindows.Remove(weakDocShell);
@@ -1221,10 +1217,10 @@ nsMsgComposeService::GetMsgComposeForDocShell(nsIDocShell *aDocShell,
 
   // get the weak reference for our dom window
   nsresult rv;
-  nsCOMPtr<nsIWeakReference> weakDocShell = do_GetWeakReference(aDocShell, &rv);
+  nsWeakPtr weakDocShell = do_GetWeakReference(aDocShell, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIWeakReference> weakMsgComposePtr;
+  nsWeakPtr weakMsgComposePtr;
 
   if (!mOpenComposeWindows.Get(weakDocShell,
                                getter_AddRefs(weakMsgComposePtr)))
@@ -1328,14 +1324,14 @@ nsMsgComposeService::RunMessageThroughMimeDraft(
     rv = messageService->GetUrlForUri(PromiseFlatCString(aMsgURI).get(), getter_AddRefs(url), aMsgWindow);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  // ignore errors here - it's not fatal, and in the case of mailbox messages,
-  // we're always passing in an invalid spec...
   nsCOMPtr<nsIMsgMailNewsUrl> mailnewsurl = do_QueryInterface(url);
   if (!mailnewsurl) {
     NS_WARNING("Trying to run a message through MIME which doesn't have a nsIMsgMailNewsUrl?");
     return NS_ERROR_UNEXPECTED;
   }
-  mozilla::Unused << mailnewsurl->SetSpecInternal(mailboxUri);
+  // SetSpecInternal must not fail, or else the URL won't have a base URL and we'll crash later.
+  rv = mailnewsurl->SetSpecInternal(mailboxUri);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   // if we are forwarding a message and that message used a charset over ride
   // then use that over ride charset instead of the charset specified in the message

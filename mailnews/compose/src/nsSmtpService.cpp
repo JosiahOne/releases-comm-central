@@ -21,8 +21,6 @@
 #include "nsIMsgIdentity.h"
 #include "nsIPrompt.h"
 #include "nsIWindowWatcher.h"
-#include "nsIUTF8ConverterService.h"
-#include "nsUConvCID.h"
 #include "nsAutoPtr.h"
 #include "nsComposeStrings.h"
 #include "nsIAsyncInputStream.h"
@@ -218,6 +216,7 @@ nsresult NS_MsgLoadSmtpUrl(nsIURI * aUrl, nsISupports * aConsumer, nsIRequest **
   // For now, assume the url is an smtp url and load it.
   nsresult rv;
   nsCOMPtr<nsISmtpUrl> smtpUrl(do_QueryInterface(aUrl, &rv));
+  mozilla::Unused << smtpUrl;
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Create a smtp protocol instance to run the url in.
@@ -229,7 +228,8 @@ nsresult NS_MsgLoadSmtpUrl(nsIURI * aUrl, nsISupports * aConsumer, nsIRequest **
   rv = smtpProtocol->LoadUrl(aUrl, aConsumer);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  return CallQueryInterface(smtpProtocol.get(), aRequest);
+  smtpProtocol.forget(aRequest);
+  return NS_OK;
 }
 
 NS_IMETHODIMP nsSmtpService::VerifyLogon(nsISmtpServer *aServer,
@@ -284,57 +284,33 @@ nsSmtpService::AllowPort(int32_t port, const char *scheme, bool *_retval)
 NS_IMETHODIMP nsSmtpService::GetProtocolFlags(uint32_t *result)
 {
     *result = URI_NORELATIVE | ALLOWS_PROXY | URI_LOADABLE_BY_ANYONE |
-      URI_NON_PERSISTABLE | URI_DOES_NOT_RETURN_DATA |
-      URI_FORBIDS_COOKIE_ACCESS;
+      URI_NON_PERSISTABLE | URI_DOES_NOT_RETURN_DATA;
     return NS_OK;
 }
 
 // the smtp service is also the protocol handler for mailto urls....
 
 NS_IMETHODIMP nsSmtpService::NewURI(const nsACString &aSpec,
-                                    const char *aOriginCharset,
+                                    const char *aOriginCharset,  // ignored, always UTF-8.
                                     nsIURI *aBaseURI,
                                     nsIURI **_retval)
 {
   // get a new smtp url
   nsresult rv;
 
-  nsAutoCString utf8Spec;
-  if (aOriginCharset)
-  {
-    nsCOMPtr<nsIUTF8ConverterService>
-      utf8Converter(do_GetService(NS_UTF8CONVERTERSERVICE_CONTRACTID, &rv));
-    if (NS_SUCCEEDED(rv))
-      rv = utf8Converter->ConvertURISpecToUTF8(aSpec, aOriginCharset, utf8Spec);
-  }
-
-  // utf8Spec is filled up only when aOriginCharset is specified and
-  // the conversion is successful. Otherwise, fall back to aSpec.
   nsCOMPtr<nsIURI> mailtoUrl;
-  if (aOriginCharset && NS_SUCCEEDED(rv)) {
-    rv = NS_MutateURI(new nsMailtoUrl::Mutator())
-           .SetSpec(utf8Spec)
-           .Finalize(mailtoUrl);
-    NS_ENSURE_SUCCESS(rv, rv);
-  } else {
-    rv = NS_MutateURI(new nsMailtoUrl::Mutator())
-           .SetSpec(aSpec)
-           .Finalize(mailtoUrl);
-    NS_ENSURE_SUCCESS(rv, rv);
-  }
+  rv = NS_MutateURI(new nsMailtoUrl::Mutator())
+         .SetSpec(aSpec)
+         .Finalize(mailtoUrl);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   mailtoUrl.forget(_retval);
   return NS_OK;
 }
 
-NS_IMETHODIMP nsSmtpService::NewChannel(nsIURI *aURI, nsIChannel **_retval)
-{
-  return NewChannel2(aURI, nullptr, _retval);
-}
-
-NS_IMETHODIMP nsSmtpService::NewChannel2(nsIURI *aURI,
-                                         nsILoadInfo* aLoadInfo,
-                                         nsIChannel **_retval)
+NS_IMETHODIMP nsSmtpService::NewChannel(nsIURI *aURI,
+                                        nsILoadInfo* aLoadInfo,
+                                        nsIChannel **_retval)
 {
   NS_ENSURE_ARG_POINTER(aURI);
   // create an empty pipe for use with the input stream channel.
@@ -385,7 +361,7 @@ nsSmtpService::GetServers(nsISimpleEnumerator **aResult)
   if (serverCount <= 0)
     loadSmtpServers();
 
-  return NS_NewArrayEnumerator(aResult, mSmtpServers);
+  return NS_NewArrayEnumerator(aResult, mSmtpServers, NS_GET_IID(nsISmtpServer));
 }
 
 nsresult

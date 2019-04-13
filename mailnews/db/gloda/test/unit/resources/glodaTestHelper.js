@@ -21,9 +21,9 @@
  */
 
 // Services
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 // MailServices
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 // Import the main scripts that mailnews tests need to set up and tear down
 load("../../../../resources/abSetup.js");
@@ -44,7 +44,7 @@ var msgGen = gMessageGenerator = new MessageGenerator();
 // Create a message scenario generator using that message generator
 var scenarios = gMessageScenarioFactory = new MessageScenarioFactory(msgGen);
 
-ChromeUtils.import("resource:///modules/errUtils.js");
+var {logObject} = ChromeUtils.import("resource:///modules/errUtils.js");
 
 /**
  * Create a 'me' identity of "me@localhost" for the benefit of Gloda.  At the
@@ -88,17 +88,36 @@ for (let {envVar, prefName} of ENVIRON_MAPPINGS) {
 
 
 // -- Import our modules
-ChromeUtils.import("resource:///modules/gloda/public.js");
-ChromeUtils.import("resource:///modules/gloda/indexer.js");
-ChromeUtils.import("resource:///modules/gloda/index_msg.js");
-ChromeUtils.import("resource:///modules/gloda/datastore.js");
-ChromeUtils.import("resource:///modules/gloda/collection.js");
-ChromeUtils.import("resource:///modules/gloda/datamodel.js");
-ChromeUtils.import("resource:///modules/gloda/noun_tag.js");
-ChromeUtils.import("resource:///modules/gloda/mimemsg.js");
+var {Gloda} = ChromeUtils.import("resource:///modules/gloda/public.js");
+var {GlodaIndexer, IndexingJob} = ChromeUtils.import("resource:///modules/gloda/indexer.js");
+var {GlodaMsgIndexer} = ChromeUtils.import("resource:///modules/gloda/index_msg.js");
+var {GlodaDatastore} = ChromeUtils.import("resource:///modules/gloda/datastore.js");
+var {
+  GlodaCollection,
+  GlodaCollectionManager,
+} = ChromeUtils.import("resource:///modules/gloda/collection.js");
+var {
+  GlodaAttributeDBDef,
+  GlodaAccount,
+  GlodaConversation,
+  GlodaFolder,
+  GlodaMessage,
+  GlodaContact,
+  GlodaIdentity,
+  GlodaAttachment,
+} = ChromeUtils.import("resource:///modules/gloda/datamodel.js");
+var {TagNoun} = ChromeUtils.import("resource:///modules/gloda/noun_tag.js");
+var {
+  MsgHdrToMimeMessage,
+  MimeMessage,
+  MimeContainer,
+  MimeBody,
+  MimeUnknown,
+  MimeMessageAttachment,
+} = ChromeUtils.import("resource:///modules/gloda/mimemsg.js");
 
 // -- Add a logger listener that throws when we give it a warning/error.
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+var {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 var throwingAppender = new Log4Moz.ThrowingAppender(do_throw);
 throwingAppender.level = Log4Moz.Level.Warn;
 Log4Moz.repository.rootLogger.addAppender(throwingAppender);
@@ -390,7 +409,7 @@ var _indexMessageState = {
   expectedCleanedUpCount: null,
   /** Expected value of |_workerHadNoCleanUpCount| at assertion time */
   expectedHadNoCleanUpCount: null,
-  /** Exepected value of |_numFullIndexed| at assertion time */
+  /** Expected value of |_numFullIndexed| at assertion time */
   expectedNumFullIndexed: null,
 
   /** The number of times a worker had a recover helper and it recovered. */

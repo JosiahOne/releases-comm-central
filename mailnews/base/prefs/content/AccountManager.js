@@ -25,12 +25,20 @@
  *   on values set in the previous step.
  */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/folderUtils.jsm");
-ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {BrowserUtils} = ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
+var {Gloda} = ChromeUtils.import("resource:///modules/gloda/gloda.js");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {allAccountsSorted} = ChromeUtils.import("resource:///modules/folderUtils.jsm");
+var {cleanUpHostName, isLegalHostNameOrIP} = ChromeUtils.import("resource:///modules/hostnameUtils.jsm");
+
+document.addEventListener("dialogcancel", onNotAccept);
+document.addEventListener("dialogaccept", (event) => {
+  if (!onAccept(true)) {
+    event.preventDefault();
+  }
+});
 
 // If Local directory has changed the app needs to restart. Once this is set
 // a restart will be attempted at each attempt to close the Account manager with OK.
@@ -195,15 +203,15 @@ function selectServer(server, selectPageId)
   }
 
   let accountTree = document.getElementById("accounttree");
-  let index = accountTree.contentView.getIndexOfItem(pageToSelect);
+  let index = accountTree.view.getIndexOfItem(pageToSelect);
   accountTree.view.selection.select(index);
-  accountTree.treeBoxObject.ensureRowIsVisible(index);
+  accountTree.ensureRowIsVisible(index);
 
   let lastItem = accountNode.lastChild.lastChild;
   if (lastItem.localName == "treeitem")
-    index = accountTree.contentView.getIndexOfItem(lastItem);
+    index = accountTree.view.getIndexOfItem(lastItem);
 
-  accountTree.treeBoxObject.ensureRowIsVisible(index);
+  accountTree.ensureRowIsVisible(index);
 }
 
 function replaceWithDefaultSmtpServer(deletedSmtpServerKey)
@@ -282,13 +290,12 @@ function onAccept(aDoChecks) {
  * This function must not be called onCancel(), because it would call itself
  * recursively for pages that don't have an onCancel() implementation.
  */
-function onNotAccept()
+function onNotAccept(event)
 {
   // If onCancel() present in current page frame, call it.
-  if ("onCancel" in top.frames["contentFrame"])
-    return top.frames["contentFrame"].onCancel();
-
-  return true;
+  if ("onCancel" in top.frames.contentFrame) {
+    top.frames.contentFrame.onCancel(event);
+  }
 }
 
 /**
@@ -708,10 +715,8 @@ function markDefaultServer(newDefault, oldDefault) {
   if (oldDefault == newDefault)
     return;
 
-  let accountTreeNodes = document.getElementById("account-tree-children")
-                                 .childNodes;
-  for (let i = 0; i < accountTreeNodes.length; i++) {
-    let accountNode = accountTreeNodes[i];
+  let accountTree = document.getElementById("account-tree-children");
+  for (let accountNode of accountTree.childNodes) {
     if (newDefault && newDefault == accountNode._account) {
       let props = accountNode.firstChild.firstChild.getAttribute("properties");
       accountNode.firstChild.firstChild
@@ -726,6 +731,30 @@ function markDefaultServer(newDefault, oldDefault) {
 }
 
 /**
+ * Sets the name of the account rowitem in the tree pane.
+ *
+ * @param aAccountKey   the key of the account to change
+ * @param aAccountNode  the node on which to change the label
+ * @param aLabel        the value of the label to set
+ */
+function setAccountLabel(aAccountKey, aAccountNode, aLabel) {
+  if (!aAccountNode) {
+    // We can't use the current tree selection to determine the current account,
+    // because this function may be called when the selection
+    // is already on another tree item (account) than the one we want to change.
+    // So find the proper node using the account key.
+    let accountTree = document.getElementById("account-tree-children");
+    for (let accountNode of accountTree.childNodes) {
+      if (("_account" in accountNode) && (accountNode._account.key == aAccountKey)) {
+        aAccountNode = accountNode.firstChild.firstChild;
+        break;
+      }
+    }
+  }
+  aAccountNode.setAttribute("label", aLabel);
+}
+
+/**
  * Make currentAccount (currently selected in the account tree) the default one.
  */
 function onSetDefault(event) {
@@ -733,9 +762,11 @@ function onSetDefault(event) {
   if (event.target.getAttribute("disabled") == "true")
     return;
 
-  let previousDefault = getDefaultAccount();
+  let previousDefault = MailServices.accounts.defaultAccount;
   MailServices.accounts.defaultAccount = currentAccount;
   markDefaultServer(currentAccount, previousDefault);
+  // Update gloda's myContact with the new default account's default identity.
+  Gloda._initMyIdentities();
 
   // This is only needed on Seamonkey which has this button.
   setEnabled(document.getElementById("setDefaultButton"), false);
@@ -800,7 +831,7 @@ function onRemoveAccount(event) {
   // Either the default account was deleted so there is a new one
   // or the default account was not changed. Either way, there is
   // no need to unmark the old one.
-  markDefaultServer(getDefaultAccount(), null);
+  markDefaultServer(MailServices.accounts.defaultAccount, null);
 }
 
 function saveAccount(accountValues, account)
@@ -957,7 +988,7 @@ function updateItems(tree, account, addAccountItem, setDefaultItem, removeItem) 
     // problem. Either way, we don't want the user to act on it.
     let server = account.incomingServer;
 
-    if (account != getDefaultAccount() &&
+    if (account != MailServices.accounts.defaultAccount &&
         server.canBeDefaultServer && account.identities.length > 0)
       canSetDefault = true;
 
@@ -1016,7 +1047,7 @@ function onAccountTreeSelect(pageId, account)
     if (tree.view.selection.count < 1)
       return false;
 
-    let node = tree.contentView.getItemAtIndex(tree.currentIndex);
+    let node = tree.view.getItemAtIndex(tree.currentIndex);
     account = ("_account" in node) ? node._account : null;
 
     pageId = node.getAttribute("PageTag")
@@ -1130,9 +1161,11 @@ function pageURL(pageId)
 
 function loadPage(pageId)
 {
-  const LOAD_FLAGS_NONE = Ci.nsIWebNavigation.LOAD_FLAGS_NONE;
-  document.getElementById("contentFrame").webNavigation.loadURI(pageURL(pageId),
-    LOAD_FLAGS_NONE, null, null, null);
+  const loadURIOptions = {
+    triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
+  };
+  document.getElementById("contentFrame")
+          .webNavigation.loadURI(pageURL(pageId), loadURIOptions);
 }
 
 // save the values of the widgets to the given server
@@ -1333,7 +1366,7 @@ function getFormElementValue(formElement) {
       return null;
     }
     if ((type == "textbox") || ("value" in formElement)) {
-      return formElement.value;
+      return formElement.value.trim();
     }
     return null;
   }
@@ -1412,18 +1445,6 @@ function getCurrentAccount()
 }
 
 /**
- * Returns the default account without throwing exception if there is none.
- * The account manager can be opened even if there are no account yet.
- */
-function getDefaultAccount() {
-  try {
-    return MailServices.accounts.defaultAccount;
-  } catch (e) {
-    return null; // No default account yet.
-  }
-}
-
-/**
  * Get the array of persisted form elements for the given page.
  */
 function getPageFormElements() {
@@ -1478,8 +1499,7 @@ var gAccountTree = {
   },
   onServerChanged: function at_onServerChanged(aServer) {},
 
-  _dataStore: Cc["@mozilla.org/xul/xulstore;1"]
-                .getService(Ci.nsIXULStore),
+  _dataStore: Services.xulStore,
 
   /**
    * Retrieve from XULStore.json whether the account should be expanded (open)
@@ -1557,15 +1577,10 @@ var gAccountTree = {
           panelsToKeep.push(panels[3]);
 
         // extensions
-        let catMan = Cc["@mozilla.org/categorymanager;1"]
-                       .getService(Ci.nsICategoryManager);
         const CATEGORY = "mailnews-accountmanager-extensions";
-        let catEnum = catMan.enumerateCategory(CATEGORY);
-        while (catEnum.hasMoreElements()) {
-          let entryName = null;
+        for (let {data} of Services.catMan.enumerateCategory(CATEGORY)) {
           try {
-            entryName = catEnum.getNext().QueryInterface(Ci.nsISupportsCString).data;
-            let svc = Cc[catMan.getCategoryEntry(CATEGORY, entryName)]
+            let svc = Cc[Services.catMan.getCategoryEntry(CATEGORY, data)]
                         .getService(Ci.nsIMsgAccountManagerExtension);
             if (svc.showPanel(server)) {
               let bundleName = "chrome://" + svc.chromePackageName +
@@ -1577,7 +1592,7 @@ var gAccountTree = {
           } catch(e) {
             // Fetching of this extension panel failed so do not show it,
             // just log error.
-            let extName = entryName || "(unknown)";
+            let extName = data || "(unknown)";
             Cu.reportError("Error accessing panel from extension '" +
                            extName + "': " + e);
           }
@@ -1622,7 +1637,7 @@ var gAccountTree = {
           kidtreeitem.appendChild(kidtreerow);
           var kidtreecell = document.createElement("treecell");
           kidtreerow.appendChild(kidtreecell);
-          kidtreecell.setAttribute("label", panel.string);
+          setAccountLabel(null, kidtreecell, panel.string);
           kidtreeitem.setAttribute("PageTag", panel.src);
           kidtreeitem._account = account;
         }
@@ -1637,7 +1652,7 @@ var gAccountTree = {
       treeitem._account = account;
     }
 
-    markDefaultServer(getDefaultAccount(), null);
+    markDefaultServer(MailServices.accounts.defaultAccount, null);
 
     // Now add the outgoing server node.
     var treeitem = document.createElement("treeitem");

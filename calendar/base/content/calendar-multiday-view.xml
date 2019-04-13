@@ -3,6 +3,11 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from ../../resources/content/mouseoverPreviews.js -->
+<!-- import-globals-from calendar-dnd-listener.js -->
+<!-- import-globals-from calendar-ui-utils.js -->
+<!-- import-globals-from calendar-views.js -->
+
 <!DOCTYPE bindings SYSTEM "chrome://global/locale/global.dtd" >
 
 <bindings id="calendar-multiday-view-bindings"
@@ -30,9 +35,10 @@
       <field name="mDayStartHour">0</field>
       <field name="mDayEndHour">24</field>
 
-      <constructor>
+      <constructor><![CDATA[
           this.relayout();
-      </constructor>
+          this.dispatchEvent(new CustomEvent("bindingattached", { bubbles: false }));
+      ]]></constructor>
 
       <method name="setDayStartEndHours">
         <parameter name="aDayStartHour"/>
@@ -41,7 +47,7 @@
             if (aDayStartHour * 60 < this.mStartMin ||
                 aDayStartHour > aDayEndHour ||
                 aDayEndHour * 60 > this.mEndMin) {
-                throw Components.results.NS_ERROR_INVALID_ARG;
+                throw Cr.NS_ERROR_INVALID_ARG;
             }
             if (this.mDayStartHour != aDayStartHour ||
                 this.mDayEndHour != aDayEndHour) {
@@ -92,12 +98,12 @@
 
       <method name="relayout">
         <body><![CDATA[
-            ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+            const { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
             let topbox = document.getAnonymousElementByAttribute(this, "anonid", "topbox");
             let orient = topbox.getAttribute("orient");
 
             function makeTimeBox(timestr, size) {
-                let box = createXULElement("box");
+                let box = document.createXULElement("box");
                 box.setAttribute("orient", orient);
 
                 if (orient == "horizontal") {
@@ -106,7 +112,7 @@
                     box.setAttribute("height", size);
                 }
 
-                let label = createXULElement("label");
+                let label = document.createXULElement("label");
                 label.setAttribute("class", "calendar-time-bar-label");
                 label.setAttribute("value", timestr);
                 label.setAttribute("align", "center");
@@ -170,54 +176,6 @@
     </implementation>
   </binding>
 
-  <!--
-     - A simple gripbar that is displayed at the start and end of an
-     - event box.  Needs to handle being dragged and resizing the
-     - event, thus changing its start/end time.
-    -->
-  <binding id="calendar-event-gripbar">
-    <content>
-      <xul:box anonid="thebox"
-               flex="1"
-               pack="center"
-               xbl:inherits="align=whichside">
-        <xul:image xbl:inherits="class"/>
-      </xul:box>
-    </content>
-
-    <implementation>
-      <property name="parentorient">
-        <getter><![CDATA[
-            return this.getAttribute("parentorient");
-        ]]></getter>
-        <setter><![CDATA[
-            let thebox = document.getAnonymousElementByAttribute(this, "anonid", "thebox");
-            this.setAttribute("parentorient", val);
-            thebox.setAttribute("orient", getOtherOrientation(val));
-            return val;
-        ]]></setter>
-      </property>
-
-      <!-- private -->
-      <constructor><![CDATA[
-          this.parentorient = this.getAttribute("parentorient");
-      ]]></constructor>
-    </implementation>
-
-    <handlers>
-      <handler event="mousedown" button="0"><![CDATA[
-          // store the attribute 'whichside' in the event object
-          // but *don't* call stopPropagation(). as soon as the
-          // enclosing event box will receive the event it will
-          // make use of this information in order to invoke the
-          // appropriate action.
-          event.whichside = this.getAttribute("whichside");
-      ]]></handler>
-      <handler event="click" button="0"><![CDATA[
-          event.stopPropagation();
-      ]]></handler>
-    </handlers>
-  </binding>
 
   <!--
      - A column for displaying event boxes in.  One column per
@@ -244,7 +202,7 @@
 
     <implementation>
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+          const { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
           this.mEventInfos = [];
           this.mTimezone = cal.dtz.UTC;
@@ -639,8 +597,8 @@
             configBox.removeAttribute("hidden");
             let minSize = configBox.getOptimalMinSize();
             configBox.setAttribute("hidden", "true");
-            this.mMinDuration = Components.classes["@mozilla.org/calendar/duration;1"]
-                                              .createInstance(Components.interfaces.calIDuration);
+            this.mMinDuration = Cc["@mozilla.org/calendar/duration;1"]
+                                  .createInstance(Ci.calIDuration);
             this.mMinDuration.minutes = Math.trunc(minSize / this.mPixPerMin);
 
             let theMin = this.mStartMin;
@@ -651,7 +609,7 @@
                     dur = 60;
                 }
 
-                let box = createXULElement("spacer");
+                let box = document.createXULElement("spacer");
                 // we key off this in a CSS selector
                 box.setAttribute("orient", orient);
                 box.setAttribute("class", "calendar-event-column-linebox");
@@ -705,7 +663,7 @@
             // First of all we create a xul:stack which
             // will hold all events for this event column.
             // The stack will be grouped below .../calendar-event-column/stack/topbox.
-            let stack = createXULElement("stack");
+            let stack = document.createXULElement("stack");
             stack.setAttribute("flex", "1");
             this.topbox.appendChild(stack);
 
@@ -717,7 +675,7 @@
                 // The event-map (this.mEventMap) contains an array of layers.
                 // For each layer we create a box below the stack just created above.
                 // So each different layer lives in a box that's contained in the stack.
-                let xulColumn = createXULElement("box");
+                let xulColumn = document.createXULElement("box");
                 xulColumn.setAttribute("orient", otherorient);
                 xulColumn.setAttribute("flex", "1");
                 xulColumn.setAttribute("style", "min-width: 1px; min-height: 1px;");
@@ -734,7 +692,7 @@
                 // Each layer contains a list of the columns that
                 // need to be created for a span.
                 for (let column of layer) {
-                    let innerColumn = createXULElement("box");
+                    let innerColumn = document.createXULElement("box");
                     innerColumn.setAttribute("orient", orient);
 
                     let colFlex = column.specialSpan ? columnCount * column.specialSpan : 1;
@@ -755,7 +713,7 @@
                         }
 
                         if (chunk.event) {
-                            let chunkBox = createXULElement("calendar-event-box");
+                            let chunkBox = document.createXULElement("calendar-event-box");
                             let durMinutes = duration.inSeconds / 60;
                             let size = Math.max(durMinutes * this.mPixPerMin, minSize);
                             if (orient == "vertical") {
@@ -801,7 +759,7 @@
                                 boxToEdit = chunkBox;
                             }
                         } else {
-                            let chunkBox = createXULElement("spacer");
+                            let chunkBox = document.createXULElement("spacer");
                             chunkBox.setAttribute("context", this.getAttribute("context"));
                             chunkBox.setAttribute("style", "min-width: 1px; min-height: 1px;");
                             chunkBox.setAttribute("orient", orient);
@@ -822,7 +780,7 @@
 
                 // add last empty column if necessary
                 if (spanTotal < columnCount) {
-                    let lastColumn = createXULElement("box");
+                    let lastColumn = document.createXULElement("box");
                     lastColumn.setAttribute("orient", orient);
                     lastColumn.setAttribute("flex", columnCount - spanTotal);
                     lastColumn.style.minWidth = "1px";
@@ -1463,6 +1421,8 @@
                 document.calendarEventColumnDragging = null;
                 col.mDragState = null;
 
+                var item = dragState.dragOccurrence;
+
                 // the multiday view currently exhibits a less than optimal strategy
                 // in terms of item selection. items don't get automatically selected
                 // when clicked and dragged, as to differentiate inline editing from
@@ -1801,7 +1761,7 @@
         <body><![CDATA[
             if (!cal.acl.isCalendarWritable(aOccurrence.calendar) ||
                 !cal.acl.userCanModifyItem(aOccurrence) ||
-                (aOccurrence.calendar instanceof Components.interfaces.calISchedulingSupport && aOccurrence.calendar.isInvitation(aOccurrence)) ||
+                (aOccurrence.calendar instanceof Ci.calISchedulingSupport && aOccurrence.calendar.isInvitation(aOccurrence)) ||
                 aOccurrence.calendar.getProperty("capabilities.events.supported") === false) {
                 return;
             }
@@ -1942,7 +1902,7 @@
         <parameter name="aFirstColumn"/>
         <parameter name="aLastColumn"/>
         <body><![CDATA[
-            ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+            const { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
             if (!this.mDragState) {
                 return;
             }
@@ -1986,7 +1946,7 @@
         <body><![CDATA[
             if (aDayStartMin < this.mStartMin || aDayStartMin > aDayEndMin ||
                 aDayEndMin > this.mEndMin) {
-                throw Components.results.NS_ERROR_INVALID_ARG;
+                throw Cr.NS_ERROR_INVALID_ARG;
             }
             if (this.mDayStartMin != aDayStartMin || this.mDayEndMin != aDayEndMin) {
                 this.mDayStartMin = aDayStartMin;
@@ -2021,7 +1981,7 @@
     <handlers>
       <handler event="dblclick" button="0"><![CDATA[
           if (this.calendarView.controller) {
-              let newStart = getClickedDateTime(event);
+              let newStart = this.getClickedDateTime(event);
               this.calendarView.controller.createNewEvent(null, newStart, null);
           }
       ]]></handler>
@@ -2034,7 +1994,7 @@
       ]]></handler>
 
       <handler event="click" button="2"><![CDATA[
-          let newStart = getClickedDateTime(event);
+          let newStart = this.getClickedDateTime(event);
           this.calendarView.selectedDateTime = newStart;
       ]]></handler>
 
@@ -2104,8 +2064,6 @@
     <implementation>
       <field name="mItemBoxes">null</field>
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-
           this.mItemBoxes = [];
       ]]></constructor>
 
@@ -2140,7 +2098,7 @@
                 return;
             }
 
-            let itemBox = createXULElement("calendar-editable-item");
+            let itemBox = document.createXULElement("calendar-editable-item");
             this.appendChild(itemBox);
             itemBox.calendarView = this.calendarView;
             itemBox.occurrence = aItem;
@@ -2225,13 +2183,6 @@
               // In vertical view (normal), don't let the parent multiday view
               // handle the scrolling in its bubbling phase. The default action
               // will make the box scroll here.
-
-              // TODO We could scroll by the height of exactly one event box, but
-              // since a normal box's boxObject doesn't implement ScrollBoxObject,
-              // there is no way to scroll by pixels. Using a xul:scrollbox has
-              // problems since the equalsize attribute isn't inherited by the
-              // inner box, and even if that is worked around, something makes the
-              // rotated view look bad in that case.
               event.stopPropagation();
           }
       ]]></handler>
@@ -2269,19 +2220,15 @@
                                wrap="true"/>
                   <xul:label anonid="event-location" class="calendar-event-details-core location-desc" crop="end"/>
                 </xul:vbox>
+                <xul:hbox anonid="alarm-icons-box"
+                          class="alarm-icons-box"
+                          align="top"
+                          xbl:inherits="flashing"/>
+                <xul:image anonid="item-classification-box"
+                           class="item-classification-box"/>
               </xul:hbox>
               <xul:stack mousethrough="always">
                 <xul:calendar-category-box anonid="category-box" xbl:inherits="categories" pack="end" />
-                <xul:hbox align="right">
-                  <xul:hbox anonid="alarm-icons-box"
-                            class="alarm-icons-box"
-                            pack="end"
-                            align="top"
-                            xbl:inherits="flashing"/>
-                  <xul:image anonid="item-classification-box"
-                             class="item-classification-box"
-                             pack="end"/>
-                </xul:hbox>
               </xul:stack>
               <xul:box xbl:inherits="orient">
                 <xul:calendar-event-gripbar anonid="gripbar1"
@@ -2307,8 +2254,6 @@
 
     <implementation>
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-
           this.orient = this.getAttribute("orient");
       ]]></constructor>
 
@@ -2332,11 +2277,11 @@
 
             if (needsrelayout) {
                 let eventbox = document.getAnonymousElementByAttribute(this, "anonid", "eventbox");
-                eventbox.setAttribute("orient", val);
+                eventbox.setAttribute("orient", aVal);
                 let gb1 = document.getAnonymousElementByAttribute(this, "anonid", "gripbar1");
-                gb1.parentorient = val;
+                gb1.parentorient = aVal;
                 let gb2 = document.getAnonymousElementByAttribute(this, "anonid", "gripbar2");
-                gb2.parentorient = val;
+                gb2.parentorient = aVal;
             }
 
             return ret;
@@ -2524,29 +2469,19 @@
 
     <implementation implements="calICalendarView">
       <constructor><![CDATA[
-          ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-
           // get day start/end hour from prefs and set on the view
-          this.setDayStartEndMinutes(Preferences.get("calendar.view.daystarthour", 8) * 60,
-                                     Preferences.get("calendar.view.dayendhour", 17) * 60);
+          this.setDayStartEndMinutes(Services.prefs.getIntPref("calendar.view.daystarthour", 8) * 60,
+                                     Services.prefs.getIntPref("calendar.view.dayendhour", 17) * 60);
 
           // initially scroll to the day start hour in the view
           this.scrollToMinute(this.mDayStartMin);
 
           // get visible hours from prefs and set on the view
-          let visibleMinutes = Preferences.get("calendar.view.visiblehours", 9) * 60;
+          let visibleMinutes = Services.prefs.getIntPref("calendar.view.visiblehours", 9) * 60;
           this.setVisibleMinutes(visibleMinutes);
 
-          // set the flex attribute at the scrollbox-innerbox
-          // (this can be removed, after Bug 343555 is fixed)
-          let scrollbox = document.getAnonymousElementByAttribute(
-                         this, "anonid", "scrollbox");
-          document.getAnonymousElementByAttribute(
-              scrollbox, "class", "box-inherit scrollbox-innerbox").flex = "1";
-
           // set the time interval for the time indicator timer
-          this.setTimeIndicatorInterval(Preferences.get("calendar.view.timeIndicatorInterval", 15));
+          this.setTimeIndicatorInterval(Services.prefs.getIntPref("calendar.view.timeIndicatorInterval", 15));
           this.enableTimeIndicator();
 
           this.reorient();
@@ -2570,7 +2505,7 @@
             // range [0, 1440], we change it into the nearest limit (0 or 1440).
             let newTimeInterval = Math.max(0, Math.min(1440, aPrefInterval));
             if (newTimeInterval != aPrefInterval) {
-                Preferences.set("calendar.view.timeIndicatorInterval", newTimeInterval);
+                Services.prefs.setIntPref("calendar.view.timeIndicatorInterval", newTimeInterval);
             }
 
             if (newTimeInterval != this.mTimeIndicatorInterval) {
@@ -2646,7 +2581,11 @@
             // Update the position of the indicator.
             let position = Math.round(this.mPixPerMin * this.mTimeIndicatorMinutes) - 1;
             let posAttr = (this.orient == "vertical" ? "top: " : "left: ");
-            this.timeBarTimeIndicator.setAttribute("style", posAttr + position + "px;");
+
+            if (this.timeBarTimeIndicator) {
+                this.timeBarTimeIndicator.setAttribute("style", posAttr + position + "px;");
+            }
+
             let todayColumn = this.findColumnForDate(this.today());
             if (todayColumn) {
                 todayColumn.column.timeIndicatorBox.setAttribute("style", "margin-" + posAttr + position + "px;");
@@ -2659,7 +2598,7 @@
         <parameter name="aTopic"/>
         <parameter name="aPreference"/>
         <body><![CDATA[
-            aSubject.QueryInterface(Components.interfaces.nsIPrefBranch);
+            aSubject.QueryInterface(Ci.nsIPrefBranch);
             switch (aPreference) {
                 case "calendar.view.daystarthour":
                     this.setDayStartEndMinutes(aSubject.getIntPref(aPreference) * 60,
@@ -2743,6 +2682,16 @@
       <field name="mModeHandler">null</field>
       <field name="mTimeIndicatorMinutes">0</field>
 
+      <field name="mTimezoneObserver"><![CDATA[
+        ({
+            observe: () => {
+                this.timezone = cal.dtz.defaultTimezone;
+                this.refreshView();
+                this.updateTimeIndicatorPosition(true);
+            }
+        })
+      ]]></field>
+
       <method name="flashAlarm">
         <parameter name="aAlarmItem"/>
         <parameter name="aStop"/>
@@ -2756,8 +2705,8 @@
                 }
             }
 
-            let showIndicator = Preferences.get("calendar.alarms.indicator.show", true);
-            let totaltime = Preferences.get("calendar.alarms.indicator.totaltime", 3600);
+            let showIndicator = Services.prefs.getBoolPref("calendar.alarms.indicator.show", true);
+            let totaltime = Services.prefs.getIntPref("calendar.alarms.indicator.totaltime", 3600);
 
             if (!aStop && (!showIndicator || totaltime < 1)) {
                 // No need to animate if the indicator should not be shown.
@@ -2913,7 +2862,7 @@
             if (this.mStartDate && this.mEndDate) {
                 let date = this.mStartDate.clone();
                 while (date.compare(this.mEndDate) <= 0) {
-                    dates.push(d.clone());
+                    dates.push(date.clone());
                     date.day += 1;
                 }
             } else if (this.mDateList) {
@@ -3182,10 +3131,15 @@
         ]]></setter>
       </property>
 
+      <property name="timebar" readonly="true">
+        <getter><![CDATA[
+            return document.getAnonymousElementByAttribute(this, "anonid", "timebar");
+        ]]></getter>
+      </property>
+
       <property name="timeBarTimeIndicator" readonly="true">
         <getter><![CDATA[
-            let timebar = document.getAnonymousElementByAttribute(this, "anonid", "timebar");
-            return document.getAnonymousElementByAttribute(timebar, "anonid", "timeIndicatorBoxTimeBar");
+            return document.getAnonymousElementByAttribute(this.timebar, "anonid", "timeIndicatorBoxTimeBar");
         ]]></getter>
       </property>
 
@@ -3297,7 +3251,7 @@
             }
             this.mDateList = computedDateList;
 
-            // unselect previous selected event upon switch views, otherwise those
+            // deselect previous selected event upon switch views, otherwise those
             // events will stay selected forever, if select other events after
             // change week view.
             this.setSelectedItems(0, [], true);
@@ -3346,7 +3300,7 @@
                     dayEventsBox.removeAttribute("relation");
                     dayEventsBox.mEventInfos = [];
                 } else {
-                    dayEventsBox = createXULElement("calendar-event-column");
+                    dayEventsBox = document.createXULElement("calendar-event-column");
                     dayEventsBox.setAttribute("flex", "1");
                     daybox.appendChild(dayEventsBox);
                 }
@@ -3362,7 +3316,7 @@
                         dayHeaderBox.deleteEvent(dayHeaderBox.mItemBoxes[num-1].occurrence);
                     }
                 } else {
-                    dayHeaderBox = createXULElement("calendar-header-container");
+                    dayHeaderBox = document.createXULElement("calendar-header-container");
                     dayHeaderBox.setAttribute("flex", "1");
                     headerdaybox.appendChild(dayHeaderBox);
                 }
@@ -3380,7 +3334,7 @@
                     labelbox = labelboxkids[counter];
                     labelbox.date = date;
                 } else {
-                    labelbox = createXULElement("calendar-day-label");
+                    labelbox = document.createXULElement("calendar-day-label");
                     labelbox.setAttribute("orient", otherorient);
                     this.labeldaybox.appendChild(labelbox);
                     labelbox.date = date;
@@ -3755,20 +3709,19 @@
         <parameter name="aMinute"/>
         <body><![CDATA[
             let scrollbox = document.getAnonymousElementByAttribute(this, "anonid", "scrollbox");
-            let scrollBoxObject = scrollbox.boxObject;
             // 'aMinute' will be the first minute showed in the view, so it must
             // belong to the range 0 <-> (24*60 - minutes_showed_in_the_view) but
             // we consider 25 hours instead of 24 to let the view scroll until
             // showing events that start just before 0.00
-            let maxFirstMin = 25 * 60 - Math.round(scrollBoxObject.height / this.mPixPerMin);
+            let maxFirstMin = 25 * 60 - Math.round(scrollbox.boxObject.height / this.mPixPerMin);
             aMinute = Math.min(maxFirstMin, Math.max(0, aMinute));
 
-            if (scrollBoxObject && scrollbox.scrollHeight > 0) {
+            if (scrollbox.scrollHeight > 0) {
                 let pos = Math.round(aMinute * this.mPixPerMin);
                 if (scrollbox.getAttribute("orient") == "horizontal") {
-                    scrollBoxObject.scrollTo(scrollBoxObject.positionX, pos);
+                    scrollbox.scrollTo(scrollbox.scrollLeft, pos);
                 } else {
-                    scrollBoxObject.scrollTo(pos, scrollBoxObject.positionY);
+                    scrollbox.scrollTo(pos, scrollbox.scrollTop);
                 }
             }
 
@@ -3782,9 +3735,15 @@
         <parameter name="aDayStartMin"/>
         <parameter name="aDayEndMin"/>
         <body><![CDATA[
+            if (!("setDayStartEndHours" in this.timebar)) {
+                this.timebar.addEventListener(
+                  "bindingattached", () => this.setDayStartEndMinutes(aDayStartMin, aDayEndMin), { once: true }
+                );
+                return;
+            }
             if (aDayStartMin < this.mStartMin || aDayStartMin > aDayEndMin ||
                 aDayEndMin > this.mEndMin) {
-                throw Components.results.NS_ERROR_INVALID_ARG;
+                throw Cr.NS_ERROR_INVALID_ARG;
             }
             if (this.mDayStartMin != aDayStartMin ||
                 this.mDayEndMin != aDayEndMin) {
@@ -3792,9 +3751,8 @@
                 this.mDayEndMin = aDayEndMin;
 
                 // Also update on the time-bar
-                document.getAnonymousElementByAttribute(this, "anonid", "timebar")
-                        .setDayStartEndHours(this.mDayStartMin / 60,
-                                             this.mDayEndMin / 60);
+                this.timebar.setDayStartEndHours(this.mDayStartMin / 60,
+                                                 this.mDayEndMin / 60);
             }
 
         ]]></body>
@@ -3805,7 +3763,7 @@
         <body><![CDATA[
             if (aVisibleMinutes <= 0 ||
                 aVisibleMinutes > (this.mEndMin - this.mStartMin)) {
-                throw Components.results.NS_ERROR_INVALID_ARG;
+                throw Cr.NS_ERROR_INVALID_ARG;
             }
             if (this.mVisibleMinutes != aVisibleMinutes) {
                 this.mVisibleMinutes = aVisibleMinutes;
@@ -3817,24 +3775,24 @@
       <method name="zoomIn">
         <parameter name="aLevel"/>
         <body><![CDATA[
-            let visibleHours = Preferences.get("calendar.view.visiblehours", 9);
+            let visibleHours = Services.prefs.getIntPref("calendar.view.visiblehours", 9);
             visibleHours += (aLevel || 1);
 
-            Preferences.set("calendar.view.visiblehours", Math.min(visibleHours, 24));
+            Services.prefs.setIntPref("calendar.view.visiblehours", Math.min(visibleHours, 24));
         ]]></body>
       </method>
       <method name="zoomOut">
         <parameter name="aLevel"/>
         <body><![CDATA[
-            let visibleHours = Preferences.get("calendar.view.visiblehours", 9);
+            let visibleHours = Services.prefs.getIntPref("calendar.view.visiblehours", 9);
             visibleHours -= (aLevel || 1);
 
-            Preferences.set("calendar.view.visiblehours", Math.max(1, visibleHours));
+            Services.prefs.setIntPref("calendar.view.visiblehours", Math.max(1, visibleHours));
         ]]></body>
       </method>
       <method name="zoomReset">
         <body><![CDATA[
-            Preferences.set("calendar.view.visiblehours", 9);
+            Services.prefs.setIntPref("calendar.view.visiblehours", 9);
         ]]></body>
       </method>
     </implementation>
@@ -3872,14 +3830,13 @@
 
       <handler event="scroll" phase="bubbling"><![CDATA[
           let scrollbox = document.getAnonymousElementByAttribute(this, "anonid", "scrollbox");
-          let scrollBoxObject = scrollbox.boxObject;
-          if (scrollBoxObject && scrollbox.scrollHeight > 0) {
+          if (scrollbox.scrollHeight > 0) {
               // We need to update the first visible minute, but only if the
               // scrollbox has been sized.
               if (scrollbox.getAttribute("orient") == "horizontal") {
-                  this.mFirstVisibleMinute = Math.round(scrollBoxObject.positionY / this.mPixPerMin);
+                  this.mFirstVisibleMinute = Math.round(scrollbox.scrollTop / this.mPixPerMin);
               } else {
-                  this.mFirstVisibleMinute = Math.round(scrollBoxObject.positionX / this.mPixPerMin);
+                  this.mFirstVisibleMinute = Math.round(scrollbox.scrollLeft / this.mPixPerMin);
               }
           }
       ]]></handler>

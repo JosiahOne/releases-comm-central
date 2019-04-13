@@ -3,23 +3,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+/* import-globals-from ../../../mail/base/content/nsDragAndDrop.js */
+/* import-globals-from ../../../mail/components/addrbook/content/abCommon.js */
+/* import-globals-from ../../../mail/components/compose/content/addressingWidgetOverlay.js */
+/* import-globals-from abResultsPane.js */
+
+var {PluralForm} = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 // Returns the load context for the current window
 function getLoadContext() {
-  return window.QueryInterface(Ci.nsIInterfaceRequestor)
-               .getInterface(Ci.nsIWebNavigation)
-               .QueryInterface(Ci.nsILoadContext);
+  return window.docShell.QueryInterface(Ci.nsILoadContext);
 }
 
 var abFlavorDataProvider = {
   QueryInterface: ChromeUtils.generateQI([Ci.nsIFlavorDataProvider]),
 
-  getFlavorData: function(aTransferable, aFlavor, aData, aDataLen)
-  {
-    if (aFlavor == "application/x-moz-file-promise")
-    {
+  getFlavorData(aTransferable, aFlavor, aData, aDataLen) {
+    if (aFlavor == "application/x-moz-file-promise") {
       var primitive = {};
       aTransferable.getTransferData("text/vcard", primitive, {});
       var vCard = primitive.value.QueryInterface(Ci.nsISupportsString).data;
@@ -38,64 +39,56 @@ var abFlavorDataProvider = {
 
       aData.value = localFile;
     }
-  }
+  },
 };
 
 var abResultsPaneObserver = {
-  onDragStart: function (aEvent, aXferData, aDragAction)
-    {
-      var selectedRows = GetSelectedRows();
+  onDragStart(aEvent, aXferData, aDragAction) {
+    var selectedRows = GetSelectedRows();
 
-      if (!selectedRows)
-        return;
+    if (!selectedRows)
+      return;
 
-      var selectedAddresses = GetSelectedAddresses();
+    var selectedAddresses = GetSelectedAddresses();
 
-      aXferData.data = new TransferData();
-      aXferData.data.addDataForFlavour("moz/abcard", selectedRows);
-      aXferData.data.addDataForFlavour("text/x-moz-address", selectedAddresses);
-      aXferData.data.addDataForFlavour("text/unicode", selectedAddresses);
+    aXferData.data = new TransferData();
+    aXferData.data.addDataForFlavour("moz/abcard", selectedRows);
+    aXferData.data.addDataForFlavour("text/x-moz-address", selectedAddresses);
+    aXferData.data.addDataForFlavour("text/unicode", selectedAddresses);
 
-      let srcDirectory = getSelectedDirectory();
-      // The default allowable actions are copy, move and link, so we need
-      // to restrict them here.
-      if (!srcDirectory.readOnly)
-        // Only allow copy & move from read-write directories.
-        aDragAction.action = Ci.
-                             nsIDragService.DRAGDROP_ACTION_COPY |
-                             Ci.
-                             nsIDragService.DRAGDROP_ACTION_MOVE;
-      else
-        // Only allow copy from read-only directories.
-        aDragAction.action = Ci.
-                             nsIDragService.DRAGDROP_ACTION_COPY;
+    let srcDirectory = getSelectedDirectory();
+    // The default allowable actions are copy, move and link, so we need
+    // to restrict them here.
+    if (!srcDirectory.readOnly)
+      // Only allow copy & move from read-write directories.
+      aDragAction.action = Ci.nsIDragService.DRAGDROP_ACTION_COPY |
+                           Ci.nsIDragService.DRAGDROP_ACTION_MOVE;
+    else
+      // Only allow copy from read-only directories.
+      aDragAction.action = Ci.nsIDragService.DRAGDROP_ACTION_COPY;
 
-      var card = GetSelectedCard();
-      if (card && card.displayName) {
-        let vCard = card.translateTo("vcard");
-        aXferData.data.addDataForFlavour("text/vcard", decodeURIComponent(vCard));
-        aXferData.data.addDataForFlavour("application/x-moz-file-promise-dest-filename", card.displayName + ".vcf");
-        aXferData.data.addDataForFlavour("application/x-moz-file-promise-url", "data:text/vcard," + vCard);
-        aXferData.data.addDataForFlavour("application/x-moz-file-promise", abFlavorDataProvider);
-      }
-    },
-
-  onDrop: function (aEvent, aXferData, aDragSession)
-    {
-    },
-
-  onDragExit: function (aEvent, aDragSession)
-    {
-    },
-
-  onDragOver: function (aEvent, aFlavour, aDragSession)
-    {
-    },
-
-  getSupportedFlavours: function ()
-    {
-      return null;
+    var card = GetSelectedCard();
+    if (card && card.displayName) {
+      let vCard = card.translateTo("vcard");
+      aXferData.data.addDataForFlavour("text/vcard", decodeURIComponent(vCard));
+      aXferData.data.addDataForFlavour("application/x-moz-file-promise-dest-filename", card.displayName + ".vcf");
+      aXferData.data.addDataForFlavour("application/x-moz-file-promise-url", "data:text/vcard," + vCard);
+      aXferData.data.addDataForFlavour("application/x-moz-file-promise", abFlavorDataProvider);
     }
+  },
+
+  onDrop(aEvent, aXferData, aDragSession) {
+  },
+
+  onDragExit(aEvent, aDragSession) {
+  },
+
+  onDragOver(aEvent, aFlavour, aDragSession) {
+  },
+
+  getSupportedFlavours() {
+    return null;
+  },
 };
 
 
@@ -128,8 +121,7 @@ var abDirTreeObserver = {
    *   card in mailing list -> other address book  = MOVE or COPY
    *   read only directory item -> anywhere        = COPY only
    */
-  canDrop: function(index, orientation, dataTransfer)
-  {
+  canDrop(index, orientation, dataTransfer) {
     if (orientation != Ci.nsITreeView.DROP_ON)
       return false;
     if (!dataTransfer.types.includes("moz/abcard")) {
@@ -171,15 +163,15 @@ var abDirTreeObserver = {
     // If target directory is a mailing list, then only allow copies.
     //    if (targetDirectory.isMailList &&
     //   dragSession.dragAction != Ci.nsIDragService.DRAGDROP_ACTION_COPY)
-    //return false;
+    // return false;
 
     var srcDirectory = GetDirectoryFromURI(srcURI);
 
     // Only allow copy from read-only directories.
     if (srcDirectory.readOnly &&
-        dragSession.dragAction != Ci.
-                                  nsIDragService.DRAGDROP_ACTION_COPY)
+        dragSession.dragAction != Ci.nsIDragService.DRAGDROP_ACTION_COPY) {
       return false;
+    }
 
     // Go through the cards checking to see if one of them is a mailing list
     // (if we are attempting a copy) - we can't copy mailing lists as
@@ -190,10 +182,8 @@ var abDirTreeObserver = {
     // The data contains the a string of "selected rows", eg.: "1,2".
     var rows = dataTransfer.getData("moz/abcard").split(",").map(j => parseInt(j, 10));
 
-    for (var j = 0; j < rows.length; j++)
-    {
-      if (gAbView.getCardFromRow(rows[j]).isMailList)
-      {
+    for (var j = 0; j < rows.length; j++) {
+      if (gAbView.getCardFromRow(rows[j]).isMailList) {
         draggingMailList = true;
         break;
       }
@@ -203,9 +193,7 @@ var abDirTreeObserver = {
     // move of mailing lists if we're not going into another mailing list.
     if (draggingMailList &&
         (targetDirectory.isMailList ||
-         dragSession.dragAction == Ci.
-                                   nsIDragService.DRAGDROP_ACTION_COPY))
-    {
+         dragSession.dragAction == Ci.nsIDragService.DRAGDROP_ACTION_COPY)) {
       return false;
     }
 
@@ -218,8 +206,7 @@ var abDirTreeObserver = {
    * tree view calls canDrop just before calling onDrop.
    *
    */
-  onDrop: function(index, orientation, dataTransfer)
-  {
+  onDrop(index, orientation, dataTransfer) {
     var dragSession = dragService.getCurrentSession();
     if (!dragSession)
       return;
@@ -245,8 +232,7 @@ var abDirTreeObserver = {
         // src directory is a mailing list on target directory, no need to copy card
         needToCopyCard = false;
       }
-    }
-    else {
+    } else {
       result = targetURI.split(srcURI);
       if (result[0] != targetURI) {
         // target directory is a mailing list on src directory, no need to copy card
@@ -322,37 +308,29 @@ var abDirTreeObserver = {
     document.getElementById("statusText").label = cardsTransferredText;
   },
 
-  onToggleOpenState: function()
-  {
+  onToggleOpenState() {
   },
 
-  onCycleHeader: function(colID, elt)
-  {
+  onCycleHeader(colID, elt) {
   },
 
-  onCycleCell: function(row, colID)
-  {
+  onCycleCell(row, colID) {
   },
 
-  onSelectionChanged: function()
-  {
+  onSelectionChanged() {
   },
 
-  onPerformAction: function(action)
-  {
+  onPerformAction(action) {
   },
 
-  onPerformActionOnRow: function(action, row)
-  {
+  onPerformActionOnRow(action, row) {
   },
 
-  onPerformActionOnCell: function(action, row, colID)
-  {
-  }
-}
+  onPerformActionOnCell(action, row, colID) {
+  },
+};
 
-function DragAddressOverTargetControl(event)
-{
+function DragAddressOverTargetControl(event) {
   var dragSession = gDragService.getCurrentSession();
 
   if (!dragSession.isDataFlavorSupported("text/x-moz-address"))
@@ -365,18 +343,14 @@ function DragAddressOverTargetControl(event)
 
   var canDrop = true;
 
-  for ( var i = 0; i < dragSession.numDropItems; ++i )
-  {
-    dragSession.getData ( trans, i );
-    var dataObj = new Object();
-    var bestFlavor = new Object();
-    var len = new Object();
-    try
-    {
-      trans.getAnyTransferData ( bestFlavor, dataObj, len );
-    }
-    catch (ex)
-    {
+  for (var i = 0; i < dragSession.numDropItems; ++i) {
+    dragSession.getData(trans, i);
+    var dataObj = {};
+    var bestFlavor = {};
+    var len = {};
+    try {
+      trans.getAnyTransferData(bestFlavor, dataObj, len);
+    } catch (ex) {
       canDrop = false;
       break;
     }
@@ -384,33 +358,28 @@ function DragAddressOverTargetControl(event)
   dragSession.canDrop = canDrop;
 }
 
-function DropAddressOverTargetControl(event)
-{
+function DropAddressOverTargetControl(event) {
   var dragSession = gDragService.getCurrentSession();
 
   var trans = Cc["@mozilla.org/widget/transferable;1"].createInstance(Ci.nsITransferable);
   trans.addDataFlavor("text/x-moz-address");
 
-  for ( var i = 0; i < dragSession.numDropItems; ++i )
-  {
-    dragSession.getData ( trans, i );
-    var dataObj = new Object();
-    var bestFlavor = new Object();
-    var len = new Object();
+  for (var i = 0; i < dragSession.numDropItems; ++i) {
+    dragSession.getData(trans, i);
+    var dataObj = {};
+    var bestFlavor = {};
+    var len = {};
 
     // Ensure we catch any empty data that may have slipped through
-    try
-    {
-      trans.getAnyTransferData ( bestFlavor, dataObj, len);
-    }
-    catch (ex)
-    {
+    try {
+      trans.getAnyTransferData(bestFlavor, dataObj, len);
+    } catch (ex) {
       continue;
     }
 
-    if ( dataObj )
+    if (dataObj)
       dataObj = dataObj.value.QueryInterface(Ci.nsISupportsString);
-    if ( !dataObj )
+    if (!dataObj)
       continue;
 
     // pull the address out of the data object

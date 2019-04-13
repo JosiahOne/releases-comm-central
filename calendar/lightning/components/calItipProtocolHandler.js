@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 var ITIP_HANDLER_MIMETYPE = "application/x-itip-internal";
 var ITIP_HANDLER_PROTOCOL = "moz-cal-handle-itip";
@@ -11,12 +11,13 @@ var NS_ERROR_WONT_HANDLE_CONTENT = 0x805d0001;
 
 
 function NYI() {
-    throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+    throw Cr.NS_ERROR_NOT_IMPLEMENTED;
 }
 
-function ItipChannel(URI) {
+function ItipChannel(URI, aLoadInfo) {
     this.wrappedJSObject = this;
     this.URI = this.originalURI = URI;
+    this.loadInfo = aLoadInfo;
 }
 ItipChannel.prototype = {
     QueryInterface: ChromeUtils.generateQI([Ci.nsIChannel, Ci.nsIRequest]),
@@ -31,15 +32,15 @@ ItipChannel.prototype = {
     securityInfo: null,
 
     open: NYI,
-    asyncOpen: function(observer, ctxt) {
-        observer.onStartRequest(this, ctxt);
+    asyncOpen: function(observer) {
+        observer.onStartRequest(this, null);
     },
     asyncRead: function(listener, ctxt) {
         return listener.onStartRequest(this, ctxt);
     },
 
     isPending: function() { return true; },
-    status: Components.results.NS_OK,
+    status: Cr.NS_OK,
     cancel: function(status) { this.status = status; },
     suspend: NYI,
     resume: NYI,
@@ -57,20 +58,14 @@ ItipProtocolHandler.prototype = {
     isSecure: false,
     newURI: function(spec, charSet, baseURI) {
         dump("Creating new URI for " + spec + "\n");
-        return Components.classes["@mozilla.org/network/standard-url-mutator;1"]
-                         .createInstance(Ci.nsIStandardURLMutator)
-                         .init(Ci.nsIStandardURL.URLTYPE_STANDARD, 0,
-                               spec, charSet, baseURI)
-                         .finalize();
+        return Cc["@mozilla.org/network/standard-url-mutator;1"]
+                 .createInstance(Ci.nsIStandardURLMutator)
+                 .init(Ci.nsIStandardURL.URLTYPE_STANDARD, 0, spec, charSet, baseURI)
+                 .finalize();
     },
-
-    newChannel: function(URI) {
-        return this.newChannel2(URI, null);
-    },
-
-    newChannel2: function(URI, aLoadInfo) {
+    newChannel: function(URI, aLoadInfo) {
         dump("Creating new ItipChannel for " + URI + "\n");
-        return new ItipChannel(URI);
+        return new ItipChannel(URI, aLoadInfo);
     },
 };
 

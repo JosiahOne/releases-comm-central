@@ -18,8 +18,6 @@
  *   connect(<originHost>, <originPort>[, ("starttls" | "ssl" | "udp")
  *           [, <proxy>[, <host>, <port>]]])
  *   disconnect()
- *   listen(<port>)
- *   stopListening()
  *   sendData(String <data>[, <logged data>])
  *   sendString(String <data>[, <encoding>[, <logged data>]])
  *   sendBinaryData(<arraybuffer data>)
@@ -36,7 +34,7 @@
  *   connectTimeout (default is no timeout)
  *   readWriteTimeout (default is no timeout)
  *   disconnected
- *   sslStatus
+ *   secInfo
  *
  * Users should "subclass" this object, i.e. set their .__proto__ to be it. And
  * then implement:
@@ -78,19 +76,22 @@
 
 this.EXPORTED_SYMBOLS = ["Socket"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/ArrayBufferUtils.jsm");
-ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/hiddenWindow.jsm");
+const {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {
+  ArrayBufferToBytes,
+  ArrayBufferToHexString,
+} = ChromeUtils.import("resource:///modules/ArrayBufferUtils.jsm");
+var {
+  setTimeout,
+  clearTimeout,
+  executeSoon,
+} = ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+var {getHiddenHTMLWindow} = ChromeUtils.import("resource:///modules/hiddenWindow.jsm");
 
 // Network errors see: xpcom/base/nsError.h
 var NS_ERROR_MODULE_NETWORK = 2152398848;
-var NS_ERROR_CONNECTION_REFUSED = NS_ERROR_MODULE_NETWORK + 13;
 var NS_ERROR_NET_TIMEOUT = NS_ERROR_MODULE_NETWORK + 14;
 var NS_ERROR_NET_RESET = NS_ERROR_MODULE_NETWORK + 20;
-var NS_ERROR_UNKNOWN_HOST = NS_ERROR_MODULE_NETWORK + 30;
-var NS_ERROR_UNKNOWN_PROXY_HOST = NS_ERROR_MODULE_NETWORK + 42;
-var NS_ERROR_PROXY_CONNECTION_REFUSED = NS_ERROR_MODULE_NETWORK + 72;
 
 var BinaryInputStream =
   Components.Constructor("@mozilla.org/binaryinputstream;1",
@@ -101,9 +102,6 @@ var BinaryOutputStream =
 var ScriptableInputStream =
   Components.Constructor("@mozilla.org/scriptableinputstream;1",
                          "nsIScriptableInputStream", "init");
-var ServerSocket =
-  Components.Constructor("@mozilla.org/network/server-socket;1",
-                         "nsIServerSocket", "init");
 var InputStreamPump =
   Components.Constructor("@mozilla.org/network/input-stream-pump;1",
                          "nsIInputStreamPump", "init");
@@ -130,8 +128,8 @@ var Socket = {
   connectTimeout: 0,
   readWriteTimeout: 0,
 
-  // A nsISSLStatus instance giving details about the certificate error.
-  sslStatus: null,
+  // A nsITransportSecurityInfo instance giving details about the certificate error.
+  secInfo: null,
 
   /*
    *****************************************************************************
@@ -142,8 +140,8 @@ var Socket = {
   // It connects to aHost and aPort, but uses aOriginHost and aOriginPort for
   // checking the certificate for them (see nsIRoutedSocketTransportService
   // in nsISocketTransportService.idl).
-  connect: function(aOriginHost, aOriginPort, aSecurity, aProxy,
-                    aHost = aOriginHost, aPort = aOriginPort) {
+  connect(aOriginHost, aOriginPort, aSecurity, aProxy,
+          aHost = aOriginHost, aPort = aOriginPort) {
     if (Services.io.offline)
       throw Cr.NS_ERROR_FAILURE;
 
@@ -180,7 +178,7 @@ var Socket = {
         // This will return null when the result is known immediately and
         // the callback will just be dispatched to the current thread.
         this._proxyCancel = proxyService.asyncResolve(uri, this.proxyFlags, this);
-      } catch(e) {
+      } catch (e) {
         Cu.reportError(e);
         // We had some error getting the proxy service, just don't use one.
         this._createTransport(null);
@@ -189,7 +187,7 @@ var Socket = {
   },
 
   // Disconnect all open streams.
-  disconnect: function() {
+  disconnect() {
     this.LOG("Disconnect");
 
     // Don't handle any remaining unhandled data.
@@ -228,38 +226,21 @@ var Socket = {
     this.disconnected = true;
   },
 
-  // Listen for a connection on a port.
-  // XXX take a timeout and then call stopListening
-  listen: function(aPort) {
-    this.LOG("Listening on port " + aPort);
-
-    this.serverSocket = new ServerSocket(aPort, false, -1);
-    this.serverSocket.asyncListen(this);
-  },
-
-  // Stop listening for a connection.
-  stopListening: function() {
-    this.LOG("Stop listening");
-    // Close the socket to stop listening.
-    if ("serverSocket" in this)
-      this.serverSocket.close();
-  },
-
   // Send data on the output stream. Provide aLoggedData to log something
   // different than what is actually sent.
-  sendData: function(/* string */ aData, aLoggedData = aData) {
+  sendData(/* string */ aData, aLoggedData = aData) {
     this.LOG("Sending:\n" + aLoggedData);
 
     try {
       this._outputStream.write(aData, aData.length);
-    } catch(e) {
+    } catch (e) {
       Cu.reportError(e);
     }
   },
 
   // Send a string to the output stream after converting the encoding. Provide
   // aLoggedData to log something different than what is actually sent.
-  sendString: function(aString, aEncoding = "UTF-8", aLoggedData = aString) {
+  sendString(aString, aEncoding = "UTF-8", aLoggedData = aString) {
     this.LOG("Sending:\n" + aLoggedData);
 
     let converter = new ScriptableUnicodeConverter();
@@ -267,12 +248,12 @@ var Socket = {
     try {
       let stream = converter.convertToInputStream(aString);
       this._outputStream.writeFrom(stream, stream.available());
-    } catch(e) {
+    } catch (e) {
       Cu.reportError(e);
     }
   },
 
-  sendBinaryData: function(/* ArrayBuffer */ aData, aLoggedData) {
+  sendBinaryData(/* ArrayBuffer */ aData, aLoggedData) {
     this.LOG("Sending binary data:\n" + (aLoggedData ||
              "<" + ArrayBufferToHexString(aData) + ">"));
 
@@ -280,21 +261,21 @@ var Socket = {
     try {
       // Send the data as a byte array
       this._binaryOutputStream.writeByteArray(byteArray, byteArray.length);
-    } catch(e) {
+    } catch (e) {
       Cu.reportError(e);
     }
   },
 
   disconnected: true,
 
-  startTLS: function() {
+  startTLS() {
     this.transport.securityInfo.QueryInterface(Ci.nsISSLSocketControl).StartTLS();
   },
 
   // If using the ping functionality, this should be called whenever a message is
   // received (e.g. when it is known the socket is still open). Calling this for
   // the first time enables the ping functionality.
-  resetPingTimer: function() {
+  resetPingTimer() {
     // Clearing and setting timeouts is expensive, so we do it at most
     // once per eventloop spin cycle.
     if (this._resetPingTimerPending)
@@ -304,7 +285,7 @@ var Socket = {
   },
   kTimeBeforePing: 120000, // 2 min
   kTimeAfterPingBeforeDisconnect: 30000, // 30 s
-  _delayedResetPingTimer: function() {
+  _delayedResetPingTimer() {
     if (!this._resetPingTimerPending)
       return;
     delete this._resetPingTimerPending;
@@ -316,7 +297,7 @@ var Socket = {
 
   // If using the ping functionality, this should be called when a ping receives
   // a response.
-  cancelDisconnectTimer: function() {
+  cancelDisconnectTimer() {
     if (!this._disconnectTimer)
       return;
     clearTimeout(this._disconnectTimer);
@@ -326,7 +307,7 @@ var Socket = {
   // Plenty of time may have elapsed if the computer wakes from sleep, so check
   // if we should reconnect immediately.
   _lastAliveTime: null,
-  observe: function(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     if (aTopic != "wake_notification")
       return;
     let elapsedTime = Date.now() - this._lastAliveTime;
@@ -355,7 +336,7 @@ var Socket = {
   /*
    * nsIProtocolProxyCallback methods
    */
-  onProxyAvailable: function(aRequest, aURI, aProxyInfo, aStatus) {
+  onProxyAvailable(aRequest, aURI, aProxyInfo, aStatus) {
     if (!("_proxyCancel" in this)) {
       this.LOG("onProxyAvailable called, but disconnect() was called before.");
       return;
@@ -376,36 +357,11 @@ var Socket = {
   },
 
   /*
-   * nsIServerSocketListener methods
-   */
-  // Called after a client connection is accepted when we're listening for one.
-  onSocketAccepted: function(aServerSocket, aTransport) {
-    this.LOG("onSocketAccepted");
-    // Store the values
-    this.transport = aTransport;
-    this.host = this.transport.host;
-    this.port = this.transport.port;
-
-    this._resetBuffers();
-    this._openStreams();
-
-    this.onConnectionHeard();
-    this.stopListening();
-  },
-  // Called when the listening socket stops for some reason.
-  // The server socket is effectively dead after this notification.
-  onStopListening: function(aSocket, aStatus) {
-    this.LOG("onStopListening");
-    if ("serverSocket" in this)
-      delete this.serverSocket;
-  },
-
-  /*
    * nsIStreamListener methods
    */
   // onDataAvailable, called by Mozilla's networking code.
   // Buffers the data, and parses it into discrete messages.
-  onDataAvailable: function(aRequest, aContext, aInputStream, aOffset, aCount) {
+  onDataAvailable(aRequest, aInputStream, aOffset, aCount) {
     if (this.disconnected)
       return;
     this._lastAliveTime = Date.now();
@@ -455,14 +411,14 @@ var Socket = {
 
   _pendingData: [],
   _handlingQueue: false,
-  _activateQueue: function() {
+  _activateQueue() {
     if (this._handlingQueue)
       return;
     this._handlingQueue =
       this.window.requestIdleCallback(this._handleQueue.bind(this));
   },
   // Asynchronously send each string to the handle data function.
-  _handleQueue: function(timing) {
+  _handleQueue(timing) {
     while (this._pendingData.length) {
       this.onDataReceived(this._pendingData.shift());
       // One pendingData entry generally takes less than 1ms to handle.
@@ -484,7 +440,7 @@ var Socket = {
    * nsIRequestObserver methods
    */
   // Signifies the beginning of an async request
-  onStartRequest: function(aRequest, aContext) {
+  onStartRequest(aRequest) {
     if (this.disconnected) {
       // Ignore this if we're already disconnected.
       return;
@@ -492,7 +448,7 @@ var Socket = {
     this.DEBUG("onStartRequest");
   },
   // Called to signify the end of an asynchronous request.
-  onStopRequest: function(aRequest, aContext, aStatus) {
+  onStopRequest(aRequest, aStatus) {
     if (this.disconnected) {
       // We're already disconnected, so nothing left to do here.
       return;
@@ -504,7 +460,7 @@ var Socket = {
     this._activateQueue();
   },
   // Close the connection after receiving a stop request.
-  _handleStopRequest: function(aStatus) {
+  _handleStopRequest(aStatus) {
     if (this.disconnected)
       return;
     this.disconnected = true;
@@ -533,15 +489,15 @@ var Socket = {
    */
   // Called when there's an error, return true to suppress the modal alert.
   // Whatever this function returns, NSS will close the connection.
-  notifyCertProblem: function(aSocketInfo, aStatus, aTargetSite) {
-    this.sslStatus = aStatus;
+  notifyCertProblem(aSocketInfo, aSecInfo, aTargetSite) {
+    this.secInfo = aSecInfo;
     return true;
   },
 
   /*
    * nsITransportEventSink methods
    */
-  onTransportStatus: function(aTransport, aStatus, aProgress, aProgressmax) {
+  onTransportStatus(aTransport, aStatus, aProgress, aProgressmax) {
     // Don't send status change notifications after the socket has been closed.
     // The event sink can't be removed after opening the transport, so we can't
     // do better than adding a null check here.
@@ -555,10 +511,10 @@ var Socket = {
          0x804b0004: "STATUS_CONNECTED_TO",
          0x804b0005: "STATUS_SENDING_TO",
          0x804b000a: "STATUS_WAITING_FOR",
-         0x804b0006: "STATUS_RECEIVING_FROM"
+         0x804b0006: "STATUS_RECEIVING_FROM",
     };
     let status = nsITransportEventSinkStatus[aStatus];
-    this.DEBUG("onTransportStatus(" + (status || ("0x" + aStatus.toString(16))) +")");
+    this.DEBUG("onTransportStatus(" + (status || ("0x" + aStatus.toString(16))) + ")");
 
     if (status == "STATUS_CONNECTED_TO") {
       // Notify that the connection has been established.
@@ -571,12 +527,12 @@ var Socket = {
    ****************************** Private methods ******************************
    *****************************************************************************
    */
-  _resetBuffers: function() {
+  _resetBuffers() {
     this._incomingDataBuffer = this.binaryMode ? [] : "";
     this._outgoingDataBuffer = [];
   },
 
-  _createTransport: function(aProxy) {
+  _createTransport(aProxy) {
     this.proxy = aProxy;
 
     // Empty incoming and outgoing data storage buffers
@@ -597,7 +553,7 @@ var Socket = {
   },
 
   // Open the incoming and outgoing streams, and init the nsISocketTransport.
-  _openStreams: function() {
+  _openStreams() {
     // Security notification callbacks (must support nsIBadCertListener2
     // for SSL connections, and possibly other interfaces).
     this.transport.securityCallbacks = this;
@@ -619,13 +575,13 @@ var Socket = {
     this._outputStream =
       this.transport.openOutputStream(0, this.outputSegmentSize, -1);
     if (!this._outputStream)
-      throw "Error getting output stream.";
+      throw new Error("Error getting output stream.");
 
     this._inputStream = this.transport.openInputStream(0, // flags
                                                        0, // Use default segment size
                                                        0); // Use default segment count
     if (!this._inputStream)
-      throw "Error getting input stream.";
+      throw new Error("Error getting input stream.");
 
     if (this.binaryMode) {
       // Handle binary mode
@@ -646,7 +602,7 @@ var Socket = {
 
   _pingTimer: null,
   _disconnectTimer: null,
-  _sendPing: function() {
+  _sendPing() {
     delete this._pingTimer;
     this.sendPing();
     this._disconnectTimer = setTimeout(this.onConnectionTimedOut.bind(this),
@@ -658,38 +614,37 @@ var Socket = {
    ********************* Methods for subtypes to override **********************
    *****************************************************************************
    */
-  LOG: function(aString) { },
-  DEBUG: function(aString) { },
+  LOG(aString) { },
+  DEBUG(aString) { },
   // Called when a connection is established.
-  onConnection: function() { },
+  onConnection() { },
   // Called when a socket is accepted after listening.
-  onConnectionHeard: function() { },
+  onConnectionHeard() { },
   // Called when a connection times out.
-  onConnectionTimedOut: function() { },
+  onConnectionTimedOut() { },
   // Called when a socket request's network is reset.
-  onConnectionReset: function() { },
+  onConnectionReset() { },
   // Called when the certificate provided by the server didn't satisfy NSS.
-  onBadCertificate: function(aNSSErrorMessage) { },
+  onBadCertificate(aNSSErrorMessage) { },
   // Called when the other end has closed the connection.
-  onConnectionClosed: function() { },
+  onConnectionClosed() { },
 
   // Called when ASCII data is available.
-  onDataReceived: function(/* string */ aData) { },
+  onDataReceived(/* string */ aData) { },
 
   // Called when binary data is available.
-  onBinaryDataReceived: function(/* ArrayBuffer */ aData) { },
+  onBinaryDataReceived(/* ArrayBuffer */ aData) { },
 
   // If using the ping functionality, this is called when a new ping message
   // should be sent on the socket.
-  sendPing: function() { },
+  sendPing() { },
 
   /* QueryInterface and nsIInterfaceRequestor implementations */
-  QueryInterface: ChromeUtils.generateQI(["nsIServerSocketListener",
-                                          "nsIStreamListener",
+  QueryInterface: ChromeUtils.generateQI(["nsIStreamListener",
                                           "nsIRequestObserver",
                                           "nsITransportEventSink",
                                           "nsIBadCertListener2",
                                           "nsIProtocolProxyCallback"]),
 
-  getInterface: function(iid) { return this.QueryInterface(iid); }
+  getInterface(iid) { return this.QueryInterface(iid); },
 };

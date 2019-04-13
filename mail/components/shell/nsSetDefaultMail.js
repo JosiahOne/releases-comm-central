@@ -10,7 +10,7 @@
  * by making the current executable the "default mail app."
  */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function nsSetDefaultMail() {
 }
@@ -20,7 +20,7 @@ nsSetDefaultMail.prototype = {
   QueryInterface: ChromeUtils.generateQI([Ci.nsICommandLineHandler]),
 
   /* nsICommandLineHandler */
-  handle : function nsSetDefault_handle(cmdline) {
+  handle(cmdline) {
     if (cmdline.handleFlag("setDefaultMail", false)) {
       var shell = Cc["@mozilla.org/mail/shell-service;1"].
                   getService(Ci.nsIShellService);
@@ -28,8 +28,8 @@ nsSetDefaultMail.prototype = {
     }
   },
 
-  helpInfo : "  -setDefaultMail    Set this app as the default mail client.\n",
-  classID: Components.ID("{ED117D0A-F6C2-47d8-8A71-0E15BABD2554}")
+  helpInfo: "  -setDefaultMail    Set this app as the default mail client.\n",
+  classID: Components.ID("{ED117D0A-F6C2-47d8-8A71-0E15BABD2554}"),
 };
 
 var NSGetFactory = XPCOMUtils.generateNSGetFactory([nsSetDefaultMail]);

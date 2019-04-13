@@ -24,6 +24,7 @@
 ]>
 
 <window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         id="activityManager" windowtype="Activity:Manager"
         orient="vertical" title="&activity.title;"
         statictitle="&activity.title;"
@@ -37,6 +38,8 @@
   <script type="application/javascript"
           src="chrome://messenger/content/activity.js"/>
   <script type="application/javascript"
+          src="chrome://messenger/content/activity-widgets.js"/>
+  <script type="application/javascript"
           src="chrome://global/content/contentAreaUtils.js"/>
   <script type="application/javascript"
           src="chrome://global/content/nsDragAndDrop.js"/>
@@ -46,8 +49,6 @@
   <stringbundleset id="activitySet">
     <stringbundle id="brandStrings"
                   src="chrome://branding/locale/brand.properties"/>
-    <stringbundle id="activityStrings"
-                  src="chrome://messenger/locale/activity.properties"/>
   </stringbundleset>
 
   <!-- Use this commandset for command which do not depend on focus or

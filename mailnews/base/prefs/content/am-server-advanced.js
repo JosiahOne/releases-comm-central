@@ -3,8 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+
+document.addEventListener("dialogaccept", onOk);
 
 // pull stuff out of window.arguments
 var gServerSettings = window.arguments[0];
@@ -94,7 +96,7 @@ function onLoad()
   }
 }
 
-function onOk()
+function onOk(event)
 {
   // Handle account deferral settings for POP3 accounts.
   if (gServerSettings.serverType == "pop3")
@@ -108,15 +110,17 @@ function onOk()
     {
       // If the user hasn't selected a folder, keep the default.
       if (!picker.selectedItem)
-        return true;
+        return;
 
       var confirmDeferAccount =
         gPrefsBundle.getString("confirmDeferAccountWarning");
 
       var confirmTitle = gPrefsBundle.getString("confirmDeferAccountTitle");
 
-      if (!Services.prompt.confirm(window, confirmTitle, confirmDeferAccount))
-        return false;
+      if (!Services.prompt.confirm(window, confirmTitle, confirmDeferAccount)) {
+        event.preventDefault();
+        return;
+      }
     }
     switch (radioGroup.value)
     {
@@ -144,8 +148,6 @@ function onOk()
         gServerSettings[slot] = controls[i].value;
     }
   }
-
-  return true;
 }
 
 

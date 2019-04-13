@@ -59,7 +59,7 @@
 
 /* import-globals-from editBookmarkOverlay.js */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 ChromeUtils.defineModuleGetter(this, "PrivateBrowsingUtils",
                                "resource://gre/modules/PrivateBrowsingUtils.jsm");
 
@@ -161,7 +161,7 @@ var BookmarkPropertiesPanel = {
         this._defaultInsertionPoint = dialogInfo.defaultInsertionPoint;
       } else {
         this._defaultInsertionPoint =
-          new InsertionPoint({
+          new PlacesInsertionPoint({
             parentId: PlacesUtils.bookmarksMenuFolderId,
             parentGuid: PlacesUtils.bookmarks.menuGuid
           });

@@ -14,23 +14,20 @@
 
 this.EXPORTED_SYMBOLS = ['GlodaMsgIndexer'];
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/MailUtils.js");
+const {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+const {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+const {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+const {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 
-ChromeUtils.import("resource:///modules/gloda/utils.js");
-ChromeUtils.import("resource:///modules/gloda/datastore.js");
-ChromeUtils.import("resource:///modules/gloda/datamodel.js");
-ChromeUtils.import("resource:///modules/gloda/gloda.js");
-ChromeUtils.import("resource:///modules/gloda/collection.js");
-ChromeUtils.import("resource:///modules/gloda/connotent.js");
-
-ChromeUtils.import("resource:///modules/gloda/indexer.js");
-
-ChromeUtils.import("resource:///modules/gloda/mimemsg.js");
+const {GlodaUtils} = ChromeUtils.import("resource:///modules/gloda/utils.js");
+const {GlodaDatastore} = ChromeUtils.import("resource:///modules/gloda/datastore.js");
+const {GlodaContact, GlodaFolder} = ChromeUtils.import("resource:///modules/gloda/datamodel.js");
+const {Gloda} = ChromeUtils.import("resource:///modules/gloda/gloda.js");
+const {GlodaCollectionManager} = ChromeUtils.import("resource:///modules/gloda/collection.js");
+const {GlodaIndexer, IndexingJob} = ChromeUtils.import("resource:///modules/gloda/indexer.js");
+const {MsgHdrToMimeMessage} = ChromeUtils.import("resource:///modules/gloda/mimemsg.js");
 
 // Cr does not have mailnews error codes!
 var NS_MSG_ERROR_FOLDER_SUMMARY_OUT_OF_DATE = 0x80550005;
@@ -70,23 +67,14 @@ var JUNK_SCORE_PROPERTY = "junkscore";
 var JUNK_SPAM_SCORE_STR = Ci.nsIJunkMailPlugin.IS_SPAM_SCORE.toString();
 var JUNK_HAM_SCORE_STR = Ci.nsIJunkMailPlugin.IS_HAM_SCORE.toString();
 
-var nsIArray = Ci.nsIArray;
-var nsIMsgFolder = Ci.nsIMsgFolder;
-var nsIMsgLocalMailFolder = Ci.nsIMsgLocalMailFolder;
-var nsIMsgImapMailFolder = Ci.nsIMsgImapMailFolder;
-var nsIMsgDBHdr = Ci.nsIMsgDBHdr;
-var nsMsgFolderFlags = Ci.nsMsgFolderFlags;
-var nsMsgMessageFlags = Ci.nsMsgMessageFlags;
-var nsMsgProcessingFlags = Ci.nsMsgProcessingFlags;
-
 /**
  * The processing flags that tell us that a message header has not yet been
  *  reported to us via msgsClassified.  If it has one of these flags, it is
  *  still being processed.
  */
 var NOT_YET_REPORTED_PROCESSING_FLAGS =
-  nsMsgProcessingFlags.NotReportedClassified |
-  nsMsgProcessingFlags.ClassifyJunk;
+  Ci.nsMsgProcessingFlags.NotReportedClassified |
+  Ci.nsMsgProcessingFlags.ClassifyJunk;
 
 // for list comprehension fun
 function* range(begin, end) {
@@ -541,7 +529,7 @@ var GlodaMsgIndexer = {
    *  that the messages are indexed.
    * The reason we allow for queueing messages in an event-driven fashion is
    *  that once we have reached a steady-state, it is preferable to be able to
-   *  deal with new messages and modified meta-data in a prompt fasion rather
+   *  deal with new messages and modified meta-data in a prompt fashion rather
    *  than having to (potentially) walk every folder in the system just to find
    *  the message that the user changed the tag on.
    */
@@ -603,7 +591,7 @@ var GlodaMsgIndexer = {
       // The msf may need to be created or otherwise updated for local folders.
       // This may require yielding until such time as the msf has been created.
       try {
-        if (this._indexingFolder instanceof nsIMsgLocalMailFolder) {
+        if (this._indexingFolder instanceof Ci.nsIMsgLocalMailFolder) {
           this._indexingDatabase =
             this._indexingFolder.getDatabaseWithReparse(null,
                                                         null);
@@ -720,7 +708,7 @@ var GlodaMsgIndexer = {
                             .createInstance(Ci.nsIMsgSearchSession);
       let searchTerms = Cc["@mozilla.org/array;1"]
                          .createInstance(Ci.nsIMutableArray);
-      let isLocal = this._indexingFolder instanceof nsIMsgLocalMailFolder;
+      let isLocal = this._indexingFolder instanceof Ci.nsIMsgLocalMailFolder;
 
       searchSession.addScopeTerm(Ci.nsMsgSearchScope.offlineMail,
                                  this._indexingFolder);
@@ -782,7 +770,7 @@ var GlodaMsgIndexer = {
       if (!isLocal)
       {
         // If the folder is offline, then the message should be too
-        if (this._indexingFolder.flags & Ci.nsMsgFolderFlags.Offline) {
+        if (this._indexingFolder.getFlag(Ci.nsMsgFolderFlags.Offline)) {
           // third term: && Status Is nsMsgMessageFlags.Offline
           searchTerm = searchSession.createTerm();
           searchTerm.booleanAnd = true;
@@ -790,7 +778,7 @@ var GlodaMsgIndexer = {
           searchTerm.op = nsMsgSearchOp.Is;
           value = searchTerm.value;
           value.attrib = searchTerm.attrib;
-          value.status = nsMsgMessageFlags.Offline;
+          value.status = Ci.nsMsgMessageFlags.Offline;
           searchTerm.value = value;
           searchTerms.appendElement(searchTerm);
         }
@@ -802,7 +790,7 @@ var GlodaMsgIndexer = {
         searchTerm.op = nsMsgSearchOp.Isnt;
         value = searchTerm.value;
         value.attrib = searchTerm.attrib;
-        value.status = nsMsgMessageFlags.Expunged;
+        value.status = Ci.nsMsgMessageFlags.Expunged;
         searchTerm.value = value;
         searchTerms.appendElement(searchTerm);
       }
@@ -1157,8 +1145,7 @@ var GlodaMsgIndexer = {
     let numHeadersSeen = 0;
 
     // We are consuming two lists; our loop structure has to reflect that.
-    let headerIter = XPCOMUtils.IterSimpleEnumerator(this._indexingEnumerator,
-                                                     nsIMsgDBHdr);
+    let headerIter = this._indexingEnumerator[Symbol.iterator]();
     let mayHaveMoreGlodaMessages = true;
     let keepIterHeader = false;
     let keepGlodaTuple = false;
@@ -1353,7 +1340,7 @@ var GlodaMsgIndexer = {
     if (glodaFolder.dirtyStatus == glodaFolder.kFolderFilthy) {
       this._indexerGetEnumerator(this.kEnumIndexedMsgs, true);
       let count = 0;
-      for (let msgHdr of fixIterator(this._indexingEnumerator, nsIMsgDBHdr)) {
+      for (let msgHdr of fixIterator(this._indexingEnumerator, Ci.nsIMsgDBHdr)) {
         // we still need to avoid locking up the UI, pause periodically...
         if (++count % HEADER_CHECK_SYNC_BLOCK_SIZE == 0)
           yield this.kWorkSync;
@@ -1411,7 +1398,7 @@ var GlodaMsgIndexer = {
 
       // Pass 2: index the messages.
       let count = 0;
-      for (let msgHdr of fixIterator(this._indexingEnumerator, nsIMsgDBHdr)) {
+      for (let msgHdr of fixIterator(this._indexingEnumerator, Ci.nsIMsgDBHdr)) {
         // per above, we want to periodically release control while doing all
         // this header traversal/investigation.
         if (++count % HEADER_CHECK_SYNC_BLOCK_SIZE == 0)
@@ -2044,7 +2031,7 @@ var GlodaMsgIndexer = {
                                       aMsgHdrs, aDirtyingEvent) {
     let glodaIdsNeedingDeletion = null;
     let messageKeyChangedIds = null, messageKeyChangedNewKeys = null;
-    for (let msgHdr of fixIterator(aMsgHdrs, nsIMsgDBHdr)) {
+    for (let msgHdr of fixIterator(aMsgHdrs, Ci.nsIMsgDBHdr)) {
       // -- Index this folder?
       let msgFolder = msgHdr.folder;
       if (!this.shouldIndexFolder(msgFolder)) {
@@ -2087,10 +2074,10 @@ var GlodaMsgIndexer = {
       // -- Index this message?
       // We index local messages, IMAP messages that are offline, and IMAP
       // messages that aren't offline but whose folders aren't offline either
-      let isFolderLocal = msgFolder instanceof nsIMsgLocalMailFolder;
+      let isFolderLocal = msgFolder instanceof Ci.nsIMsgLocalMailFolder;
       if (!isFolderLocal) {
-        if (!(msgHdr.flags & nsMsgMessageFlags.Offline) &&
-            (msgFolder.flags & nsMsgFolderFlags.Offline)) {
+        if (!(msgHdr.flags & Ci.nsMsgMessageFlags.Offline) &&
+            (msgFolder.getFlag(Ci.nsMsgFolderFlags.Offline))) {
           continue;
         }
       }
@@ -2232,7 +2219,7 @@ var GlodaMsgIndexer = {
       let glodaMessageIds = [];
 
       for (let iMsgHdr = 0; iMsgHdr < aMsgHdrs.length; iMsgHdr++) {
-        let msgHdr = aMsgHdrs.queryElementAt(iMsgHdr, nsIMsgDBHdr);
+        let msgHdr = aMsgHdrs.queryElementAt(iMsgHdr, Ci.nsIMsgDBHdr);
         let [glodaId, glodaDirty] = PendingCommitTracker.getGlodaState(msgHdr);
         if (glodaId >= GLODA_FIRST_VALID_MESSAGE_ID &&
             glodaDirty != GlodaMsgIndexer.kMessageFilthy)
@@ -2311,13 +2298,13 @@ var GlodaMsgIndexer = {
           //  strip the gloda-id's off of all the destination headers because
           //  none of the gloda-id's are valid (and so we certainly don't want
           //  to try and use them as a basis for updating message keys.)
-          let srcMsgFolder = aSrcMsgHdrs.queryElementAt(0, nsIMsgDBHdr).folder;
+          let srcMsgFolder = aSrcMsgHdrs.queryElementAt(0, Ci.nsIMsgDBHdr).folder;
           if (!this.indexer.shouldIndexFolder(srcMsgFolder) ||
               (GlodaDatastore._mapFolder(srcMsgFolder).dirtyStatus ==
                  GlodaFolder.prototype.kFolderFilthy)) {
             // Local case, just modify the destination headers directly.
             if (aDestMsgHdrs) {
-              for (let destMsgHdr of fixIterator(aDestMsgHdrs, nsIMsgDBHdr)) {
+              for (let destMsgHdr of fixIterator(aDestMsgHdrs, Ci.nsIMsgDBHdr)) {
                 // zero it out if it exists
                 // (no need to deal with pending commit issues here; a filthy
                 //  folder by definition has nothing indexed in it.)
@@ -2349,7 +2336,7 @@ var GlodaMsgIndexer = {
                                        " Gloda corruption possible.");
                 return;
               }
-              for (let srcMsgHdr of fixIterator(aSrcMsgHdrs, nsIMsgDBHdr)) {
+              for (let srcMsgHdr of fixIterator(aSrcMsgHdrs, Ci.nsIMsgDBHdr)) {
                 // zero it out if it exists
                 // (no need to deal with pending commit issues here; a filthy
                 //  folder by definition has nothing indexed in it.)
@@ -2373,14 +2360,14 @@ var GlodaMsgIndexer = {
             // (Which means ignore filthy gloda-id's.)
             let glodaIds = [];
             let newMessageKeys = [];
-            aSrcMsgHdrs.QueryInterface(nsIArray);
-            aDestMsgHdrs.QueryInterface(nsIArray);
+            aSrcMsgHdrs.QueryInterface(Ci.nsIArray);
+            aDestMsgHdrs.QueryInterface(Ci.nsIArray);
             // Track whether we see any messages that are not gloda indexed so
             //  we know if we have to mark the destination folder dirty.
             let sawNonGlodaMessage = false;
             for (let iMsg = 0; iMsg < aSrcMsgHdrs.length; iMsg++) {
-              let srcMsgHdr = aSrcMsgHdrs.queryElementAt(iMsg, nsIMsgDBHdr);
-              let destMsgHdr = aDestMsgHdrs.queryElementAt(iMsg, nsIMsgDBHdr);
+              let srcMsgHdr = aSrcMsgHdrs.queryElementAt(iMsg, Ci.nsIMsgDBHdr);
+              let destMsgHdr = aDestMsgHdrs.queryElementAt(iMsg, Ci.nsIMsgDBHdr);
 
               let [glodaId, dirtyStatus] =
                 PendingCommitTracker.getGlodaState(srcMsgHdr);
@@ -2419,9 +2406,9 @@ var GlodaMsgIndexer = {
             let glodaIds = [];
 
             let srcFolderIsLocal =
-              (srcMsgFolder instanceof nsIMsgLocalMailFolder);
+              (srcMsgFolder instanceof Ci.nsIMsgLocalMailFolder);
             for (let iMsgHdr = 0; iMsgHdr < aSrcMsgHdrs.length; iMsgHdr++) {
-              let msgHdr = aSrcMsgHdrs.queryElementAt(iMsgHdr, nsIMsgDBHdr);
+              let msgHdr = aSrcMsgHdrs.queryElementAt(iMsgHdr, Ci.nsIMsgDBHdr);
 
               let [glodaId, dirtyStatus] =
                 PendingCommitTracker.getGlodaState(msgHdr);
@@ -2464,7 +2451,7 @@ var GlodaMsgIndexer = {
           // -- Do not propagate gloda-id's for copies
           // (Only applies if we have the destination header, which means local)
           if (aDestMsgHdrs) {
-            for (let destMsgHdr of fixIterator(aDestMsgHdrs, nsIMsgDBHdr)) {
+            for (let destMsgHdr of fixIterator(aDestMsgHdrs, Ci.nsIMsgDBHdr)) {
               let glodaId = destMsgHdr.getUint32Property(
                 GLODA_MESSAGE_ID_PROPERTY);
               if (glodaId)
@@ -2619,7 +2606,7 @@ var GlodaMsgIndexer = {
      */
     _folderRenameHelper: function gloda_indexer_folderRenameHelper(aOrigFolder,
                                                                    aNewURI) {
-      let newFolder = MailUtils.getFolderForURI(aNewURI);
+      let newFolder = MailUtils.getOrCreateFolder(aNewURI);
       let specialFolderFlags = Ci.nsMsgFolderFlags.Trash | Ci.nsMsgFolderFlags.Junk;
       if (newFolder.isSpecialFolder(specialFolderFlags, true)) {
         let descendentFolders = newFolder.descendants;
@@ -2684,7 +2671,7 @@ var GlodaMsgIndexer = {
       //  with one minor difference.
       if (aEvent == "FolderCompactStart" ||
           aEvent == "FolderReindexTriggered") {
-        let aMsgFolder = aItem.QueryInterface(nsIMsgFolder);
+        let aMsgFolder = aItem.QueryInterface(Ci.nsIMsgFolder);
         // ignore folders we ignore...
         if (!GlodaMsgIndexer.shouldIndexFolder(aMsgFolder))
           return;
@@ -2714,7 +2701,7 @@ var GlodaMsgIndexer = {
         //  it, it already must have been marked dirty.)
       }
       else if (aEvent == "FolderCompactFinish") {
-        let aMsgFolder = aItem.QueryInterface(nsIMsgFolder);
+        let aMsgFolder = aItem.QueryInterface(Ci.nsIMsgFolder);
         // ignore folders we ignore...
         if (!GlodaMsgIndexer.shouldIndexFolder(aMsgFolder))
           return;
@@ -2801,10 +2788,10 @@ var GlodaMsgIndexer = {
       if (aProperty == "Keywords" ||
           // We could care less about the new flag changing.
           (aProperty == "Status" &&
-           (aOldValue ^ aNewValue) != nsMsgMessageFlags.New &&
+           (aOldValue ^ aNewValue) != Ci.nsMsgMessageFlags.New &&
            // We do care about IMAP deletion, but msgsDeleted tells us that, so
            //  ignore IMAPDeleted too...
-           (aOldValue ^ aNewValue) != nsMsgMessageFlags.IMAPDeleted) ||
+           (aOldValue ^ aNewValue) != Ci.nsMsgMessageFlags.IMAPDeleted) ||
           aProperty == "Flagged") {
         GlodaMsgIndexer._reindexChangedMessages([aMsgHdr], true);
       }
@@ -2952,8 +2939,8 @@ var GlodaMsgIndexer = {
     // If the message is offline, then get the message body as well
     let isMsgOffline = false;
     let aMimeMsg;
-    if ((aMsgHdr.flags & nsMsgMessageFlags.Offline) ||
-        (aMsgHdr.folder instanceof nsIMsgLocalMailFolder)) {
+    if ((aMsgHdr.flags & Ci.nsMsgMessageFlags.Offline) ||
+        (aMsgHdr.folder instanceof Ci.nsIMsgLocalMailFolder)) {
       isMsgOffline = true;
       this._MsgHdrToMimeMessageFunc(aMsgHdr, aCallbackHandle.callbackThis,
           aCallbackHandle.callback, false, {saneBodySize: true});

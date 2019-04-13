@@ -11,38 +11,30 @@
 
 @namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
 
-#compose-toolbox:-moz-lwtheme {
-  -moz-appearance: none;
-  background-color: var(--toolbar-bgcolor);
-  color: var(--toolbar-color, inherit);
-  /* Uses a background image instead of a border to avoid jumping of the toolbar
-     when a theme is enabled. */
-  background-image: linear-gradient(to bottom, var(--tabs-border-color, transparent) 1px, transparent 1px);
-}
-
-#compose-toolbox:-moz-lwtheme::after {
+#compose-toolbox:-moz-lwtheme::before {
   content: "";
   display: -moz-box;
+  position: absolute;
+  top: 100%;
   margin-top: -1px;
   height: 1px;
-  border-bottom: 1px solid var(--toolbox-border-bottom-color);
+  border-bottom: 1px solid var(--chrome-content-separator-color);
 }
 
 #attachments-box[empty] > #attachmentBucket:focus {
   box-shadow: 0 0 1.5px 1px -moz-mac-focusring inset;
 }
 
-#attachmentBucket attachmentitem {
-  border-top: 1px solid transparent;
-  border-bottom: 1px solid #fff;
+#attachmentBucket .attachmentItem {
+  border: 1px solid transparent;
 }
 
-#attachmentBucket attachmentitem[dropOn="top"] {
+#attachmentBucket .attachmentItem[dropOn="top"] {
   border-top-color: #000;
   outline-color: transparent;
 }
 
-#attachmentBucket attachmentitem[dropOn="bottom"] {
+#attachmentBucket .attachmentItem[dropOn="bottom"] {
   border-bottom-color: #000;
 }
 
@@ -54,11 +46,10 @@
 #compose-toolbox > toolbar:-moz-window-inactive {
   border-top-color: rgba(255,255,255,0.45);
   border-bottom-color: rgba(0,0,0,0.35);
-  background-color: #cfcfcf;
 }
 
-#compose-toolbox > toolbar:-moz-lwtheme {
-  background-color: transparent;
+#compose-toolbox > toolbar:not(:-moz-lwtheme) {
+  background-color: #cfcfcf;
 }
 
 #composeToolbar2 {
@@ -89,6 +80,10 @@ toolbar[nowindowdrag="true"] {
 
 #composeContentBox:-moz-window-inactive {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) inset;
+}
+
+#headers-box {
+  padding-bottom: 3px;
 }
 
 #MsgHeadersToolbar {
@@ -128,21 +123,23 @@ toolbar[nowindowdrag="true"] {
 
 #msgIdentity:hover,
 #msgIdentity:focus,
+#msgIdentity:focus-within,
 #msgIdentity[focused="true"] {
   background-color: white;
   border-color: #C6C6C6;
 }
 
-#msgIdentity > .menulist-editable-box {
+#msgIdentity > .menulist-input {
+  color: inherit;
   padding-inline-start: 3px;
 }
 
-#msgIdentity[editable="true"] > menupopup {
+#msgIdentity[is="menulist-editable"][editable="true"] > menupopup {
   -moz-appearance: menupopup;
   margin-inline-start: 0;
 }
 
-#msgIdentity[editable="true"] > menupopup > menuitem {
+#msgIdentity[is="menulist-editable"][editable="true"] > menupopup > menuitem {
   -moz-appearance: menuitem;
 }
 
@@ -152,12 +149,6 @@ toolbar[nowindowdrag="true"] {
 
 #addresses-box {
   margin: 4px 6px;
-}
-
-#attachmentbucket-sizer {
-  border-top: none;
-  border-bottom: none;
-  height: 7px;
 }
 
 #attachments-header-box {
@@ -171,7 +162,7 @@ toolbar[nowindowdrag="true"] {
 #attachmentBucketSize {
   padding-top: 2px;
   padding-inline-end: 2px;
-  color: GrayText;
+  color: #999;
 }
 
 #attachmentBucketCloseButton {
@@ -192,13 +183,6 @@ toolbar[nowindowdrag="true"] {
   margin-inline-end: 3px;
   padding-inline-end: 5px;
   border-inline-end: 1px solid #9b9b9b;
-}
-
-/* XXX I should really have a selector rule here to select just .listcell-icon objects underneath the attachmentList listbox */
-
-.listcell-icon {
-  margin-inline-start: 2px;
-  margin-top: 2px;
 }
 
 #subjectLabel {
@@ -263,13 +247,9 @@ toolbar[nowindowdrag="true"] {
   -moz-user-focus: none;
   -moz-appearance: none;
   width: 0;
-  margin: 0px;
+  margin: 0;
+  padding-inline-end: 1px;
   border: none;
-  background-color: transparent;
-}
-
-#addressingWidget listboxbody {
-  margin: 1px 0;
   background-color: transparent;
 }
 
@@ -279,8 +259,8 @@ toolbar[nowindowdrag="true"] {
   color: inherit !important;
 }
 
-.textbox-addressingWidget,
-.dummy-row-cell:not(:first-child) {
+textbox.textbox-addressingWidget,
+.dummy-row-cell:last-child {
   border: 1px solid transparent !important;
   border-bottom-color: #C6C6C6 !important;
   border-top-left-radius: 2px;
@@ -293,22 +273,16 @@ toolbar[nowindowdrag="true"] {
   transition: border .2s, background-color .2s;
 }
 
-.textbox-addressingWidget[focused="true"],
-.textbox-addressingWidget:hover {
+textbox.textbox-addressingWidget[focused="true"],
+textbox.textbox-addressingWidget:hover {
   background-color: white;
   background-image: none;
   border-color: #C6C6C6 !important;
 }
 
 .deleteAddress {
-  -moz-box-ordinal-group: 0;
-  cursor: default;
+  margin-top: 1px;
   margin-inline-end: 0;
-  width: 0;
-  height: 18px;
-  transition-property: width, margin-inline-end;
-  transition-duration: 50ms, 50ms;
-  transition-timing-function: ease-in-out, ease-in-out;
 }
 
 .addressingWidgetCell:hover > .aw-menulist:not([open="true"]) + .deleteAddress {
@@ -322,13 +296,11 @@ toolbar[nowindowdrag="true"] {
   -moz-box-pack: center;
   margin: 1px;
   margin-inline-end: 4px;
-  background-color: rgba(200, 200, 200, .4) !important;
-  border: rgba(149, 165, 166, .3) 1px solid;
+  border: 1px solid transparent;
   border-radius: 2px;
-  background-repeat: no-repeat;
-  background-position: 3px center;
-  background-size: 9px 7px;
-  background-image: url("chrome://messenger/skin/icons/toolbarbutton-arrow.svg");
+  background: var(--toolbarbutton-active-background);
+  border-color: var(--toolbarbutton-active-bordercolor);
+  list-style-image: url("chrome://messenger/skin/icons/toolbarbutton-arrow.svg");
   -moz-context-properties: fill;
   fill: currentColor;
   transition: background-color .25s ease-in;
@@ -338,17 +310,21 @@ toolbar[nowindowdrag="true"] {
   background-position: calc(100% - 3px) center;
 }
 
-.aw-menulist:-moz-window-inactive {
-  opacity: .7;
-}
-
-.aw-menulist:hover {
-  background-color: rgba(150, 150, 150, .4) !important;
+.aw-menulist[open="true"] {
+  background: var(--toolbarbutton-active-background);
+  border-color: var(--toolbarbutton-active-bordercolor);
+  box-shadow: var(--toolbarbutton-active-boxshadow);
 }
 
 .aw-menulist:focus {
   border-color: -moz-mac-focusring;
   box-shadow: 0 0 1.5px 1px -moz-mac-focusring;
+}
+
+.aw-menulist > .menulist-label-box > .menulist-icon {
+  width: 9px;
+  height: 7px;
+  margin-inline-start: 2px;
 }
 
 .aw-menulist  > .menulist-label-box > .menulist-label {
@@ -360,15 +336,21 @@ toolbar[nowindowdrag="true"] {
   display: none;
 }
 
+.menulist-description {
+  color: #999;
+}
+
 /* ::::: compose toolbar sizer ::::: */
 
 #compose-toolbar-sizer {
   position: relative;
-  margin-top: -2px;
-  min-height: 7px;
-  background-image: url("chrome://messenger/skin/messengercompose/osx-noise.png");
-  background-color: rgb(242, 242, 242);
-  border-bottom: 1px solid #DCDCDC;
+  z-index: 10;
+  min-height: 0;
+  height: 5px;
+  margin-top: -5px;
+  border-top-width: 0;
+  border-bottom-color: var(--splitter-color);
+  background-color: transparent;
 }
 
 /* ::::: format toolbar ::::: */
@@ -1038,9 +1020,14 @@ toolbarbutton.toolbarbutton-1 > .toolbarbutton-menubutton-dropmarker > .dropmark
 }
 
 #sidebar-splitter {
-  border-right: 1px solid #8e8e8e;
-  border-left: 1px solid #bebebe;
-  background-color: #ececec;
+  border-inline-end-width: 0;
+  border-inline-start: 1px solid var(--splitter-color);
+  min-width: 0;
+  width: 5px;
+  background-color: transparent;
+  margin-inline-end: -5px;
+  position: relative;
+  z-index: 10;
 }
 
 #sidebar-title {

@@ -16,9 +16,7 @@
 %junkMailDTD;
 ]>
 
-<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-      xmlns:nc="http://home.netscape.com/NC-rdf#"
-      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+<page xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
       title="&junkSettings.label;"
       onload="parent.onPanelLoaded('am-junk.xul');">
 
@@ -29,10 +27,12 @@
     <script type="application/javascript" src="chrome://messenger/content/amUtils.js"/>
     <stringbundle id="bundle_messenger" src="chrome://messenger/locale/messenger.properties"/>
 
-    <dialogheader title="&junkSettings.label;"/>
+    <hbox class="dialogheader">
+      <label class="dialogheader-title" value="&junkSettings.label;"/>
+    </hbox>
 
     <groupbox>
-      <caption label="&junkClassification.label;"/>
+      <label class="header">&junkClassification.label;</label>
 
       <label hidden="true"
              id="server.spamLevel"
@@ -99,7 +99,7 @@
         <label id="whiteListLabel"
                accesskey="&whitelistHeader.accesskey;"
                control="whiteListAbURI">&whitelistHeader.label;</label>
-        <listbox id="whiteListAbURI" rows="5"/>
+        <richlistbox id="whiteListAbURI" class="theme-listbox" height="100px"/>
       </vbox>
 
       <separator/>
@@ -128,7 +128,7 @@
     </groupbox>
 
     <groupbox>
-      <caption label="&junkActions.label;"/>
+      <label class="header">&junkActions.label;</label>
 
       <checkbox id="server.moveOnSpam"
                 label="&move.label;"

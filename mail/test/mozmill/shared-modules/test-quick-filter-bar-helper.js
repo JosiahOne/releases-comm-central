@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "quick-filter-bar-helper";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -118,7 +120,12 @@ function toggle_boolean_constraints(...aArgs) {
  * Toggle the tag faceting buttons by tag key.  Wait for messages after.
  */
 function toggle_tag_constraints(...aArgs) {
-  aArgs.forEach(arg => mc.click(mc.eid("qfb-tag-" + arg)));
+  let qfbButtons = mc.e("quick-filter-bar-tab-bar");
+  aArgs.forEach(function(arg) {
+    let tagId = "qfb-tag-" + arg;
+    qfbButtons.ensureElementIsVisible(mc.e(tagId));
+    mc.click(mc.eid(tagId));
+  });
   fdh.wait_for_all_messages_to_load(mc);
 }
 

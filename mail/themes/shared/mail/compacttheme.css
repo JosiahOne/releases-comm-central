@@ -7,36 +7,16 @@
    there are overrides for each platform in their compacttheme.css files. */
 
 :root:-moz-lwtheme {
-  --toolbar-color: var(--chrome-color);
-  --toolbar-bgcolor: var(--chrome-secondary-background-color);
   --toolbar-non-lwt-bgcolor: var(--toolbar-bgcolor);
-  --toolbar-non-lwt-textcolor: var(--chrome-color);
+  --toolbar-non-lwt-textcolor: var(--lwt-text-color);
   --toolbar-non-lwt-bgimage: none;
   --lwt-toolbar-field-border-color: hsla(240,5%,5%,.25);
-
-  --toolbarbutton-icon-fill-opacity: .7;
-
-  --tab-line-color: #0a84ff;
 }
 
 :root:-moz-lwtheme-brighttext {
-  /* Chrome */
-  --chrome-background-color: hsl(240, 5%, 5%);
-  --chrome-color: rgb(249, 249, 250);
-  --chrome-secondary-background-color: hsl(240, 1%, 20%);
-  --toolbox-border-bottom-color: hsla(240, 5%, 5%, .1);
-  --chrome-nav-bar-controls-border-color: hsla(240, 5%, 5%, .3);
-  --chrome-selection-color: #fff;
-  --chrome-selection-background-color: #5675b9;
-
   /* Toolbar buttons */
   --lwt-toolbarbutton-hover-background: rgba(179, 179, 179, 0.4);
   --lwt-toolbarbutton-active-background: rgba(179, 179, 179, 0.6);
-
-  /* Search bars */
-  --lwt-toolbar-field-background-color: rgb(71, 71, 73);
-  --lwt-toolbar-field-color: var(--chrome-color);
-  --urlbar-separator-color: #5F6670;
 
   /* !important to override LightweightThemeManager.addBuiltInTheme in
      mailGlue.js */
@@ -48,49 +28,15 @@
 }
 
 :root:-moz-lwtheme-darktext {
-  --lwt-toolbar-field-background-color: #fff;
-
-  --chrome-background-color: #e3e4e6;
-  --chrome-color: #18191a;
-  --chrome-secondary-background-color: #f5f6f7;
-  --toolbox-border-bottom-color: #ccc;
-  --chrome-nav-bar-controls-border-color: #ccc;
-  --chrome-selection-color: #f5f7fa;
-  --chrome-selection-background-color: #4c9ed9;
-
   /* composer header fields bottom border */
   --composer-header-border-color: #aaa;
 }
 
-toolbar[brighttext] .toolbarbutton-1 {
-  fill: rgb(249, 249, 250);
-}
-
-#searchInput ::-moz-selection,
-#IMSearchInput ::-moz-selection,
-#peopleSearchInput ::-moz-selection,
-.remote-gloda-search ::-moz-selection,
-#qfb-qs-textbox ::-moz-selection,
-findbar ::-moz-selection {
-  background-color: var(--chrome-selection-background-color);
-  color: var(--chrome-selection-color);
-}
-
-/* Change the base colors for the mail chrome */
-
 #headers-box,
-#navigation-toolbox {
-  background-color: var(--chrome-background-color);
-  color: var(--chrome-color);
-}
-
-findbar,
-.mail-toolbox,
-.contentTabToolbox,
 #msgHeaderView {
-  background-color: var(--chrome-secondary-background-color) !important;
+  background-color: var(--toolbar-bgcolor) !important;
   background-image: none !important;
-  color: var(--chrome-color);
+  color: var(--lwt-text-color);
 }
 
 /* Let the message headers use the theme colors */
@@ -104,18 +50,13 @@ findbar,
   color: var(--lwt-toolbar-field-color);
 }
 .editContactTextbox:not([readonly="true"]):not([focused="true"]) {
-  border-color: var(--lwt-toolbar-field-border-color);
-}
-
-.editContactTextbox ::-moz-selection {
-  background-color: var(--chrome-selection-background-color);
-  color: var(--chrome-selection-color);
+  border-color: var(--panel-separator-color);
 }
 
 /* Quick-Filter-Bar */
 #quick-filter-bar:-moz-lwtheme {
-  background-color: var(--chrome-background-color);
-  color: var(--chrome-color);
+  background-color: var(--lwt-accent-color);
+  color: var(--lwt-text-color);
 }
 #quick-filter-bar:-moz-lwtheme-brighttext {
   --toolbarbutton-hover-background: var(--lwt-toolbarbutton-hover-background);
@@ -141,18 +82,14 @@ findbar,
   background-color: var(--lwt-toolbar-field-background-color, white);
 }
 
+#qfb-qs-textbox:-moz-lwtheme-brighttext:hover {
+  box-shadow: 0 1px 3px rgba(255,255,255,.15);
+}
+
 #qfb-qs-textbox:-moz-lwtheme[focused="true"] {
   background-color: var(--lwt-toolbar-field-focus, var(--lwt-toolbar-field-background-color, white));
   color: var(--lwt-toolbar-field-focus-color, var(--lwt-toolbar-field-color, black));
   border-color: var(--toolbar-field-focus-border-color);
-}
-
-/* Search bar*/
-#searchInput:not([focused="true"]),
-#IMSearchInput:not([focused="true"]),
-#peopleSearchInput:not([focused="true"]),
-.remote-gloda-search:not([focused="true"]) {
-  border-color: var(--chrome-nav-bar-controls-border-color);
 }
 
 /* Composer header box styling */
@@ -163,6 +100,8 @@ findbar,
   --toolbarbutton-active-background: var(--lwt-toolbarbutton-active-background);
   --toolbarbutton-active-bordercolor: var(--lwt-toolbarbutton-active-background);
   --toolbarbutton-active-boxshadow: 0 0 0 1px var(--lwt-toolbarbutton-active-background) inset;
+
+  scrollbar-color: rgba(249,249,250,.4) rgba(20,20,25,.3);
 }
 
 #MsgHeadersToolbar,
@@ -173,28 +112,22 @@ findbar,
 
 #msgIdentity,
 #msgSubject,
-.textbox-addressingWidget,
-.dummy-row-cell:not(:first-child) {
+textbox.textbox-addressingWidget,
+.dummy-row-cell:last-child {
   border-bottom-color: var(--composer-header-border-color) !important;
-  color: var(--chrome-color);
+  color: var(--lwt-text-color);
 }
 
 #msgIdentity:hover,
 #msgIdentity:focus,
+#msgIdentity:focus-within,
 #msgSubject:hover,
 #msgSubject[focused="true"],
-.textbox-addressingWidget:hover,
-.textbox-addressingWidget[focused="true"] {
+textbox.textbox-addressingWidget:hover,
+textbox.textbox-addressingWidget[focused="true"] {
   background-color: var(--lwt-toolbar-field-background-color);
   color: var(--lwt-toolbar-field-color);
   border-color: var(--lwt-toolbar-field-border-color) !important;
-}
-
-#msgIdentity ::-moz-selection,
-#msgSubject ::-moz-selection,
-.textbox-addressingWidget ::-moz-selection {
-  background-color: var(--chrome-selection-background-color);
-  color: var(--chrome-selection-color);
 }
 
 .textbox-addressingWidget > .autocomplete-result-popupset {
@@ -219,4 +152,14 @@ findbar,
 .textbox-addressingWidget .autocomplete-richlistitem[selected] {
   background: #0a84ff;
   color: #fff;
+}
+
+/* Make the new mail indicator better visible on dark theme */
+#folderTree:-moz-lwtheme-brighttext
+  treechildren::-moz-tree-cell-text(folderNameCol, isServer-true, biffState-NewMail),
+#folderTree:-moz-lwtheme-brighttext
+  treechildren::-moz-tree-cell-text(folderNameCol, newMessages-true),
+#folderTree:-moz-lwtheme-brighttext
+  treechildren::-moz-tree-cell-text(folderNameCol, specialFolder-Inbox, newMessages-true) {
+  color: #0aa5ff !important;
 }

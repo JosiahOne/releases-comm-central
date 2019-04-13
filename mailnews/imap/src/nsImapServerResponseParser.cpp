@@ -58,6 +58,7 @@ nsImapServerResponseParser::nsImapServerResponseParser(nsImapProtocol &imapProto
   fStatusExistingMessages = 0;
   fReceivedHeaderOrSizeForUID = nsMsgKey_None;
   fCondStoreEnabled = false;
+  fStdJunkNotJunkUseOk = false;
 }
 
 nsImapServerResponseParser::~nsImapServerResponseParser()
@@ -185,6 +186,9 @@ void nsImapServerResponseParser::ParseIMAPServerResponse(const char *aCurrentCom
     if (commandToken && ContinueParse())
       PreProcessCommandToken(commandToken, aCurrentCommand);
 
+    // For checking expected response to IDLE command below.
+    bool untagged = false;
+
     if (ContinueParse())
     {
       ResetLexAnalyzer();
@@ -209,6 +213,7 @@ void nsImapServerResponseParser::ParseIMAPServerResponse(const char *aCurrentCom
             else if (!inIdle && !fCurrentCommandFailed && !aGreetingWithCapability)
               AdvanceToNextToken();
           }
+          untagged = true;
         }
 
         // command continuation request [RFC3501, Sec. 7.5]
@@ -241,7 +246,29 @@ void nsImapServerResponseParser::ParseIMAPServerResponse(const char *aCurrentCom
       // fWaitingForMoreClientInput so we don't lose that information....
       if ((fNextToken && *fNextToken == '+') || inIdle)
       {
-        fWaitingForMoreClientInput = true;
+        if (inIdle && !((fNextToken && *fNextToken == '+') || untagged))
+        {
+          // IDLE "response" + will not be "eaten" as described above since it
+          // is not an authentication response. So if IDLE response does not
+          // begin with '+' (continuation) or '*' (untagged and probably useful
+          // response) then something is wrong and it is probably a tagged
+          // NO or BAD due to transient error or bad configuration of the server.
+          if (!PL_strcmp(fCurrentCommandTag, fNextToken))
+          {
+            response_tagged();
+          }
+          else
+          {
+            // Expected tag doesn't match the received tag. Not good, start over.
+            response_fatal();
+          }
+          // Show an alert notification containing the server response to bad IDLE.
+          fServerConnection.AlertUserEventFromServer(fCurrentLine, true);
+        }
+        else
+        {
+          fWaitingForMoreClientInput = true;
+        }
       }
       // if we aren't still waiting for more input....
       else if (!fWaitingForMoreClientInput && !aGreetingWithCapability)
@@ -259,7 +286,7 @@ void nsImapServerResponseParser::ParseIMAPServerResponse(const char *aCurrentCom
           // a failed command may change the eIMAPstate
           ProcessBadCommand(commandToken);
           if (fReportingErrors && !aIgnoreBadAndNOResponses)
-            fServerConnection.AlertUserEventFromServer(fCurrentLine);
+            fServerConnection.AlertUserEventFromServer(fCurrentLine, false);
         }
       }
     }
@@ -756,7 +783,7 @@ void nsImapServerResponseParser::mailbox_data()
     if (fGotPermanentFlags)
       skip_to_CRLF();
     else
-      parse_folder_flags();
+      parse_folder_flags(true);
   }
   else if (!PL_strcasecmp(fNextToken, "LIST") ||
            !PL_strcasecmp(fNextToken, "XLIST"))
@@ -1824,20 +1851,19 @@ void nsImapServerResponseParser::text()
   skip_to_CRLF();
 }
 
-void nsImapServerResponseParser::parse_folder_flags()
+void nsImapServerResponseParser::parse_folder_flags(bool calledForFlags)
 {
   uint16_t labelFlags = 0;
+  uint16_t junkNotJunkFlags = 0;
+  bool storeUserFlags = calledForFlags && fFlagState;
+  uint16_t numOtherKeywords = 0;
 
   do
   {
     AdvanceToNextToken();
     if (*fNextToken == '(')
       fNextToken++;
-    if (!PL_strncasecmp(fNextToken, "$MDNSent", 8))
-      fSupportsUserDefinedFlags |= kImapMsgSupportMDNSentFlag;
-    else if (!PL_strncasecmp(fNextToken, "$Forwarded", 10))
-      fSupportsUserDefinedFlags |= kImapMsgSupportForwardedFlag;
-    else if (!PL_strncasecmp(fNextToken, "\\Seen", 5))
+    if (!PL_strncasecmp(fNextToken, "\\Seen", 5))
       fSettablePermanentFlags |= kImapMsgSeenFlag;
     else if (!PL_strncasecmp(fNextToken, "\\Answered", 9))
       fSettablePermanentFlags |= kImapMsgAnsweredFlag;
@@ -1847,22 +1873,58 @@ void nsImapServerResponseParser::parse_folder_flags()
       fSettablePermanentFlags |= kImapMsgDeletedFlag;
     else if (!PL_strncasecmp(fNextToken, "\\Draft", 6))
       fSettablePermanentFlags |= kImapMsgDraftFlag;
-    else if (!PL_strncasecmp(fNextToken, "$Label1", 7))
-      labelFlags |= 1;
-    else if (!PL_strncasecmp(fNextToken, "$Label2", 7))
-      labelFlags |= 2;
-    else if (!PL_strncasecmp(fNextToken, "$Label3", 7))
-      labelFlags |= 4;
-    else if (!PL_strncasecmp(fNextToken, "$Label4", 7))
-      labelFlags |= 8;
-    else if (!PL_strncasecmp(fNextToken, "$Label5", 7))
-      labelFlags |= 16;
     else if (!PL_strncasecmp(fNextToken, "\\*", 2))
     {
+      // User defined and special keywords (tags) can be defined and set for
+      // mailbox. Should only occur in PERMANENTFLAGS response.
       fSupportsUserDefinedFlags |= kImapMsgSupportUserFlag;
       fSupportsUserDefinedFlags |= kImapMsgSupportForwardedFlag;
       fSupportsUserDefinedFlags |= kImapMsgSupportMDNSentFlag;
       fSupportsUserDefinedFlags |= kImapMsgLabelFlags;
+    }
+    else
+    {
+      // Treat special and built-in $LabelX's as user defined if a
+      // store occurs below. Include $Junk/$NotJunk in this too.
+      if (!PL_strncasecmp(fNextToken, "$MDNSent", 8))
+        fSupportsUserDefinedFlags |= kImapMsgSupportMDNSentFlag;
+      else if (!PL_strncasecmp(fNextToken, "$Forwarded", 10))
+        fSupportsUserDefinedFlags |= kImapMsgSupportForwardedFlag;
+      else if (!PL_strncasecmp(fNextToken, "$Label1", 7))
+        labelFlags |= 1;
+      else if (!PL_strncasecmp(fNextToken, "$Label2", 7))
+        labelFlags |= 2;
+      else if (!PL_strncasecmp(fNextToken, "$Label3", 7))
+        labelFlags |= 4;
+      else if (!PL_strncasecmp(fNextToken, "$Label4", 7))
+        labelFlags |= 8;
+      else if (!PL_strncasecmp(fNextToken, "$Label5", 7))
+        labelFlags |= 16;
+      else if (!PL_strncasecmp(fNextToken, "$Junk", 5))
+        junkNotJunkFlags |= 1;
+      else if (!PL_strncasecmp(fNextToken, "$NotJunk", 8))
+        junkNotJunkFlags |= 2;
+
+      // Store user keywords defined for mailbox, usually by other clients.
+      // But only do this for FLAGS response, not PERMANENTFLAGS response.
+      // This is only needed if '\*' does not appear in a PERMANENTFLAGS
+      // response indicating the user defined keywords are not allowed. But this
+      // is not known until this function is called for PERMANENTFLAGS which
+      // typically occurs after FLAGS, so must store them regardless.
+      if (storeUserFlags && *fNextToken != '\r')
+      {
+        if (*(fNextToken + strlen(fNextToken) - 1) != ')')
+        {
+          // Token doesn't end in ')' so save it as is.
+          fFlagState->SetOtherKeywords(numOtherKeywords++, nsDependentCString(fNextToken));
+        }
+        else
+        {
+          // Token ends in ')' so end of list. Save all but ending ')'.
+          fFlagState->SetOtherKeywords(numOtherKeywords++,
+                                       nsDependentCSubstring(fNextToken, strlen(fNextToken) - 1));
+        }
+      }
     }
   } while (!fAtEndOfLine && ContinueParse());
 
@@ -1871,6 +1933,12 @@ void nsImapServerResponseParser::parse_folder_flags()
 
   if (fFlagState)
     fFlagState->OrSupportedUserFlags(fSupportsUserDefinedFlags);
+
+  if (storeUserFlags)
+  {
+    // Set true if both "$Junk" and "$NotJunk" appear in FLAGS.
+    fStdJunkNotJunkUseOk = (junkNotJunkFlags == 3);
+  }
 }
 /*
   resp_text_code  ::= ("ALERT" / "PARSE" /
@@ -1921,7 +1989,7 @@ void nsImapServerResponseParser::resp_text_code()
       uint32_t saveSettableFlags = fSettablePermanentFlags;
       fSupportsUserDefinedFlags = 0;  // assume no unless told
       fSettablePermanentFlags = 0;            // assume none, unless told otherwise.
-      parse_folder_flags();
+      parse_folder_flags(false);
       // if the server tells us there are no permanent flags, we're
       // just going to pretend that the FLAGS response flags, if any, are
       // permanent in case the server is broken. This will allow us
@@ -3206,7 +3274,7 @@ bool nsImapServerResponseParser::msg_fetch_literal(bool chunk, int32_t origin)
         {
           // Ignore the orphan '\n' on a line by itself.
           MOZ_ASSERT(strlen(fCurrentLine) == 1 && fCurrentLine[0] == '\n',
-                     "Expect '\n' as only character in this line");
+                     "Expect '\\n' as only character in this line");
           fNextChunkStartsWithNewline = false;
         }
       }
@@ -3274,6 +3342,11 @@ uint32_t nsImapServerResponseParser::CurrentResponseUID()
 uint32_t nsImapServerResponseParser::HighestRecordedUID()
 {
   return fHighestRecordedUID;
+}
+
+void nsImapServerResponseParser::ResetHighestRecordedUID()
+{
+  fHighestRecordedUID = 0;
 }
 
 bool nsImapServerResponseParser::IsNumericString(const char *string)

@@ -2,18 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calExtract.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+/* import-globals-from ../../../mail/base/content/msgMail3PaneWindow.js */
+/* import-globals-from calendar-item-editing.js */
+
+var { Extractor } = ChromeUtils.import("resource://calendar/modules/calExtract.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var calendarExtract = {
     onShowLocaleMenu: function(target) {
         let localeList = document.getElementById(target.id);
         let langs = [];
-        let chrome = Components.classes["@mozilla.org/chrome/chrome-registry;1"]
-                               .getService(Components.interfaces.nsIXULChromeRegistry);
-        chrome.QueryInterface(Components.interfaces.nsIToolkitChromeRegistry);
+        let chrome = Cc["@mozilla.org/chrome/chrome-registry;1"]
+                       .getService(Ci.nsIXULChromeRegistry)
+                       .QueryInterface(Ci.nsIToolkitChromeRegistry);
         let locales = chrome.getLocalesForPackage("calendar");
         let langRegex = /^(([^-]+)-*(.*))$/;
 
@@ -37,7 +39,7 @@ var calendarExtract = {
 
         // sort
         let pref = "calendar.patterns.last.used.languages";
-        let lastUsedLangs = Preferences.get(pref, "");
+        let lastUsedLangs = Services.prefs.getStringPref(pref, "");
 
         langs.sort((a, b) => {
             let idx_a = lastUsedLangs.indexOf(a[1]);
@@ -70,10 +72,9 @@ var calendarExtract = {
         // TODO would be nice to handle multiple selected messages,
         // though old conversion functionality didn't
         let message = gFolderDisplay.selectedMessage;
-        let messenger = Components.classes["@mozilla.org/messenger;1"]
-                                  .createInstance(Components.interfaces.nsIMessenger);
-        let listener = Components.classes["@mozilla.org/network/sync-stream-listener;1"]
-                                 .createInstance(Components.interfaces.nsISyncStreamListener);
+        let messenger = Cc["@mozilla.org/messenger;1"].createInstance(Ci.nsIMessenger);
+        let listener = Cc["@mozilla.org/network/sync-stream-listener;1"]
+                         .createInstance(Ci.nsISyncStreamListener);
         let uri = message.folder.getUriForMsg(message);
         messenger.messageServiceFromURI(uri)
                  .streamMessage(uri, listener, null, null, false, "");
@@ -90,8 +91,8 @@ var calendarExtract = {
         let date = new Date(message.date / 1000);
         let time = (new Date()).getTime();
 
-        let locale = Services.locale.getRequestedLocale();
-        let dayStart = Preferences.get("calendar.view.daystarthour", 6);
+        let locale = Services.locale.requestedLocale;
+        let dayStart = Services.prefs.getIntPref("calendar.view.daystarthour", 6);
         let extractor;
 
         if (fixedLang) {
@@ -148,7 +149,7 @@ var calendarExtract = {
                 }
 
                 item.endDate = item.startDate.clone();
-                item.endDate.minute += Preferences.get("calendar.event.defaultlength", 60);
+                item.endDate.minute += Services.prefs.getIntPref("calendar.event.defaultlength", 60);
 
                 if (endGuess.year != null) {
                     item.endDate.year = endGuess.year;

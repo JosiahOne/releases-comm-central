@@ -2,12 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/MailUtils.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
 var gSubscribeTree = null;
 var gSubscribeBody = null;
-var gSearchTree;
 var okCallback = null;
 var gChangeTable = {};
 var gServerURI = null;
@@ -17,8 +15,11 @@ var gNameFieldLabel = null;
 var gStatusFeedback;
 var gSubscribeDeck = null;
 var gSearchView = null;
-var gSearchTreeBoxObject = null;
+var gSearchTree = null;
 var gSubscribeBundle;
+
+document.addEventListener("dialogaccept", subscribeOK);
+document.addEventListener("dialogcancel", subscribeCancel);
 
 function Stop()
 {
@@ -32,7 +33,7 @@ function SetServerTypeSpecificTextValues()
   if (!gServerURI)
     return;
 
-  let serverType = MailUtils.getFolderForURI(gServerURI, true).server.type;
+  let serverType = MailUtils.getExistingFolder(gServerURI).server.type;
 
   // set the server specific ui elements
   let subscribeLabelString = gSubscribeBundle.getString("subscribeLabel-" + serverType);
@@ -71,7 +72,7 @@ function SetUpTree(forceToServer, getOnlyNew)
   if (!gServerURI)
     return;
 
-  var server = MailUtils.getFolderForURI(gServerURI, true).server;
+  var server = MailUtils.getExistingFolder(gServerURI).server;
   try
   {
     CleanUpSearchView();
@@ -148,7 +149,7 @@ function SubscribeOnLoad()
   gSubscribeTree = document.getElementById("subscribeTree");
   gSubscribeBody = document.getElementById("subscribeTreeBody");
   gSearchTree = document.getElementById("searchTree");
-  gSearchTreeBoxObject = document.getElementById("searchTree").treeBoxObject;
+  gSearchTree = document.getElementById("searchTree");
   gNameField = document.getElementById("namefield");
   gNameFieldLabel = document.getElementById("namefieldlabel");
 
@@ -222,7 +223,6 @@ function subscribeOK()
   if (gSubscribableServer) {
     gSubscribableServer.subscribeCleanup();
   }
-  return true;
 }
 
 function subscribeCancel()
@@ -231,7 +231,6 @@ function subscribeCancel()
   if (gSubscribableServer) {
     gSubscribableServer.subscribeCleanup();
   }
-  return true;
 }
 
 function SetState(name, state)
@@ -270,25 +269,24 @@ function SearchOnClick(event)
   // we only care about button 0 (left click) events
   if (event.button != 0 || event.originalTarget.localName != "treechildren") return;
 
-  var row = {}, col = {}, childElt = {};
-  gSearchTreeBoxObject.getCellAt(event.clientX, event.clientY, row, col, childElt);
-  if (row.value == -1 || row.value > gSearchView.rowCount-1)
+  let treeCellInfo = gSearchTree.getCellAt(event.clientX, event.clientY);
+  if (treeCellInfo.row == -1 || treeCellInfo.row > gSearchView.rowCount-1)
     return;
 
-  if (col.value.id == "subscribedColumn2") {
+  if (treeCellInfo.col.id == "subscribedColumn2") {
     if (event.detail != 2) {
       // single clicked on the check box
       // (in the "subscribedColumn2" column) reverse state
       // if double click, do nothing
-      ReverseStateFromRow(row.value);
+      ReverseStateFromRow(treeCellInfo.row);
     }
   } else if (event.detail == 2) {
     // double clicked on a row, reverse state
-    ReverseStateFromRow(row.value);
+    ReverseStateFromRow(treeCellInfo.row);
   }
 
   // invalidate the row
-  InvalidateSearchTreeRow(row.value);
+  InvalidateSearchTreeRow(treeCellInfo.row);
 }
 
 function ReverseStateFromRow(aRow)
@@ -356,24 +354,23 @@ function SubscribeOnClick(event)
   if (event.button != 0 || event.originalTarget.localName != "treechildren")
    return;
 
-  var row = {}, col = {}, obj = {};
-  gSubscribeTree.treeBoxObject.getCellAt(event.clientX, event.clientY, row, col, obj);
-  if (row.value == -1 || row.value > (gSubscribeTree.view.rowCount - 1))
+  let treeCellInfo = gSubscribeTree.getCellAt(event.clientX, event.clientY);
+  if (treeCellInfo.row == -1 || treeCellInfo.row > (gSubscribeTree.view.rowCount - 1))
     return;
 
   if (event.detail == 2) {
     // only toggle subscribed state when double clicking something
     // that isn't a container
-    if (!gSubscribeTree.view.isContainer(row.value)) {
-      ReverseStateFromNode(row.value);
+    if (!gSubscribeTree.view.isContainer(treeCellInfo.row)) {
+      ReverseStateFromNode(treeCellInfo.row);
       return;
     }
   }
   else if (event.detail == 1)
   {
     // if the user single clicks on the subscribe check box, we handle it here
-    if (col.value.id == "subscribedColumn")
-      ReverseStateFromNode(row.value);
+    if (treeCellInfo.col.id == "subscribedColumn")
+      ReverseStateFromNode(treeCellInfo.row);
   }
 }
 
@@ -412,12 +409,12 @@ function ShowNewGroupsList()
 
 function InvalidateSearchTreeRow(row)
 {
-    gSearchTreeBoxObject.invalidateRow(row);
+    gSearchTree.invalidateRow(row);
 }
 
 function InvalidateSearchTree()
 {
-    gSearchTreeBoxObject.invalidate();
+    gSearchTree.invalidate();
 }
 
 function SwitchToNormalView()
@@ -442,7 +439,7 @@ function Search()
     if (!gSearchView && gSubscribableServer) {
     gSearchView = gSubscribableServer.QueryInterface(Ci.nsITreeView);
       gSearchView.selection = null;
-    gSearchTreeBoxObject.view = gSearchView;
+    gSearchTree.view = gSearchView;
   }
   }
   else {

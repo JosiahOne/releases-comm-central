@@ -4,10 +4,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/ABQueryUtils.jsm");
+/* import-globals-from ../../../../mailnews/addrbook/content/abResultsPane.js */
+/* import-globals-from abCommon.js */
 
-function GetAbViewListener()
-{
+var {
+  getSearchTokens,
+  getModelQuery,
+  generateQueryURI,
+} = ChromeUtils.import("resource:///modules/ABQueryUtils.jsm");
+
+function GetAbViewListener() {
   // the ab panel doesn't care if the total changes, or if the selection changes
   return null;
 }
@@ -51,8 +57,7 @@ function contactsListOnContextMenu(aEvent) {
  *
  * @param aEvent  a click event
  */
-function contactsListOnClick(aEvent)
-{
+function contactsListOnClick(aEvent) {
   CommandUpdate_AddressBook();
 
   let target = aEvent.originalTarget;
@@ -66,7 +71,7 @@ function contactsListOnClick(aEvent)
   }
   // Any click on gAbResultsTree view (rows or blank space).
   if (target.localName == "treechildren") {
-    let row = gAbResultsTree.treeBoxObject.getRowAt(aEvent.clientX, aEvent.clientY);
+    let row = gAbResultsTree.getRowAt(aEvent.clientX, aEvent.clientY);
     if (row < 0 || row >= gAbResultsTree.view.rowCount) {
       // Any click on results tree whitespace.
       if ((aEvent.detail == 1 && aEvent.button == 0) || aEvent.button == 2) {
@@ -76,15 +81,11 @@ function contactsListOnClick(aEvent)
         // for single right click, so we also let this trigger for the second
         // click of right double-click.
         gAbView.selection.clearSelection();
-        return;
       }
-    } else {
+    } else if (aEvent.button == 0 && aEvent.detail == 2) {
       // Any click on results tree rows.
-      if (aEvent.button == 0 && aEvent.detail == 2) {
-        // Double-click on a row: Go ahead and add the entry.
-        addSelectedAddresses("addr_to");
-        return;
-      }
+      // Double-click on a row: Go ahead and add the entry.
+      addSelectedAddresses("addr_to");
     }
   }
 }
@@ -94,8 +95,7 @@ function contactsListOnClick(aEvent)
  *
  * @param aRecipientType  Type of recipient, e.g. "addr_to".
  */
-function addSelectedAddresses(aRecipientType)
-{
+function addSelectedAddresses(aRecipientType) {
   var cards = GetSelectedAbCards();
 
   // Turn each card into a properly formatted address.
@@ -103,13 +103,12 @@ function addSelectedAddresses(aRecipientType)
   parent.AddRecipientsArray(aRecipientType, addressArray);
 }
 
-function AddressBookMenuListChange()
-{
+function AddressBookMenuListChange() {
   let searchInput = document.getElementById("peopleSearchInput");
   if (searchInput.value && !searchInput.showingSearchCriteria)
     onEnterInSearchBar();
   else
-    ChangeDirectoryByURI(document.getElementById('addressbookList').value);
+    ChangeDirectoryByURI(document.getElementById("addressbookList").value);
 
   // Hide the addressbook column if the selected addressbook isn't
   // "All address books". Since the column is redundant in all other cases.
@@ -127,13 +126,16 @@ function AddressBookMenuListChange()
 
 var mutationObs = null;
 
-function AbPanelLoad()
-{
+function AbPanelLoad() {
+  if (location.search == "?focus") {
+    document.getElementById("peopleSearchInput").focus();
+  }
+
   InitCommonJS();
 
   document.title = parent.document.getElementById("sidebar-title").value;
 
-  var abPopup = document.getElementById('addressbookList');
+  var abPopup = document.getElementById("addressbookList");
 
   // Reselect the persisted address book if possible, if not just select the
   // first in the list.
@@ -162,62 +164,55 @@ function AbPanelLoad()
                       { attributes: true, childList: true });
 }
 
-function AbPanelUnload()
-{
+function AbPanelUnload() {
   mutationObs.disconnect();
 
   CloseAbView();
 }
 
-function AbPanelNewCard()
-{
+function AbPanelNewCard() {
   goNewCardDialog(abList.value);
 }
 
-function AbPanelNewList()
-{
+function AbPanelNewList() {
   goNewListDialog(abList.value);
 }
 
-function ResultsPaneSelectionChanged()
-{
+function ResultsPaneSelectionChanged() {
   // do nothing for ab panel
 }
 
-function OnClickedCard()
-{
+function OnClickedCard() {
   // do nothing for ab panel
 }
 
-function AbResultsPaneDoubleClick(card)
-{
+function AbResultsPaneDoubleClick(card) {
   // double click for ab panel means "send mail to this person / list"
   AbNewMessage();
 }
 
-function UpdateCardView()
-{
+function UpdateCardView() {
   // do nothing for ab panel
 }
 
-function CommandUpdate_AddressBook()
-{
+function CommandUpdate_AddressBook() {
   // Toggle disable state of to,cc,bcc buttons.
   let disabled = (GetNumSelectedCards() == 0) ? "true" : "false";
   document.getElementById("cmd_addrTo").setAttribute("disabled", disabled);
   document.getElementById("cmd_addrCc").setAttribute("disabled", disabled);
   document.getElementById("cmd_addrBcc").setAttribute("disabled", disabled);
 
-  goUpdateCommand('cmd_delete');
-  goUpdateCommand('cmd_properties');
+  goUpdateCommand("cmd_delete");
+  goUpdateCommand("cmd_properties");
 }
 
-function onEnterInSearchBar()
-{
+function onEnterInSearchBar() {
   if (!gQueryURIFormat) {
     // Get model query from pref. We don't want the query starting with "?"
     // as we have to prefix "?and" to this format.
+    /* eslint-disable no-global-assign */
     gQueryURIFormat = getModelQuery("mail.addr_book.quicksearchquery.format");
+    /* eslint-enable no-global-assign */
   }
 
   let searchURI = getSelectedDirectoryURI();

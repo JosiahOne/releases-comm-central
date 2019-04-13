@@ -25,7 +25,7 @@ class nsIImapFlagAndUidState;
 class nsImapServerResponseParser : public nsIMAPGenericParser
 {
 public:
-  nsImapServerResponseParser(nsImapProtocol &imapConnection);
+  explicit nsImapServerResponseParser(nsImapProtocol &imapConnection);
   virtual ~nsImapServerResponseParser();
 
   // Overridden from the base parser class
@@ -51,6 +51,7 @@ public:
   virtual eIMAPstate GetIMAPstate();
   virtual bool WaitingForMoreClientInput() { return fWaitingForMoreClientInput; }
   const char *GetSelectedMailboxName();   // can be NULL
+  bool IsStdJunkNotJunkUseOk() { return fStdJunkNotJunkUseOk; }
 
   // if we get a PREAUTH greeting from the server, initialize the parser to begin in
   // the kAuthenticated state
@@ -65,6 +66,7 @@ public:
   int32_t    FolderUID();
   uint32_t   CurrentResponseUID();
   uint32_t   HighestRecordedUID();
+  void       ResetHighestRecordedUID();
   void       SetCurrentResponseUID(uint32_t uid);
   bool       IsNumericString(const char *string);
   uint32_t   SizeOfMostRecentMessage();
@@ -136,7 +138,7 @@ protected:
   virtual void    resp_cond_state(bool isTagged);
   virtual void    text_mime2();
   virtual void    text();
-  virtual void    parse_folder_flags();
+  virtual void    parse_folder_flags(bool calledForFlags);
   virtual void    enable_data();
   virtual void    language_data();
   virtual void    authChallengeResponse_data();
@@ -197,6 +199,7 @@ private:
   bool            fDownloadingHeaders;
   bool            fCurrentCommandIsSingleMessageFetch;
   bool            fGotPermanentFlags;
+  bool            fStdJunkNotJunkUseOk;
   imapMessageFlagsType   fSavedFlagInfo;
   nsTArray<nsCString> fCustomFlags;
 

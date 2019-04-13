@@ -2,14 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "dom-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
 // we need this for the main controller
 var MODULE_REQUIRES = ["folder-display-helpers"];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 
 var NORMAL_TIMEOUT = 6000;
 var FAST_TIMEOUT = 1000;
@@ -83,8 +84,11 @@ function element_visible_recursive(aElem) {
   let parent = aElem.parentNode;
   if (parent == null)
     return true;
+
+  // #tabpanelcontainer and its parent #tabmail-tabbox have the same selectedPanel.
+  // Don't ask me why, it's just the way it is.
   if (("selectedPanel" in parent) &&
-      parent.selectedPanel != aElem)
+      parent.selectedPanel != aElem && aElem.id != "tabpanelcontainer")
     return false;
   return element_visible_recursive(parent);
 }
@@ -227,4 +231,6 @@ function collapse_panes(aElement, aShouldBeCollapsed) {
       }
     }
   }
+  // Spin the event loop once to let other window elements redraw.
+  mc.sleep(50);
 }

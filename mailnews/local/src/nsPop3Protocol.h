@@ -240,7 +240,7 @@ typedef struct _Pop3ConData {
 // commands, etc. I do not intend it to refer to protocol state)
 #define POP3_PAUSE_FOR_READ      0x00000001  /* should we pause for the next read */
 #define POP3_PASSWORD_FAILED    0x00000002
-#define POP3_STOPLOGIN              0x00000004  /* error loging in, so stop here */
+#define POP3_STOPLOGIN              0x00000004  /* error logging in, so stop here */
 #define POP3_AUTH_FAILURE           0x00000008  /* extended code said authentication failed */
 
 
@@ -250,7 +250,7 @@ class nsPop3Protocol : public nsMsgProtocol,
                        public nsIProtocolProxyCallback
 {
 public:
-  nsPop3Protocol(nsIURI* aURL);
+  explicit nsPop3Protocol(nsIURI* aURL);
 
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_NSIPOP3PROTOCOL
@@ -269,7 +269,7 @@ public:
   nsresult StartGetAsyncPassword(Pop3StatesEnum aNextState);
 
   NS_IMETHOD OnTransportStatus(nsITransport *transport, nsresult status, int64_t progress, int64_t progressMax) override;
-  NS_IMETHOD OnStopRequest(nsIRequest *request, nsISupports * aContext, nsresult aStatus) override;
+  NS_IMETHOD OnStopRequest(nsIRequest *request, nsresult aStatus) override;
   NS_IMETHOD Cancel(nsresult status) override;
 
   static void MarkMsgInHashTable(PLHashTable *hashTable, const Pop3UidlEntry *uidl,
@@ -317,7 +317,7 @@ private:
   nsCOMPtr<nsIPop3Sink> m_nsIPop3Sink;
   nsCOMPtr<nsIPop3IncomingServer> m_pop3Server;
 
-  nsMsgLineStreamBuffer   * m_lineStreamBuffer; // used to efficiently extract lines from the incoming data stream
+  RefPtr<nsMsgLineStreamBuffer> m_lineStreamBuffer; // used to efficiently extract lines from the incoming data stream
   Pop3ConData* m_pop3ConData;
   void FreeMsgInfo();
   void Abort();

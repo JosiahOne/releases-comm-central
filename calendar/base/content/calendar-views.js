@@ -9,10 +9,12 @@
  *          editSelectedEvents, selectAllEvents
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+/* import-globals-from calendar-chrome-startup.js */
+/* import-globals-from calendar-item-editing.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { countOccurrences } = ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
  * Controller for the views
@@ -116,23 +118,45 @@ var calendarViewController = {
         // are readonly.
         let occurrences = aOccurrences.filter(item => cal.acl.isCalendarWritable(item.calendar));
 
+        // we check how many occurrences the parent item has
+        let parents = new Map();
+        for (let occ of occurrences) {
+            if (!parents.has(occ.id)) {
+                parents.set(occ.id, countOccurrences(occ));
+            }
+        }
+
+        let promptUser = !aDoNotConfirm;
+        let previousResponse = 0;
         for (let itemToDelete of occurrences) {
-            if (aUseParentItems) {
+            if (parents.get(itemToDelete.id) == -1) {
+                // we have scheduled the master item for deletion in a previous
+                // loop already
+                continue;
+            }
+            if (aUseParentItems ||
+                parents.get(itemToDelete.id) == 1 ||
+                previousResponse == 3) {
                 // Usually happens when ctrl-click is used. In that case we
                 // don't need to ask the user if he wants to delete an
                 // occurrence or not.
+                // if an occurrence is the only one of a series or the user
+                // decided so before, we delete the series, too.
                 itemToDelete = itemToDelete.parentItem;
-            } else if (!aDoNotConfirm && occurrences.length == 1) {
-                // Only give the user the selection if only one occurrence is
-                // selected. Otherwise he will get a dialog for each occurrence
-                // he deletes.
+                parents.set(itemToDelete.id, -1);
+            } else if (promptUser) {
                 let [targetItem, , response] = promptOccurrenceModification(itemToDelete, false, "delete");
                 if (!response) {
                     // The user canceled the dialog, bail out
                     break;
                 }
-
                 itemToDelete = targetItem;
+
+                // if we have multiple items and the user decided already for one
+                // item whether to delete the occurrence or the entire series,
+                // we apply that decision also to subsequent items
+                previousResponse = response;
+                promptUser = false;
             }
 
             // Now some dirty work: Make sure more than one occurrence can be
@@ -331,11 +355,10 @@ function scheduleMidnightUpdate(aRefreshCallback) {
                     if (this.mTimer) {
                         this.mTimer.cancel();
                     } else {
-                        this.mTimer = Components.classes["@mozilla.org/timer;1"]
-                                                .createInstance(Components.interfaces.nsITimer);
+                        this.mTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
                     }
                     this.mTimer.initWithCallback(udCallback, 10 * 1000,
-                                                 Components.interfaces.nsITimer.TYPE_ONE_SHOT);
+                                                 Ci.nsITimer.TYPE_ONE_SHOT);
                 }
             }
         };
@@ -347,14 +370,13 @@ function scheduleMidnightUpdate(aRefreshCallback) {
         window.addEventListener("unload", () => {
             Services.obs.removeObserver(wakeObserver, "wake_notification");
         });
-        gMidnightTimer = Components.classes["@mozilla.org/timer;1"]
-                                   .createInstance(Components.interfaces.nsITimer);
+        gMidnightTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
     }
     gMidnightTimer.initWithCallback(udCallback, msUntilTomorrow, gMidnightTimer.TYPE_ONE_SHOT);
 }
 
 /**
- * Retuns a cached copy of the view stylesheet.
+ * Returns a cached copy of the view stylesheet.
  *
  * @return      The view stylesheet object.
  */
@@ -388,9 +410,16 @@ function updateStyleSheetForViews(aCalendar) {
         // We haven't create a rule for this calendar yet, do so now.
         let sheet = getViewStyleSheet();
         let ruleString = '.calendar-color-box[calendar-id="' + aCalendar.id + '"] {} ';
-        let ruleIndex = sheet.insertRule(ruleString, sheet.cssRules.length);
 
-        ruleCache[aCalendar.id] = sheet.cssRules[ruleIndex];
+        try {
+            let ruleIndex = sheet.insertRule(ruleString, sheet.cssRules.length);
+            ruleCache[aCalendar.id] = sheet.cssRules[ruleIndex];
+        } catch (ex) {
+            sheet.ownerNode.addEventListener("load",
+                                             () => updateStyleSheetForViews(aCalendar),
+                                             { once: true });
+            return;
+        }
     }
 
     let color = aCalendar.getProperty("color") || "#A8C2E1";
@@ -457,12 +486,19 @@ var categoryManagement = {
             // We haven't created a rule for this category yet, do so now.
             let sheet = getViewStyleSheet();
             let ruleString = '.category-color-box[categories~="' + aCatName + '"] {} ';
-            let ruleIndex = sheet.insertRule(ruleString, sheet.cssRules.length);
 
-            this.categoryStyleCache[aCatName] = sheet.cssRules[ruleIndex];
+            try {
+                let ruleIndex = sheet.insertRule(ruleString, sheet.cssRules.length);
+                this.categoryStyleCache[aCatName] = sheet.cssRules[ruleIndex];
+            } catch (ex) {
+                sheet.ownerNode.addEventListener("load",
+                                                 () => this.updateStyleSheetForCategory(aCatName),
+                                                 { once: true });
+                return;
+            }
         }
 
-        let color = Preferences.get("calendar.category.color." + aCatName) || "";
+        let color = Services.prefs.getStringPref("calendar.category.color." + aCatName, "");
         this.categoryStyleCache[aCatName].style.backgroundColor = color;
     }
 };
@@ -608,7 +644,7 @@ function goToDate(aDate) {
  */
 function getLastCalendarView() {
     let deck = getViewDeck();
-    if (deck.selectedIndex > -1) {
+    if (deck.hasAttribute("selectedIndex")) {
         let viewNode = deck.childNodes[deck.selectedIndex];
         return viewNode.id.replace(/-view/, "");
     }
@@ -678,7 +714,6 @@ function selectAllEvents() {
     composite.getItems(filter, 0, currentView().startDay, end, listener);
 }
 
-var cal = cal || {};
 cal.navigationBar = {
     setDateRange: function(aStartDate, aEndDate) {
         let docTitle = "";
@@ -727,3 +762,14 @@ var timeIndicator = {
     },
     lastView: null
 };
+
+var timezoneObserver = {
+    observe: function() {
+        let minimonth = getMinimonth();
+        minimonth.update(minimonth.value);
+    }
+};
+Services.obs.addObserver(timezoneObserver, "defaultTimezoneChanged");
+window.addEventListener("unload", () => {
+    Services.obs.removeObserver(timezoneObserver, "defaultTimezoneChanged");
+});

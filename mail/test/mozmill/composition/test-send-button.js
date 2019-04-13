@@ -6,14 +6,17 @@
  * Tests proper enabling of send buttons depending on addresses input.
  */
 
+"use strict";
+
 var MODULE_NAME = "test-send-button";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "compose-helpers",
                          "window-helpers", "address-book-helpers"];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 
 var account = null;
 
@@ -56,6 +59,7 @@ function check_send_commands_state(aCwc, aEnabled) {
  * by the user.
  */
 function test_send_enabled_manual_address() {
+  let isMac = AppConstants.platform == "macosx";
   let cwc = open_compose_new_mail(); // compose controller
   // On an empty window, Send must be disabled.
   check_send_commands_state(cwc, false);
@@ -81,6 +85,23 @@ function test_send_enabled_manual_address() {
   toggle_recipient_type(cwc, "addr_cc");
   check_send_commands_state(cwc, false);
 
+  // We change focus from recipient type box to recipient input box.
+  // One click on the recipient input box selects the whole typed string (bug 1527547).
+  cwc.click(cwc.eid("addressCol2#1"), 200, 5);
+  // On macOS the focus is automatically returned to the input box after operating
+  // the type box and no focus event is fired. So the recipient is not selected
+  // and the caret is after the last typed character (where we left off).
+  if (AppConstants.platform == "macosx") {
+    // Click subject and then back to recipient input to see that it gets selected.
+    cwc.click(cwc.eid("msgSubject"));
+    cwc.click(cwc.eid("addressCol2#1"));
+  }
+  assert_equals(cwc.e("addressCol2#1").selectionStart, 0);
+  // End of selection counts the length of the " recipient@" string from above.
+  assert_equals(cwc.e("addressCol2#1").selectionEnd, 11);
+  // Another click after the recipient deselects it to allow typing.
+  cwc.click(cwc.eid("addressCol2#1"), 200, 5);
+  assert_equals(cwc.e("addressCol2#1").selectionStart, 11);
   // This types additional characters into the recipient.
   setup_msg_contents(cwc, "domain.invalid", "", "");
   check_send_commands_state(cwc, true);
@@ -198,7 +219,7 @@ function test_send_enabled_address_contacts_sidebar() {
 
   let sidebar = cwc.e("sidebar");
   wait_for_frame_load(sidebar,
-    "chrome://messenger/content/addressbook/abContactsPanel.xul");
+    "chrome://messenger/content/addressbook/abContactsPanel.xul?focus");
 
   let abTree = sidebar.contentDocument.getElementById("abResultsTree");
   click_tree_row(abTree, 0, cwc);

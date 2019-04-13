@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyScriptGetter(this, ["PlacesToolbar", "PlacesMenu",
                                          "PlacesPanelview", "PlacesPanelMenuView"],
@@ -401,7 +401,7 @@ var PlacesCommandHook = {
     let parentGuid = parentId == PlacesUtils.bookmarksMenuFolderId ?
                        PlacesUtils.bookmarks.menuGuid :
                        await PlacesUtils.promiseItemGuid(parentId);
-    let defaultInsertionPoint = new InsertionPoint({ parentId, parentGuid });
+    let defaultInsertionPoint = new PlacesInsertionPoint({ parentId, parentGuid });
 
     PlacesUIUtils.showBookmarkDialog({ action: "add",
                                        type: "bookmark",
@@ -481,7 +481,7 @@ var PlacesCommandHook = {
    *            A short description of the feed. Optional.
    */
   async addLiveBookmark(url, feedTitle, feedSubtitle) {
-    let toolbarIP = new InsertionPoint({
+    let toolbarIP = new PlacesInsertionPoint({
       parentId: PlacesUtils.toolbarFolderId,
       parentGuid: PlacesUtils.bookmarks.toolbarGuid
     });
@@ -531,15 +531,6 @@ var PlacesCommandHook = {
  * Functions for handling events in the Bookmarks Toolbar and menu.
  */
 var BookmarksEventHandler = {
-  /**
-   * Handler for click event for an item in the bookmarks toolbar or menu.
-   * Menus and submenus from the folder buttons bubble up to this handler.
-   * Left-click is handled in the onCommand function.
-   * When items are middle-clicked (or clicked with modifier), open in tabs.
-   * If the click came through a menu, close the menu.
-   * @param aEvent
-   *        DOMEvent for the click
-   */
 
   onMouseUp(aEvent) {
     // Handles left-click with modifier if not browser.bookmarks.openInTabClosesMenu.
@@ -556,7 +547,18 @@ var BookmarksEventHandler = {
     }
   },
 
-  onClick: function BEH_onClick(aEvent) {
+  /**
+   * Handler for click event for an item in the bookmarks toolbar or menu.
+   * Menus and submenus from the folder buttons bubble up to this handler.
+   * Left-click is handled in the onCommand function.
+   * When items are middle-clicked (or clicked with modifier), open in tabs.
+   * If the click came through a menu, close the menu.
+   * @param aEvent
+   *        DOMEvent for the click
+   * @param aView
+   *        The places view which aEvent should be associated with.
+   */
+  onClick: function BEH_onClick(aEvent, aView) {
     // Only handle middle-click or left-click with modifiers.
     if (aEvent.button == 2 || (aEvent.button == 0 && !aEvent.shiftKey &&
                                !aEvent.ctrlKey && !aEvent.metaKey))
@@ -586,7 +588,7 @@ var BookmarksEventHandler = {
       // is middle-clicked or when a non-bookmark item except for Open in Tabs)
       // in a bookmarks menupopup is middle-clicked.
       if (target.localName == "menu" || target.localName == "toolbarbutton")
-        PlacesUIUtils.openContainerNodeInTabs(target._placesNode, aEvent);
+        PlacesUIUtils.openContainerNodeInTabs(target._placesNode, aEvent, aView);
     }
     else if (aEvent.button == 1) {
       // left-clicks with modifier are already served by onCommand
@@ -750,7 +752,7 @@ var PlacesMenuDNDHandler = {
    *          The DragOver event.
    */
   onDragOver: function PMDH_onDragOver(event) {
-    let ip = new InsertionPoint({
+    let ip = new PlacesInsertionPoint({
       parentId: PlacesUtils.bookmarksMenuFolderId,
       parentGuid: PlacesUtils.bookmarks.menuGuid
     });
@@ -767,7 +769,7 @@ var PlacesMenuDNDHandler = {
    */
   onDrop: function PMDH_onDrop(event) {
     // Put the item at the end of bookmark menu.
-    let ip = new InsertionPoint({
+    let ip = new PlacesInsertionPoint({
       parentId: PlacesUtils.bookmarksMenuFolderId,
       parentGuid: PlacesUtils.bookmarks.menuGuid
     });

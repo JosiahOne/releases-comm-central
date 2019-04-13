@@ -38,6 +38,7 @@
 #include "nsIServiceManager.h"
 #include "nsCOMArray.h"
 #include "nsEnumeratorUtils.h"
+#include "nsSimpleEnumerator.h"
 #include "nsTArray.h"
 #include "nsCRT.h"
 #include "nsRDFCID.h"
@@ -350,7 +351,7 @@ mozilla::LazyLogModule InMemoryDataSource::gLog("InMemoryDataSource");
 /**
  * InMemoryAssertionEnumeratorImpl
  */
-class InMemoryAssertionEnumeratorImpl : public nsISimpleEnumerator
+class InMemoryAssertionEnumeratorImpl : public nsSimpleEnumerator
 {
 private:
     InMemoryDataSource* mDataSource;
@@ -361,20 +362,22 @@ private:
     bool            mTruthValue;
     Assertion*      mNextAssertion;
 
-    virtual ~InMemoryAssertionEnumeratorImpl();
+    ~InMemoryAssertionEnumeratorImpl() override;
 
 public:
+    const nsID& DefaultInterface() override
+    {
+      return NS_GET_IID(nsIRDFNode);
+    }
+
+    // nsISimpleEnumerator interface
+    NS_DECL_NSISIMPLEENUMERATOR
+
     InMemoryAssertionEnumeratorImpl(InMemoryDataSource* aDataSource,
                                     nsIRDFResource* aSource,
                                     nsIRDFResource* aProperty,
                                     nsIRDFNode* aTarget,
                                     bool aTruthValue);
-
-    // nsISupports interface
-    NS_DECL_ISUPPORTS
-
-    // nsISimpleEnumerator interface
-    NS_DECL_NSISIMPLEENUMERATOR
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -435,10 +438,6 @@ InMemoryAssertionEnumeratorImpl::~InMemoryAssertionEnumeratorImpl()
     NS_IF_RELEASE(mTarget);
     NS_IF_RELEASE(mValue);
 }
-
-NS_IMPL_ADDREF(InMemoryAssertionEnumeratorImpl)
-NS_IMPL_RELEASE(InMemoryAssertionEnumeratorImpl)
-NS_IMPL_QUERY_INTERFACE(InMemoryAssertionEnumeratorImpl, nsISimpleEnumerator)
 
 NS_IMETHODIMP
 InMemoryAssertionEnumeratorImpl::HasMoreElements(bool* aResult)
@@ -517,7 +516,7 @@ InMemoryAssertionEnumeratorImpl::GetNext(nsISupports** aResult)
  * out for is the multiple inheritance clashes.
  */
 
-class InMemoryArcsEnumeratorImpl : public nsISimpleEnumerator
+class InMemoryArcsEnumeratorImpl : public nsSimpleEnumerator
 {
 private:
     InMemoryDataSource* mDataSource;
@@ -528,18 +527,20 @@ private:
     Assertion*          mAssertion;
     nsCOMArray<nsIRDFNode>* mHashArcs;
 
-    virtual ~InMemoryArcsEnumeratorImpl();
+    ~InMemoryArcsEnumeratorImpl() override;
 
 public:
-    InMemoryArcsEnumeratorImpl(InMemoryDataSource* aDataSource,
-                               nsIRDFResource* aSource,
-                               nsIRDFNode* aTarget);
-
-    // nsISupports interface
-    NS_DECL_ISUPPORTS
+    const nsID& DefaultInterface() override
+    {
+      return NS_GET_IID(nsIRDFResource);
+    }
 
     // nsISimpleEnumerator interface
     NS_DECL_NSISIMPLEENUMERATOR
+
+    InMemoryArcsEnumeratorImpl(InMemoryDataSource* aDataSource,
+                               nsIRDFResource* aSource,
+                               nsIRDFNode* aTarget);
 };
 
 
@@ -590,10 +591,6 @@ InMemoryArcsEnumeratorImpl::~InMemoryArcsEnumeratorImpl()
     NS_IF_RELEASE(mCurrent);
     delete mHashArcs;
 }
-
-NS_IMPL_ADDREF(InMemoryArcsEnumeratorImpl)
-NS_IMPL_RELEASE(InMemoryArcsEnumeratorImpl)
-NS_IMPL_QUERY_INTERFACE(InMemoryArcsEnumeratorImpl, nsISimpleEnumerator)
 
 NS_IMETHODIMP
 InMemoryArcsEnumeratorImpl::HasMoreElements(bool* aResult)
@@ -1854,13 +1851,7 @@ InMemoryDataSource::VisitAllSubjects(rdfITripleVisitor *aVisitor)
     nsresult rv = NS_OK;
     for (auto iter = mForwardArcs.Iter(); !iter.Done(); iter.Next()) {
         auto entry = static_cast<Entry*>(iter.Get());
-        nsresult rv2;
-        nsCOMPtr<nsIRDFNode> subject = do_QueryInterface(entry->mNode, &rv2);
-        if (NS_FAILED(rv2)) {
-            NS_WARNING("QI to nsIRDFNode failed");
-            continue;
-        }
-        rv = aVisitor->Visit(subject, nullptr, nullptr, true);
+        rv = aVisitor->Visit(entry->mNode, nullptr, nullptr, true);
         if (NS_FAILED(rv) || rv == NS_RDF_STOP_VISIT) {
             break;
         }
@@ -1883,12 +1874,7 @@ InMemoryDataSource::VisitAllTriples(rdfITripleVisitor *aVisitor)
     for (auto iter = mForwardArcs.Iter(); !iter.Done(); iter.Next()) {
         auto entry = static_cast<Entry*>(iter.Get());
 
-        nsresult rv2;
-        nsCOMPtr<nsIRDFNode> subject = do_QueryInterface(entry->mNode, &rv2);
-        if (NS_FAILED(rv2)) {
-            NS_WARNING("QI to nsIRDFNode failed");
-
-        } else if (entry->mAssertions->mHashEntry) {
+        if (entry->mAssertions->mHashEntry) {
             for (auto iter = entry->mAssertions->u.hash.mPropertyHash->Iter();
                  !iter.Done();
                  iter.Next()) {
@@ -1896,9 +1882,9 @@ InMemoryDataSource::VisitAllTriples(rdfITripleVisitor *aVisitor)
                 Assertion* assertion = entry->mAssertions;
                 while (assertion) {
                     NS_ASSERTION(!assertion->mHashEntry, "shouldn't have to hashes");
-                    rv = aVisitor->Visit(subject, assertion->u.as.mProperty,
-                                                  assertion->u.as.mTarget,
-                                                  assertion->u.as.mTruthValue);
+                    rv = aVisitor->Visit(entry->mNode, assertion->u.as.mProperty,
+                                                       assertion->u.as.mTarget,
+                                                       assertion->u.as.mTruthValue);
                     if (NS_FAILED(rv)) {
                         goto end;
                     }
@@ -1913,9 +1899,9 @@ InMemoryDataSource::VisitAllTriples(rdfITripleVisitor *aVisitor)
             Assertion* assertion = entry->mAssertions;
             while (assertion) {
                 NS_ASSERTION(!assertion->mHashEntry, "shouldn't have to hashes");
-                rv = aVisitor->Visit(subject, assertion->u.as.mProperty,
-                                              assertion->u.as.mTarget,
-                                              assertion->u.as.mTruthValue);
+                rv = aVisitor->Visit(entry->mNode, assertion->u.as.mProperty,
+                                                   assertion->u.as.mTarget,
+                                                   assertion->u.as.mTruthValue);
                 if (NS_FAILED(rv) || rv == NS_RDF_STOP_VISIT) {
                     goto end;
                 }

@@ -2,9 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 function calBackendLoader() {
     this.wrappedJSObject = this;
@@ -22,7 +21,7 @@ calBackendLoader.prototype = {
     loaded: false,
 
     observe: function() {
-        // Nothing to do here, just need the entry so this is instanciated
+        // Nothing to do here, just need the entry so this is instantiated
     },
 
     loadBackend: function() {
@@ -30,7 +29,7 @@ calBackendLoader.prototype = {
             return;
         }
 
-        if (Preferences.get("calendar.icaljs", false)) {
+        if (Services.prefs.getBoolPref("calendar.icaljs", false)) {
             let contracts = {
                 "@mozilla.org/calendar/datetime;1": "{36783242-ec94-4d8a-9248-d2679edd55b9}",
                 "@mozilla.org/calendar/ics-service;1": "{c61cb903-4408-41b3-bc22-da0b27efdfe1}",
@@ -45,7 +44,7 @@ calBackendLoader.prototype = {
 
             // Register the icaljs components. We used to unregisterFactory, but this caused all
             // sorts of problems. Just registering over it seems to work quite fine.
-            let registrar = Components.manager.QueryInterface(Components.interfaces.nsIComponentRegistrar);
+            let registrar = Components.manager.QueryInterface(Ci.nsIComponentRegistrar);
             for (let [contractID, classID] of Object.entries(contracts)) {
                 let newClassID = Components.ID(classID);
                 let newFactory = lazyFactoryFor(scope, newClassID);
@@ -69,7 +68,7 @@ function lazyFactoryFor(backendScope, classID) {
         },
         lockFactory: function(lock) {
             let realFactory = backendScope.NSGetFactory(classID);
-            return realFactory.lockFactory(aOuter, aIID);
+            return realFactory.lockFactory(lock);
         }
     };
 }

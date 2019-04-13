@@ -7,7 +7,7 @@
 #include "nsDirectoryServiceUtils.h"
 #include "nsAutoPtr.h"
 #include "nsString.h"
-#include "nsISimpleEnumerator.h"
+#include "nsIDirectoryEnumerator.h"
 #include "mozilla/ArrayUtils.h"
 
 #ifdef _WIN32_WINNT
@@ -167,17 +167,15 @@ NS_IMETHODIMP nsMailWinSearchHelper::SetFANCIBit(nsIFile* aFile, bool aBit, bool
   NS_ENSURE_SUCCESS(rv, rv);
   if (aRecurse && isDirectory)
   {
-    nsCOMPtr<nsISimpleEnumerator> children;
+    nsCOMPtr<nsIDirectoryEnumerator> children;
     rv = aFile->GetDirectoryEntries(getter_AddRefs(children));
     NS_ENSURE_SUCCESS(rv, rv);
 
-    bool hasMore;
-    while (NS_SUCCEEDED(rv) && NS_SUCCEEDED(children->HasMoreElements(&hasMore)) && hasMore)
+    bool hasMore = false;
+    while (NS_SUCCEEDED(children->HasMoreElements(&hasMore)) && hasMore)
     {
-      nsCOMPtr<nsISupports> supports;
-      rv = children->GetNext(getter_AddRefs(supports));
-      NS_ENSURE_SUCCESS(rv, rv);
-      nsCOMPtr<nsIFile> childFile = do_QueryInterface(supports, &rv);
+      nsCOMPtr<nsIFile> childFile;
+      rv = children->GetNextFile(getter_AddRefs(childFile));
       NS_ENSURE_SUCCESS(rv, rv);
       rv = SetFANCIBit(childFile, aBit, aRecurse);
     }
@@ -188,7 +186,6 @@ NS_IMETHODIMP nsMailWinSearchHelper::SetFANCIBit(nsIFile* aFile, bool aBit, bool
 NS_IMETHODIMP nsMailWinSearchHelper::GetIsFileAssociationSet(bool *aResult)
 {
   NS_ENSURE_ARG_POINTER(aResult);
-  *aResult = false;
 
   // We'll use the Vista method here
   RefPtr<IApplicationAssociationRegistration> pAAR;
@@ -198,7 +195,7 @@ NS_IMETHODIMP nsMailWinSearchHelper::GetIsFileAssociationSet(bool *aResult)
                                 IID_IApplicationAssociationRegistration,
                                 getter_AddRefs(pAAR));
 
-  BOOL res;
+  BOOL res = false;
   if (SUCCEEDED(hr))
     pAAR->QueryAppIsDefault(L".wdseml", AT_FILEEXTENSION, AL_EFFECTIVE, APP_REG_NAME_MAIL, &res);
   *aResult = res;
@@ -258,7 +255,7 @@ NS_IMETHODIMP nsMailWinSearchHelper::RunSetup(bool aEnable)
   executeInfo.lpParameters = params.get();
   executeInfo.nShow = SW_SHOWNORMAL;
 
-  DWORD dwRet;
+  DWORD dwRet = ERROR_SUCCESS;
 
   if (ShellExecuteExW(&executeInfo))
   {

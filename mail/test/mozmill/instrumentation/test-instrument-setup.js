@@ -2,15 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "test-instrument-setup";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers",
                        "keyboard-helpers" ];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var user = {
   name: "Roger Sterling",
@@ -36,7 +37,7 @@ function setupModule(module) {
 }
 
 function test_mail_account_setup() {
-  awc = wait_for_existing_window("mail:autoconfig");
+  let awc = wait_for_existing_window("mail:autoconfig");
 
   // Input user's account information
   awc.e("realname").focus();
@@ -57,7 +58,7 @@ function test_mail_account_setup() {
   plan_for_window_close(awc);
   awc.e("create_button").click();
 
-  let events = mc.window.mailInstrumentationManager._currentState.events;
+  let events = mc.window.MailInstrumentation._currentState.events;
   wait_for_window_close();
 
   // we expect to have accountAdded and smtpServerAdded events.

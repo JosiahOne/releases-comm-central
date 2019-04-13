@@ -7,8 +7,9 @@
 <?xml-stylesheet href="chrome://messenger/skin/messengercompose/messengercompose.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/folderMenus.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/attachmentList.css" type="text/css"?>
-<?xml-stylesheet href="chrome://messenger/skin/smime/msgCompSMIMEOverlay.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/smime/smime-compose.css" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/compacttheme.css" type="text/css" alternate="yes" title="Light/Dark"?>
+<?xml-stylesheet href="chrome://messenger/skin/menulist.css" type="text/css"?>
 
 <!DOCTYPE window [
   <!ENTITY % messengercomposeDTD SYSTEM "chrome://messenger/locale/messengercompose/messengercompose.dtd" >
@@ -36,7 +37,8 @@
 
 <window id="msgcomposeWindow"
         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-        xmlns:nc="http://home.netscape.com/NC-rdf#"
+        xmlns:html="http://www.w3.org/1999/xhtml"
+        icon="msgcomposeWindow"
         onunload="ComposeUnload()"
         onload="ComposeLoad()"
         onclose="return DoCommandClose()"
@@ -56,6 +58,10 @@
   <stringbundle id="bundle_comp_smime"  src="chrome://messenger-smime/locale/msgCompSMIMEOverlay.properties"/>
   <stringbundle id="charsetBundle"      src="chrome://communicator/content/labelsencodings.properties"/>
 </stringbundleset>
+
+<linkset>
+  <html:link rel="localization" href="toolkit/main-window/findbar.ftl"/>
+</linkset>
 
 <script type="application/javascript" src="chrome://global/content/printUtils.js"/>
 <script type="application/javascript" src="chrome://messenger/content/accountUtils.js"/>
@@ -386,15 +392,6 @@
 
   <command id="cmd_doNotRemindForAttachments" oncommand="disableAttachmentReminder();"/>
 
-<broadcasterset id="composeBroadcasters">
-  <broadcaster id="args" value="editorType=default"/>
-  <broadcaster id="viewAddressPicker" autoCheck="false" type="checkbox" oncommand="toggleAddressPicker();"/>
-  <broadcaster id="securityStatus" crypto="" signing=""/>
-</broadcasterset>
-
-<observes element="securityStatus" attribute="crypto" />
-<observes element="securityStatus" attribute="signing" />
-
 <keyset id="tasksKeys">
   <!-- File Menu -->
 #ifdef XP_MACOSX
@@ -438,23 +435,20 @@
 #ifdef XP_MACOSX
   <key id="key_delete" keycode="VK_BACK" command="cmd_delete"/>
   <key id="key_delete2" keycode="VK_DELETE" command="cmd_delete"/>
-  <key id="key_reorderAttachments"
-       key="&reorderAttachmentsCmd.key;" modifiers="control"
-       command="cmd_reorderAttachments"/>
   <key id="key_toggleAttachmentPane"
        key="&toggleAttachmentPaneCmd.key;" modifiers="control"
-       command="keyToggleAttachmentPaneOnCommand();"/>
+       oncommand="keyToggleAttachmentPaneOnCommand();"/>
 #else
   <key id="key_delete" keycode="VK_DELETE" command="cmd_delete"/>
   <key id="key_renameAttachment" keycode="VK_F2"
        command="cmd_renameAttachment"/>
-  <key id="key_reorderAttachments"
-       key="&reorderAttachmentsCmd.key;" modifiers="alt"
-       command="cmd_reorderAttachments"/>
   <key id="key_toggleAttachmentPane"
-       key="&toggleAttachmentPaneCmd.key;" modifiers="alt"
+       key="&attachments.accesskey;" modifiers="alt"
        oncommand="keyToggleAttachmentPaneOnCommand();"/>
 #endif
+  <key id="key_reorderAttachments"
+       key="&reorderAttachmentsCmd.key;" modifiers="accel,shift"
+       command="cmd_reorderAttachments"/>
   <key id="key_selectAll" key="&selectAllCmd.key;" modifiers="accel"/>
   <key id="key_find" key="&findBarCmd.key;" command="cmd_find" modifiers="accel"/>
 #ifndef XP_MACOSX
@@ -567,6 +561,8 @@
 
   <key id="insertlinkkb" key="&insertLinkCmd2.key;" observes="cmd_link" modifiers="accel"/>
 </keyset>
+
+<popupset id="mainPopupSet"/>
 
 <!-- Reorder Attachments Panel -->
 <panel id="reorderAttachmentsPanel"
@@ -1009,7 +1005,10 @@
           </menu>
           <menuitem id="menu_AddressSidebar"
                     label="&addressSidebar.label;" accesskey="&addressSidebar.accesskey;"
-                    key="key_addressSidebar" observes="viewAddressPicker"/>
+                    type="checkbox"
+                    autoCheck="false"
+                    key="key_addressSidebar"
+                    oncommand="toggleAddressPicker();"/>
           <menuitem id="menu_toggleAttachmentPane"
                     label="&toggleAttachmentPaneCmd.label;"
                     accesskey="&toggleAttachmentPaneCmd.accesskey;"
@@ -1700,11 +1699,11 @@
       </menu>
 
 #ifdef XP_MACOSX
-#include ../../../base/content/macWindowMenu.inc
+#include ../../../base/content/macWindowMenu.inc.xul
 #endif
 
       <!-- Help -->
-#include ../../../base/content/helpMenu.inc
+#include ../../../base/content/helpMenu.inc.xul
     </menubar>
    </toolbaritem>
   </toolbar>
@@ -1724,7 +1723,8 @@
     <toolbarbutton class="toolbarbutton-1"
                id="button-contacts" label="&addressButton.label;"
                tooltiptext="&addressButton.tooltip;"
-               observes="viewAddressPicker"/>
+               autoCheck="false" type="checkbox"
+               oncommand="toggleAddressPicker();"/>
 
     <toolbarbutton class="toolbarbutton-1" type="menu-button"
                id="button-attach" label="&attachButton.label;"
@@ -1919,26 +1919,32 @@
       <hbox id="msgheaderstoolbar-box" flex="1">
         <vbox flex="1" id="addresses-box">
           <hbox id="top-gradient-box">
+            <hbox class="aw-firstColBox"/>
             <hbox id="identityLabel-box" align="center" pack="end" style="&headersSpace.style;">
               <label id="identityLabel" value="&fromAddr.label;"
                      accesskey="&fromAddr.accesskey;" control="msgIdentity"/>
             </hbox>
-            <menulist id="msgIdentity" type="description" flex="1"
+            <menulist is="menulist-editable" id="msgIdentity"
+                      type="description" flex="1"
                       disableautoselect="true" onkeypress="fromKeyPress(event);"
                       oncommand="LoadIdentity(false);" disableonsend="true">
               <menupopup id="msgIdentityPopup"/>
             </menulist>
           </hbox>
-          <listbox id="addressingWidget" flex="1" seltype="multiple" rows="1"
-                   onkeydown="awKeyDown(event, this)"
-                   onclick="awClickEmptySpace(event.originalTarget, true)"
-                   disableonsend="true">
-            <listcols>
-              <listcol id="typecol-addressingWidget" style="&headersSpace.style;"/>
-              <listcol id="textcol-addressingWidget" flex="1"/>
-            </listcols>
-            <listitem class="addressingWidgetItem" allowevents="true">
-              <listcell class="addressingWidgetCell">
+          <richlistbox id="addressingWidget" flex="1" seltype="multiple"
+                       onclick="awClickEmptySpace(event.originalTarget, true)"
+                       disableonsend="true">
+            <treecols hidden="true">
+              <treecol id="firstcol-addressingWidget"/>
+              <treecol id="typecol-addressingWidget" style="&headersSpace.style;"/>
+              <treecol id="textcol-addressingWidget" flex="1"/>
+            </treecols>
+            <richlistitem class="addressingWidgetItem" allowevents="true">
+              <hbox class="aw-firstColBox" align="center">
+                <image class="deleteAddress close-icon"
+                       onclick="awDeleteAddressOnClick(this);"/>
+              </hbox>
+              <hbox class="addressingWidgetCell" align="center" style="&headersSpace.style;">
                 <menulist id="addressCol1#1" disableonsend="true"
                           class="aw-menulist" flex="1"
                           oncommand="onAddressColCommand(this.id);">
@@ -1951,10 +1957,8 @@
                     <menuitem value="addr_followup" label="&followupAddr.label;"/>
                   </menupopup>
                 </menulist>
-                <image class="deleteAddress close-icon"
-                       onclick="awDeleteHit(this.parentNode.nextSibling.querySelector('textbox.textbox-addressingWidget'));"/>
-              </listcell>
-              <listcell class="addressingWidgetCell">
+              </hbox>
+              <hbox class="addressingWidgetCell" flex="1">
                 <textbox id="addressCol2#1" class="plain textbox-addressingWidget uri-element"
                          aria-labelledby="addressCol1#1"
                          type="autocomplete" flex="1"
@@ -1965,6 +1969,7 @@
                          completedefaultindex="true" forcecomplete="true"
                          completeselectedindex="true"
                          minresultsforpopup="2" ignoreblurwhilesearching="true"
+                         onfocus="awRecipientOnFocus(this);"
                          ontextentered="awRecipientTextCommand(param, this)"
                          onchange="onRecipientsChanged();"
                          oninput="onRecipientsChanged();"
@@ -1972,15 +1977,16 @@
                          onkeydown="awRecipientKeyDown(event, this)"
                          disableonsend="true">
                 </textbox>
-              </listcell>
-            </listitem>
-          </listbox>
+              </hbox>
+            </richlistitem>
+          </richlistbox>
           <hbox id="subject-box">
+            <hbox class="aw-firstColBox"/>
             <hbox align="center" pack="end" style="&headersSpace.style;">
               <label id="subjectLabel" value="&subject.label;" accesskey="&subject.accesskey;" control="msgSubject"/>
             </hbox>
             <textbox id="msgSubject" flex="1" class="toolbar" disableonsend="true" spellcheck="true"
-                     oninput="gContentChanged=true;SetComposeWindowTitle();"
+                     oninput="gContentChanged = true; SetComposeWindowTitle();"
                      onkeypress="subjectKeyPress(event);" />
           </hbox>
         </vbox>
@@ -2014,21 +2020,22 @@
                            context=""
                            oncommand="attachmentBucketCloseButtonOnCommand();"/>
           </hbox>
-          <attachmentlist id="attachmentBucket"
-                          tooltiptext=""
-                          disableonsend="true"
-                          seltype="multiple"
-                          orient="vertical"
-                          flex="1"
-                          height="0"
-                          role="listbox"
-                          context="msgComposeAttachmentListContext"
-                          itemcontext="msgComposeAttachmentItemContext"
-                          onclick="attachmentBucketOnClick(event);"
-                          onkeypress="attachmentBucketOnKeyPress(event);"
-                          onselect="attachmentBucketOnSelect();"
-                          ondragstart="attachmentBucketOnDragStart(event);"
-                          onblur="attachmentBucketOnBlur();"/>
+          <richlistbox id="attachmentBucket"
+                       class="attachmentList"
+                       tooltiptext=""
+                       disableonsend="true"
+                       seltype="multiple"
+                       orient="vertical"
+                       flex="1"
+                       height="0"
+                       role="listbox"
+                       context="msgComposeAttachmentListContext"
+                       itemcontext="msgComposeAttachmentItemContext"
+                       onclick="attachmentBucketOnClick(event);"
+                       onkeypress="attachmentBucketOnKeyPress(event);"
+                       onselect="attachmentBucketOnSelect();"
+                       ondragstart="attachmentBucketOnDragStart(event);"
+                       onblur="attachmentBucketOnBlur();"/>
         </vbox>
         <vbox id="attachments-placeholder-box"
               hidden="true"
@@ -2040,13 +2047,13 @@
     <toolbox id="FormatToolbox" mode="icons">
       <toolbar class="chromeclass-toolbar" id="FormatToolbar" persist="collapsed"
                customizable="true" nowindowdrag="true">
-#include editFormatButtons.inc
+#include editFormatButtons.inc.xul
         <spacer flex="1"/>
       </toolbar>
     </toolbox>
   </toolbox>
 
-  <splitter id="compose-toolbar-sizer" onmousedown="awSizerListen()"/>
+  <splitter id="compose-toolbar-sizer" onmousedown="awSizerListen()" orient="vertical"/>
 
   <!-- The mail message body frame -->
   <vbox id="appcontent" flex="1">
@@ -2055,6 +2062,7 @@
             primary="true"
             src="about:blank"
             name="browser.message.body"
+            aria-label="&aria.message.bodyName;"
             minheight="100"
             flex="1"
             ondblclick="EditorDblClick(event);"
@@ -2076,34 +2084,36 @@
                      notificationside="bottom"/>
   </hbox>
 
-  <statusbar id="status-bar" class="chromeclass-status">
+  <hbox id="status-bar" class="statusbar chromeclass-status">
     <statusbarpanel id="statusText" flex="1"/>
-    <statusbarpanel id="statusbar-progresspanel"
-                    class="statusbarpanel-progress"
-                    collapsed="true">
-      <progressmeter id="compose-progressmeter" class="progressmeter-statusbar" mode="normal" value="0"/>
-    </statusbarpanel>
-    <statusbarpanel class="statusbarpanel-iconic"
-                    collapsed="true"
-                    id="signing-status"
-                    oncommand="showMessageComposeSecurityStatus();">
+    <hbox id="statusbar-progresspanel"
+          class="statusbarpanel statusbarpanel-progress"
+          collapsed="true">
+      <html:progress id="compose-progressmeter" class="progressmeter-statusbar" value="0" max="100"/>
+    </hbox>
+    <hbox id="signing-status"
+          class="statusbarpanel statusbarpanel-iconic"
+          collapsed="true"
+          oncommand="showMessageComposeSecurityStatus();">
       <image/>
-    </statusbarpanel>
-    <statusbarpanel class="statusbarpanel-iconic"
-                    collapsed="true"
-                    id="encryption-status"
-                    oncommand="showMessageComposeSecurityStatus();">
+    </hbox>
+    <hbox id="encryption-status"
+          class="statusbarpanel statusbarpanel-iconic"
+          collapsed="true"
+          oncommand="showMessageComposeSecurityStatus();">
       <image/>
-    </statusbarpanel>
+    </hbox>
     <statusbarpanel id="encodingStatusPanel" tooltiptext="&encodingStatusPanel.tooltip;"/>
-    <statusbarpanel id="spellCheckStatusPanel">
+    <hbox id="spellCheckStatusPanel" class="statusbarpanel">
       <toolbarbutton id="languageStatusButton"
                      tooltiptext="&languageStatusButton.tooltip;"
                      oncommand="showPopupById('languageMenuList',
                                               'languageStatusButton',
                                               'before_start');">
       </toolbarbutton>
-    </statusbarpanel>
-  </statusbar>
-
+    </hbox>
+    <hbox class="statusbarpanel statusbar-resizerpanel">
+      <resizer dir="bottomend"/>
+    </hbox>
+  </hbox>
 </window>

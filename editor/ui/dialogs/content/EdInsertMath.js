@@ -5,10 +5,15 @@
 
 /* Insert MathML dialog */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+
 var XULNS = "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul";
 
-function Startup()
-{
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+function Startup() {
   var editor = GetCurrentEditor();
   if (!editor) {
     window.close();
@@ -30,9 +35,8 @@ function Startup()
   // TeXZilla.js contains non-ASCII characters and explicitly sets
   // window.TeXZilla, so we have to specify the charset parameter but don't
   // need to worry about the targetObj parameter.
-  Cc["@mozilla.org/moz/jssubscript-loader;1"]
-    .getService(Ci.mozIJSSubScriptLoader)
-    .loadSubScript("chrome://editor/content/TeXZilla.js", {}, "UTF-8");
+  /* globals TeXZilla */
+  Services.scriptloader.loadSubScript("chrome://editor/content/TeXZilla.js", {}, "UTF-8");
 
   // Verify if the selection is on a <math> and initialize the dialog.
   gDialog.oldMath = editor.getElementOrParentByTagName("math", null);
@@ -73,7 +77,7 @@ function Startup()
             "\\dot{⋯}",
             "\\ddot{⋯}",
             "\\boxed{⋯}",
-            "\\slash{⋯}"
+            "\\slash{⋯}",
     ],
     "(▦)": ["\\begin{matrix} ⋯ & ⋯ \\\\ ⋯ & ⋯ \\end{matrix}",
             "\\begin{pmatrix} ⋯ & ⋯ \\\\ ⋯ & ⋯ \\end{pmatrix}",
@@ -82,8 +86,8 @@ function Startup()
             "\\begin{vmatrix} ⋯ & ⋯ \\\\ ⋯ & ⋯ \\end{vmatrix}",
             "\\begin{Vmatrix} ⋯ & ⋯ \\\\ ⋯ & ⋯ \\end{Vmatrix}",
             "\\begin{cases} ⋯ \\\\ ⋯  \\end{cases}",
-            "\\begin{aligned} ⋯ &= ⋯ \\\\ ⋯ &= ⋯ \\end{aligned}"
-    ]
+            "\\begin{aligned} ⋯ &= ⋯ \\\\ ⋯ &= ⋯ \\end{aligned}",
+    ],
   });
   createSymbolPanels([
     "∏∐∑∫∬∭⨌∮⊎⊕⊖⊗⊘⊙⋀⋁⋂⋃⌈⌉⌊⌋⎰⎱⟨⟩⟪⟫∥⫼⨀⨁⨂⨄⨅⨆ðıȷℏℑℓ℘ℜℵℶ",
@@ -95,7 +99,7 @@ function Startup()
     "αβγδϵ϶εζηθϑικϰλμνξℴπϖρϱσςτυϕφχψωΓΔΘΛΞΠΣϒΦΨΩϝ℧",
     "𝕒𝕓𝕔𝕕𝕖𝕗𝕘𝕙𝕚𝕛𝕜𝕝𝕞𝕟𝕠𝕡𝕢𝕣𝕤𝕥𝕦𝕧𝕨𝕩𝕪𝕫𝔸𝔹ℂ𝔻𝔼𝔽𝔾ℍ𝕀𝕁𝕂𝕃𝕄ℕ𝕆ℙℚℝ𝕊𝕋𝕌𝕍𝕎𝕏𝕐ℤ",
     "𝒶𝒷𝒸𝒹ℯ𝒻ℊ𝒽𝒾𝒿𝓀𝓁𝓂𝓃ℴ𝓅𝓆𝓇𝓈𝓉𝓊𝓋𝓌𝓍𝓎𝓏𝒜ℬ𝒞𝒟ℰℱ𝒢ℋℐ𝒥𝒦ℒℳ𝒩𝒪𝒫𝒬ℛ𝒮𝒯𝒰𝒱𝒲𝒳𝒴𝒵",
-    "𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ"
+    "𝔞𝔟𝔠𝔡𝔢𝔣𝔤𝔥𝔦𝔧𝔨𝔩𝔪𝔫𝔬𝔭𝔮𝔯𝔰𝔱𝔲𝔳𝔴𝔵𝔶𝔷𝔄𝔅ℭ𝔇𝔈𝔉𝔊ℌℑ𝔍𝔎𝔏𝔐𝔑𝔒𝔓𝔔ℜ𝔖𝔗𝔘𝔙𝔚𝔛𝔜ℨ",
   ]);
   gDialog.tabbox.selectedIndex = 0;
 
@@ -104,8 +108,7 @@ function Startup()
   SetWindowLocation();
 }
 
-function insertLaTeXCommand(aButton)
-{
+function insertLaTeXCommand(aButton) {
   gDialog.input.focus();
 
   // For a single math symbol, just use the insertText command.
@@ -147,12 +150,10 @@ function insertLaTeXCommand(aButton)
   updateMath();
 }
 
-function createCommandPanel(aCommandPanelList)
-{
+function createCommandPanel(aCommandPanelList) {
   const columnCount = 10;
 
   for (var label in aCommandPanelList) {
-
     var commands = aCommandPanelList[label];
 
     // Create a <rows> element with some LaTeX commands.
@@ -198,12 +199,10 @@ function createCommandPanel(aCommandPanelList)
   }
 }
 
-function createSymbolPanels(aSymbolPanelList)
-{
-  const columnCount = 13, tabLabelLength = 3
+function createSymbolPanels(aSymbolPanelList) {
+  const columnCount = 13, tabLabelLength = 3;
 
   for (var symbols of aSymbolPanelList) {
-
     // Create a <rows> element with the symbols of the i-th panel.
     var rows = document.createElementNS(XULNS, "rows");
     var i = 0, tabLabel = "", row;
@@ -251,10 +250,8 @@ function createSymbolPanels(aSymbolPanelList)
   }
 }
 
-function onAccept()
-{
-  if (gDialog.output.firstChild)
-  {
+function onAccept(event) {
+  if (gDialog.output.firstChild) {
     var editor = GetCurrentEditor();
     editor.beginTransaction();
 
@@ -271,19 +268,14 @@ function onAccept()
     } catch (e) {}
 
     editor.endTransaction();
-  }
-  else
-  {
+  } else {
     dump("Null value -- not inserting in MathML Source dialog\n");
-    return false;
+    event.preventDefault();
   }
   SaveWindowLocation();
-
-  return true;
 }
 
-function updateMath()
-{
+function updateMath() {
   // Remove the preview, if any.
   if (gDialog.output.firstChild)
     gDialog.output.firstChild.remove();
@@ -301,14 +293,12 @@ function updateMath()
   gDialog.accept.disabled = !gDialog.input.value || !gDialog.output.firstChild;
 }
 
-function updateMode()
-{
+function updateMode() {
   if (gDialog.output.firstChild)
     gDialog.output.firstChild.setAttribute("display", gDialog.mode.selectedIndex ? "block" : "inline");
 }
 
-function updateDirection()
-{
+function updateDirection() {
   if (gDialog.output.firstChild)
     gDialog.output.firstChild.setAttribute("dir", gDialog.direction.selectedIndex ? "rtl" : "ltr");
 }

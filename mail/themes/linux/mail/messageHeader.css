@@ -12,7 +12,7 @@
 .main-header-area {
   color: WindowText;
   background-color: AppWorkspace;
-  border-bottom: 1px solid ThreeDShadow;
+  border-bottom: 1px solid var(--splitter-color);
   padding: 0.4ex;
 }
 
@@ -237,20 +237,12 @@ toolbar[mode="icons"] > #otherActionsButton > .toolbarbutton-menu-dropmarker {
   margin-inline-end: 3px;
 }
 
-.headerValueBox {
-  overflow:visible;
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
 .headerValue {
   min-width: 50px;
   white-space: normal;
   color: WindowText;
   line-height: 1.5em;
-
   -moz-appearance: none !important;
-
   padding: .1em 0px !important;
   margin: 0px !important;
   margin-bottom: 3px !important;
@@ -267,6 +259,10 @@ toolbar[mode="icons"] > #otherActionsButton > .toolbarbutton-menu-dropmarker {
 
 .headerValueUrl:hover {
   color: -moz-activehyperlinktext;
+}
+
+mail-headerfield.headerValue:focus {
+  outline-color: Highlight;
 }
 
 .moreIndicator {

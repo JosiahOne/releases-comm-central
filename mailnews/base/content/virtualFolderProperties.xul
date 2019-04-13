@@ -16,7 +16,7 @@
   %searchTermDTD;
 ]>
 
-<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         id="virtualFolderPropertiesDialog"
         title="&virtualFolderProperties.title;"
         onload="onLoad();"
@@ -26,8 +26,7 @@
         editFolderAcceptButtonLabel="&editFolderButton.label;"
         editFolderAcceptButtonAccessKey="&editFolderButton.accesskey;"
         style="width: 50em; height: 28em;"
-        windowtype="mailnews:virtualFolderProperties"
-        ondialogaccept="return onOK();">
+        windowtype="mailnews:virtualFolderProperties">
 
   <stringbundleset id="stringbundleset">
     <stringbundle id="bundle_search"    src="chrome://messenger/locale/search.properties"/>
@@ -35,14 +34,11 @@
     <stringbundle id="bundle_folder"    src="chrome://messenger/locale/folderWidgets.properties"/>
   </stringbundleset>
 
+  <script type="application/javascript" src="chrome://messenger/content/searchWidgets.js"/>
   <script type="application/javascript" src="chrome://messenger/content/mailCommands.js"/>
   <script type="application/javascript" src="chrome://messenger/content/commandglue.js"/>
   <script type="application/javascript" src="chrome://messenger/content/virtualFolderProperties.js"/>
-#ifndef MOZ_THUNDERBIRD
-  <script type="application/javascript" src="chrome://messenger/content/searchTermOverlay.js"/>
-#else
   <script type="application/javascript" src="chrome://messenger/content/searchTerm.js"/>
-#endif
   <script type="application/javascript" src="chrome://messenger/content/dateFormat.js"/>
 
   <grid>
@@ -104,7 +100,7 @@
     <label value="&searchTermCaption.label;"/>
     <hbox flex="1">
       <vbox id="searchTermListBox" flex="2">
-#include ../search/content/searchTerm.inc
+#include ../search/content/searchTerm.inc.xul
     </hbox>
   </vbox>
 

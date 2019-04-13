@@ -5,9 +5,9 @@
 # PLEASE DO NOT ADD MORE EXCEPTIONS TO THIS LIST UNLESS NECESSARY FOR THEMES OR EXTENSIONS
 #
 
-# browser (see bug 1451050)
+# browser (see bug 1451050 and bug 1476934)
 defaults/settings/pinning/pins.json
-defaults/settings/main/tippytop.json
+defaults/settings/main/example.json
 
 extensions/modern@themes.mozilla.org/chrome/modern/skin/modern/communicator/console/error-dash.gif
 chrome/classic/skin/classic/communicator/console/console-error-dash.gif
@@ -153,6 +153,8 @@ extensions/modern@themes.mozilla.org/chrome/modern/skin/modern/communicator/icon
 chrome/classic/skin/classic/communicator/icons/smileys/smiley-sealed.png
 extensions/modern@themes.mozilla.org/chrome/modern/skin/modern/communicator/icons/geo.png
 chrome/classic/skin/classic/communicator/icons/geo.png
+extensions/modern@themes.mozilla.org/chrome/modern/skin/modern/communicator/icons/notification-icons.svg
+chrome/classic/skin/classic/communicator/icons/notification-icons.svg
 extensions/modern@themes.mozilla.org/chrome/modern/skin/modern/communicator/icons/save.png
 chrome/classic/skin/classic/communicator/icons/save.png
 extensions/modern@themes.mozilla.org/chrome/modern/skin/modern/communicator/icons/smileys/smiley-foot.png

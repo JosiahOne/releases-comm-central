@@ -9,12 +9,12 @@
 #chatTabPanel {
   --imbox-selected-text-color: -moz-FieldText;
   --imbox-selected-background-color: -moz-Field;
-  --imbox-selected-border-color: #a9b7c9;
+  --imbox-selected-border-color: var(--splitter-color);
   --imgroup-selected-background-color: ThreeDLightShadow;
 }
 
 /* Adaptation from #folderTree */
-#listPaneBox {
+:root:not([lwt-tree]) #listPaneBox {
   -moz-appearance:  none;
   background-color: -moz-Field;
   color: -moz-FieldText;
@@ -28,11 +28,6 @@
 
 #conversationsDeck {
   background: var(--imbox-selected-background-color);
-}
-
-.conv-messages {
-  border-top: 0;
-  border-bottom: 0;
 }
 
 .conv-textbox {
@@ -49,10 +44,6 @@
 #contextPane {
   background-color: -moz-field;
   color: -moz-fieldtext;
-}
-
-.conv-top-info {
-  background: transparent;
 }
 
 .userIcon {
@@ -74,6 +65,11 @@
   padding-bottom: 2px;
   border-bottom: 1px solid ThreeDShadow;
   background-color: -moz-Dialog;
+}
+
+.statusMessage[editing] {
+  color: -moz-dialogtext;
+  margin: 28px 0 -1px -2px;
 }
 
 #displayNameAndstatusMessageStack #statusMessage {
@@ -98,51 +94,16 @@
 
 #listSplitter,
 #contextSplitter {
-  border-width: 0;
   background-color: transparent;
   min-width: 0;
-  /* splitter grip area */
-  width: 5px;
-  margin-top: 0;
-  /* because of the negative margin needed to make the splitter visible */
-  position: relative;
-  z-index: 10;
 }
 
 #listSplitter {
-  border-inline-start: 1px solid transparent;
-  /* make only the splitter border visible */
-  margin-inline-end: -5px;
-}
-
-#listSplitter[state="collapsed"]:hover {
-  border-inline-start: 4px solid highlight;
+  border-inline-end-width: 0;
 }
 
 #contextSplitter {
-  border-inline-end: 1px solid #a9b7c9;
-  /* make only the splitter border visible */
-  margin-inline-start: -5px;
-}
-
-#contextSplitter[state="collapsed"]:hover {
-  border-inline-end: 4px solid highlight;
-}
-
-.splitter,
-#logsSplitter {
-  border-width: 0;
-  border-bottom: 1px solid ThreeDShadow;
-  min-height: 0;
-  /* splitter grip area */
-  height: 5px;
-  background-color: transparent;
-  /* make only the splitter border visible */
-  margin-top: -5px;
-  margin-inline-start: 0;
-  /* because of the negative margin needed to make the splitter visible */
-  position: relative;
-  z-index: 10;
+  border-inline-start-width: 0;
 }
 
 @media (-moz-windows-default-theme) {
@@ -172,63 +133,14 @@
     background-color: -moz-field;
   }
 
-  .splitter,
-  #logsSplitter {
-    border-bottom: 1px solid #a9b7c9;
-  }
-
-  .listitem-iconic[selected] .listcell-label,
-  #nicklist:focus > .listitem-iconic[inactive][selected] .listcell-label {
+  richlistitem[selected] > label,
+  #nicklist:focus > richlistitem[inactive][selected] > label {
     color: -moz-dialogtext !important;
   }
-
-  #nicklist > listitem {
-    border-width: 1px !important;
-    outline: none !important;
-  }
-}
-
-#statusTypeIcon[status="available"],
-#statusTypeAvailable,
-.statusTypeIcon[status="available"],
-#imStatusAvailable,
-#appmenu_imStatusAvailable,
-richlistitem[state="connected"] .accountStateIcon {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0 16px 16px 0);
-}
-
-#statusTypeIcon[status="idle"],
-.statusTypeIcon[status="idle"] {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0 32px 16px 16px);
-}
-
-#statusTypeIcon[status="offline"],
-#statusTypeIcon[status="invisible"],
-#statusTypeOffline,
-.statusTypeIcon[status="offline"],
-.statusTypeIcon[status="invisible"],
-#imStatusOffline,
-#appmenu_imStatusOffline,
-richlistitem[state="disconnected"] .accountStateIcon {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0 48px 16px 32px);
-}
-
-#statusTypeIcon[status="unavailable"],
-#statusTypeIcon[status="away"],
-#statusTypeUnavailable,
-.statusTypeIcon[status="unavailable"],
-.statusTypeIcon[status="away"],
-#imStatusUnavailable,
-#appmenu_imStatusUnavailable {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0 64px 16px 48px);
 }
 
 @media (-moz-os-version: windows-win7) and (-moz-windows-default-theme) {
-  #listPaneBox {
+  :root:not([lwt-tree]) #listPaneBox {
     background-color: rgb(238, 243, 250);
   }
 
@@ -243,13 +155,13 @@ richlistitem[state="disconnected"] .accountStateIcon {
 }
 
 @media (-moz-os-version: windows-win8) and (-moz-windows-default-theme) {
-  #listPaneBox {
+  :root:not([lwt-tree]) #listPaneBox {
     background-color: -moz-Dialog;
   }
 }
 
 @media (-moz-os-version: windows-win10) and (-moz-windows-default-theme) {
-  #listPaneBox {
+  :root:not([lwt-tree]) #listPaneBox {
     background-color: #fafafa;
   }
 }

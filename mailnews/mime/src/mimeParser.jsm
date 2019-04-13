@@ -3,9 +3,9 @@
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 // vim:set ts=2 sw=2 sts=2 et ft=javascript:
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/jsmime.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+const {jsmime} = ChromeUtils.import("resource:///modules/jsmime.jsm");
 
 var EXPORTED_SYMBOLS = ["MimeParser"];
 
@@ -99,20 +99,20 @@ var MimeParser = {
    */
   makeStreamListenerParser: function MimeParser_makeSLParser(emitter, opts) {
     var StreamListener = {
-      onStartRequest: function SLP_onStartRequest(aRequest, aContext) {
+      onStartRequest: function SLP_onStartRequest(aRequest) {
         try {
           if ("onStartRequest" in emitter)
-            emitter.onStartRequest(aRequest, aContext);
+            emitter.onStartRequest(aRequest);
         } finally {
           this._parser.resetParser();
         }
       },
-      onStopRequest: function SLP_onStopRequest(aRequest, aContext, aStatus) {
+      onStopRequest: function SLP_onStopRequest(aRequest, aStatus) {
         this._parser.deliverEOF();
         if ("onStopRequest" in emitter)
-          emitter.onStopRequest(aRequest, aContext, aStatus);
+          emitter.onStopRequest(aRequest, aStatus);
       },
-      onDataAvailable: function SLP_onData(aRequest, aContext, aStream,
+      onDataAvailable: function SLP_onData(aRequest, aStream,
                                            aOffset, aCount) {
         var scriptIn = Cc["@mozilla.org/scriptableinputstream;1"]
                          .createInstance(Ci.nsIScriptableInputStream);

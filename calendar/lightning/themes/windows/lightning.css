@@ -4,25 +4,27 @@
 
 @import url(chrome://lightning-common/skin/lightning.css);
 
+.lightning-notification-bar {
+    background-color: #baeeff;
+    color: -moz-dialogtext;
+    border-bottom: 1px solid ThreeDDarkShadow;
+    padding: 3px;
+}
+
 #calendarContent {
     color: -moz-DialogText;
     background-color: -moz-Dialog;
 }
 
+#calsidebar_splitter {
+  border-inline-start: 1px solid var(--splitter-color);
+  /* make only the splitter border visible */
+  margin-inline-end: -5px;
+}
+
 /* Calendar list rules */
 #calendar-panel {
     padding-bottom: 5px;
-}
-
-/* Lightning preferences icon */
-radio[pane=paneLightning] {
-    list-style-image: url(chrome://calendar/skin/cal-icon32.png);
-}
-
-/* iMIP notification bar */
-#imip-bar > image {
-    list-style-image: url(chrome://calendar/skin/cal-icon32.png);
-    -moz-image-region: rect(0 32px 32px 0);
 }
 
 /* Lightning sidebar background in calendar and task mode */
@@ -36,11 +38,8 @@ radio[pane=paneLightning] {
   padding: 1px 2px 0 !important;
 }
 
-#calendar-status-todaypane-button:hover {
-  border-color: ThreeDShadow;
-}
-
 #calendar-status-todaypane-button[hideLabel] > stack {
+  margin-top: -1px;
   margin-inline-start: 5px;
 }
 
@@ -57,62 +56,20 @@ radio[pane=paneLightning] {
   margin-top: 3px;
 }
 
-.icon-holder[type="calendar"],
-.tabmail-tab[type="calendar"] {
-  list-style-image: url(chrome://lightning/skin/mode-switch-icons-aero.png);
-  -moz-image-region: rect(16px 16px 32px 0);
-}
-
-.icon-holder[type="tasks"],
-.tabmail-tab[type="tasks"] {
-  list-style-image: url(chrome://lightning/skin/mode-switch-icons-aero.png);
-  -moz-image-region: rect(16px 32px 32px 16px);
-}
-
 #calsidebar_splitter,
 #today-splitter {
-  border-width: 0;
   min-width: 0;
-  width: 5px;
   background-color: transparent;
-  margin-top: 0;
-  position: relative;
-  z-index: 10;
-  transition: border-width .3s ease-in;
-}
-
-#calsidebar_splitter {
-  border-inline-start: 1px solid #a9b7c9;
-  margin-inline-end: -5px;
-}
-
-#calsidebar_splitter[state="collapsed"] {
-  border-inline-start: 1px solid transparent;
-}
-
-#calsidebar_splitter[state="collapsed"]:hover {
-  border-inline-start: 4px solid highlight;
 }
 
 #today-splitter {
-  border-inline-end: 1px solid #a9b7c9;
+  border-inline-end: 1px solid var(--splitter-color);
   margin-inline-start: -5px;
   position: relative;
 }
 
 #today-splitter.calendar-sidebar-splitter:-moz-lwtheme {
   background-image: none;
-}
-
-#today-pane-splitter {
-  border-width: 0;
-  border-bottom: 3px double #a9b7c9;
-  min-height: 0;
-  height: 5px;
-  background-color: transparent;
-  margin-top: -3px;
-  position: relative;
-  z-index: 10;
 }
 
 @media (-moz-windows-default-theme) {
@@ -140,4 +97,21 @@ radio[pane=paneLightning] {
     background-image: linear-gradient(rgba(0, 0, 0, .15), rgba(0, 0, 0, .15)),
                       linear-gradient(-moz-dialog, -moz-dialog);
   }
+}
+
+menupopup[anonid="years-popup"] .scrollbutton-up,
+menupopup[anonid="years-popup"] .scrollbutton-down {
+  -moz-appearance: none;
+  border: 1px solid transparent;
+  padding: 1px;
+}
+
+menupopup[anonid="years-popup"] .scrollbutton-up:not([disabled="true"]):hover,
+menupopup[anonid="years-popup"] .scrollbutton-down:not([disabled="true"]):hover {
+  margin: 1px;
+  border: 1px inset ThreeDFace;
+  padding-top: 2px;
+  padding-bottom: 1px;
+  padding-inline-start: 2px;
+  padding-inline-end: 1px;
 }

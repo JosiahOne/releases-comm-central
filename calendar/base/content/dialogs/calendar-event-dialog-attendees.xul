@@ -5,9 +5,10 @@
 
 <?xml-stylesheet type="text/css" href="chrome://global/skin/global.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/calendar-attendees.css"?>
-<?xml-stylesheet type="text/css" href="chrome://calendar/skin/calendar-event-dialog.css"?>
+<?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/widgets/minimonth.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar/content/calendar-event-dialog.css"?>
-<?xml-stylesheet type="text/css" href="chrome://calendar/content/datetimepickers/datetimepickers.css"?>
+<?xml-stylesheet type="text/css" href="chrome://calendar/content/widgets/calendar-widget-bindings.css"?>
+<?xml-stylesheet type="text/css" href="chrome://lightning-common/skin/datetimepickers.css"?>
 
 <!DOCTYPE dialog [
   <!ENTITY % dtd1 SYSTEM "chrome://calendar/locale/calendar.dtd" > %dtd1;
@@ -18,19 +19,22 @@
         title="&invite.title.label;"
         windowtype="Calendar:EventDialog:Attendees"
         onload="onLoad()"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();"
         defaultButton="none"
+        height="500"
         persist="screenX screenY height width"
         orient="vertical"
         style="padding-top: 8px; padding-bottom: 10px; padding-inline-start: 8px; padding-inline-end: 10px;"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <!-- Javascript includes -->
+  <script type="application/javascript"
+          src="chrome://calendar/content/calendar-event-dialog-attendees-custom-elements.js"/>
   <script type="application/javascript" src="chrome://calendar/content/calendar-event-dialog-attendees.js"/>
   <script type="application/javascript" src="chrome://calendar/content/calendar-dialog-utils.js"/>
   <script type="application/javascript" src="chrome://calendar/content/calendar-statusbar.js"/>
   <script type="application/javascript" src="chrome://calendar/content/calendar-ui-utils.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/customElements.js"/>
+  <script type="application/javascript" src="chrome://calendar/content/datetimepickers/datetimepickers.js"/>
 
   <hbox align="center" pack="end">
     <spacer flex="1"/>
@@ -66,20 +70,71 @@
                    oncommand="zoomWithButtons(false);"/>
   </hbox>
   <hbox flex="1">
-    <vbox id="attendees-container" flex="1" persist="width">
+    <vbox id="attendees-container" flex="1" width="250" persist="width">
       <box class="attendee-spacer-top"/>
-      <attendees-list flex="1" id="attendees-list"/>
+      <attendees-list flex="1" id="attendees-list" class="listbox-noborder">
+        <richlistitem class="addressingWidgetItem" allowevents="true">
+          <hbox class="addressingWidgetCell" width="27" align="center" pack="center">
+            <image class="status-icon"/>
+          </hbox>
+          <hbox class="addressingWidgetCell" width="16">
+            <image class="usertype-icon"/>
+          </hbox>
+          <hbox class="addressingWidgetCell" flex="1">
+            <textbox class="plain textbox-addressingWidget uri-element"
+                     type="autocomplete"
+                     flex="1"
+                     autocompletesearch="addrbook ldap"
+                     autocompletesearchparam="{}"
+                     timeout="300"
+                     maxrows="4"
+                     completedefaultindex="true"
+                     forcecomplete="true"
+                     completeselectedindex="true"
+                     minresultsforpopup="1"
+                     onblur="if (this.localName == 'textbox') { this.closest(&quot;attendees-list&quot;).returnHit(this, true); }"
+                     ignoreblurwhilesearching="true"
+                     oninput="this.setAttribute('dirty', 'true');"
+                     ontextentered="this.closest(&quot;attendees-list&quot;).returnHit(this);">
+            </textbox>
+          </hbox>
+        </richlistitem>
+      </attendees-list>
       <box class="attendee-spacer-bottom"/>
     </vbox>
     <splitter id="splitter"/>
-    <vbox id="freebusy-container" persist="width">
+    <vbox id="freebusy-container" width="750" persist="width">
       <stack flex="1">
         <vbox flex="1">
-          <freebusy-timebar id="timebar"
-                            range="16"/>
+          <calendar-event-freebusy-timebar id="timebar"
+                                           class="listbox-noborder"
+                                           seltype="multiple"
+                                           rows="1"
+                                           disabled="true"
+                                           range="16">
+            <richlistitem class="freebusy-listitem"
+                          allowevents="true">
+              <hbox flex="1">
+                <scroll-container flex="1">
+                  <freebusy-day/>
+                </scroll-container>
+              </hbox>
+            </richlistitem>
+          </calendar-event-freebusy-timebar>
           <freebusy-grid flex="1"
                          id="freebusy-grid"
-                         range="16"/>
+                         range="16"
+                         class="listbox-noborder"
+                         seltype="multiple"
+                         rows="-1"
+                         disabled="true">
+            <richlistitem class="addressingWidgetItem"
+                          allowevents="true">
+              <hbox class="addressingWidgetCell">
+                <freebusy-row dirty="true"/>
+              </hbox>
+            </richlistitem>
+          </freebusy-grid>
         </vbox>
         <selection-bar id="selection-bar"
                        range="16"/>
@@ -170,8 +225,8 @@
             <datetimepicker id="event-starttime"
                             onchange="updateStartTime();"/>
             <label id="timezone-starttime"
-                   crop="right"
                    class="text-link"
+                   crop="right"
                    flex="1"
                    collapsed="true"
                    hyperlink="true"
@@ -182,8 +237,8 @@
             <datetimepicker id="event-endtime"
                             onchange="updateEndTime();"/>
             <label id="timezone-endtime"
-                   crop="right"
                    class="text-link"
+                   crop="right"
                    flex="1"
                    collapsed="true"
                    hyperlink="true"

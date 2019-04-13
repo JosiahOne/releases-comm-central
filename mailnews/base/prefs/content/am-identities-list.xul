@@ -10,14 +10,11 @@
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/am-identities-list.dtd">
 
 <dialog
-  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
   onload="onLoad();"
   buttons="accept"
   buttonlabelaccept="&identitiesListClose.label;"
   buttonaccesskeyaccept="&identitiesListClose.accesskey;"
-  ondialogaccept="return onOk();"
-  ondialogcancel="return onOk();"
   style="width: 40em;">
 
 <stringbundle id="bundle_prefs" src="chrome://messenger/locale/prefs.properties"/>
@@ -41,12 +38,12 @@
 <separator class="thin"/>
 
 <hbox flex="1">
-  <listbox id="identitiesList"
-           ondblclick="onEdit(event);"
-           onselect="updateButtons();"
-           seltype="single"
-           flex="1"
-           style="height: 0px;"/>
+  <richlistbox id="identitiesList"
+               class="theme-listbox"
+               ondblclick="onEdit(event);"
+               onselect="updateButtons();"
+               seltype="single"
+               flex="1"/>
 
   <vbox>
     <button id="addButton"

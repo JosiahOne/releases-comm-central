@@ -93,7 +93,7 @@
 #else
 @BINPATH@/@MOZ_CHILD_PROCESS_NAME@
 #endif
-#ifdef XP_WIN32
+#ifdef XP_WIN
 @BINPATH@/plugin-hang-ui@BIN_SUFFIX@
 #if MOZ_PACKAGE_MSVC_DLLS
 @BINPATH@/@MSVC_C_RUNTIME_DLL@
@@ -164,7 +164,6 @@
 
 @RESPATH@/components/aboutRedirector.js
 @RESPATH@/components/activityComponents.manifest
-@RESPATH@/components/cloudFileComponents.manifest
 @RESPATH@/components/folderLookupService.js
 ; interfaces.manifest doesn't get packaged because it is dynamically
 ; re-created at packaging time when linking the xpts that will actually
@@ -176,8 +175,6 @@
 @RESPATH@/components/nsActivity.js
 @RESPATH@/components/nsActivityManager.js
 @RESPATH@/components/nsActivityManagerUI.js
-@RESPATH@/components/nsHightail.js
-@RESPATH@/components/nsBox.js
 @RESPATH@/components/nsAddrbook.manifest
 @RESPATH@/components/nsMailNewsCommandLineHandler.js
 @RESPATH@/components/nsNewsAutoCompleteSearch.js
@@ -196,6 +193,11 @@
 @RESPATH@/chrome/icons/default/addressbookWindow.ico
 @RESPATH@/chrome/icons/default/messengerWindow.ico
 @RESPATH@/chrome/icons/default/msgcomposeWindow.ico
+@RESPATH@/chrome/icons/default/calendar-alarm-dialog.ico
+@RESPATH@/chrome/icons/default/calendar-event-dialog.ico
+@RESPATH@/chrome/icons/default/calendar-event-summary-dialog.ico
+@RESPATH@/chrome/icons/default/calendar-task-dialog.ico
+@RESPATH@/chrome/icons/default/calendar-task-summary-dialog.ico
 #elifdef UNIX_BUT_NOT_MAC
 @RESPATH@/chrome/icons/default/*.png
 #endif
@@ -296,14 +298,6 @@
 @RESPATH@/chrome/devtools.manifest
 @RESPATH@/@PREF_DIR@/devtools-client.js
 @RESPATH@/@PREF_DIR@/debugger.js
-@RESPATH@/components/devtools-startup.manifest
-@RESPATH@/components/devtools-startup.js
-@RESPATH@/components/aboutdebugging-registration.js
-@RESPATH@/components/aboutdebugging.manifest
-@RESPATH@/components/aboutdevtools-registration.js
-@RESPATH@/components/aboutdevtools.manifest
-@RESPATH@/components/aboutdevtoolstoolbox-registration.js
-@RESPATH@/components/aboutdevtoolstoolbox.manifest
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Default Profile Settings
@@ -317,6 +311,7 @@
 @RESPATH@/defaults/pref/mdn.js
 @RESPATH@/defaults/pref/smime.js
 @RESPATH@/defaults/pref/thunderbird-branding.js
+@RESPATH@/defaults/permissions
 @RESPATH@/defaults/settings/blocklists
 @RESPATH@/defaults/settings/pinning
 @RESPATH@/defaults/settings/main
@@ -337,9 +332,6 @@
 @BINPATH@/@DLL_PREFIX@prldap60@DLL_SUFFIX@
 #endif
 
-; download progress for downloads
-@RESPATH@/components/DownloadsStartup.js
-
 ; Protocol/Content handling
 @RESPATH@/components/nsSMTPProtocolHandler.js
 @RESPATH@/components/nsSMTPProtocolHandler.manifest
@@ -355,7 +347,7 @@
 
 ; Windows Search integration
 ; the module is included as part of the "Modules" rule
-#ifdef XP_WIN32
+#ifdef XP_WIN
 @BINPATH@/WSEnable.exe
 #endif
 
@@ -369,95 +361,23 @@
 
 ; accessibility (out of process API support)
 #ifdef ACCESSIBILITY
-#ifdef XP_WIN32
+#ifdef XP_WIN
 @BINPATH@/Accessible.tlb
 @BINPATH@/AccessibleHandler.dll
 @BINPATH@/AccessibleMarshal.dll
 @BINPATH@/IA2Marshal.dll
 #endif
 #endif
-@RESPATH@/components/mozIntl.manifest
-@RESPATH@/components/mozIntl.js
 
 ; toolkit
-@RESPATH@/components/ConsoleAPI.manifest
-@RESPATH@/components/ConsoleAPIStorage.js
-@RESPATH@/components/BrowserElementParent.manifest
-@RESPATH@/components/BrowserElementParent.js
-@RESPATH@/components/FeedProcessor.manifest
-@RESPATH@/components/FeedProcessor.js
-@RESPATH@/components/Downloads.manifest
-@RESPATH@/components/DownloadLegacy.js
-@RESPATH@/components/PageThumbsComponents.manifest
-@RESPATH@/components/crashmonitor.manifest
-@RESPATH@/components/nsCrashMonitor.js
 @RESPATH@/components/toolkitsearch.manifest
-@RESPATH@/components/nsSearchService.js
-@RESPATH@/components/nsSearchSuggestions.js
-@RESPATH@/components/passwordmgr.manifest
-@RESPATH@/components/nsLoginInfo.js
-@RESPATH@/components/nsLoginManager.js
-@RESPATH@/components/nsLoginManagerPrompter.js
-@RESPATH@/components/storage-json.js
-@RESPATH@/components/crypto-SDR.js
-@RESPATH@/components/TooltipTextProvider.js
-@RESPATH@/components/TooltipTextProvider.manifest
-@RESPATH@/components/nsHelperAppDlg.manifest
-@RESPATH@/components/nsHelperAppDlg.js
-@RESPATH@/components/NetworkGeolocationProvider.manifest
-@RESPATH@/components/NetworkGeolocationProvider.js
 @RESPATH@/components/extensions.manifest
-@RESPATH@/components/EditorUtils.manifest
-@RESPATH@/components/EditorUtils.js
-@RESPATH@/components/addonManager.js
-@RESPATH@/components/amContentHandler.js
-@RESPATH@/components/amInstallTrigger.js
 #ifdef MOZ_UPDATER
 @RESPATH@/components/nsUpdateService.manifest
-@RESPATH@/components/nsUpdateService.js
-@RESPATH@/components/nsUpdateServiceStub.js
 #endif
-@RESPATH@/components/nsUpdateTimerManager.manifest
-@RESPATH@/components/nsUpdateTimerManager.js
-@RESPATH@/components/utils.manifest
-@RESPATH@/components/simpleServices.js
-@RESPATH@/components/pluginGlue.manifest
 @RESPATH@/components/ProcessSingleton.manifest
-@RESPATH@/components/MainProcessSingleton.js
-@RESPATH@/components/ContentProcessSingleton.js
-@RESPATH@/components/nsURLFormatter.manifest
-@RESPATH@/components/nsURLFormatter.js
-@RESPATH@/components/txEXSLTRegExFunctions.manifest
-@RESPATH@/components/txEXSLTRegExFunctions.js
-@RESPATH@/components/toolkitplaces.manifest
-@RESPATH@/components/nsLivemarkService.js
-@RESPATH@/components/nsTaggingService.js
-@RESPATH@/components/UnifiedComplete.js
-@RESPATH@/components/nsPlacesExpiration.js
-@RESPATH@/components/PageIconProtocolHandler.js
-@RESPATH@/components/PlacesCategoriesStarter.js
-@RESPATH@/components/ColorAnalyzer.js
-@RESPATH@/components/PageThumbsStorageService.js
-@RESPATH@/components/nsDefaultCLH.manifest
-@RESPATH@/components/nsDefaultCLH.js
-@RESPATH@/components/ContentPrefService2.manifest
-@RESPATH@/components/ContentPrefService2.js
-@RESPATH@/components/nsContentDispatchChooser.manifest
-@RESPATH@/components/nsContentDispatchChooser.js
 @RESPATH@/components/HandlerService.manifest
 @RESPATH@/components/HandlerService.js
-@RESPATH@/components/nsWebHandlerApp.manifest
-@RESPATH@/components/nsWebHandlerApp.js
-@RESPATH@/components/satchel.manifest
-@RESPATH@/components/nsFormAutoComplete.js
-@RESPATH@/components/FormHistoryStartup.js
-@RESPATH@/components/nsInputListAutoComplete.js
-@RESPATH@/components/contentAreaDropListener.manifest
-@RESPATH@/components/contentAreaDropListener.js
-@RESPATH@/components/UAOverridesBootstrapper.js
-@RESPATH@/components/UAOverridesBootstrapper.manifest
-@RESPATH@/components/WellKnownOpportunisticUtils.js
-@RESPATH@/components/WellKnownOpportunisticUtils.manifest
 
 #ifdef MOZ_CALENDAR
 [calendar]
@@ -467,57 +387,28 @@
 @RESPATH@/distribution/extensions/{e2fda1a4-762b-4020-b5ad-a41df1933103}/
 #endif
 #endif
-@RESPATH@/components/nsINIProcessor.manifest
-@RESPATH@/components/nsINIProcessor.js
-@RESPATH@/components/nsPrompter.manifest
-@RESPATH@/components/nsPrompter.js
-@RESPATH@/components/CaptivePortalDetectComponents.manifest
-@RESPATH@/components/captivedetect.js
+@RESPATH@/features/wetransfer@extensions.thunderbird.net/
+
 @RESPATH@/components/servicesComponents.manifest
 @RESPATH@/components/servicesSettings.manifest
 @RESPATH@/components/cryptoComponents.manifest
-@RESPATH@/components/TelemetryStartup.js
-@RESPATH@/components/TelemetryStartup.manifest
-@RESPATH@/components/XULStore.js
-@RESPATH@/components/XULStore.manifest
-@RESPATH@/components/htmlMenuBuilder.js
-@RESPATH@/components/htmlMenuBuilder.manifest
-@RESPATH@/components/Push.js
 @RESPATH@/components/Push.manifest
-@RESPATH@/components/PushComponents.js
 
-@RESPATH@/components/ProcessSelector.js
-@RESPATH@/components/ProcessSelector.manifest
-
-@RESPATH@/components/SlowScriptDebug.manifest
-@RESPATH@/components/SlowScriptDebug.js
-
-@RESPATH@/components/ClearDataService.manifest
-@RESPATH@/components/ClearDataService.js
-
-#ifdef MOZ_WEBRTC
-@RESPATH@/components/PeerConnection.js
-@RESPATH@/components/PeerConnection.manifest
+; Remote control protocol
+#ifdef ENABLE_MARIONETTE
+@RESPATH@/chrome/marionette@JAREXT@
+@RESPATH@/chrome/marionette.manifest
+@RESPATH@/components/marionette.manifest
+@RESPATH@/components/marionette.js
+@RESPATH@/defaults/pref/marionette.js
 #endif
 
-@RESPATH@/components/nsAsyncShutdown.manifest
-@RESPATH@/components/nsAsyncShutdown.js
-
-@RESPATH@/components/BuiltinProviders.manifest
-@RESPATH@/components/PresentationControlService.js
 
 ; Phishing Protection
+
 ; Modules
 @RESPATH@/modules/*
-
-@RESPATH@/components/nsURLClassifier.manifest
-@RESPATH@/components/nsUrlClassifierHashCompleter.js
-@RESPATH@/components/nsUrlClassifierListManager.js
-@RESPATH@/components/nsUrlClassifierLib.js
-
-; Security Reports
-@RESPATH@/components/SecurityReporter.manifest
-@RESPATH@/components/SecurityReporter.js
+@RESPATH@/actors/*
 
 ; ANGLE GLES-on-D3D rendering library
 #ifdef MOZ_ANGLE_RENDERER
@@ -574,7 +465,6 @@
 
 ; [Extensions]
 @RESPATH@/components/extensions-toolkit.manifest
-@RESPATH@/components/extension-process-script.js
 @RESPATH@/components/extensions-mail.manifest
 
 ; [Personal Security Manager]
@@ -637,8 +527,6 @@
 ; [Crash Reporter]
 ;
 #ifdef MOZ_CRASHREPORTER
-@RESPATH@/components/CrashService.manifest
-@RESPATH@/components/CrashService.js
 #ifdef XP_MACOSX
 @BINPATH@/crashreporter.app/
 #else
@@ -659,14 +547,4 @@
 @BINPATH@/pingsender@BIN_SUFFIX@
 
 ; Shutdown Terminator
-@RESPATH@/components/nsTerminatorTelemetry.js
 @RESPATH@/components/terminator.manifest
-
-; Background Hang Monitor
-
-; NOTE: This must match the config checks in
-; /toolkit/components/backgroundhangmonitor/moz.build.
-#if defined(NIGHTLY_BUILD) && !defined(MOZ_DEBUG) && !defined(MOZ_TSAN) && !defined(MOZ_ASAN)
-@RESPATH@/components/BHRTelemetryService.js
-@RESPATH@/components/BHRTelemetryService.manifest
-#endif

@@ -1,11 +1,11 @@
 /**
  * This test checks if the imap message service code streams headers correctly.
- * It checks thst streaming headers for messages stored for offline use works.
+ * It checks that streaming headers for messages stored for offline use works.
  * It doesn't test streaming messages that haven't been stored for offline use
  * because that's not implemented yet, and it's unclear if anyone will want it.
  */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
@@ -34,16 +34,16 @@ var streamListener =
     ChromeUtils.generateQI([Ci.nsIStreamListener, Ci.nsIRequestObserver]),
 
   // nsIRequestObserver
-  onStartRequest: function(aRequest, aContext) {
+  onStartRequest: function(aRequest) {
   },
-  onStopRequest: function(aRequest, aContext, aStatusCode) {
+  onStopRequest: function(aRequest, aStatusCode) {
     Assert.equal(aStatusCode, 0);
     Assert.ok(this._data.includes("Content-Type"));
     async_driver();
   },
 
   // nsIStreamListener
-  onDataAvailable: function(aRequest, aContext, aInputStream, aOffset, aCount) {
+  onDataAvailable: function(aRequest, aInputStream, aOffset, aCount) {
     if (this._stream == null) {
       this._stream = Cc["@mozilla.org/scriptableinputstream;1"].createInstance(Ci.nsIScriptableInputStream);
       this._stream.init(aInputStream);

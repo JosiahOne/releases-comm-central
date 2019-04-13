@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 function run_test() {
     do_calendar_startup(run_next_test);
@@ -32,22 +32,24 @@ add_task(async function formatDate_test() {
         expected: ["4/1/2017", "4/1/17"]
     }];
 
-    let dateformat = Preferences.get("calendar.date.format", 0);
-    let tzlocal = Preferences.get("calendar.timezone.local", "Pacific/Fakaofo");
-    Preferences.set("calendar.timezone.local", "Pacific/Fakaofo");
-
+    let dateformat = Services.prefs.getIntPref("calendar.date.format", 0);
+    let tzlocal = Services.prefs.getStringPref("calendar.timezone.local", "Pacific/Fakaofo");
+    let useOsLocale = Services.prefs.getBoolPref("intl.regional_prefs.use_os_locales", false);
+    // make sure to use the app locale to avoid test failures when running
+    // locally on an OS with a regional setting other than en-US
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", false);
+    Services.prefs.setStringPref("calendar.timezone.local", "Pacific/Fakaofo");
 
     let tzs = cal.getTimezoneService();
 
     let i = 0;
     for (let test of data) {
         i++;
-        Preferences.set("calendar.date.format", test.input.dateformat);
+        Services.prefs.setIntPref("calendar.date.format", test.input.dateformat);
         let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
-        let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
-                                    .getService(Components.interfaces.calIDateTimeFormatter);
+        let dtFormatter = Cc["@mozilla.org/calendar/datetime-formatter;1"].getService(Ci.calIDateTimeFormatter);
         let formatted = dtFormatter.formatDate(date);
         ok(
             test.expected.includes(formatted),
@@ -55,8 +57,9 @@ add_task(async function formatDate_test() {
         );
     }
     // let's reset the preferences
-    Preferences.set("calendar.timezone.local", tzlocal);
-    Preferences.set("calendar.date.format", dateformat);
+    Services.prefs.setStringPref("calendar.timezone.local", tzlocal);
+    Services.prefs.setIntPref("calendar.date.format", dateformat);
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", useOsLocale);
 });
 
 add_task(async function formatDateShort_test() {
@@ -110,11 +113,15 @@ add_task(async function formatDateShort_test() {
         expected: ["4/1/2017", "4/1/17"]
     }];
 
-    let dateformat = Preferences.get("calendar.date.format", 0);
-    let tzlocal = Preferences.get("calendar.timezone.local", "Pacific/Fakaofo");
-    Preferences.set("calendar.timezone.local", "Pacific/Fakaofo");
+    let dateformat = Services.prefs.getIntPref("calendar.date.format", 0);
+    let tzlocal = Services.prefs.getStringPref("calendar.timezone.local", "Pacific/Fakaofo");
+    let useOsLocale = Services.prefs.getBoolPref("intl.regional_prefs.use_os_locales", false);
+    // make sure to use the app locale to avoid test failures when running
+    // locally on an OS with a regional setting other than en-US
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", false);
+    Services.prefs.setStringPref("calendar.timezone.local", "Pacific/Fakaofo");
     // we make sure to have set long format
-    Preferences.set("calendar.date.format", 0);
+    Services.prefs.setIntPref("calendar.date.format", 0);
 
     let tzs = cal.getTimezoneService();
 
@@ -125,8 +132,7 @@ add_task(async function formatDateShort_test() {
         let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
-        let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
-                                    .getService(Components.interfaces.calIDateTimeFormatter);
+        let dtFormatter = Cc["@mozilla.org/calendar/datetime-formatter;1"].getService(Ci.calIDateTimeFormatter);
 
         let formatted = dtFormatter.formatDateShort(date);
         ok(
@@ -135,8 +141,9 @@ add_task(async function formatDateShort_test() {
         );
     }
     // let's reset the preferences
-    Preferences.set("calendar.timezone.local", tzlocal);
-    Preferences.set("calendar.date.format", dateformat);
+    Services.prefs.setStringPref("calendar.timezone.local", tzlocal);
+    Services.prefs.setIntPref("calendar.date.format", dateformat);
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", useOsLocale);
 });
 
 add_task(async function formatDateLong_test() {
@@ -190,11 +197,15 @@ add_task(async function formatDateLong_test() {
         expected: ["Saturday, April 01, 2017", "Saturday, April 1, 2017"]
     }];
 
-    let dateformat = Preferences.get("calendar.date.format", 0);
-    let tzlocal = Preferences.get("calendar.timezone.local", "Pacific/Fakaofo");
-    Preferences.set("calendar.timezone.local", "Pacific/Fakaofo");
+    let dateformat = Services.prefs.getIntPref("calendar.date.format", 0);
+    let tzlocal = Services.prefs.getStringPref("calendar.timezone.local", "Pacific/Fakaofo");
+    let useOsLocale = Services.prefs.getBoolPref("intl.regional_prefs.use_os_locales", false);
+    // make sure to use the app locale to avoid test failures when running
+    // locally on an OS with a regional setting other than en-US
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", false);
+    Services.prefs.setStringPref("calendar.timezone.local", "Pacific/Fakaofo");
     // we make sure to have set short format
-    Preferences.set("calendar.date.format", 1);
+    Services.prefs.setIntPref("calendar.date.format", 1);
 
     let tzs = cal.getTimezoneService();
 
@@ -205,8 +216,7 @@ add_task(async function formatDateLong_test() {
         let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
-        let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
-                                    .getService(Components.interfaces.calIDateTimeFormatter);
+        let dtFormatter = Cc["@mozilla.org/calendar/datetime-formatter;1"].getService(Ci.calIDateTimeFormatter);
 
         let formatted = dtFormatter.formatDateLong(date);
         ok(
@@ -215,8 +225,9 @@ add_task(async function formatDateLong_test() {
         );
     }
     // let's reset the preferences
-    Preferences.set("calendar.timezone.local", tzlocal);
-    Preferences.set("calendar.date.format", dateformat);
+    Services.prefs.setStringPref("calendar.timezone.local", tzlocal);
+    Services.prefs.setIntPref("calendar.date.format", dateformat);
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", useOsLocale);
 });
 
 add_task(async function formatDateWithoutYear_test() {
@@ -270,11 +281,15 @@ add_task(async function formatDateWithoutYear_test() {
         expected: "Apr 1"
     }];
 
-    let dateformat = Preferences.get("calendar.date.format", 0);
-    let tzlocal = Preferences.get("calendar.timezone.local", "Pacific/Fakaofo");
-    Preferences.set("calendar.timezone.local", "Pacific/Fakaofo");
+    let dateformat = Services.prefs.getIntPref("calendar.date.format", 0);
+    let tzlocal = Services.prefs.getStringPref("calendar.timezone.local", "Pacific/Fakaofo");
+    let useOsLocale = Services.prefs.getBoolPref("intl.regional_prefs.use_os_locales", false);
+    // make sure to use the app locale to avoid test failures when running
+    // locally on an OS with a regional setting other than en-US
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", false);
+    Services.prefs.setStringPref("calendar.timezone.local", "Pacific/Fakaofo");
     // we make sure to have set short format
-    Preferences.set("calendar.date.format", 1);
+    Services.prefs.setIntPref("calendar.date.format", 1);
 
     let tzs = cal.getTimezoneService();
 
@@ -285,14 +300,14 @@ add_task(async function formatDateWithoutYear_test() {
         let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
-        let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
-                                    .getService(Components.interfaces.calIDateTimeFormatter);
+        let dtFormatter = Cc["@mozilla.org/calendar/datetime-formatter;1"].getService(Ci.calIDateTimeFormatter);
 
         equal(dtFormatter.formatDateWithoutYear(date), test.expected, "(test #" + i + ")");
     }
     // let's reset the preferences
-    Preferences.set("calendar.timezone.local", tzlocal);
-    Preferences.set("calendar.date.format", dateformat);
+    Services.prefs.setStringPref("calendar.timezone.local", tzlocal);
+    Services.prefs.setIntPref("calendar.date.format", dateformat);
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", useOsLocale);
 });
 
 add_task(async function formatTime_test() {
@@ -328,8 +343,12 @@ add_task(async function formatTime_test() {
         expected: "All Day"
     }];
 
-    let tzlocal = Preferences.get("calendar.timezone.local", "Pacific/Fakaofo");
-    Preferences.set("calendar.timezone.local", "Pacific/Fakaofo");
+    let tzlocal = Services.prefs.getStringPref("calendar.timezone.local", "Pacific/Fakaofo");
+    let useOsLocale = Services.prefs.getBoolPref("intl.regional_prefs.use_os_locales", false);
+    // make sure to use the app locale to avoid test failures when running
+    // locally on an OS with a regional setting other than en-US
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", false);
+    Services.prefs.setStringPref("calendar.timezone.local", "Pacific/Fakaofo");
 
     let tzs = cal.getTimezoneService();
 
@@ -340,8 +359,7 @@ add_task(async function formatTime_test() {
         let zone = (test.input.timezone == "floating") ? cal.dtz.floating : tzs.getTimezone(test.input.timezone);
         let date = cal.createDateTime(test.input.datetime).getInTimezone(zone);
 
-        let dtFormatter = Components.classes["@mozilla.org/calendar/datetime-formatter;1"]
-                                    .getService(Components.interfaces.calIDateTimeFormatter);
+        let dtFormatter = Cc["@mozilla.org/calendar/datetime-formatter;1"].getService(Ci.calIDateTimeFormatter);
 
         let formatted = dtFormatter.formatTime(date);
         ok(
@@ -350,5 +368,6 @@ add_task(async function formatTime_test() {
         );
     }
     // let's reset the preferences
-    Preferences.set("calendar.timezone.local", tzlocal);
+    Services.prefs.setStringPref("calendar.timezone.local", tzlocal);
+    Services.prefs.setBoolPref("intl.regional_prefs.use_os_locales", useOsLocale);
 });

@@ -143,13 +143,13 @@ label.label {
 
 .icon-holder[type="calendarEvent"],
 .tabmail-tab[type="calendarEvent"] {
-    list-style-image: url(chrome://calendar-common/skin/calendar-event-tab.png);
+    list-style-image: url(chrome://calendar-common/skin/icons/event.svg);
     -moz-image-region: auto;
 }
 
 .icon-holder[type="calendarTask"],
 .tabmail-tab[type="calendarTask"] {
-    list-style-image: url(chrome://calendar-common/skin/calendar-task-tab.png);
+    list-style-image: url(chrome://calendar-common/skin/icons/task.svg);
     -moz-image-region: auto;
 }
 
@@ -159,6 +159,25 @@ label.label {
 
 #event-grid-tabbox {
     margin: 5px 0;
+}
+
+#event-grid-tabbox #notify-options {
+    padding: 0px 9px;
+}
+
+#event-grid-tabpanel-description {
+    display: flex;
+}
+
+#event-grid-tabpanel-description > #item-description {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 7em;
+    margin: 2px 4px;
+}
+
+#event-grid-tabpanel-attendees > vbox > hbox > #item-attendees-box {
+    margin: 2px 4px;
 }
 
 /*--------------------------------------------------------------------
@@ -219,8 +238,10 @@ label.label {
 
 .cal-statusbar-1 {
     -moz-box-orient: vertical;
-    min-width: 0px;
-    list-style-image: url("chrome://calendar-common/skin/calendar-event-dialog.png");
+    min-width: 0;
+    list-style-image: url("chrome://calendar-common/skin/statusbar-priority.svg");
+    -moz-context-properties: fill;
+    fill: currentColor;
 }
 
 /*--------------------------------------------------------------------
@@ -239,7 +260,7 @@ label.label {
  *-------------------------------------------------------------------*/
 
 #image-priority-low {
-    -moz-image-region: rect(0px 100px 16px 84px);
+    -moz-image-region: rect(0 16px 16px 0);
 }
 
 /*--------------------------------------------------------------------
@@ -247,7 +268,7 @@ label.label {
  *-------------------------------------------------------------------*/
 
 #image-priority-normal {
-    -moz-image-region: rect(0px 116px 16px 100px);
+    -moz-image-region: rect(0 32px 16px 16px);
 }
 
 /*--------------------------------------------------------------------
@@ -255,7 +276,15 @@ label.label {
  *-------------------------------------------------------------------*/
 
 #image-priority-high {
-    -moz-image-region: rect(0px 132px 16px 116px);
+    -moz-image-region: rect(0 48px 16px 32px);
+}
+
+/*--------------------------------------------------------------------
+ *   Task completion box
+ *-------------------------------------------------------------------*/
+
+#percent-complete-textbox {
+    width: 5em;
 }
 
 /*--------------------------------------------------------------------
@@ -286,11 +315,11 @@ listbox[disabled="true"] {
     color: -moz-FieldText;
 }
 
-daypicker-weekday {
+#daypicker-weekday {
     margin-top: 2px;
 }
 
-daypicker-monthday {
+.daypicker-monthday {
     margin-top: 2px;
 }
 
@@ -316,10 +345,16 @@ daypicker-monthday {
  *   Attendees Dialog
  *-------------------------------------------------------------------*/
 
+#attendees-container {
+    min-width: 150px;
+    min-height: 150px;
+}
+
 .listbox-noborder {
     -moz-appearance: none;
     margin: 0px 0px;
     border: 1px solid var(--eventBorderColor);
+    background-color: #fff;
 }
 
 #timebar > .listbox-noborder {
@@ -331,7 +366,9 @@ daypicker-monthday {
 }
 
 /* remove on Windows the double border with the splitter */
-@media (-moz-windows-theme) {
+@media (-moz-os-version: windows-win7),
+       (-moz-os-version: windows-win8),
+       (-moz-os-version: windows-win10) {
     #attendees-list > .listbox-noborder {
         border-inline-end-style: none;
     }
@@ -348,9 +385,10 @@ daypicker-monthday {
     border-top-right-radius: 5px;
 }
 
-.freebusy-container {
+#freebusy-container {
     overflow: hidden;
     clip: rect(0px 0px 0px 0px);
+    min-width: 450px;
 }
 
 .freebusy-listitem {
@@ -450,6 +488,15 @@ freebusy-day > box {
     padding-inline-end: 10px;
 }
 
+/* --spacer-top-height and --spacer-bottom-height are defined at runtime */
+.attendee-spacer-top {
+    height: var(--spacer-top-height);
+}
+
+.attendee-spacer-bottom {
+    height: var(--spacer-bottom-height);
+}
+
 #addressingWidget {
     -moz-user-focus: none;
 }
@@ -471,7 +518,8 @@ freebusy-day > box {
      ensure that the rows of the freebusy-grid and
      the attendee-list always have the same height,
      regardless of the font size. */
-    min-height: 16px;
+    height: 17px;
+    overflow: hidden;
 }
 
 .addressingWidgetCell {
@@ -624,9 +672,17 @@ freebusy-day > box {
     margin-left: 3px;
 }
 
+#calendar-summary-dialog #item-description-wrapper,
+#calendar-event-summary-dialog #item-description-wrapper,
+#calendar-task-summary-dialog #item-description-wrapper {
+    display: flex;
+}
+
 #calendar-summary-dialog #item-description,
 #calendar-event-summary-dialog #item-description,
 #calendar-task-summary-dialog #item-description {
+    width: 100%;
+    box-sizing: border-box;
     min-height: 54px;
 }
 

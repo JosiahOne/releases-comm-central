@@ -13,8 +13,8 @@
 ]>
 
 <window id="filterListDialog"
-  xmlns:nc="http://home.netscape.com/NC-rdf#"
   xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+  xmlns:html="http://www.w3.org/1999/xhtml"
   windowtype="mailnews:filterlist"
   style="width: 45em; height: 31em;"
   onload="onLoad();"
@@ -23,6 +23,8 @@
   persist="width height screenX screenY"
   title="&window.title;">
 
+  <script type="application/javascript" src="chrome://messenger/content/searchWidgets.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/generalBindings.js"/>
   <script type="application/javascript" src="chrome://messenger/content/FilterListDialog.js"/>
   <stringbundleset id="stringbundleset">
     <stringbundle id="bundle_filter" src="chrome://messenger/locale/filter.properties"/>
@@ -33,7 +35,7 @@
     <key keycode="VK_ESCAPE" oncommand="if (onFilterClose()) window.close();"/>
   </keyset>
 
-  <hbox align="center">
+  <hbox id="filterHeader" align="center">
     <label value="&filtersForPrefix.label;"
            accesskey="&filtersForPrefix.accesskey;" control="serverMenu"/>
 
@@ -54,87 +56,26 @@
              emptytext="&searchBox.emptyText;"
              isempty="true"/>
   </hbox>
-
-  <grid flex="1">
-    <columns>
-      <column flex="1"/>
-      <column/>
-    </columns>
-    <rows>
-      <row>
-        <separator class="thin"/>
-      </row>
-      <row>
-        <hbox>
-          <label id="filterListLabel"
-                 control="filterList"
-                 flex="1">
-            &filterHeader.label;
-          </label>
-          <label id="countBox"/>
-        </hbox>
-      </row>
-
-      <row flex="1">
-        <vbox>
-          <listbox id="filterList" flex="1" onselect="updateButtons();"
-                   seltype="multiple"
-                   onkeypress="onFilterListKeyPress(event);">
-            <listhead>
-              <listheader id="nameColumn" label="&nameColumn.label;" flex="1"/>
-              <listheader id="activeColumn" label="&activeColumn.label;" minwidth="40px"/>
-            </listhead>
-          </listbox>
-        </vbox>
-
-        <vbox>
-          <button id="newButton"
-                  type="menu-button"
-                  label="&newButton.label;"
-                  accesskey="&newButton.accesskey;"
-                  oncommand="onNewFilter();">
-            <menupopup>
-              <menuitem label="&newButton.label;"
-                        accesskey="&newButton.accesskey;"/>
-              <menuitem id="copyToNewButton"
-                        label="&newButton.popupCopy.label;"
-                        accesskey="&newButton.popupCopy.accesskey;"
-                        oncommand="onCopyToNewFilter(); event.stopPropagation();"/>
-            </menupopup>
-          </button>
-          <button id="editButton" label="&editButton.label;"
-                  accesskey="&editButton.accesskey;"
-                  oncommand="onEditFilter();"/>
-          <button id="deleteButton"
-                  label="&deleteButton.label;"
-                  accesskey="&deleteButton.accesskey;"
-                  oncommand="onDeleteFilter();"/>
-          <spacer flex="1"/>
-          <button id="reorderTopButton"
-                  label="&reorderTopButton;"
-                  accesskey="&reorderTopButton.accessKey;"
-                  tooltiptext="&reorderTopButton.toolTip;"
-                  oncommand="onTop(event);"/>
-          <button id="reorderUpButton"
-                  label="&reorderUpButton.label;"
-                  accesskey="&reorderUpButton.accesskey;"
-                  class="up"
-                  oncommand="onUp(event);"/>
-          <button id="reorderDownButton"
-                  label="&reorderDownButton.label;"
-                  accesskey="&reorderDownButton.accesskey;"
-                  class="down"
-                  oncommand="onDown(event);"/>
-          <button id="reorderBottomButton"
-                  label="&reorderBottomButton;"
-                  accesskey="&reorderBottomButton.accessKey;"
-                  tooltiptext="&reorderBottomButton.toolTip;"
-                  oncommand="onBottom(event);"/>
-          <spacer flex="1"/>
-        </vbox>
-      </row>
-      <row>
-        <vbox>
+  <separator class="thin"/>
+  <hbox id="filterListGrid" flex="1">
+    <vbox flex="1">
+      <hbox>
+        <label id="filterListLabel" control="filterList" flex="1">
+          &filterHeader.label;
+        </label>
+        <label id="countBox"/>
+      </hbox>
+      <box flex="1">
+        <richlistbox id="filterList" flex="1" onselect="updateButtons();"
+                     class="theme-listbox" seltype="multiple"
+                     onkeypress="onFilterListKeyPress(event);">
+              <treecols>
+                <treecol id="nameColumn" label="&nameColumn.label;" flex="1"/>
+                <treecol id="activeColumn" label="&activeColumn.label;" width="100"/>
+              </treecols>
+        </richlistbox>
+      </box>
+      <vbox>
           <separator class="thin"/>
           <hbox align="center">
             <label id="folderPickerPrefix" value="&folderPickerPrefix.label;"
@@ -160,25 +101,70 @@
                   oncommand="runSelectedFilters();" disabled="true"/>
           </hbox>
         </vbox>
-        <vbox>
-          <separator class="thin"/>
-            <button label="&viewLogButton.label;"
-                    accesskey="&viewLogButton.accesskey;"
-                    oncommand="viewLog();"/>
-
-        </vbox>
-      </row>
-    </rows>
-  </grid>
+    </vbox>
+    <vbox>
+      <label value=""/>
+      <button id="newButton"
+              type="menu-button"
+              label="&newButton.label;"
+              accesskey="&newButton.accesskey;"
+              oncommand="onNewFilter();">
+        <menupopup>
+          <menuitem label="&newButton.label;"
+                    accesskey="&newButton.accesskey;"/>
+          <menuitem id="copyToNewButton"
+                    label="&newButton.popupCopy.label;"
+                    accesskey="&newButton.popupCopy.accesskey;"
+                    oncommand="onCopyToNewFilter(); event.stopPropagation();"/>
+        </menupopup>
+      </button>
+      <button id="editButton" label="&editButton.label;"
+              accesskey="&editButton.accesskey;"
+              oncommand="onEditFilter();"/>
+      <button id="deleteButton"
+              label="&deleteButton.label;"
+              accesskey="&deleteButton.accesskey;"
+              oncommand="onDeleteFilter();"/>
+      <separator class="thin"/>
+      <button id="reorderTopButton"
+              label="&reorderTopButton;"
+              accesskey="&reorderTopButton.accessKey;"
+              tooltiptext="&reorderTopButton.toolTip;"
+              oncommand="onTop(event);"/>
+      <button id="reorderUpButton"
+              label="&reorderUpButton.label;"
+              accesskey="&reorderUpButton.accesskey;"
+              class="up"
+              oncommand="onUp(event);"/>
+      <button id="reorderDownButton"
+              label="&reorderDownButton.label;"
+              accesskey="&reorderDownButton.accesskey;"
+              class="down"
+              oncommand="onDown(event);"/>
+      <button id="reorderBottomButton"
+              label="&reorderBottomButton;"
+              accesskey="&reorderBottomButton.accessKey;"
+              tooltiptext="&reorderBottomButton.toolTip;"
+              oncommand="onBottom(event);"/>
+      <vbox flex="1" pack="end">
+        <button label="&viewLogButton.label;"
+                accesskey="&viewLogButton.accesskey;"
+                oncommand="viewLog();"/>
+      </vbox>
+    </vbox>
+  </hbox>
 
   <separator class="thin"/>
 
-  <statusbar class="chromeclass-status" id="status-bar">
+  <hbox id="status-bar" class="statusbar chromeclass-status">
     <statusbarpanel id="statusText" flex="1" crop="right"/>
-    <statusbarpanel class="statusbarpanel-progress" collapsed="true" id="statusbar-progresspanel">
-      <progressmeter class="progressmeter-statusbar" id="statusbar-icon" mode="normal" value="0"/>
-    </statusbarpanel>
-  </statusbar>
+    <hbox id="statusbar-progresspanel" class="statusbarpanel statusbarpanel-progress" collapsed="true">
+      <html:progress class="progressmeter-statusbar" id="statusbar-icon" value="0" max="100"/>
+    </hbox>
+    <hbox class="statusbarpanel statusbar-resizerpanel">
+      <resizer dir="bottomend"/>
+    </hbox>
+  </hbox>
 
 </window>
 

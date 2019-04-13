@@ -10,7 +10,6 @@
 #include "nsIPrefBranch.h"
 #include "nsIPrefLocalizedString.h"
 #include "nsIPrefService.h"
-#include "nsIRDFService.h"
 #include "nsIServiceManager.h"
 #include "nsIMutableArray.h"
 #include "nsISupportsPrimitives.h"
@@ -21,7 +20,7 @@
 #include "prprf.h"
 #include "nsINIParser.h"
 #include "nsMailProfileMigratorUtils.h"
-#include "nsISimpleEnumerator.h"
+#include "nsIDirectoryEnumerator.h"
 #include "nsServiceManagerUtils.h"
 
 #define MIGRATION_BUNDLE "chrome://messenger/locale/migration/migration.properties"
@@ -230,21 +229,16 @@ nsNetscapeProfileMigratorBase::GetSignonFileName(bool aReplace, nsACString& aFil
 nsresult
 nsNetscapeProfileMigratorBase::LocateSignonsFile(nsACString& aResult)
 {
-  nsCOMPtr<nsISimpleEnumerator> entries;
+  nsCOMPtr<nsIDirectoryEnumerator> entries;
   nsresult rv = mSourceProfile->GetDirectoryEntries(getter_AddRefs(entries));
   if (NS_FAILED(rv)) return rv;
 
   nsAutoCString fileName;
-  do {
-    bool hasMore = false;
-    rv = entries->HasMoreElements(&hasMore);
-    if (NS_FAILED(rv) || !hasMore) break;
-
-    nsCOMPtr<nsISupports> supp;
-    rv = entries->GetNext(getter_AddRefs(supp));
+  bool hasMore = false;
+  while (NS_SUCCEEDED(entries->HasMoreElements(&hasMore)) && hasMore) {
+    nsCOMPtr<nsIFile> currFile;
+    rv = entries->GetNextFile(getter_AddRefs(currFile));
     if (NS_FAILED(rv)) break;
-
-    nsCOMPtr<nsIFile> currFile(do_QueryInterface(supp));
 
     nsCOMPtr<nsIURI> uri;
     rv = NS_NewFileURI(getter_AddRefs(uri), currFile);
@@ -259,7 +253,6 @@ nsNetscapeProfileMigratorBase::LocateSignonsFile(nsACString& aResult)
       break;
     }
   }
-  while (1);
 
   aResult = fileName;
 
@@ -284,21 +277,15 @@ nsresult nsNetscapeProfileMigratorBase::RecursiveCopy(nsIFile* srcDir, nsIFile* 
     rv = destDir->Create(nsIFile::DIRECTORY_TYPE, 0775);
   if (NS_FAILED(rv)) return rv;
 
-  bool hasMore = false;
-  nsCOMPtr<nsISimpleEnumerator> dirIterator;
+  nsCOMPtr<nsIDirectoryEnumerator> dirIterator;
   rv = srcDir->GetDirectoryEntries(getter_AddRefs(dirIterator));
   if (NS_FAILED(rv)) return rv;
 
-  rv = dirIterator->HasMoreElements(&hasMore);
-  if (NS_FAILED(rv)) return rv;
-
-  nsCOMPtr<nsIFile> dirEntry;
-
-  while (hasMore)
+  bool hasMore = false;
+  while (NS_SUCCEEDED(dirIterator->HasMoreElements(&hasMore)) && hasMore)
   {
-    nsCOMPtr<nsISupports> supports;
-    rv = dirIterator->GetNext(getter_AddRefs(supports));
-    dirEntry = do_QueryInterface(supports);
+    nsCOMPtr<nsIFile> dirEntry;
+    rv = dirIterator->GetNextFile(getter_AddRefs(dirEntry));
     if (NS_SUCCEEDED(rv) && dirEntry)
     {
       rv = dirEntry->IsDirectory(&isDir);
@@ -331,8 +318,6 @@ nsresult nsNetscapeProfileMigratorBase::RecursiveCopy(nsIFile* srcDir, nsIFile* 
         }
       }
     }
-    rv = dirIterator->HasMoreElements(&hasMore);
-    if (NS_FAILED(rv)) return rv;
   }
 
   return rv;

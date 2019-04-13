@@ -22,7 +22,6 @@
 #include "nsIMsgAccountManager.h"
 #include "nsINntpIncomingServer.h"
 #include "nsIDocShell.h"
-#include "nsIDocShellLoadInfo.h"
 #include "mozIDOMWindow.h"
 #include "nsIMsgSearchSession.h"
 #include "nsMailDirServiceDefs.h"
@@ -44,6 +43,9 @@
 #include "nsIInputStream.h"
 #include "nsIURIMutator.h"
 #include "nsTArray.h"
+#include "nsDocShellLoadState.h"
+#include "nsContentUtils.h"
+#include "mozilla/LoadInfo.h"
 
 #include "../../base/src/MailnewsLoadContextInfo.h"
 
@@ -305,17 +307,18 @@ nsresult nsNntpService::GetMessageFromUrl(nsIURI *aUrl,
   nsCOMPtr<nsIDocShell> docShell(do_QueryInterface(aDisplayConsumer, &rv));
   if (NS_SUCCEEDED(rv))
   {
-    nsCOMPtr<nsIDocShellLoadInfo> loadInfo;
     // DIRTY LITTLE HACK --> if we are opening an attachment we want the docshell to
     // treat this load as if it were a user click event. Then the dispatching stuff will be much
     // happier.
+    RefPtr<nsDocShellLoadState> loadState = new nsDocShellLoadState(aUrl);
+    loadState->SetLoadFlags(mOpenAttachmentOperation
+                              ? nsIWebNavigation::LOAD_FLAGS_IS_LINK
+                              : nsIWebNavigation::LOAD_FLAGS_NONE);
     if (mOpenAttachmentOperation)
-    {
-      docShell->CreateLoadInfo(getter_AddRefs(loadInfo));
-      loadInfo->SetLoadType(nsIDocShellLoadInfo::loadLink);
-    }
-
-    rv = docShell->LoadURI(aUrl, loadInfo, nsIWebNavigation::LOAD_FLAGS_NONE, false);
+      loadState->SetLoadType(LOAD_LINK);
+    loadState->SetFirstParty(false);
+    loadState->SetTriggeringPrincipal(nsContentUtils::GetSystemPrincipal());
+    rv = docShell->LoadURI(loadState);
   }
   else
   {
@@ -331,15 +334,20 @@ nsresult nsNntpService::GetMessageFromUrl(nsIURI *aUrl,
           mailnewsUrl->SetMsgWindow(aMsgWindow);
         mailnewsUrl->GetLoadGroup(getter_AddRefs(aLoadGroup));
       }
-      rv = NewChannel(aUrl, getter_AddRefs(aChannel));
+      nsCOMPtr<nsILoadInfo> loadInfo = new mozilla::net::LoadInfo(
+        nsContentUtils::GetSystemPrincipal(),
+        nullptr,
+        nullptr,
+        nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+        nsIContentPolicy::TYPE_OTHER);
+      rv = NewChannel(aUrl, loadInfo, getter_AddRefs(aChannel));
       if (NS_FAILED(rv)) return rv;
 
       rv = aChannel->SetLoadGroup(aLoadGroup);
       if (NS_FAILED(rv)) return rv;
 
-      nsCOMPtr<nsISupports> aCtxt = do_QueryInterface(aUrl);
       //  now try to open the channel passing in our display consumer as the listener
-      rv = aChannel->AsyncOpen(aStreamListener, aCtxt);
+      rv = aChannel->AsyncOpen(aStreamListener);
     }
     else
       rv = RunNewsUrl(aUrl, aMsgWindow, aDisplayConsumer);
@@ -353,6 +361,7 @@ nsNntpService::FetchMessage(nsIMsgFolder *folder, nsMsgKey key, nsIMsgWindow *aM
   NS_ENSURE_ARG_POINTER(folder);
   nsresult rv;
   nsCOMPtr<nsIMsgNewsFolder> msgNewsFolder = do_QueryInterface(folder, &rv);
+  mozilla::Unused << msgNewsFolder;
   NS_ENSURE_SUCCESS(rv,rv);
 
   nsCOMPtr <nsIMsgDBHdr> hdr;
@@ -444,15 +453,16 @@ NS_IMETHODIMP nsNntpService::OpenAttachment(const char *aContentType,
       msgUrl->RegisterListener(aUrlListener);
 
     nsCOMPtr<nsIDocShell> docShell(do_QueryInterface(aDisplayConsumer, &rv));
-    if (NS_SUCCEEDED(rv) && docShell)
-    {
-      nsCOMPtr<nsIDocShellLoadInfo> loadInfo;
-      docShell->CreateLoadInfo(getter_AddRefs(loadInfo));
-      loadInfo->SetLoadType(nsIDocShellLoadInfo::loadLink);
-      return docShell->LoadURI(url, loadInfo, nsIWebNavigation::LOAD_FLAGS_NONE, false);
-    }
-    else
+    if (NS_SUCCEEDED(rv) && docShell) {
+      RefPtr<nsDocShellLoadState> loadState = new nsDocShellLoadState(url);
+      loadState->SetLoadFlags(nsIWebNavigation::LOAD_FLAGS_IS_LINK);
+      loadState->SetLoadType(LOAD_LINK);
+      loadState->SetFirstParty(false);
+      loadState->SetTriggeringPrincipal(nsContentUtils::GetSystemPrincipal());
+      return docShell->LoadURI(loadState);
+    } else {
       return RunNewsUrl(url, aMsgWindow, aDisplayConsumer);
+    }
   }
   return NS_OK;
 }
@@ -1186,7 +1196,7 @@ NS_IMETHODIMP nsNntpService::GetProtocolFlags(uint32_t *aUritype)
 {
     NS_ENSURE_ARG_POINTER(aUritype);
     *aUritype = URI_NORELATIVE | URI_FORBIDS_AUTOMATIC_DOCUMENT_REPLACEMENT |
-      URI_LOADABLE_BY_ANYONE | ALLOWS_PROXY | URI_FORBIDS_COOKIE_ACCESS
+      URI_LOADABLE_BY_ANYONE | ALLOWS_PROXY
 #ifdef IS_ORIGIN_IS_FULL_SPEC_DEFINED
       | ORIGIN_IS_FULL_SPEC
 #endif
@@ -1222,14 +1232,9 @@ NS_IMETHODIMP nsNntpService::NewURI(const nsACString &aSpec,
     return NS_OK;
 }
 
-NS_IMETHODIMP nsNntpService::NewChannel(nsIURI *aURI, nsIChannel **_retval)
-{
-  return NewChannel2(aURI, nullptr, _retval);
-}
-
-NS_IMETHODIMP nsNntpService::NewChannel2(nsIURI *aURI,
-                                         nsILoadInfo *aLoadInfo,
-                                         nsIChannel **_retval)
+NS_IMETHODIMP nsNntpService::NewChannel(nsIURI *aURI,
+                                        nsILoadInfo *aLoadInfo,
+                                        nsIChannel **_retval)
 {
   NS_ENSURE_ARG_POINTER(aURI);
   nsresult rv = NS_OK;

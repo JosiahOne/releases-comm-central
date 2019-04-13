@@ -45,10 +45,12 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_MSGIOVERRIDE
 
-  NS_FORWARD_NSIABDIRECTORY(DELEGATE_JS(nsIAbDirectory, mJsIAbDirectory)->)
-  NS_FORWARD_NSIABCOLLECTION(DELEGATE_JS(nsIAbCollection, mJsIAbCollection)->)
-  NS_FORWARD_NSIABITEM(DELEGATE_JS(nsIAbItem, mJsIAbItem)->)
-  NS_FORWARD_NSIINTERFACEREQUESTOR(DELEGATE_JS(nsIInterfaceRequestor, mJsIInterfaceRequestor)->)
+  // use mCppBase as a raw pointer where possible
+  NS_FORWARD_NSIABDIRECTORY(DELEGATE_JS(mJsIAbDirectory, mMethods, mCppBase)->)
+  NS_FORWARD_NSIABCOLLECTION(DELEGATE_JS(mJsIAbCollection, mMethods, (mCppBase.get()))->)
+  NS_FORWARD_NSIABITEM(DELEGATE_JS(mJsIAbItem, mMethods, (mCppBase.get()))->)
+  NS_FORWARD_NSIINTERFACEREQUESTOR(DELEGATE_JS(mJsIInterfaceRequestor, mMethods,
+    (nsCOMPtr<nsIInterfaceRequestor>(do_QueryInterface(mCppBase))))->)
 
   JaCppAbDirectoryDelegator();
 
@@ -56,11 +58,12 @@ private:
   virtual ~JaCppAbDirectoryDelegator() {
   }
 
+  // nsIAbDirectory inherits from nsIAbCollection which inherits from nsIAbItem.
   class Super : public nsIAbDirectory,
                 public nsIInterfaceRequestor
   {
     public:
-      Super(JaCppAbDirectoryDelegator* aFakeThis) {mFakeThis = aFakeThis;}
+      explicit Super(JaCppAbDirectoryDelegator* aFakeThis) {mFakeThis = aFakeThis;}
       NS_DECL_ISUPPORTS
       NS_FORWARD_NSIABDIRECTORY(mFakeThis->JaBaseCppAbDirectory::)
       NS_FORWARD_NSIABCOLLECTION(mFakeThis->JaBaseCppAbDirectory::)

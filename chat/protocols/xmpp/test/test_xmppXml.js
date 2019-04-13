@@ -1,7 +1,7 @@
 /* Any copyright is dedicated to the Public Domain.
-* http://creativecommons.org/publicdomain/zero/1.0/ */
+ * http://creativecommons.org/publicdomain/zero/1.0/ */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var xmppXml = {};
 Services.scriptloader.loadSubScript("resource:///modules/xmpp-xml.jsm", xmppXml);
@@ -13,14 +13,14 @@ var TEST_DATA = [
       namespace: xmppXml.NS.client,
       attributes: {
         jid: "user@domain",
-        type: null
+        type: null,
       },
-      data: []
+      data: [],
     },
     XmlOutput: '<message xmlns="jabber:client" jid="user@domain"/>',
     stringOutput: '<message xmlns="jabber:client" jid="user@domain"/>\n',
     isError: false,
-    description: "Ignore attribute with null value"
+    description: "Ignore attribute with null value",
   },
   {
     input: {
@@ -28,49 +28,49 @@ var TEST_DATA = [
       namespace: xmppXml.NS.client,
       attributes: {
         jid: "user@domain",
-        type: undefined
+        type: undefined,
       },
-      data: []
+      data: [],
     },
     XmlOutput: '<message xmlns="jabber:client" jid="user@domain"/>',
     stringOutput: '<message xmlns="jabber:client" jid="user@domain"/>\n',
     isError: false,
-    description: "Ignore attribute with undefined value"
+    description: "Ignore attribute with undefined value",
   },
   {
     input: {
       name: "message",
       namespace: undefined,
       attributes: {},
-      data: []
+      data: [],
     },
-    XmlOutput: '<message/>',
-    stringOutput: '<message/>\n',
+    XmlOutput: "<message/>",
+    stringOutput: "<message/>\n",
     isError: false,
-    description: "Ignore namespace with undefined value"
+    description: "Ignore namespace with undefined value",
   },
   {
     input: {
       name: undefined,
       attributes: {},
-      data: []
+      data: [],
     },
-    XmlOutput: '',
-    stringOutput: '',
+    XmlOutput: "",
+    stringOutput: "",
     isError: true,
-    description: "Node must have a name"
+    description: "Node must have a name",
   },
   {
     input: {
       name: "message",
       attributes: {},
-      data: "test message"
+      data: "test message",
     },
-    XmlOutput: '<message>test message</message>',
-    stringOutput: '<message>\n test message\n</message>\n',
+    XmlOutput: "<message>test message</message>",
+    stringOutput: "<message>\n test message\n</message>\n",
     isError: false,
-    description: "Node with text content"
-  }
+    description: "Node with text content",
+  },
 ];
 
 function testXMLNode() {

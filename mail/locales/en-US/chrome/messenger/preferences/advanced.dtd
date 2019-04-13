@@ -12,6 +12,7 @@
 <!ENTITY enableGlodaSearch.label       "Enable Global Search and Indexer">
 <!ENTITY enableGlodaSearch.accesskey   "G">
 <!ENTITY dateTimeFormatting.label      "Date and Time Formatting">
+<!ENTITY languageSelector.label        "Language">
 <!ENTITY allowHWAccel.label            "Use hardware acceleration when available">
 <!ENTITY allowHWAccel.accesskey        "h">
 <!ENTITY storeType.label               "Message Store Type for new accounts:">
@@ -66,17 +67,18 @@
  -->
 <!ENTITY updateApp.version.pre           "Version ">
 <!ENTITY updateApp.version.post          "">
+<!ENTITY updateAppAllow.description      "Allow &brandShortName; to">
 <!ENTITY updateAuto.label                "Automatically install updates (recommended: improved security)">
 <!ENTITY updateAuto.accesskey            "A">
 <!ENTITY updateCheck.label               "Check for updates, but let me choose whether to install them">
 <!ENTITY updateCheck.accesskey           "C">
-<!ENTITY updateManual.label              "Never check for updates (not recommended: security risk)">
-<!ENTITY updateManual.accesskey          "N">
 <!ENTITY updateHistory.label             "Show Update History">
 <!ENTITY updateHistory.accesskey         "p">
 
 <!ENTITY useService.label                "Use a background service to install updates">
 <!ENTITY useService.accesskey            "b">
+
+<!ENTITY updateCrossUserSettingWarning.description "This setting will apply to all Windows accounts and &brandShortName; profiles using this installation of &brandShortName;.">
 
 <!-- Networking and Disk Space -->
 <!ENTITY showSettings.label            "Settings…">

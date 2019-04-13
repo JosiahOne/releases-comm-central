@@ -3,6 +3,8 @@
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
 
+<!-- import-globals-from calendar-invitations-dialog.js -->
+
 <!DOCTYPE dialog [
   <!ENTITY % dtd1 SYSTEM "chrome://calendar/locale/calendar-invitations-dialog.dtd" >  %dtd1;
 ]>
@@ -11,23 +13,6 @@
           xmlns="http://www.mozilla.org/xbl"
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
           xmlns:xbl="http://www.mozilla.org/xbl">
-  <binding id="calendar-invitations-richlistbox"
-           extends="chrome://global/content/bindings/richlistbox.xml#richlistbox"
-           xbl:inherits="flex">
-    <implementation>
-      <!-- methods -->
-      <method name="addCalendarItem">
-        <parameter name="aItem"/>
-        <body><![CDATA[
-            let newNode = createXULElement("calendar-invitations-richlistitem");
-            this.appendChild(newNode);
-            newNode.setAttribute("anonid", "invitations-listitem");
-            newNode.calendarItem = aItem;
-        ]]></body>
-      </method>
-    </implementation>
-  </binding>
-
   <binding id="calendar-invitations-richlistitem"
            extends="chrome://global/content/bindings/richlistbox.xml#richlistitem">
     <content>
@@ -118,7 +103,7 @@
 
       <!-- constructor -->
       <constructor><![CDATA[
-          ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+          const { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
           this.mDateFormatter = cal.getDateFormatter();
       ]]></constructor>
 
@@ -206,7 +191,7 @@
         <parameter name="aItem"/>
         <parameter name="aStatus"/>
         <body><![CDATA[
-            let calendar = cal.wrapInstance(aItem.calendar, Components.interfaces.calISchedulingSupport);
+            let calendar = cal.wrapInstance(aItem.calendar, Ci.calISchedulingSupport);
             if (calendar) {
                 let att = calendar.getInvitedAttendee(aItem);
                 if (att) {

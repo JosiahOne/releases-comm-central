@@ -14,18 +14,15 @@
 ]>
 
 <dialog title="&windowTitle.label;"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="Startup();"
-        buttons="accept,cancel"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();">
+        buttons="accept,cancel">
 
   <!-- Methods common to all editor dialogs -->
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdDialogCommon.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdSelectProps.js"/>
 
-  <broadcaster id="args" value=""/>
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
 
   <!-- Setting rows="7" on tree isn't working, equalsize vbox sets tree height. -->
@@ -43,7 +40,7 @@
 
     <hbox flex="1">
       <deck flex="1" id="SelectDeck" index="0">
-        <groupbox flex="1"><caption label="&Select.label;"/>
+        <groupbox flex="1"><label class="header">&Select.label;</label>
           <grid flex="1"><columns><column flex="1"/><column/></columns>
             <rows>
               <row align="center">
@@ -74,7 +71,7 @@
           </grid>
         </groupbox>
 
-        <groupbox flex="1"><caption label="&OptGroup.label;"/>
+        <groupbox flex="1"><label class="header">&OptGroup.label;</label>
           <grid flex="1"><columns><column flex="1"/><column/></columns>
             <rows>
               <row align="center">
@@ -89,7 +86,7 @@
           </grid>
         </groupbox>
 
-        <groupbox flex="1"><caption label="&Option.label;"/>
+        <groupbox flex="1"><label class="header">&Option.label;</label>
           <grid flex="1"><columns><column flex="1"/><column/></columns>
             <rows>
               <row align="center">

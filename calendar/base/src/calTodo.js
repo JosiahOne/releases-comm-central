@@ -2,8 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from calItemModule.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 //
 // constructor
@@ -22,16 +23,16 @@ function calTodo() {
 
 var calTodoClassID = Components.ID("{7af51168-6abe-4a31-984d-6f8a3989212d}");
 var calTodoInterfaces = [
-    Components.interfaces.calIItemBase,
-    Components.interfaces.calITodo,
-    Components.interfaces.calIInternalShallowCopy
+    Ci.calIItemBase,
+    Ci.calITodo,
+    Ci.calIInternalShallowCopy
 ];
 calTodo.prototype = {
     __proto__: calItemBase.prototype,
 
     classID: calTodoClassID,
     QueryInterface: cal.generateQI(calTodoInterfaces),
-    classInfo: XPCOMUtils.generateCI({
+    classInfo: cal.generateCI({
         classID: calTodoClassID,
         contractID: "@mozilla.org/calendar/todo;1",
         classDescription: "Calendar Todo",
@@ -135,21 +136,18 @@ calTodo.prototype = {
         this.fillIcalComponentFromBase(icalcomp);
         this.mapPropsToICS(icalcomp, this.icsEventPropMap);
 
-        let bagenum = this.propertyEnumerator;
-        while (bagenum.hasMoreElements()) {
-            let iprop = bagenum.getNext()
-                               .QueryInterface(Components.interfaces.nsIProperty);
+        for (let [name, value] of this.properties) {
             try {
-                if (!this.todoPromotedProps[iprop.name]) {
-                    let icalprop = icssvc.createIcalProperty(iprop.name);
-                    icalprop.value = iprop.value;
-                    let propBucket = this.mPropertyParams[iprop.name];
+                if (!this.todoPromotedProps[name]) {
+                    let icalprop = icssvc.createIcalProperty(name);
+                    icalprop.value = value;
+                    let propBucket = this.mPropertyParams[name];
                     if (propBucket) {
                         for (let paramName in propBucket) {
                             try {
                                 icalprop.setParameter(paramName, propBucket[paramName]);
                             } catch (e) {
-                                if (e.result == Components.results.NS_ERROR_ILLEGAL_VALUE) {
+                                if (e.result == Cr.NS_ERROR_ILLEGAL_VALUE) {
                                     // Illegal values should be ignored, but we could log them if
                                     // the user has enabled logging.
                                     cal.LOG("Warning: Invalid todo parameter value " + paramName + "=" + propBucket[paramName]);
@@ -162,7 +160,7 @@ calTodo.prototype = {
                     icalcomp.addProperty(icalprop);
                 }
             } catch (e) {
-                cal.ERROR("failed to set " + iprop.name + " to " + iprop.value + ": " + e + "\n");
+                cal.ERROR("failed to set " + name + " to " + value + ": " + e + "\n");
             }
         }
         return icalcomp;
@@ -175,7 +173,7 @@ calTodo.prototype = {
         if (todo.componentType != "VTODO") {
             todo = todo.getFirstSubcomponent("VTODO");
             if (!todo) {
-                throw Components.results.NS_ERROR_INVALID_ARG;
+                throw Cr.NS_ERROR_INVALID_ARG;
             }
         }
 

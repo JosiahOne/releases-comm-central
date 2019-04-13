@@ -2,9 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {
+  fixIterator,
+} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gOkButton;
 var gNameInput;
@@ -15,11 +17,12 @@ var kCollectedAddressbookURI = "moz-abmdbdirectory://history.mab";
 var kAllDirectoryRoot = "moz-abdirectory://";
 var kPABDirectory = 2; // defined in nsDirPrefs.h
 
-function abNameOnLoad()
-{
+document.addEventListener("dialogaccept", abNameOKButton);
+
+function abNameOnLoad() {
   // Get the document elements.
-  gOkButton = document.documentElement.getButton('accept');
-  gNameInput = document.getElementById('name');
+  gOkButton = document.documentElement.getButton("accept");
+  gNameInput = document.getElementById("name");
 
   // look in arguments[0] for parameters to see if we have a directory or not
   if ("arguments" in window && window.arguments[0] &&
@@ -54,8 +57,7 @@ function abNameOnLoad()
   }
 }
 
-function abNameOKButton()
-{
+function abNameOKButton(event) {
   var newName = gNameInput.value.trim();
 
   // Do not allow an already existing name.
@@ -68,7 +70,8 @@ function abNameOKButton()
       const kAlertText = document.getElementById("bundle_addressBook")
                                  .getFormattedString("duplicateNameText", [ab.dirName]);
       Services.prompt.alert(window, kAlertTitle, kAlertText);
-      return false;
+      event.preventDefault();
+      return;
     }
   }
 
@@ -78,11 +81,8 @@ function abNameOKButton()
     gDirectory.dirName = newName;
   else
     MailServices.ab.newAddressBook(newName, "", kPABDirectory);
-
-  return true;
 }
 
-function abNameDoOkEnabling()
-{
+function abNameDoOkEnabling() {
   gOkButton.disabled = gNameInput.value.trim() == "";
 }

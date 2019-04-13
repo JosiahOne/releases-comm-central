@@ -2,15 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 //
 // calAttachment.js
 //
 function calAttachment() {
     this.wrappedJSObject = this;
-    this.mProperties = new cal.data.PropertyMap();
+    this.mProperties = new Map();
 }
 
 calAttachment.prototype = {
@@ -22,11 +22,11 @@ calAttachment.prototype = {
 
     get hashId() {
         if (!this.mHashId) {
-            let cryptoHash = Components.classes["@mozilla.org/security/hash;1"]
-                                       .createInstance(Components.interfaces.nsICryptoHash);
+            let cryptoHash = Cc["@mozilla.org/security/hash;1"]
+                               .createInstance(Ci.nsICryptoHash);
 
-            let converter = Components.classes["@mozilla.org/intl/scriptableunicodeconverter"]
-                                      .createInstance(Components.interfaces.nsIScriptableUnicodeConverter);
+            let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
+                              .createInstance(Ci.nsIScriptableUnicodeConverter);
             converter.charset = "UTF-8";
             let data = converter.convertToByteArray(this.rawData, {});
 
@@ -95,7 +95,7 @@ calAttachment.prototype = {
             try {
                 icalatt.setParameter(key, value);
             } catch (e) {
-                if (e.result == Components.results.NS_ERROR_ILLEGAL_VALUE) {
+                if (e.result == Cr.NS_ERROR_ILLEGAL_VALUE) {
                     // Illegal values should be ignored, but we could log them if
                     // the user has enabled logging.
                     cal.LOG("Warning: Invalid attachment parameter value " + key + "=" + value);
@@ -114,7 +114,7 @@ calAttachment.prototype = {
     set icalProperty(attProp) {
         // Reset the property bag for the parameters, it will be re-initialized
         // from the ical property.
-        this.mProperties = new cal.data.PropertyMap();
+        this.mProperties = new Map();
         this.setData(attProp.value);
 
         for (let [name, value] of cal.iterate.icalParameter(attProp)) {
@@ -129,7 +129,7 @@ calAttachment.prototype = {
     set icalString(val) {
         let prop = cal.getIcsService().createIcalPropertyFromString(val);
         if (prop.propertyName != "ATTACH") {
-            throw Components.results.NS_ERROR_ILLEGAL_VALUE;
+            throw Cr.NS_ERROR_ILLEGAL_VALUE;
         }
         this.icalProperty = prop;
         return val;

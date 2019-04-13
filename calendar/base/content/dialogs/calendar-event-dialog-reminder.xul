@@ -6,8 +6,10 @@
 <?xml-stylesheet type="text/css" href="chrome://global/skin/global.css"?>
 <?xml-stylesheet type="text/css" href="chrome://messenger/content/bindings.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/calendar-alarms.css"?>
+<?xml-stylesheet type="text/css" href="chrome://calendar-common/skin/widgets/minimonth.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar/skin/calendar-event-dialog.css"?>
-<?xml-stylesheet type="text/css" href="chrome://calendar/content/datetimepickers/datetimepickers.css"?>
+<?xml-stylesheet type="text/css" href="chrome://calendar/content/widgets/calendar-widget-bindings.css"?>
+<?xml-stylesheet type="text/css" href="chrome://lightning-common/skin/datetimepickers.css"?>
 <?xml-stylesheet type="text/css" href="chrome://calendar/content/calendar-bindings.css"?>
 
 <!DOCTYPE dialog SYSTEM "chrome://calendar/locale/dialogs/calendar-event-dialog-reminder.dtd" >
@@ -16,24 +18,24 @@
         title="&reminderdialog.title;"
         windowtype="Calendar:EventDialog:Reminder"
         onload="onLoad()"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();"
         persist="screenX screenY width height"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <!-- Javascript includes -->
   <script type="application/javascript" src="chrome://calendar/content/calendar-event-dialog-reminder.js"/>
   <script type="application/javascript" src="chrome://calendar/content/calendar-ui-utils.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/customElements.js"/>
+  <script type="application/javascript" src="chrome://calendar/content/datetimepickers/datetimepickers.js"/>
 
   <notificationbox id="reminder-notifications"/>
 
   <!-- Listbox with custom reminders -->
   <vbox flex="1">
-    <listbox id="reminder-listbox"
-             seltype="single"
-             class="event-dialog-listbox"
-             onselect="onReminderSelected()"
-             flex="1"/>
+    <richlistbox id="reminder-listbox"
+                 seltype="single"
+                 class="event-dialog-listbox"
+                 onselect="onReminderSelected()"
+                 flex="1"/>
     <hbox id="reminder-action-buttons-box" pack="end">
       <button id="reminder-new-button"
               label="&reminder.add.label;"
@@ -46,8 +48,10 @@
     </hbox>
   </vbox>
 
-  <!-- Custom reminder details -->
-  <calendar-caption id="reminder-details-caption" label="&reminder.reminderDetails.label;"/>
+  <hbox id="reminder-details-caption" class="calendar-caption" align="center">
+    <label value="&reminder.reminderDetails.label;" class="header"/>
+    <separator class="groove" flex="1"/>
+  </hbox>
   <radiogroup id="reminder-relation-radiogroup"
                 onselect="setupRadioEnabledState(); updateReminder(event)">
     <hbox id="reminder-relative-box" align="top" flex="1">
@@ -98,10 +102,11 @@
     </hbox>
   </radiogroup>
 
-  <!-- Custom reminder action -->
-  <calendar-caption id="reminder-actions-caption"
-                    control="reminder-actions-menulist"
-                    label="&reminder.action.label;"/>
+  <hbox id="reminder-actions-caption" class="calendar-caption" align="center">
+    <label value="&reminder.action.label;" control="reminder-actions-menulist"
+           class="header"/>
+    <separator class="groove" flex="1"/>
+  </hbox>
   <menulist id="reminder-actions-menulist"
             oncommand="updateReminder(event)"
             class="reminder-icon">

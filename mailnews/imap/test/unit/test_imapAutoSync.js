@@ -26,7 +26,7 @@ load("../../../resources/alertTestUtils.js");
 load("../../../resources/messageGenerator.js");
 
 // Globals
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 setupIMAPPump();
 

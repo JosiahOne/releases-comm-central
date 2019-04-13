@@ -9,7 +9,7 @@
 <!DOCTYPE dialog SYSTEM "chrome://editor/locale/EditorInsertChars.dtd">
 
 <dialog id="insertCharsDlg" title="&windowTitle.label;"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload = "Startup()"
         onfocus = "onFocus()"
         buttonlabelaccept="&insertButton.label;"
@@ -24,9 +24,8 @@
   <script type="application/javascript" src="chrome://editor/content/EdInsertChars.js"/>
 
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
-  <broadcaster id="args" value=""/>
 
-  <groupbox><caption label="&category.label;"/>
+  <groupbox><label class="header">&category.label;</label>
     <radiogroup id="CatGrp" persist="category letter_index char_index">
       <radio id="AccentUpper" label="&accentUpper.label;"   oncommand="ChangeCategory(this.id)"/>
       <radio id="AccentLower" label="&accentLower.label;"   oncommand="ChangeCategory(this.id)"/>

@@ -8,10 +8,9 @@
  * mail.accountmanager.accounts list, and removing duplicate accounts with
  * the same server.
  */
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
-function run_test()
-{
+function run_test() {
   // Create account prefs with both kinds of duplication.
 
   Services.prefs.setCharPref("mail.account.account1.identities", "id1");
@@ -63,8 +62,7 @@ function run_test()
   // Just make sure this doesn't throw an exception, because we did remove the
   // default account.
   let defaultAccount = MailServices.accounts.defaultAccount;
-  // GetDefaultAccount should have thrown an exception for null account.
-  Assert.notEqual(defaultAccount, null);
+  Assert.equal(defaultAccount, null);
 
   // Remove an account, and verify that the account list pref looks OK:
   let server = MailServices.accounts.getIncomingServer("server4");
@@ -72,7 +70,7 @@ function run_test()
   // We need to get the root folder to read from the folder cache
   // before it gets removed or else we'll assert, because we're
   // not completely initialized...
-  let flags = server.rootFolder.flags;
+  server.rootFolder.flags;
 
   MailServices.accounts.removeAccount(MailServices.accounts.FindAccountForServer(server));
   Assert.equal(MailServices.accounts.accounts.length, 2);

@@ -23,10 +23,9 @@
 #include "prlog.h"
 #include "msgCore.h"
 #include "mozilla/dom/DOMParser.h"
-#include "nsIDocument.h"
+#include "mozilla/dom/Document.h"
 #include "nsIDocumentEncoder.h"
 #include "mozilla/ErrorResult.h"
-#include "nsIPrefBranch.h"
 #include "mimethtm.h"
 
 #define MIME_SUPERCLASS mimeInlineTextHTMLClass
@@ -92,14 +91,14 @@ MimeInlineTextHTMLParsed_parse_eof(MimeObject *obj, bool abort_p)
   mozilla::ErrorResult rv2;
   RefPtr<mozilla::dom::DOMParser> parser =
     mozilla::dom::DOMParser::CreateWithoutGlobal(rv2);
-  nsCOMPtr<nsIDocument> document = parser->ParseFromString(
+  nsCOMPtr<mozilla::dom::Document> document = parser->ParseFromString(
     rawHTML, mozilla::dom::SupportedType::Text_html, rv2);
   if (rv2.Failed())
     return -1;
 
   // Serialize it back to HTML source again.
-  nsCOMPtr<nsIDocumentEncoder> encoder = do_CreateInstance(
-    "@mozilla.org/layout/documentEncoder;1?type=text/html");
+  nsCOMPtr<nsIDocumentEncoder> encoder = do_createDocumentEncoder("text/html");
+  NS_ENSURE_TRUE(encoder, -1);
   uint32_t aFlags = nsIDocumentEncoder::OutputRaw |
                     nsIDocumentEncoder::OutputDisallowLineBreaking;
   rv = encoder->Init(document, NS_LITERAL_STRING("text/html"), aFlags);

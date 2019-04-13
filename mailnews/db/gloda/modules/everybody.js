@@ -4,42 +4,17 @@
 
 this.EXPORTED_SYMBOLS = [];
 
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+const {Log4Moz} = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 var LOG = Log4Moz.repository.getLogger("gloda.everybody");
 
-var importNS = {};
+const {GlodaFundAttr} = ChromeUtils.import("resource:///modules/gloda/fundattr.js");
+GlodaFundAttr.init();
+const {GlodaExplicitAttr} = ChromeUtils.import("resource:///modules/gloda/explattr.js");
+GlodaExplicitAttr.init();
 
-function loadModule(aModuleURI, aNSContrib) {
-  try {
-    LOG.info("... loading " + aModuleURI);
-    ChromeUtils.import(aModuleURI, importNS);
-  }
-  catch (ex) {
-    LOG.error("!!! error loading " + aModuleURI);
-    LOG.error("(" + ex.fileName + ":" + ex.lineNumber + ") " + ex);
-    return false;
-  }
-  LOG.info("+++ loaded " + aModuleURI);
-
-  if (aNSContrib) {
-    try {
-      importNS[aNSContrib].init();
-    }
-    catch (ex) {
-      LOG.error("!!! error initializing " + aModuleURI);
-      LOG.error("(" + ex.fileName + ":" + ex.lineNumber + ") " + ex);
-      return false;
-    }
-    LOG.info("+++ inited " + aModuleURI);
-  }
-  return true;
-}
-
-loadModule("resource:///modules/gloda/fundattr.js", "GlodaFundAttr");
-loadModule("resource:///modules/gloda/explattr.js", "GlodaExplicitAttr");
-
-loadModule("resource:///modules/gloda/noun_tag.js");
-loadModule("resource:///modules/gloda/noun_freetag.js");
-loadModule("resource:///modules/gloda/noun_mimetype.js");
-loadModule("resource:///modules/gloda/index_msg.js");
-loadModule("resource:///modules/gloda/index_ab.js", "GlodaABAttrs");
+ChromeUtils.import("resource:///modules/gloda/noun_tag.js");
+ChromeUtils.import("resource:///modules/gloda/noun_freetag.js");
+ChromeUtils.import("resource:///modules/gloda/noun_mimetype.js");
+ChromeUtils.import("resource:///modules/gloda/index_msg.js");
+const {GlodaABAttrs} = ChromeUtils.import("resource:///modules/gloda/index_ab.js");
+GlodaABAttrs.init();

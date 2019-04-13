@@ -18,8 +18,6 @@
 #include "nsIMsgWindow.h"
 #include "nsINetUtil.h"
 
-#include "nsIRDFService.h"
-#include "nsRDFCID.h"
 #include "nsMailDirServiceDefs.h"
 #include "prprf.h"
 #include "nsMsgUtils.h"
@@ -37,7 +35,6 @@
 #define PREF_MAIL_ROOT_POP3_REL "mail.root.pop3-rel"
 
 static NS_DEFINE_CID(kPop3UrlCID, NS_POP3URL_CID);
-static NS_DEFINE_CID(kRDFServiceCID, NS_RDFSERVICE_CID);
 
 nsPop3Service::nsPop3Service()
 {
@@ -304,8 +301,7 @@ NS_IMETHODIMP nsPop3Service::GetDefaultDoBiff(bool *aDoBiff)
 NS_IMETHODIMP nsPop3Service::GetProtocolFlags(uint32_t *result)
 {
     NS_ENSURE_ARG_POINTER(result);
-    *result = URI_NORELATIVE | URI_DANGEROUS_TO_LOAD | ALLOWS_PROXY |
-              URI_FORBIDS_COOKIE_ACCESS;
+    *result = URI_NORELATIVE | URI_DANGEROUS_TO_LOAD | ALLOWS_PROXY;
     return NS_OK;
 }
 
@@ -317,7 +313,6 @@ NS_IMETHODIMP nsPop3Service::NewURI(const nsACString &aSpec,
     NS_ENSURE_ARG_POINTER(_retval);
 
     nsAutoCString folderUri(aSpec);
-    nsCOMPtr<nsIRDFResource> resource;
     int32_t offset = folderUri.FindChar('?');
     if (offset != kNotFound)
       folderUri.SetLength(offset);
@@ -327,13 +322,8 @@ NS_IMETHODIMP nsPop3Service::NewURI(const nsACString &aSpec,
 
     nsresult rv;
 
-    nsCOMPtr<nsIRDFService> rdfService(do_GetService(kRDFServiceCID, &rv));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    rv = rdfService->GetResource(folderUri, getter_AddRefs(resource));
-    NS_ENSURE_SUCCESS(rv, rv);
-
-    nsCOMPtr<nsIMsgFolder> folder = do_QueryInterface(resource, &rv);
+    nsCOMPtr<nsIMsgFolder> folder;
+    rv = GetOrCreateFolder(folderUri, getter_AddRefs(folder));
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsIMsgIncomingServer> server;
@@ -473,14 +463,9 @@ void nsPop3Service::AlertServerBusy(nsIMsgMailNewsUrl *url)
     dialog->Alert(dialogTitle.get(), alertString.get());
 }
 
-NS_IMETHODIMP nsPop3Service::NewChannel(nsIURI *aURI, nsIChannel **_retval)
-{
-  return NewChannel2(aURI, nullptr, _retval);
-}
-
-NS_IMETHODIMP nsPop3Service::NewChannel2(nsIURI *aURI,
-                                         nsILoadInfo *aLoadInfo,
-                                         nsIChannel **_retval)
+NS_IMETHODIMP nsPop3Service::NewChannel(nsIURI *aURI,
+                                        nsILoadInfo *aLoadInfo,
+                                        nsIChannel **_retval)
 {
   NS_ENSURE_ARG_POINTER(aURI);
   nsresult rv;
@@ -518,7 +503,8 @@ NS_IMETHODIMP nsPop3Service::NewChannel2(nsIURI *aURI,
 
   protocol->SetUsername(realUserName.get());
 
-  return CallQueryInterface(protocol, _retval);
+  protocol.forget(_retval);
+  return NS_OK;
 }
 
 

@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #ifndef MSG_MAPI_MAIN_H_
-#define NSG_MAPI_MAIN_H_
+#define MSG_MAPI_MAIN_H_
 
 #define        MAX_NAME_LEN    256
 #define        MAX_PW_LEN      256
@@ -31,7 +31,7 @@ private :
   PRLock *m_Lock;
   uint32_t  m_nMaxSessions;
 
-  nsDataHashtable<nsStringHashKey, uint32_t> m_ProfileMap;
+  nsDataHashtable<nsCStringHashKey, uint32_t> m_ProfileMap;
   nsClassHashtable<nsUint32HashKey, nsMAPISession> m_SessionMap;
   nsMAPIConfiguration();
   ~nsMAPIConfiguration();
@@ -39,8 +39,8 @@ private :
 public :
   static nsMAPIConfiguration *GetMAPIConfiguration();
   void OpenConfiguration();
-  int16_t RegisterSession(uint32_t aHwnd, const char16_t *aUserName, \
-                          const char16_t *aPassword, bool aForceDownLoad, \
+  int16_t RegisterSession(uint32_t aHwnd, const nsCString& aUserName,
+                          const nsCString& aPassword, bool aForceDownLoad,
                           bool aNewSession, uint32_t *aSession, const char *aIdKey);
   bool IsSessionValid(uint32_t aSessionID);
   bool UnRegisterSession(uint32_t aSessionID);
@@ -58,24 +58,19 @@ class nsMAPISession
   friend class nsMAPIConfiguration;
 
   private :
-    bool     m_bIsForcedDownLoad;
-    bool     m_bApp_or_Service;
-    uint32_t m_hAppHandle;
     uint32_t m_nShared;
     nsCString m_pIdKey;
-    nsString m_pProfileName;
-    nsString m_pPassword;
-    int32_t m_messageIndex;
+    nsCString m_pProfileName;
+    nsCString m_pPassword;
     void   *m_listContext; // used by findNext
 
   public :
-    nsMAPISession(uint32_t aHwnd, const char16_t *aUserName, \
-                  const char16_t *aPassword, \
+    nsMAPISession(uint32_t aHwnd, const nsCString& aUserName, const nsCString& aPassword,
                   bool aForceDownLoad, const char *aKey);
     uint32_t IncrementSession();
     uint32_t DecrementSession();
     uint32_t GetSessionCount();
-    char16_t *nsMAPISession::GetPassword();
+    char16_t *GetPassword();
     void GetIdKey(nsCString& aKey);
     ~nsMAPISession();
     // For enumerating Messages...

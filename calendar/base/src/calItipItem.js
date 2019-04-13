@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Constructor of calItipItem object
@@ -44,7 +44,7 @@ calItipItem.prototype = {
     mResponseMethod: "REPLY",
     get responseMethod() {
         if (!this.mIsInitialized) {
-            throw Components.results.NS_ERROR_NOT_INITIALIZED;
+            throw Cr.NS_ERROR_NOT_INITIALIZED;
         }
         return this.mResponseMethod;
     },
@@ -87,8 +87,7 @@ calItipItem.prototype = {
     mItemList: {},
 
     init: function(aIcalString) {
-        let parser = Components.classes["@mozilla.org/calendar/ics-parser;1"]
-                               .createInstance(Components.interfaces.calIIcsParser);
+        let parser = Cc["@mozilla.org/calendar/ics-parser;1"].createInstance(Ci.calIIcsParser);
         parser.parseString(aIcalString, null);
 
         // - User specific alarms as well as X-MOZ- properties are irrelevant w.r.t. iTIP messages,
@@ -104,12 +103,9 @@ calItipItem.prototype = {
             item.alarmLastAck = null;
             item.deleteProperty("RECEIVED-SEQUENCE");
             item.deleteProperty("RECEIVED-DTSTAMP");
-            let propEnum = item.propertyEnumerator;
-            while (propEnum.hasMoreElements()) {
-                let prop = propEnum.getNext().QueryInterface(Components.interfaces.nsIProperty);
-                let pname = prop.name;
-                if (pname != "X-MOZ-FAKED-MASTER" && pname.substr(0, "X-MOZ-".length) == "X-MOZ-") {
-                    item.deleteProperty(prop.name);
+            for (let [name] of item.properties) {
+                if (name != "X-MOZ-FAKED-MASTER" && name.substr(0, "X-MOZ-".length) == "X-MOZ-") {
+                    item.deleteProperty(name);
                 }
             }
             // never publish an organizer's RECEIVED params:
@@ -187,7 +183,7 @@ calItipItem.prototype = {
      */
     getItemList: function(itemCountRef) {
         if (!this.mIsInitialized) {
-            throw Components.results.NS_ERROR_NOT_INITIALIZED;
+            throw Cr.NS_ERROR_NOT_INITIALIZED;
         }
         itemCountRef.value = this.mItemList.length;
         return this.mItemList;

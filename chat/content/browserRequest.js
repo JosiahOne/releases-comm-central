@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/imServices.jsm");
+var {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
 
 var wpl = Ci.nsIWebProgressListener;
 
@@ -28,10 +28,10 @@ var reporterListener = {
   QueryInterface: ChromeUtils.generateQI(["nsIWebProgressListener",
                                           "nsISupportsWeakReference"]),
 
-  onStateChange: function(/*in nsIWebProgress*/ aWebProgress,
-                     /*in nsIRequest*/ aRequest,
-                     /*in unsigned long*/ aStateFlags,
-                     /*in nsresult*/ aStatus) {
+  onStateChange(/* in nsIWebProgress */ aWebProgress,
+                /* in nsIRequest */ aRequest,
+                /* in unsigned long */ aStateFlags,
+                /* in nsresult */ aStatus) {
     if (aStateFlags & wpl.STATE_START &&
         aStateFlags & wpl.STATE_IS_NETWORK) {
       this.statusMeter.value = 0;
@@ -45,49 +45,42 @@ var reporterListener = {
     }
   },
 
-  onProgressChange: function(/*in nsIWebProgress*/ aWebProgress,
-                        /*in nsIRequest*/ aRequest,
-                        /*in long*/ aCurSelfProgress,
-                        /*in long */aMaxSelfProgress,
-                        /*in long */aCurTotalProgress,
-                        /*in long */aMaxTotalProgress) {
+  onProgressChange(/* in nsIWebProgress */ aWebProgress,
+                   /* in nsIRequest */ aRequest,
+                   /* in long */ aCurSelfProgress,
+                   /* in long */ aMaxSelfProgress,
+                   /* in long */ aCurTotalProgress,
+                   /* in long */ aMaxTotalProgress) {
     if (aMaxTotalProgress > 0) {
       let percentage = (aCurTotalProgress * 100) / aMaxTotalProgress;
       this.statusMeter.value = percentage;
     }
   },
 
-  onLocationChange: function(/*in nsIWebProgress*/ aWebProgress,
-                        /*in nsIRequest*/ aRequest,
-                        /*in nsIURI*/ aLocation) {
-    this.securityDisplay.setAttribute('label', aLocation.host);
+  onLocationChange(/* in nsIWebProgress */ aWebProgress,
+                   /* in nsIRequest */ aRequest,
+                   /* in nsIURI */ aLocation) {
+    this.securityDisplay.setAttribute("label", aLocation.host);
   },
 
-  onStatusChange: function(/*in nsIWebProgress*/ aWebProgress,
-                      /*in nsIRequest*/ aRequest,
-                      /*in nsresult*/ aStatus,
-                      /*in wstring*/ aMessage) {
+  onStatusChange(/* in nsIWebProgress */ aWebProgress,
+                 /* in nsIRequest */ aRequest,
+                 /* in nsresult */ aStatus,
+                 /* in wstring */ aMessage) {
   },
 
-  onSecurityChange: function(/*in nsIWebProgress*/ aWebProgress,
-                        /*in nsIRequest*/ aRequest,
-                        /*in unsigned long*/ aState) {
+  onSecurityChange(/* in nsIWebProgress */ aWebProgress,
+                   /* in nsIRequest */ aRequest,
+                   /* in unsigned long */ aState) {
     const wpl_security_bits = wpl.STATE_IS_SECURE |
                               wpl.STATE_IS_BROKEN |
-                              wpl.STATE_IS_INSECURE |
-                              wpl.STATE_SECURE_HIGH |
-                              wpl.STATE_SECURE_MED |
-                              wpl.STATE_SECURE_LOW;
+                              wpl.STATE_IS_INSECURE;
     let browser = document.getElementById("requestFrame");
     let level;
 
     switch (aState & wpl_security_bits) {
-      case wpl.STATE_IS_SECURE | wpl.STATE_SECURE_HIGH:
+      case wpl.STATE_IS_SECURE:
         level = "high";
-        break;
-      case wpl.STATE_IS_SECURE | wpl.STATE_SECURE_MED:
-      case wpl.STATE_IS_SECURE | wpl.STATE_SECURE_LOW:
-        level = "low";
         break;
       case wpl.STATE_IS_BROKEN:
         level = "broken";
@@ -103,8 +96,13 @@ var reporterListener = {
     }
     this.securityButton.setAttribute("tooltiptext",
                                      browser.securityUI.tooltipText);
-  }
-}
+  },
+
+  onContentBlockingEvent(/* in nsIWebProgress */ aWebProgress,
+                         /* in nsIRequest */ aRequest,
+                         /* in unsigned long */ aEvent) {
+  },
+};
 
 function cancelRequest()
 {

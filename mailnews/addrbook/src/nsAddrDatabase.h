@@ -14,7 +14,7 @@
 #include "nsIAddrDBListener.h"
 #include "nsCOMPtr.h"
 #include "nsTObserverArray.h"
-#include "nsWeakPtr.h"
+#include "nsIWeakReferenceUtils.h"
 
 typedef enum
 {
@@ -66,6 +66,9 @@ public:
   NS_IMETHOD GetNewListRow(nsIMdbRow * *newRow) override;
   NS_IMETHOD AddCardRowToDB(nsIMdbRow *newRow) override;
   NS_IMETHOD AddLdifListMember(nsIMdbRow* row, const char * value) override;
+
+  NS_IMETHOD AddUID(nsIMdbRow * row, const char * value) override
+  { return AddCharStringColumn(row, m_UIDColumnToken, value); }
 
   NS_IMETHOD AddFirstName(nsIMdbRow * row, const char * value) override
   { return AddCharStringColumn(row, m_FirstNameColumnToken, value); }
@@ -245,7 +248,7 @@ public:
 
   nsAddrDatabase();
 
-  void GetMDBFactory(nsIMdbFactory ** aMdbFactory);
+  nsresult GetMDBFactory(nsIMdbFactory ** aMdbFactory);
   nsIMdbEnv    *GetEnv() {return m_mdbEnv;}
   uint32_t    GetCurVersion();
   nsIMdbTableRowCursor *GetTableRowCursor();
@@ -343,6 +346,7 @@ protected:
   mdb_scope      m_ListRowScopeToken;
   mdb_scope      m_DataRowScopeToken;
 
+  mdb_token      m_UIDColumnToken;
   mdb_token      m_FirstNameColumnToken;
   mdb_token      m_LastNameColumnToken;
   mdb_token      m_PhoneticFirstNameColumnToken;

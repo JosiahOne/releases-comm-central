@@ -4,15 +4,15 @@
 
 /* exported openLocalCalendar */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * Shows the filepicker and creates a new calendar with a local file using the ICS
  * provider.
  */
 function openLocalCalendar() {
-    const nsIFilePicker = Components.interfaces.nsIFilePicker;
-    let picker = Components.classes["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
+    const nsIFilePicker = Ci.nsIFilePicker;
+    let picker = Cc["@mozilla.org/filepicker;1"].createInstance(nsIFilePicker);
     picker.init(window, cal.l10n.getCalString("Open"), nsIFilePicker.modeOpen);
     let wildmat = "*.ics";
     let description = cal.l10n.getCalString("filterIcs", [wildmat]);
@@ -25,10 +25,10 @@ function openLocalCalendar() {
         }
         let calMgr = cal.getCalendarManager();
         let calendars = calMgr.getCalendars({});
-        if (calendars.some(x => x.uri == picker.fileURL)) {
+        let calendar = calendars.find(x => x.uri == picker.fileURL);
+        if (calendar) {
             // The calendar already exists, select it and return.
-            document.getElementById("calendar-list-tree-widget")
-                    .tree.view.selection.select(index);
+            document.getElementById("calendar-list-tree-widget").selectCalendarById(calendar.id);
             return;
         }
 

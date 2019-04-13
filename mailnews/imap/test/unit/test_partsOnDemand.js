@@ -6,15 +6,12 @@
  * Tests that you can stream a message without the attachments. Tests the
  * MsgHdrToMimeMessage API that exposes this.
  */
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 Services.prefs.setIntPref("mail.imap.mime_parts_on_demand_threshold", 1000);
 
 load("../../../resources/logHelper.js");
 load("../../../resources/asyncTestUtils.js");
 load("../../../resources/messageGenerator.js");
-
-// Register the mime types provider we need for this test.
-mailTestUtils.registerUMimTypProvider();
 
 // javascript mime emitter functions
 var mimeMsg = {};

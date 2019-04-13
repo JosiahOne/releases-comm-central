@@ -21,13 +21,13 @@
 #include "nsMsgUtils.h"
 #include "nsNativeCharsetUtils.h"
 #include "nsNetUtil.h"
-#include "nsIDocShellLoadInfo.h"
 #include "nsIWebNavigation.h"
 #include "prprf.h"
 #include "nsIMsgHdr.h"
 #include "nsIFileURL.h"
 #include "mozilla/RefPtr.h"
-#include "nsIRDFService.h"
+#include "nsDocShellLoadState.h"
+#include "nsContentUtils.h"
 
 nsMailboxService::nsMailboxService()
 {
@@ -232,16 +232,18 @@ nsresult nsMailboxService::FetchMessage(const char* aMessageURI,
   // if we were given a docShell, run the url in the docshell..otherwise just run it normally.
   if (NS_SUCCEEDED(rv) && docShell)
   {
-    nsCOMPtr<nsIDocShellLoadInfo> loadInfo;
     // DIRTY LITTLE HACK --> if we are opening an attachment we want the docshell to
     // treat this load as if it were a user click event. Then the dispatching stuff will be much
     // happier.
+    RefPtr<nsDocShellLoadState> loadState = new nsDocShellLoadState(url);
+    loadState->SetLoadFlags(mailboxAction == nsIMailboxUrl::ActionFetchPart
+                              ? nsIWebNavigation::LOAD_FLAGS_IS_LINK
+                              : nsIWebNavigation::LOAD_FLAGS_NONE);
     if (mailboxAction == nsIMailboxUrl::ActionFetchPart)
-    {
-      docShell->CreateLoadInfo(getter_AddRefs(loadInfo));
-      loadInfo->SetLoadType(nsIDocShellLoadInfo::loadLink);
-    }
-    rv = docShell->LoadURI(url, loadInfo, nsIWebNavigation::LOAD_FLAGS_NONE, false);
+      loadState->SetLoadType(LOAD_LINK);
+    loadState->SetFirstParty(false);
+    loadState->SetTriggeringPrincipal(nsContentUtils::GetSystemPrincipal());
+    rv = docShell->LoadURI(loadState);
   }
   else
     rv = RunMailboxUrl(url, aDisplayConsumer);
@@ -354,21 +356,23 @@ NS_IMETHODIMP nsMailboxService::OpenAttachment(const char *aContentType,
   urlString += aContentType;
   urlString += "&filename=";
   urlString += aFileName;
-  CreateStartupUrl(urlString.get(), getter_AddRefs(URL));
-  nsresult rv;
+  nsresult rv = NS_NewURI(getter_AddRefs(URL), urlString);
+  NS_ENSURE_SUCCESS(rv, rv);
 
   // try to run the url in the docshell...
   nsCOMPtr<nsIDocShell> docShell(do_QueryInterface(aDisplayConsumer, &rv));
   // if we were given a docShell, run the url in the docshell..otherwise just run it normally.
   if (NS_SUCCEEDED(rv) && docShell)
   {
-    nsCOMPtr<nsIDocShellLoadInfo> loadInfo;
     // DIRTY LITTLE HACK --> since we are opening an attachment we want the docshell to
     // treat this load as if it were a user click event. Then the dispatching stuff will be much
     // happier.
-    docShell->CreateLoadInfo(getter_AddRefs(loadInfo));
-    loadInfo->SetLoadType(nsIDocShellLoadInfo::loadLink);
-    return docShell->LoadURI(URL, loadInfo, nsIWebNavigation::LOAD_FLAGS_NONE, false);
+    RefPtr<nsDocShellLoadState> loadState = new nsDocShellLoadState(URL);
+    loadState->SetLoadFlags(nsIWebNavigation::LOAD_FLAGS_IS_LINK);
+    loadState->SetLoadType(LOAD_LINK);
+    loadState->SetFirstParty(false);
+    loadState->SetTriggeringPrincipal(nsContentUtils::GetSystemPrincipal());
+    return docShell->LoadURI(loadState);
   }
   return RunMailboxUrl(URL, aDisplayConsumer);
 
@@ -533,8 +537,8 @@ NS_IMETHODIMP nsMailboxService::AllowPort(int32_t port, const char *scheme, bool
 NS_IMETHODIMP nsMailboxService::GetProtocolFlags(uint32_t *result)
 {
   NS_ENSURE_ARG_POINTER(result);
-  *result = URI_STD | URI_FORBIDS_AUTOMATIC_DOCUMENT_REPLACEMENT |
-            URI_DANGEROUS_TO_LOAD | URI_FORBIDS_COOKIE_ACCESS
+  *result = URI_NORELATIVE | URI_FORBIDS_AUTOMATIC_DOCUMENT_REPLACEMENT |
+            URI_DANGEROUS_TO_LOAD
 #ifdef IS_ORIGIN_IS_FULL_SPEC_DEFINED
             | ORIGIN_IS_FULL_SPEC
 #endif
@@ -552,34 +556,28 @@ NS_IMETHODIMP nsMailboxService::NewURI(const nsACString &aSpec,
   nsresult rv;
   nsCOMPtr<nsIMsgMailNewsUrl> aMsgUri = do_CreateInstance(NS_MAILBOXURL_CONTRACTID, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
-  // SetSpec calls below may fail if the mailbox url is of the form
-  // mailbox://<account>/<mailbox name>?... instead of
-  // mailbox://<path to folder>?.... This is the case for pop3 download urls.
-  // We know this, and the failure is harmless.
+  // SetSpecInternal must not fail, or else the URL won't have a base URL and we'll crash later.
   if (aBaseURI)
   {
     nsAutoCString newSpec;
     rv = aBaseURI->Resolve(aSpec, newSpec);
     NS_ENSURE_SUCCESS(rv, rv);
-    (void)aMsgUri->SetSpecInternal(newSpec);
+    rv = aMsgUri->SetSpecInternal(newSpec);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
   else
   {
-    (void)aMsgUri->SetSpecInternal(aSpec);
+    rv = aMsgUri->SetSpecInternal(aSpec);
+    NS_ENSURE_SUCCESS(rv, rv);
   }
   aMsgUri.forget(_retval);
 
   return rv;
 }
 
-NS_IMETHODIMP nsMailboxService::NewChannel(nsIURI *aURI, nsIChannel **_retval)
-{
-  return NewChannel2(aURI, nullptr, _retval);
-}
-
-NS_IMETHODIMP nsMailboxService::NewChannel2(nsIURI *aURI,
-                                            nsILoadInfo *aLoadInfo,
-                                            nsIChannel **_retval)
+NS_IMETHODIMP nsMailboxService::NewChannel(nsIURI *aURI,
+                                           nsILoadInfo *aLoadInfo,
+                                           nsIChannel **_retval)
 {
   NS_ENSURE_ARG_POINTER(aURI);
   NS_ENSURE_ARG_POINTER(_retval);
@@ -598,7 +596,7 @@ NS_IMETHODIMP nsMailboxService::NewChannel2(nsIURI *aURI,
 
       rv = handler->NewURI(spec, "" /* ignored */, aURI, getter_AddRefs(pop3Uri));
       NS_ENSURE_SUCCESS(rv, rv);
-      return handler->NewChannel2(pop3Uri, aLoadInfo, _retval);
+      return handler->NewChannel(pop3Uri, aLoadInfo, _retval);
     }
   }
 
@@ -613,7 +611,8 @@ NS_IMETHODIMP nsMailboxService::NewChannel2(nsIURI *aURI,
   rv = protocol->SetLoadInfo(aLoadInfo);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  return CallQueryInterface(protocol, _retval);
+  protocol.forget(_retval);
+  return NS_OK;
 }
 
 nsresult nsMailboxService::DisplayMessageForPrinting(const char* aMessageURI,
@@ -646,17 +645,7 @@ nsMailboxService::DecomposeMailboxURI(const char * aMessageURI, nsIMsgFolder ** 
   rv = nsParseLocalMessageURI(aMessageURI, folderURI, aMsgKey);
   NS_ENSURE_SUCCESS(rv,rv);
 
-  nsCOMPtr <nsIRDFService> rdf = do_GetService("@mozilla.org/rdf/rdf-service;1",&rv);
-  NS_ENSURE_SUCCESS(rv,rv);
-
-  nsCOMPtr<nsIRDFResource> res;
-  rv = rdf->GetResource(folderURI, getter_AddRefs(res));
-  NS_ENSURE_SUCCESS(rv,rv);
-
-  rv = res->QueryInterface(NS_GET_IID(nsIMsgFolder), (void **) aFolder);
-  NS_ENSURE_SUCCESS(rv,rv);
-
-  return NS_OK;
+  return GetOrCreateFolder(folderURI, aFolder);
 }
 
 NS_IMETHODIMP

@@ -2,64 +2,52 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+var MODULE_NAME = "testUTF8";
 var RELATIVE_ROOT = "../shared-modules";
-var MODULE_REQUIRES = ["calendar-utils"];
+var MODULE_REQUIRES = ["calendar-utils", "item-editing-helpers"];
 
-var helpersForController, invokeEventDialog, createCalendar;
-var deleteCalendars, switchToView;
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+
 var EVENT_BOX, CANVAS_BOX;
-
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+var helpersForController, invokeEventDialog, closeAllEventDialogs, createCalendar, deleteCalendars;
+var setData;
 
 var UTF8STRING = " 💣 💥  ☣  ";
 
 function setupModule(module) {
     controller = mozmill.getMail3PaneController();
     ({
+        EVENT_BOX,
+        CANVAS_BOX,
         helpersForController,
         invokeEventDialog,
+        closeAllEventDialogs,
         createCalendar,
-        deleteCalendars,
-        switchToView,
-        EVENT_BOX,
-        CANVAS_BOX
+        deleteCalendars
     } = collector.getModule("calendar-utils"));
-    collector.getModule("calendar-utils").setupModule();
+    collector.getModule("calendar-utils").setupModule(controller);
     Object.assign(module, helpersForController(controller));
 
+    ({ setData } = collector.getModule("item-editing-helpers"));
+    collector.getModule("item-editing-helpers").setupModule(module);
+
     createCalendar(controller, UTF8STRING);
-    Preferences.set("calendar.categories.names", UTF8STRING);
+    Services.prefs.setStringPref("calendar.categories.names", UTF8STRING);
 }
 
 function testUTF8() {
-    let eventDialog = '/id("calendar-event-dialog-inner")/id("event-grid")/id("event-grid-rows")';
-
-    controller.click(eid("calendar-tab-button"));
-    switchToView(controller, "day");
-
-    // create new event
+    // Create new event.
     let eventBox = lookupEventBox("day", CANVAS_BOX, null, 1, 8);
     invokeEventDialog(controller, eventBox, (event, iframe) => {
-        let { lookup: eventlookup, eid: eventid } = helpersForController(event);
+        let { eid: eventid } = helpersForController(event);
 
-        // fill in name, location, description
-        let titleTextBox = eventlookup(`
-            ${eventDialog}/id("event-grid-title-row")/id("item-title")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `);
-        event.waitForElement(titleTextBox);
-        event.type(titleTextBox, UTF8STRING);
-        event.type(eventlookup(`
-            ${eventDialog}/id("event-grid-location-row")/id("item-location")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `), UTF8STRING);
-        event.type(eventlookup(`
-            ${eventDialog}/id("event-grid-description-row")/id("item-description")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `), UTF8STRING);
-
-        // select category
-        event.select(eventid("item-categories"), null, UTF8STRING);
+        // Fill in name, location, description.
+        setData(event, iframe, {
+            title: UTF8STRING,
+            location: UTF8STRING,
+            description: UTF8STRING,
+            categories: [UTF8STRING]
+        });
 
         // save
         event.click(eventid("button-saveandclose"));
@@ -67,33 +55,26 @@ function testUTF8() {
 
     // open
     let eventPath = `/{"tooltip":"itemTooltip","calendar":"${UTF8STRING.toLowerCase()}"}`;
-    eventBox = lookupEventBox("day", EVENT_BOX, null, 1, 8, eventPath);
+    eventBox = lookupEventBox("day", EVENT_BOX, null, 1, null, eventPath);
     invokeEventDialog(controller, eventBox, (event, iframe) => {
-        let { lookup: eventlookup, eid: eventid } = helpersForController(event);
+        let { eid: iframeId } = helpersForController(iframe);
 
-        // check values
-        titleTextBox = eventlookup(`
-            ${eventDialog}/id("event-grid-title-row")/id("item-title")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `);
-        event.waitForElement(titleTextBox);
-        event.assertValue(titleTextBox, UTF8STRING);
-        event.assertValue(eventlookup(`
-            ${eventDialog}/id("event-grid-location-row")/id("item-location")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `), UTF8STRING);
-        event.assertValue(eventlookup(`
-            ${eventDialog}/id("event-grid-description-row")/id("item-description")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `), UTF8STRING);
-        event.assertValue(eventid("item-categories"), UTF8STRING);
+        // Check values.
+        event.assertValue(iframeId("item-title"), UTF8STRING);
+        event.assertValue(iframeId("item-location"), UTF8STRING);
+        event.assertValue(iframeId("item-description"), UTF8STRING);
+        event.assert(() => iframeId("item-categories").getNode().querySelector(`
+            menuitem[label="${UTF8STRING}"][checked]
+        `));
 
-        // escape the event window
+        // Escape the event window.
         event.keypress(null, "VK_ESCAPE", {});
     });
 }
+testUTF8.EXCLUDED_PLATFORMS = ["darwin"];
 
 function teardownTest(module) {
     deleteCalendars(controller, UTF8STRING);
-    Preferences.reset("calendar.categories.names");
+    Services.prefs.clearUserPref("calendar.categories.names");
+    closeAllEventDialogs();
 }

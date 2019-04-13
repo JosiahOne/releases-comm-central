@@ -6,8 +6,8 @@
 
 "use strict";
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gImportType = null;
 var gImportMsgsBundle;
@@ -127,7 +127,7 @@ async function ImportDialogOKButton()
   var deck = document.getElementById("stateDeck");
   var header = document.getElementById("header");
   var progressMeterEl = document.getElementById("progressMeter");
-  progressMeterEl.mode = "determined";
+  progressMeterEl.value = 0;
   var progressStatusEl = document.getElementById("progressStatus");
   var progressTitleEl = document.getElementById("progressTitle");
 
@@ -213,7 +213,7 @@ async function ImportDialogOKButton()
 
             progressStatusEl.setAttribute("label", "");
             progressTitleEl.setAttribute("label", meterText);
-            progressMeterEl.mode = "undetermined";
+            progressMeterEl.removeAttribute("value");
 
             deck.selectedIndex = 2;
             return true;
@@ -402,8 +402,10 @@ function AddModuleToList(moduleName, index)
 {
   var body = document.getElementById("moduleList");
 
-  var item = document.createElement('listitem');
-  item.setAttribute('label', moduleName);
+  let item = document.createElement("richlistitem");
+  let label = document.createElement("label");
+  label.setAttribute("value", moduleName);
+  item.appendChild(label);
   item.setAttribute('list-index', index);
   body.appendChild(item);
 }
@@ -414,8 +416,10 @@ function ListFeedAccounts() {
     body.lastChild.remove();
 
   // Add item to allow for new account creation.
-  let item = document.createElement("listitem");
-  item.setAttribute("label", gFeedsBundle.getString('ImportFeedsCreateNewListItem'));
+  let item = document.createElement("richlistitem");
+  let label = document.createElement("label");
+  label.setAttribute("value", gFeedsBundle.getString("ImportFeedsCreateNewListItem"));
+  item.appendChild(label);
   item.setAttribute("list-index", 0);
   body.appendChild(item);
 
@@ -423,8 +427,10 @@ function ListFeedAccounts() {
   let feedRootFolders = FeedUtils.getAllRssServerRootFolders();
 
   feedRootFolders.forEach(function(rootFolder) {
-    item = document.createElement("listitem");
-    item.setAttribute("label", rootFolder.prettyName);
+    item = document.createElement("richlistitem");
+    let label = document.createElement("label");
+    label.setAttribute("value", rootFolder.prettyName);
+    item.appendChild(label);
     item.setAttribute("list-index", ++index);
     item.server = rootFolder.server;
     body.appendChild(item);
@@ -893,10 +899,8 @@ function ImportFilters(module, error)
 */
 async function ImportFeeds()
 {
-  // Get file to open from filepicker.
-  let openFile = await FeedSubscriptions.opmlPickOpenFile();
-  if (!openFile)
-    return false;
+  // Get file and file url to open from filepicker.
+  let [openFile, openFileUrl] = await FeedSubscriptions.opmlPickOpenFile();
 
   let acctName;
   let acctNewExist = gFeedsBundle.getString("ImportFeedsExisting");
@@ -928,6 +932,7 @@ async function ImportFeeds()
       let feedWin = subscriptionsWindow.FeedSubscriptions;
       if (aLastFolder)
         feedWin.FolderListener.folderAdded(aLastFolder);
+
       feedWin.mActionMode = null;
       feedWin.updateButtons(feedWin.mView.currentItem);
       feedWin.clearStatusInfo();
@@ -935,7 +940,7 @@ async function ImportFeeds()
     }
   }
 
-  if (!FeedSubscriptions.importOPMLFile(openFile, server, callback))
+  if (!(await FeedSubscriptions.importOPMLFile(openFile, openFileUrl, server, callback)))
     return false;
 
   let subscriptionsWindow = Services.wm.getMostRecentWindow("Mail:News-BlogSubscriptions");

@@ -6,6 +6,8 @@
  * Ensures that attachment events are fired properly
  */
 
+"use strict";
+
 var MODULE_NAME = 'test-attachment-events';
 
 var RELATIVE_ROOT = '../shared-modules';
@@ -16,11 +18,10 @@ var MODULE_REQUIRES = ['folder-display-helpers',
                        'observer-helpers',
                        'prompt-helpers'];
 
-var os = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/os.js", os);
+var os = ChromeUtils.import("chrome://mozmill/content/stdlib/os.jsm");
 
-ChromeUtils.import('resource://gre/modules/Services.jsm');
-ChromeUtils.import('resource:///modules/iteratorUtils.jsm');
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
 
 var kAttachmentsAdded = "attachments-added";
 var kAttachmentsRemoved = "attachments-removed";
@@ -54,7 +55,7 @@ function test_attachments_added_on_single() {
   cw.e("attachmentBucket").addEventListener(kAttachmentsAdded, listener);
 
   // Attach a single file
-  add_attachment(cw, "http://www.example.com/1", 0);
+  add_attachment(cw, "http://www.example.com/1", 0, false);
 
   // Make sure we only saw the event once
   assert_equals(1, eventCount);
@@ -67,7 +68,7 @@ function test_attachments_added_on_single() {
 
   // Make sure that we can get that event again if we
   // attach more files.
-  add_attachment(cw, "http://www.example.com/2", 0);
+  add_attachment(cw, "http://www.example.com/2", 0, false);
   assert_equals(2, eventCount);
   subjects = lastEvent.detail;
   assert_true(subjects instanceof Ci.nsIMutableArray);
@@ -76,7 +77,7 @@ function test_attachments_added_on_single() {
 
   // And check that we don't receive the event if we try to attach a file
   // that's already attached.
-  add_attachment(cw, "http://www.example.com/2");
+  add_attachment(cw, "http://www.example.com/2", null, false);
   assert_equals(2, eventCount);
 
   cw.e("attachmentBucket").removeEventListener(kAttachmentsAdded, listener);
@@ -105,7 +106,7 @@ function test_attachments_added_on_multiple() {
   let cw = open_compose_new_mail(mc);
   cw.e("attachmentBucket").addEventListener(kAttachmentsAdded, listener);
 
-  add_attachments(cw, attachmentUrls);
+  add_attachments(cw, attachmentUrls, null, false);
 
   // Make sure we only saw a single attachments-added for this group
   // of files.
@@ -132,7 +133,7 @@ function test_attachments_added_on_multiple() {
   cw = open_compose_new_mail(mc);
   cw.e("attachmentBucket").addEventListener(kAttachmentsAdded, listener);
 
-  add_attachments(cw, attachmentUrls);
+  add_attachments(cw, attachmentUrls, null, false);
   assert_equals(2, eventCount);
 
   // Make sure that we got the right subjects back
@@ -146,7 +147,7 @@ function test_attachments_added_on_multiple() {
 
   // Make sure we don't fire the event again if we try to attach the same
   // files.
-  add_attachments(cw, attachmentUrls);
+  add_attachments(cw, attachmentUrls, null, false);
   assert_equals(2, eventCount);
 
   cw.e("attachmentBucket").removeEventListener(kAttachmentsAdded, listener);

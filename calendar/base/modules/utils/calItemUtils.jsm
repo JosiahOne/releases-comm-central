@@ -2,14 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Deprecated.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { Deprecated } = ChromeUtils.import("resource://gre/modules/Deprecated.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
-ChromeUtils.import("resource://calendar/modules/calHashedArray.jsm");
-
-XPCOMUtils.defineLazyModuleGetter(this, "cal", "resource://calendar/modules/calUtils.jsm", "cal");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calHashedArray.jsm");
 
 /*
  * Calendar item related functions
@@ -236,7 +232,7 @@ var calitem = {
      * @returns        true if the object is a calIEvent, false otherwise
      */
     isEvent: function(aObject) {
-        return cal.wrapInstance(aObject, Components.interfaces.calIEvent) != null;
+        return cal.wrapInstance(aObject, Ci.calIEvent) != null;
     },
 
     /**
@@ -246,7 +242,7 @@ var calitem = {
      * @returns        true if the object is a calITodo, false otherwise
      */
     isToDo: function(aObject) {
-        return cal.wrapInstance(aObject, Components.interfaces.calITodo) != null;
+        return cal.wrapInstance(aObject, Ci.calITodo) != null;
     },
 
     /**
@@ -388,11 +384,11 @@ var calitem = {
     getEventDefaultTransparency: function(aIsAllDay) {
         let transp = null;
         if (aIsAllDay) {
-            transp = Preferences.get("calendar.events.defaultTransparency.allday.transparent", false)
+            transp = Services.prefs.getBoolPref("calendar.events.defaultTransparency.allday.transparent", false)
                      ? "TRANSPARENT"
                      : "OPAQUE";
         } else {
-            transp = Preferences.get("calendar.events.defaultTransparency.standard.transparent", false)
+            transp = Services.prefs.getBoolPref("calendar.events.defaultTransparency.standard.transparent", false)
                      ? "TRANSPARENT"
                      : "OPAQUE";
         }
@@ -545,14 +541,14 @@ var calitem = {
      * Shortcut function to serialize an item (including all overridden items).
      */
     serialize: function(aItem) {
-        let serializer = Components.classes["@mozilla.org/calendar/ics-serializer;1"]
-                                   .createInstance(Components.interfaces.calIIcsSerializer);
+        let serializer = Cc["@mozilla.org/calendar/ics-serializer;1"]
+                           .createInstance(Ci.calIIcsSerializer);
         serializer.addItems([aItem], 1);
         return serializer.serializeToString();
     },
 
     /**
-     * Centralized funtions for accessing prodid and version
+     * Centralized functions for accessing prodid and version
      */
     get productId() { return "-//Mozilla.org/NONSGML Mozilla Calendar V1.1//EN"; },
     get productVersion() { return "2.0"; },
@@ -567,9 +563,9 @@ var calitem = {
      */
     setStaticProps: function(aIcalComponent) {
         // Throw for an invalid parameter
-        aIcalComponent = cal.wrapInstance(aIcalComponent, Components.interfaces.calIIcalComponent);
+        aIcalComponent = cal.wrapInstance(aIcalComponent, Ci.calIIcalComponent);
         if (!aIcalComponent) {
-            throw Components.results.NS_ERROR_INVALID_ARG;
+            throw Cr.NS_ERROR_INVALID_ARG;
         }
         // Set the prodid and version
         aIcalComponent.prodid = calitem.productId;

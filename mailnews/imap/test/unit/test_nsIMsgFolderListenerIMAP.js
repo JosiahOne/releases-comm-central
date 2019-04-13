@@ -17,7 +17,7 @@
 
 load("../../../resources/msgFolderListenerSetup.js");
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 // Globals
 var gRootFolder;
@@ -41,7 +41,7 @@ var gMsgWindow = Cc["@mozilla.org/messenger/msgwindow;1"]
 
 function addFolder(parent, folderName, storeIn)
 {
-  gExpectedEvents = [[gMFNService.folderAdded, parent, folderName, storeIn]];
+  gExpectedEvents = [[MailServices.mfn.folderAdded, parent, folderName, storeIn]];
   // No copy listener notification for this
   gCurrStatus |= kStatus.onStopCopyDone;
   parent.createSubfolder(folderName, null);
@@ -66,10 +66,10 @@ function copyFileMessage(file, messageId, destFolder)
   // copyListener.mMessageId = messageId;
 
   // Instead store the message id in gExpectedEvents, so we can match that up
-  gExpectedEvents = [[gMFNService.msgAdded, {expectedMessageId: messageId}],
-                     [gMFNService.msgsClassified, [messageId], false, false]];
+  gExpectedEvents = [[MailServices.mfn.msgAdded, {expectedMessageId: messageId}],
+                     [MailServices.mfn.msgsClassified, [messageId], false, false]];
   destFolder.updateFolder(null);
-  gCopyService.CopyFileMessage(file, destFolder, null, true, 0, "", copyListener, null);
+  MailServices.copy.CopyFileMessage(file, destFolder, null, true, 0, "", copyListener, null);
   gCurrStatus |= kStatus.functionCallDone;
   gServer.performTest("APPEND");
   // Allow some time for the append operation to complete, so update folder
@@ -103,9 +103,9 @@ function addMessagesToServer(messages, mailbox, localFolder)
     // Create the imapMessage and store it on the mailbox.
     mailbox.addMessage(new imapMessage(URI.spec, mailbox.uidnext++, []));
     // We can't get the headers again, so just pass on the message id
-    gExpectedEvents.push([gMFNService.msgAdded, {expectedMessageId: message.messageId}]);
+    gExpectedEvents.push([MailServices.mfn.msgAdded, {expectedMessageId: message.messageId}]);
   });
-  gExpectedEvents.push([gMFNService.msgsClassified,
+  gExpectedEvents.push([MailServices.mfn.msgsClassified,
                         messages.map(hdr => hdr.messageId),
                         false, false]);
 
@@ -123,22 +123,22 @@ function copyMessages(messages, isMove, srcFolder, destFolder)
   {
     array.appendElement(message);
   });
-  gExpectedEvents = [[gMFNService.msgsMoveCopyCompleted, isMove, messages, destFolder, true]];
+  gExpectedEvents = [[MailServices.mfn.msgsMoveCopyCompleted, isMove, messages, destFolder, true]];
   // We'll also get the msgAdded events when we go and update the destination
   // folder
   messages.forEach(function (message)
   {
     // We can't use the headers directly, because the notifications we'll
     // receive are for message headers in the destination folder
-    gExpectedEvents.push([gMFNService.msgKeyChanged,
+    gExpectedEvents.push([MailServices.mfn.msgKeyChanged,
                           {expectedMessageId: message.messageId}]);
-    gExpectedEvents.push([gMFNService.msgAdded,
+    gExpectedEvents.push([MailServices.mfn.msgAdded,
                           {expectedMessageId: message.messageId}]);
   });
-  gExpectedEvents.push([gMFNService.msgsClassified,
+  gExpectedEvents.push([MailServices.mfn.msgsClassified,
                         messages.map(hdr => hdr.messageId),
                         false, false]);
-  gCopyService.CopyMessages(srcFolder, array, destFolder, isMove, copyListener, gMsgWindow, true);
+  MailServices.copy.CopyMessages(srcFolder, array, destFolder, isMove, copyListener, gMsgWindow, true);
   gCurrStatus |= kStatus.functionCallDone;
 
   gServer.performTest("COPY");
@@ -153,8 +153,12 @@ var gTestArray =
 [
   // Adding folders
   // Create another folder to move and copy messages around, and force initialization.
-  function testAddFolder1() { addFolder(gRootFolder, "folder2", "gIMAPFolder2") },
-  function testAddFolder2() { addFolder(gRootFolder, "folder3", "gIMAPFolder3") },
+  function testAddFolder1() {
+    addFolder(gRootFolder, "folder2", function(folder) { gIMAPFolder2 = folder; });
+   },
+  function testAddFolder2() {
+    addFolder(gRootFolder, "folder3", function(folder) { gIMAPFolder3 = folder; });
+  },
 
   // Adding messages to folders
   function testCopyFileMessage1()
@@ -162,7 +166,7 @@ var gTestArray =
     // Make sure the offline flag is not set for any of the folders
     [gIMAPInbox, gIMAPFolder2, gIMAPFolder3].forEach(function (folder)
     {
-      folder.flags &= ~Ci.nsMsgFolderFlags.Offline;
+      folder.clearFlag(Ci.nsMsgFolderFlags.Offline);
     });
     copyFileMessage(gMsgFile1, gMsgId1, gIMAPInbox)
   },
@@ -191,8 +195,6 @@ function run_test()
   // This is before any of the actual tests, so...
   gTest = 0;
 
-  // Add a listener.
-  gMFNService.addListener(gMFListener, allTestedEvents);
   gIMAPDaemon = new imapDaemon();
   gServer = makeServer(gIMAPDaemon, "");
 
@@ -208,13 +210,13 @@ function run_test()
   localAccount.addIdentity(identity);
   localAccount.defaultIdentity = identity;
   localAccount.incomingServer = localAccountUtils.incomingServer;
-  MailServices.accounts.defaultAccount = localAccount;
 
   // Let's also have another account, using the same identity
   let imapAccount = MailServices.accounts.createAccount();
   imapAccount.addIdentity(identity);
   imapAccount.defaultIdentity = identity;
   imapAccount.incomingServer = gIMAPIncomingServer;
+  MailServices.accounts.defaultAccount = imapAccount;
 
   // The server doesn't support more than one connection
   Services.prefs.setIntPref("mail.server.server1.max_cached_connections", 1);
@@ -226,14 +228,17 @@ function run_test()
   // We aren't interested in downloading messages automatically
   Services.prefs.setBoolPref("mail.server.server1.download_on_biff", false);
 
+  // Add a listener so that we can check all folder events from this point.
+  MailServices.mfn.addListener(gMFListener, allTestedEvents);
+
   // Get the server list...
   gIMAPIncomingServer.performExpand(null);
 
   // We get these notifications on initial discovery
   gRootFolder = gIMAPIncomingServer.rootFolder;
   gIMAPInbox = gRootFolder.getChildNamed("Inbox");
-  gExpectedEvents = [[gMFNService.folderAdded, gRootFolder, "Trash",
-                     "gIMAPTrashFolder"]];
+  gExpectedEvents = [[MailServices.mfn.folderAdded, gRootFolder, "Trash",
+                      function(folder) { gIMAPTrashFolder = folder; } ]];
   gCurrStatus |= kStatus.onStopCopyDone | kStatus.functionCallDone;
 
   gServer.performTest("SUBSCRIBE");
@@ -261,7 +266,7 @@ function doTest(test)
   }
   else
   {
-    gMFNService.removeListener(gMFListener);
+    MailServices.mfn.removeListener(gMFListener);
     // Cleanup, null out everything, close all cached connections and stop the
     // server
     gRootFolder = null;

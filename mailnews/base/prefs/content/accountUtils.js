@@ -3,9 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gAnyValidIdentity = false; //If there are no valid identities for any account
 // returns the first account with an invalid server or identity
@@ -204,7 +204,7 @@ function msgOpenAccountWizard(wizardCallback, type)
 function initAccountWizardTB(args) {
   let type = args[0] && args[0].acctType;
   let selType = type == "newsgroups" ? "newsaccount" :
-                type == "movemail" ? "Movemail" : null;
+                type == "movemail" ? "movemail" : null;
   let accountwizard = document.getElementById("AccountWizard");
   let acctyperadio = document.getElementById("acctyperadio");
   let feedRadio = acctyperadio.querySelector("radio[value='Feeds']");

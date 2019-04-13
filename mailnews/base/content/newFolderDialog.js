@@ -8,6 +8,8 @@ var FOLDERS = 1;
 var MESSAGES = 2;
 var dialog;
 
+document.addEventListener("dialogaccept", onOK);
+
 function onLoad()
 {
   var windowArgs = window.arguments[0];
@@ -39,8 +41,7 @@ function onLoad()
     newFolderTypeBox.setAttribute("hidden", "true");
   } else {
     // set our folder type by calling the default selected type's oncommand
-    var selectedFolderType = document.getElementById("folderGroup").selectedItem;
-    eval(selectedFolderType.getAttribute("oncommand"));
+    document.getElementById("folderGroup").selectedItem.doCommand();
   }
 
   doEnabling();
@@ -64,8 +65,6 @@ function onOK()
     dialog.okCallback(name + "/", dialog.folder);
   else
     dialog.okCallback(name, dialog.folder);
-
-  return true;
 }
 
 function onFoldersOnly()

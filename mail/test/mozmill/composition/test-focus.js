@@ -5,6 +5,9 @@
 /*
  * Test that cycling through the focus of the 3pane's panes works correctly.
  */
+
+"use strict";
+
 var MODULE_NAME = "test-focus";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -36,12 +39,6 @@ function check_element_cycling(controller, attachmentsExpanded, ctrlTab) {
   let key = ctrlTab ? "VK_TAB" : "VK_F6";
 
   // We start on the addressing widget and go from there.
-  // If we added an attachment, the attachment bucket got focused so
-  // we need to fix this first.
-  if (attachmentsExpanded) {
-    assert_equals(attachmentElement, controller.window.WhichElementHasFocus());
-    controller.window.SetMsgAddressingWidgetTreeElementFocus();
-  }
 
   controller.keypress(null, key, {ctrlKey: ctrlTab});
   assert_equals(subjectElement, controller.window.WhichElementHasFocus());

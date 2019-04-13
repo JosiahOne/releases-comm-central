@@ -6,8 +6,8 @@ const kSpace = " ".charCodeAt(0);
 const kSlash = "/".charCodeAt(0);
 const kApostrophe = "'".charCodeAt(0);
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function findTypeController(aTypeAheadFind, aWindow)
 {
@@ -159,7 +159,8 @@ typeAheadFind.prototype = {
       return true;
 
     // Don't start a find if the focus is on a form element.
-    if (ChromeUtils.getClassName(element) === "XULElement" ||
+    if ((element.nodeType == element.ELEMENT_NODE &&
+         element.namespaceURI == "http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul") ||
         ChromeUtils.getClassName(element) === "HTMLEmbedElement" ||
         ChromeUtils.getClassName(element) === "HTMLObjectElement" ||
         ChromeUtils.getClassName(element) === "HTMLSelectElement" ||
@@ -167,7 +168,7 @@ typeAheadFind.prototype = {
       return true;
 
     // Don't start a find if the focus is on an editable field
-    if (element instanceof Ci.nsIDOMHTMLInputElement &&
+    if (ChromeUtils.getClassName(element) === "HTMLInputElement" &&
         element.mozIsTextField(false))
       return true;
 

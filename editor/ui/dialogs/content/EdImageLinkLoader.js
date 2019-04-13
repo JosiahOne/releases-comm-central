@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gMsgCompProcessLink = false;
 var gMsgCompInputElement = null;
@@ -14,14 +17,12 @@ function OnLoadDialog() {
   gMsgCompAttachSourceElement = document.getElementById("AttachSourceToMail");
   var editor = GetCurrentEditor();
   if (gMsgCompAttachSourceElement && editor &&
-      (editor.flags & Ci.nsIPlaintextEditor.eEditorMailMask))
-  {
-    SetRelativeCheckbox = function() { SetAttachCheckbox();};
-    //initialize the AttachSourceToMail checkbox
+      (editor.flags & Ci.nsIPlaintextEditor.eEditorMailMask)) {
+    SetRelativeCheckbox = function() { SetAttachCheckbox(); };
+    // initialize the AttachSourceToMail checkbox
     gMsgCompAttachSourceElement.hidden = false;
 
-    switch (document.documentElement.id)
-    {
+    switch (document.documentElement.id) {
       case "imageDlg":
         gMsgCompInputElement = gDialog.srcInput;
         gMsgCompProcessLink = false;
@@ -31,10 +32,9 @@ function OnLoadDialog() {
         gMsgCompProcessLink = true;
         break;
     }
-    if (gMsgCompInputElement)
-    {
+    if (gMsgCompInputElement) {
       SetAttachCheckbox();
-      gMsgCompPrevMozDoNotSendAttribute = globalElement.getAttribute("moz-do-not-send")
+      gMsgCompPrevMozDoNotSendAttribute = globalElement.getAttribute("moz-do-not-send");
     }
   }
 }
@@ -51,35 +51,31 @@ function OnAcceptDialog() {
   }
   DoAttachSourceCheckbox();
 }
-addEventListener("dialogaccept", OnAcceptDialog, false);
+document.addEventListener("dialogaccept", OnAcceptDialog, true);
 
 function SetAttachCheckbox() {
   var resetCheckbox = false;
   var mozDoNotSend = globalElement.getAttribute("moz-do-not-send");
 
-  //In case somebody played with the advanced property and changed the moz-do-not-send attribute
-  if (mozDoNotSend != gMsgCompPrevMozDoNotSendAttribute)
-  {
+  // In case somebody played with the advanced property and changed the moz-do-not-send attribute
+  if (mozDoNotSend != gMsgCompPrevMozDoNotSendAttribute) {
     gMsgCompPrevMozDoNotSendAttribute = mozDoNotSend;
     resetCheckbox = true;
   }
 
   // Has the URL changed
-  if (gMsgCompInputElement && gMsgCompInputElement.value != gMsgCompPrevInputValue)
-  {
+  if (gMsgCompInputElement && gMsgCompInputElement.value != gMsgCompPrevInputValue) {
     gMsgCompPrevInputValue = gMsgCompInputElement.value;
     resetCheckbox = true;
   }
 
-  if (gMsgCompInputElement && resetCheckbox)
-  {
+  if (gMsgCompInputElement && resetCheckbox) {
     // Here is the rule about how to set the checkbox Attach Source To Message:
     // If the attribute "moz-do-not-send" has not been set, we look at the scheme of the URL
     // and at some preference to decide what is the best for the user.
     // If it is set to "false", the checkbox is checked, otherwise unchecked.
     var attach = false;
-    if (mozDoNotSend == null)
-    {
+    if (mozDoNotSend == null) {
       // We haven't yet set the "moz-do-not-send" attribute.
       var inputValue = gMsgCompInputElement.value.trim();
       if (/^(file|data):/i.test(inputValue)) {
@@ -90,9 +86,7 @@ function SetAttachCheckbox() {
         // For images loaded via http(s) we default to the preference value.
         attach = Services.prefs.getBoolPref("mail.compose.attach_http_images");
       }
-    }
-    else
-    {
+    } else {
       attach = (mozDoNotSend == "false");
     }
 

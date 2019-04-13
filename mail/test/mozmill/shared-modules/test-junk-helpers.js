@@ -2,16 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "junk-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
 // we need this for the main controller
 var MODULE_REQUIRES = ["folder-display-helpers"];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-var utils = {};
-ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var utils = ChromeUtils.import("chrome://mozmill/content/modules/utils.jsm");
 
 var folderDisplayHelper;
 var mc;

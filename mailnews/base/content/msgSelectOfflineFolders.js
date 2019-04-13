@@ -17,7 +17,7 @@ var gSelectOffline = {
       if (this._folder.isServer)
         return " isServer-true";
 
-      if (this._folder.getFlag(nsMsgFolderFlags.Offline))
+      if (this._folder.getFlag(Ci.nsMsgFolderFlags.Offline))
         properties += " synchronize-true";
 
       return properties;
@@ -68,15 +68,12 @@ var gSelectOffline = {
     if (aEvent.button != 0)
       return;
 
-    let row = {};
-    let col = {};
-    this._treeElement.treeBoxObject
-        .getCellAt(aEvent.clientX, aEvent.clientY, row, col, {});
+    let treeCellInfo = this._treeElement.getCellAt(aEvent.clientX);
 
-    if (row.value == -1 || col.value.id != "syncCol")
+    if (treeCellInfo.row == -1 || treeCellInfo.col.id != "syncCol")
       return;
 
-    this._toggle(row.value);
+    this._toggle(treeCellInfo.row);
   },
 
   _toggle: function(aRow) {
@@ -87,9 +84,9 @@ var gSelectOffline = {
 
     // Save our current state for rollback, if necessary.
     if (!this._rollbackMap.has(folder))
-      this._rollbackMap.set(folder, folder.getFlag(nsMsgFolderFlags.Offline));
+      this._rollbackMap.set(folder, folder.getFlag(Ci.nsMsgFolderFlags.Offline));
 
-    folder.toggleFlag(nsMsgFolderFlags.Offline);
+    folder.toggleFlag(Ci.nsMsgFolderFlags.Offline);
     gFolderTreeView._tree.invalidateRow(aRow);
   },
 
@@ -100,8 +97,11 @@ var gSelectOffline = {
   onCancel: function() {
     gFolderTreeView.unload();
     for (let [folder, value] of this._rollbackMap) {
-      if (value != folder.getFlag(nsMsgFolderFlags.Offline))
-        folder.toggleFlag(nsMsgFolderFlags.Offline);
+      if (value != folder.getFlag(Ci.nsMsgFolderFlags.Offline))
+        folder.toggleFlag(Ci.nsMsgFolderFlags.Offline);
     }
   }
 };
+
+document.addEventListener("dialogaccept", gSelectOffline.onAccept);
+document.addEventListener("dialogcancel", gSelectOffline.onCancel);

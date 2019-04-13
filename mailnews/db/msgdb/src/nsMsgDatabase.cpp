@@ -38,6 +38,7 @@
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"
 #include "nsArrayEnumerator.h"
+#include "nsSimpleEnumerator.h"
 #include "nsIMemoryReporter.h"
 #include "mozilla/mailnews/MimeHeaderParser.h"
 #include "mozilla/mailnews/Services.h"
@@ -249,8 +250,8 @@ NS_IMETHODIMP nsMsgDBService::OpenMore(nsIMsgDatabase *aDB,
     if (outDone)
     {
       nsCOMPtr<nsIMdbFactory> mdbFactory;
-      msgDatabase->GetMDBFactory(getter_AddRefs(mdbFactory));
-      NS_ENSURE_TRUE(mdbFactory, NS_ERROR_FAILURE);
+      rv = msgDatabase->GetMDBFactory(getter_AddRefs(mdbFactory));
+      NS_ENSURE_SUCCESS(rv, rv);
       rv = mdbFactory->ThumbToOpenStore(msgDatabase->m_mdbEnv, msgDatabase->m_thumb, &msgDatabase->m_mdbStore);
       msgDatabase->m_thumb = nullptr;
       nsCOMPtr<nsIFile> folderPath;
@@ -734,10 +735,7 @@ nsMsgDatabase::MatchEntry(const PLDHashEntryHdr* aEntry, const void* aKey)
 void
 nsMsgDatabase::MoveEntry(PLDHashTable* aTable, const PLDHashEntryHdr* aFrom, PLDHashEntryHdr* aTo)
 {
-  const MsgHdrHashElement* from = static_cast<const MsgHdrHashElement*>(aFrom);
-  MsgHdrHashElement* to = static_cast<MsgHdrHashElement*>(aTo);
-  // ### eh? Why is this needed? I don't think we have a copy operator?
-  *to = *from;
+  new (KnownNotNull, aTo) MsgHdrHashElement(std::move(*((MsgHdrHashElement *)aFrom)));
 }
 
 void
@@ -1020,7 +1018,7 @@ class MsgDBReporter final : public nsIMemoryReporter
 {
   nsMsgDatabase *mDatabase;
 public:
-  MsgDBReporter(nsMsgDatabase *db) : mDatabase(db) {}
+  explicit MsgDBReporter(nsMsgDatabase *db) : mDatabase(db) {}
 
   NS_DECL_ISUPPORTS
   NS_IMETHOD GetName(nsACString &aName)
@@ -1167,16 +1165,21 @@ nsMsgDatabase::~nsMsgDatabase()
 
 NS_IMPL_ISUPPORTS(nsMsgDatabase, nsIMsgDatabase, nsIDBChangeAnnouncer)
 
-void nsMsgDatabase::GetMDBFactory(nsIMdbFactory ** aMdbFactory)
+nsresult nsMsgDatabase::GetMDBFactory(nsIMdbFactory ** aMdbFactory)
 {
   if (!mMdbFactory)
   {
     nsresult rv;
     nsCOMPtr <nsIMdbFactoryService> mdbFactoryService = do_GetService(NS_MORK_CONTRACTID, &rv);
-    if (NS_SUCCEEDED(rv) && mdbFactoryService)
-      mdbFactoryService->GetMdbFactory(getter_AddRefs(mMdbFactory));
+    if (NS_SUCCEEDED(rv) && mdbFactoryService) {
+      rv = mdbFactoryService->GetMdbFactory(getter_AddRefs(mMdbFactory));
+      NS_ENSURE_SUCCESS(rv, rv);
+      if (!mMdbFactory)
+        return NS_ERROR_FAILURE;
+    }
   }
-  NS_IF_ADDREF(*aMdbFactory = mMdbFactory);
+  NS_ADDREF(*aMdbFactory = mMdbFactory);
+  return NS_OK;
 }
 
 // aLeaveInvalidDB: true if caller wants back a db even out of date.
@@ -1312,117 +1315,113 @@ nsresult nsMsgDatabase::CheckForErrors(nsresult err, bool sync,
  */
 nsresult nsMsgDatabase::OpenMDB(nsIFile *dbFile, bool create, bool sync)
 {
-  nsresult ret = NS_OK;
   nsCOMPtr<nsIMdbFactory> mdbFactory;
-  GetMDBFactory(getter_AddRefs(mdbFactory));
-  if (mdbFactory)
+  nsresult ret = GetMDBFactory(getter_AddRefs(mdbFactory));
+  NS_ENSURE_SUCCESS(ret, ret);
+
+  ret = mdbFactory->MakeEnv(NULL, &m_mdbEnv);
+  if (NS_SUCCEEDED(ret))
   {
-    ret = mdbFactory->MakeEnv(NULL, &m_mdbEnv);
-    if (NS_SUCCEEDED(ret))
+    nsIMdbHeap* dbHeap = nullptr;
+
+    if (m_mdbEnv)
+      m_mdbEnv->SetAutoClear(true);
+    PathString dbName = dbFile->NativePath();
+    ret = dbFile->Clone(getter_AddRefs(m_dbFile));
+    NS_ENSURE_SUCCESS(ret, ret);
+    bool exists = false;
+    ret = dbFile->Exists(&exists);
+    if (!exists)
     {
-      nsIMdbHeap* dbHeap = nullptr;
+      ret = NS_MSG_ERROR_FOLDER_SUMMARY_MISSING;
+    }
+    // If m_thumb is set, we're asynchronously opening the db already.
+    else if (!m_thumb)
+    {
+      mdbOpenPolicy inOpenPolicy;
+      mdb_bool  canOpen;
+      mdbYarn    outFormatVersion;
 
-      if (m_mdbEnv)
-        m_mdbEnv->SetAutoClear(true);
-      PathString dbName = dbFile->NativePath();
-      ret = dbFile->Clone(getter_AddRefs(m_dbFile));
-      NS_ENSURE_SUCCESS(ret, ret);
-      bool exists = false;
-      ret = dbFile->Exists(&exists);
-      if (!exists)
+      nsIMdbFile* oldFile = nullptr;
+      ret = mdbFactory->OpenOldFile(m_mdbEnv, dbHeap, dbName.get(),
+                                    mdbBool_kFalse, // not readonly, we want modifiable
+                                    &oldFile);
+      if (oldFile)
       {
-        ret = NS_MSG_ERROR_FOLDER_SUMMARY_MISSING;
-      }
-      // If m_thumb is set, we're asynchronously opening the db already.
-      else if (!m_thumb)
-      {
-        mdbOpenPolicy inOpenPolicy;
-        mdb_bool  canOpen;
-        mdbYarn    outFormatVersion;
-
-        nsIMdbFile* oldFile = nullptr;
-        ret = mdbFactory->OpenOldFile(m_mdbEnv, dbHeap, dbName.get(),
-                                      mdbBool_kFalse, // not readonly, we want modifiable
-                                      &oldFile);
-        if (oldFile)
+        if (NS_SUCCEEDED(ret))
         {
-          if (NS_SUCCEEDED(ret))
+          ret = mdbFactory->CanOpenFilePort(m_mdbEnv, oldFile, // the file to investigate
+            &canOpen, &outFormatVersion);
+          if (NS_SUCCEEDED(ret) && canOpen)
           {
-            ret = mdbFactory->CanOpenFilePort(m_mdbEnv, oldFile, // the file to investigate
-              &canOpen, &outFormatVersion);
-            if (NS_SUCCEEDED(ret) && canOpen)
-            {
-              inOpenPolicy.mOpenPolicy_ScopePlan.mScopeStringSet_Count = 0;
-              inOpenPolicy.mOpenPolicy_MinMemory = 0;
-              inOpenPolicy.mOpenPolicy_MaxLazy = 0;
-
-              ret = mdbFactory->OpenFileStore(m_mdbEnv, dbHeap,
-                oldFile, &inOpenPolicy, getter_AddRefs(m_thumb));
-            }
-            else
-              ret = NS_MSG_ERROR_FOLDER_SUMMARY_OUT_OF_DATE;
-          }
-          NS_RELEASE(oldFile); // always release our file ref, store has own
-        }
-      }
-      if (NS_SUCCEEDED(ret) && m_thumb && sync)
-      {
-        mdb_count outTotal;    // total somethings to do in operation
-        mdb_count outCurrent;  // subportion of total completed so far
-        mdb_bool outDone = false;      // is operation finished?
-        mdb_bool outBroken;     // is operation irreparably dead and broken?
-        do
-        {
-          ret = m_thumb->DoMore(m_mdbEnv, &outTotal, &outCurrent, &outDone, &outBroken);
-          if (NS_FAILED(ret))
-          {// mork isn't really doing NS errors yet.
-            outDone = true;
-            break;
-          }
-        }
-        while (NS_SUCCEEDED(ret) && !outBroken && !outDone);
-        //        m_mdbEnv->ClearErrors(); // ### temporary...
-        // only 0 is a non-error return.
-        if (NS_SUCCEEDED(ret) && outDone)
-        {
-          ret = mdbFactory->ThumbToOpenStore(m_mdbEnv, m_thumb, &m_mdbStore);
-          if (NS_SUCCEEDED(ret))
-            ret = (m_mdbStore) ? InitExistingDB() : NS_ERROR_FAILURE;
-        }
-#ifdef DEBUG_bienvenu1
-        DumpContents();
-#endif
-        m_thumb = nullptr;
-      }
-      else if (create)  // ### need error code saying why open file store failed
-      {
-        nsIMdbFile* newFile = 0;
-        ret = mdbFactory->CreateNewFile(m_mdbEnv, dbHeap, dbName.get(), &newFile);
-        if (NS_FAILED(ret))
-          ret = NS_ERROR_FILE_TARGET_DOES_NOT_EXIST;
-        if ( newFile )
-        {
-          if (NS_SUCCEEDED(ret))
-          {
-            mdbOpenPolicy inOpenPolicy;
-
             inOpenPolicy.mOpenPolicy_ScopePlan.mScopeStringSet_Count = 0;
             inOpenPolicy.mOpenPolicy_MinMemory = 0;
             inOpenPolicy.mOpenPolicy_MaxLazy = 0;
 
-            ret = mdbFactory->CreateNewFileStore(m_mdbEnv, dbHeap,
-              newFile, &inOpenPolicy, &m_mdbStore);
-            if (NS_SUCCEEDED(ret))
-              ret = (m_mdbStore) ? InitNewDB() : NS_ERROR_FAILURE;
+            ret = mdbFactory->OpenFileStore(m_mdbEnv, dbHeap,
+              oldFile, &inOpenPolicy, getter_AddRefs(m_thumb));
           }
-          NS_RELEASE(newFile); // always release our file ref, store has own
+          else
+            ret = NS_MSG_ERROR_FOLDER_SUMMARY_OUT_OF_DATE;
         }
+        NS_RELEASE(oldFile); // always release our file ref, store has own
+      }
+    }
+    if (NS_SUCCEEDED(ret) && m_thumb && sync)
+    {
+      mdb_count outTotal;    // total somethings to do in operation
+      mdb_count outCurrent;  // subportion of total completed so far
+      mdb_bool outDone = false;      // is operation finished?
+      mdb_bool outBroken;     // is operation irreparably dead and broken?
+      do
+      {
+        ret = m_thumb->DoMore(m_mdbEnv, &outTotal, &outCurrent, &outDone, &outBroken);
+        if (NS_FAILED(ret))
+        {// mork isn't really doing NS errors yet.
+          outDone = true;
+          break;
+        }
+      }
+      while (NS_SUCCEEDED(ret) && !outBroken && !outDone);
+      //        m_mdbEnv->ClearErrors(); // ### temporary...
+      // only 0 is a non-error return.
+      if (NS_SUCCEEDED(ret) && outDone)
+      {
+        ret = mdbFactory->ThumbToOpenStore(m_mdbEnv, m_thumb, &m_mdbStore);
+        if (NS_SUCCEEDED(ret))
+          ret = (m_mdbStore) ? InitExistingDB() : NS_ERROR_FAILURE;
+      }
+#ifdef DEBUG_bienvenu1
+      DumpContents();
+#endif
+      m_thumb = nullptr;
+    }
+    else if (create)  // ### need error code saying why open file store failed
+    {
+      nsIMdbFile* newFile = 0;
+      ret = mdbFactory->CreateNewFile(m_mdbEnv, dbHeap, dbName.get(), &newFile);
+      if (NS_FAILED(ret))
+        ret = NS_ERROR_FILE_TARGET_DOES_NOT_EXIST;
+      if ( newFile )
+      {
+        if (NS_SUCCEEDED(ret))
+        {
+          mdbOpenPolicy inOpenPolicy;
+
+          inOpenPolicy.mOpenPolicy_ScopePlan.mScopeStringSet_Count = 0;
+          inOpenPolicy.mOpenPolicy_MinMemory = 0;
+          inOpenPolicy.mOpenPolicy_MaxLazy = 0;
+
+          ret = mdbFactory->CreateNewFileStore(m_mdbEnv, dbHeap,
+            newFile, &inOpenPolicy, &m_mdbStore);
+          if (NS_SUCCEEDED(ret))
+            ret = (m_mdbStore) ? InitNewDB() : NS_ERROR_FAILURE;
+        }
+        NS_RELEASE(newFile); // always release our file ref, store has own
       }
     }
   }
-#ifdef DEBUG_David_Bienvenu
-//  NS_ASSERTION(NS_SUCCEEDED(ret), "failed opening mdb");
-#endif
+
   return ret;
 }
 
@@ -2011,14 +2010,14 @@ NS_IMETHODIMP nsMsgDatabase::DeleteHeader(nsIMsgDBHdr *msg, nsIDBChangeListener 
 NS_IMETHODIMP
 nsMsgDatabase::UndoDelete(nsIMsgDBHdr *aMsgHdr)
 {
-    if (aMsgHdr)
-    {
-        nsMsgHdr* msgHdr = static_cast<nsMsgHdr*>(aMsgHdr);  // closed system, so this is ok
-        // force deleted flag, so SetHdrFlag won't bail out because  deleted flag isn't set
-        msgHdr->m_flags |= nsMsgMessageFlags::Expunged;
-        SetHdrFlag(msgHdr, false, nsMsgMessageFlags::Expunged); // clear deleted flag in db
-    }
-    return NS_OK;
+  if (aMsgHdr)
+  {
+    // Force deleted flag, so SetHdrFlag won't bail out because deleted flag isn't set.
+    uint32_t result;
+    aMsgHdr->OrFlags(nsMsgMessageFlags::Expunged, &result);
+    SetHdrFlag(aMsgHdr, false, nsMsgMessageFlags::Expunged);  // Clear deleted flag in db.
+  }
+  return NS_OK;
 }
 
 nsresult nsMsgDatabase::RemoveHeaderFromThread(nsMsgHdr *msgHdr)
@@ -2030,8 +2029,7 @@ nsresult nsMsgDatabase::RemoveHeaderFromThread(nsMsgHdr *msgHdr)
   ret = GetThreadContainingMsgHdr(msgHdr, getter_AddRefs(thread));
   if (NS_SUCCEEDED(ret) && thread)
   {
-    nsCOMPtr <nsIDBChangeAnnouncer> announcer = do_QueryInterface(this);
-    ret = thread->RemoveChildHdr(msgHdr, announcer);
+    ret = thread->RemoveChildHdr(msgHdr, this);
   }
   return ret;
 }
@@ -2062,7 +2060,7 @@ nsresult nsMsgDatabase::RemoveHeaderFromDB(nsMsgHdr *msgHdr)
     ret = m_mdbAllMsgHeadersTable->CutRow(GetEnv(), row);
     row->CutAllColumns(GetEnv());
   }
-  msgHdr->m_initedValues = 0; // invalidate cached values.
+  msgHdr->ClearCachedValues();
   return ret;
 }
 
@@ -2077,7 +2075,7 @@ nsresult nsMsgDatabase::IsRead(nsMsgKey key, bool *pRead)
   return rv;
 }
 
-uint32_t  nsMsgDatabase::GetStatusFlags(nsIMsgDBHdr *msgHdr, uint32_t origFlags)
+uint32_t nsMsgDatabase::GetStatusFlags(nsIMsgDBHdr *msgHdr, nsMsgMessageFlagType origFlags)
 {
   uint32_t  statusFlags = origFlags;
   bool    isRead = true;
@@ -2278,8 +2276,8 @@ nsMsgDatabase::MarkThreadRead(nsIMsgThread *thread, nsIDBChangeListener *instiga
   if (thoseMarked.Length())
   {
     *aThoseMarked =
-      (nsMsgKey *) nsMemory::Clone(&thoseMarked[0],
-                                   thoseMarked.Length() * sizeof(nsMsgKey));
+      (nsMsgKey *) moz_xmemdup(&thoseMarked[0],
+                               thoseMarked.Length() * sizeof(nsMsgKey));
     if (!*aThoseMarked)
       return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -2555,8 +2553,8 @@ nsresult nsMsgDatabase::IsMDNSent(nsMsgKey key, bool *pSent)
 }
 
 
-nsresult  nsMsgDatabase::SetKeyFlag(nsMsgKey key, bool set, uint32_t flag,
-                                     nsIDBChangeListener *instigator)
+nsresult nsMsgDatabase::SetKeyFlag(nsMsgKey key, bool set, nsMsgMessageFlagType flag,
+                                   nsIDBChangeListener *instigator)
 {
   nsresult rv;
   nsCOMPtr <nsIMsgDBHdr> msgHdr;
@@ -2565,32 +2563,21 @@ nsresult  nsMsgDatabase::SetKeyFlag(nsMsgKey key, bool set, uint32_t flag,
   if (NS_FAILED(rv) || !msgHdr)
     return NS_MSG_MESSAGE_NOT_FOUND; // XXX return rv?
 
-  uint32_t oldFlags;
-  msgHdr->GetFlags(&oldFlags);
-
-  SetHdrFlag(msgHdr, set, flag);
-
-  uint32_t flags;
-  (void)msgHdr->GetFlags(&flags);
-
-  if (oldFlags == flags)
-    return NS_OK;
-
-  return NotifyHdrChangeAll(msgHdr, oldFlags, flags, instigator);
+  return SetMsgHdrFlag(msgHdr, set, flag, instigator);
 }
 
-nsresult nsMsgDatabase::SetMsgHdrFlag(nsIMsgDBHdr *msgHdr, bool set, uint32_t flag, nsIDBChangeListener *instigator)
+nsresult nsMsgDatabase::SetMsgHdrFlag(nsIMsgDBHdr *msgHdr, bool set,
+                                      nsMsgMessageFlagType flag,
+                                      nsIDBChangeListener *instigator)
 {
   uint32_t oldFlags;
-  msgHdr->GetFlags(&oldFlags);
+  (void)msgHdr->GetFlags(&oldFlags);
 
-  SetHdrFlag(msgHdr, set, flag);
+  if (!SetHdrFlag(msgHdr, set, flag))
+    return NS_OK;
 
   uint32_t flags;
   (void)msgHdr->GetFlags(&flags);
-
-  if (oldFlags == flags)
-    return NS_OK;
 
   return NotifyHdrChangeAll(msgHdr, oldFlags, flags, instigator);
 }
@@ -2713,8 +2700,8 @@ NS_IMETHODIMP nsMsgDatabase::MarkAllRead(uint32_t *aNumKeys, nsMsgKey **aThoseMa
 
   if (thoseMarked.Length())
   {
-    *aThoseMarked = (nsMsgKey *) nsMemory::Clone(&thoseMarked[0],
-                                                 thoseMarked.Length() * sizeof(nsMsgKey));
+    *aThoseMarked = (nsMsgKey *) moz_xmemdup(&thoseMarked[0],
+                                             thoseMarked.Length() * sizeof(nsMsgKey));
     if (!*aThoseMarked)
       return NS_ERROR_OUT_OF_MEMORY;
   }
@@ -2825,8 +2812,6 @@ void nsMsgDBEnumerator::Clear()
     mDB->m_enumerators.RemoveElement(this);
   mDB = nullptr;
 }
-
-NS_IMPL_ISUPPORTS(nsMsgDBEnumerator, nsISimpleEnumerator)
 
 nsresult nsMsgDBEnumerator::GetRowCursor()
 {
@@ -3035,7 +3020,9 @@ nsMsgDatabase::GetFilterEnumerator(nsIArray *searchTerms, bool aReverse,
   NS_ENSURE_TRUE(e, NS_ERROR_OUT_OF_MEMORY);
   nsresult rv = e->InitSearchSession(searchTerms, m_folder);
   NS_ENSURE_SUCCESS(rv, rv);
-  return CallQueryInterface(e.get(), aResult);
+
+  e.forget(aResult);
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -3164,13 +3151,18 @@ NS_IMETHODIMP nsMsgDatabase::ListAllKeys(nsIMsgKeyArray *aKeys)
   return rv;
 }
 
-class nsMsgDBThreadEnumerator : public nsISimpleEnumerator, public nsIDBChangeListener
+class nsMsgDBThreadEnumerator : public nsSimpleEnumerator, nsIDBChangeListener
 {
 public:
-    NS_DECL_ISUPPORTS
+    NS_DECL_ISUPPORTS_INHERITED
 
     // nsISimpleEnumerator methods:
     NS_DECL_NSISIMPLEENUMERATOR
+
+    const nsID& DefaultInterface() override
+    {
+      return NS_GET_IID(nsIMsgThread);
+    }
 
     NS_DECL_NSIDBCHANGELISTENER
 
@@ -3180,7 +3172,7 @@ public:
     nsMsgDBThreadEnumerator(nsMsgDatabase* db, nsMsgDBThreadEnumeratorFilter filter);
 
 protected:
-    virtual ~nsMsgDBThreadEnumerator();
+    ~nsMsgDBThreadEnumerator() override;
     nsresult          GetTableCursor(void);
     nsresult          PrefetchNext();
     nsMsgDatabase*    mDB;
@@ -3208,7 +3200,7 @@ nsMsgDBThreadEnumerator::~nsMsgDBThreadEnumerator()
     mDB->RemoveListener(this);
 }
 
-NS_IMPL_ISUPPORTS(nsMsgDBThreadEnumerator, nsISimpleEnumerator, nsIDBChangeListener)
+NS_IMPL_ISUPPORTS_INHERITED(nsMsgDBThreadEnumerator, nsSimpleEnumerator, nsIDBChangeListener)
 
 
 /* void OnHdrFlagsChanged (in nsIMsgDBHdr aHdrChanged, in unsigned long aOldFlags, in unsigned long aNewFlags, in nsIDBChangeListener aInstigator); */
@@ -3461,8 +3453,10 @@ NS_IMETHODIMP nsMsgDatabase::AddNewHdrToDB(nsIMsgDBHdr *newHdr, bool notify)
   NS_ENSURE_ARG_POINTER(newHdr);
   nsMsgHdr* hdr = static_cast<nsMsgHdr*>(newHdr);          // closed system, cast ok
   bool newThread;
-  bool hasKey;
-  ContainsKey(hdr->m_messageKey, &hasKey);
+  bool hasKey = false;
+  nsMsgKey msgKey = nsMsgKey_None;
+  (void)hdr->GetMessageKey(&msgKey);
+  (void)ContainsKey(msgKey, &hasKey);
   if (hasKey)
   {
     NS_ERROR("adding hdr that already exists");
@@ -3537,7 +3531,7 @@ NS_IMETHODIMP nsMsgDatabase::CopyHdrFromExistingHdr(nsMsgKey key, nsIMsgDBHdr *e
     {
       // we may have gotten the header from a cache - calling SetRow
       // basically invalidates any cached values, so invalidate them.
-      destMsgHdr->m_initedValues = 0;
+      destMsgHdr->ClearCachedValues();
       if(addHdrToDB)
         err = AddNewHdrToDB(destMsgHdr, true);
       if (NS_SUCCEEDED(err) && newHdr)
@@ -4559,9 +4553,7 @@ nsresult nsMsgDatabase::ThreadNewHdr(nsMsgHdr* newHdr, bool &newThread)
 nsresult nsMsgDatabase::AddToThread(nsMsgHdr *newHdr, nsIMsgThread *thread, nsIMsgDBHdr *inReplyTo, bool threadInThread)
 {
   // don't worry about real threading yet.
-  nsCOMPtr <nsIDBChangeAnnouncer> announcer = do_QueryInterface(this);
-
-  return thread->AddChild(newHdr, inReplyTo, threadInThread, announcer);
+  return thread->AddChild(newHdr, inReplyTo, threadInThread, this);
 }
 
 nsMsgHdr * nsMsgDatabase::GetMsgHdrForReference(nsCString &reference)
@@ -4778,7 +4770,8 @@ nsresult nsMsgDatabase::AddNewThread(nsMsgHdr *msgHdr)
   nsMsgThread *threadHdr = nullptr;
 
   nsCString subject;
-  nsMsgKey threadKey = msgHdr->m_messageKey;
+  nsMsgKey threadKey;
+  msgHdr->GetMessageKey(&threadKey);
   // can't have a thread with key 1 since that's the table id of the all msg hdr table,
   // so give it kTableKeyForThreadOne (0xfffffffe).
   if (threadKey == kAllMsgHdrsTableKey)
@@ -5007,9 +5000,8 @@ nsresult nsMsgDatabase::DumpContents()
   keys->GetLength(&numKeys);
   for (i = 0; i < numKeys; i++) {
     key = keys->m_keys[i];
-    nsIMsgDBHdr *msg = NULL;
-    rv = GetMsgHdrForKey(key, &msg);
-    nsMsgHdr* msgHdr = static_cast<nsMsgHdr*>(msg);      // closed system, cast ok
+    nsCOMPtr<nsIMsgDBHdr> msgHdr;
+    rv = GetMsgHdrForKey(key, getter_AddRefs(msgHdr));
     if (NS_SUCCEEDED(rv))
     {
       nsCString author;
@@ -5019,7 +5011,6 @@ nsresult nsMsgDatabase::DumpContents()
       msgHdr->GetAuthor(getter_Copies(author));
       msgHdr->GetSubject(getter_Copies(subject));
       printf("hdr key = %u, author = %s subject = %s\n", key, author.get(), subject.get());
-      NS_RELEASE(msgHdr);
     }
   }
   nsTArray<nsMsgKey> threads;
@@ -5809,24 +5800,25 @@ nsMsgDatabase::UpdateHdrInCache(const char *aSearchFolderUri, nsIMsgDBHdr *aHdr,
   nsresult err = GetSearchResultsTable(aSearchFolderUri, true, getter_AddRefs(table));
   NS_ENSURE_SUCCESS(err, err);
   nsMsgKey key;
-  aHdr->GetMessageKey(&key);
+  err = aHdr->GetMessageKey(&key);
   nsMsgHdr* msgHdr = static_cast<nsMsgHdr*>(aHdr);  // closed system, so this is ok
-  if (NS_SUCCEEDED(err) && m_mdbStore && msgHdr->m_mdbRow)
+  nsIMdbRow* hdrRow = msgHdr->GetMDBRow();
+  if (NS_SUCCEEDED(err) && m_mdbStore && hdrRow)
   {
     if (!aAdd)
     {
-      table->CutRow(m_mdbEnv, msgHdr->m_mdbRow);
+      table->CutRow(m_mdbEnv, hdrRow);
     }
     else
     {
       mdbOid rowId;
-      msgHdr->m_mdbRow->GetOid(m_mdbEnv, &rowId);
+      hdrRow->GetOid(m_mdbEnv, &rowId);
       mdb_pos insertPos = FindInsertIndexInSortedTable(table, rowId.mOid_Id);
       uint32_t rowCount;
       table->GetCount(m_mdbEnv, &rowCount);
-      table->AddRow(m_mdbEnv, msgHdr->m_mdbRow);
+      table->AddRow(m_mdbEnv, hdrRow);
       mdb_pos newPos;
-      table->MoveRow(m_mdbEnv, msgHdr->m_mdbRow, rowCount, insertPos, &newPos);
+      table->MoveRow(m_mdbEnv, hdrRow, rowCount, insertPos, &newPos);
     }
   }
 

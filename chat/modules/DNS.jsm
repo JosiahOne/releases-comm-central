@@ -6,9 +6,9 @@
 // loading system DNS libraries on Linux, Mac and Windows.
 
 if (typeof Components !== "undefined") {
-  ChromeUtils.import("resource://gre/modules/ctypes.jsm");
-  ChromeUtils.import("resource://gre/modules/Services.jsm");
-  ChromeUtils.import('resource://gre/modules/PromiseWorker.jsm');
+  var {ctypes} = ChromeUtils.import("resource://gre/modules/ctypes.jsm");
+  var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+  var {BasePromiseWorker} = ChromeUtils.import("resource://gre/modules/PromiseWorker.jsm");
 }
 
 var LOCATION = "resource:///modules/DNS.jsm";
@@ -26,7 +26,7 @@ load_libresolv.prototype = {
   library: null,
 
   // Tries to find and load library.
-  _open: function() {
+  _open() {
     function findLibrary() {
       let lastException = null;
       let libnames =
@@ -93,13 +93,13 @@ load_libresolv.prototype = {
     this.NS_C_IN = 1;
   },
 
-  close: function() {
+  close() {
     this.library.close();
     this.library = null;
   },
 
   // Maps record to SRVRecord or TXTRecord according to aTypeID and return it.
-  _mapAnswer: function(aTypeID, aAnswer, aIdx, aLength) {
+  _mapAnswer(aTypeID, aAnswer, aIdx, aLength) {
     if (aTypeID == NS_T_SRV) {
       let prio = this.ns_get16(aAnswer.addressOfElement(aIdx));
       let weight = this.ns_get16(aAnswer.addressOfElement(aIdx + 2));
@@ -123,7 +123,7 @@ load_libresolv.prototype = {
 
   // Performs a DNS query for aTypeID on a certain address (aName) and returns
   // array of records of aTypeID.
-  lookup: function(aName, aTypeID) {
+  lookup(aName, aTypeID) {
     let qname = ctypes.char.array()(aName);
     let answer = ctypes.unsigned_char.array(this.QUERYBUF_SIZE)();
     let length =
@@ -163,7 +163,7 @@ load_libresolv.prototype = {
       idx += dataLength;
     }
     return results;
-  }
+  },
 };
 
 // For Windows.
@@ -175,7 +175,7 @@ load_dnsapi.prototype = {
   library: null,
 
   // Tries to find and load library.
-  _open: function() {
+  _open() {
     function declare(aSymbolName, ...aArgs) {
       try {
         return library.declare(aSymbolName, ...aArgs);
@@ -192,12 +192,12 @@ load_dnsapi.prototype = {
       { wPriority: ctypes.unsigned_short },
       { wWeight: ctypes.unsigned_short },
       { wPort: ctypes.unsigned_short },
-      { Pad: ctypes.unsigned_short }
+      { Pad: ctypes.unsigned_short },
     ]);
 
     this.DNS_TXT_DATA = ctypes.StructType("DNS_TXT_DATA", [
       { dwStringCount: ctypes.unsigned_long },
-      { pStringArray: ctypes.jschar.ptr.array(1) }
+      { pStringArray: ctypes.jschar.ptr.array(1) },
     ]);
 
     this.DNS_RECORD = ctypes.StructType("_DnsRecord");
@@ -209,7 +209,7 @@ load_dnsapi.prototype = {
       { Flags: ctypes.unsigned_long },
       { dwTtl: ctypes.unsigned_long },
       { dwReserved: ctypes.unsigned_long },
-      { Data: this.DNS_SRV_DATA } // its a union, can be cast to many things
+      { Data: this.DNS_SRV_DATA }, // it's a union, can be cast to many things
     ]);
 
     this.PDNS_RECORD = ctypes.PointerType(this.DNS_RECORD);
@@ -226,13 +226,13 @@ load_dnsapi.prototype = {
     this.DnsFreeRecordList = 1;
   },
 
-  close: function() {
+  close() {
     this.library.close();
     this.library = null;
   },
 
   // Maps record to SRVRecord or TXTRecord according to aTypeID and return it.
-  _mapAnswer: function(aTypeID, aData) {
+  _mapAnswer(aTypeID, aData) {
     if (aTypeID == NS_T_SRV) {
       let srvdata = ctypes.cast(aData, this.DNS_SRV_DATA);
       return new SRVRecord(srvdata.wPriority, srvdata.wWeight,
@@ -249,7 +249,7 @@ load_dnsapi.prototype = {
 
   // Performs a DNS query for aTypeID on a certain address (aName) and returns
   // array of records of aTypeID (e.g. SRVRecord or TXTRecord).
-  lookup: function(aName, aTypeID) {
+  lookup(aName, aTypeID) {
     let queryResultsSet = this.PDNS_RECORD();
     let qname = ctypes.jschar.array()(aName);
     let dnsStatus = this.DnsQuery_W(qname, aTypeID, this.DNS_QUERY_STANDARD,
@@ -274,7 +274,7 @@ load_dnsapi.prototype = {
 
     this.DnsRecordListFree(queryResultsSet, this.DnsFreeRecordList);
     return results;
-  }
+  },
 };
 
 // Used to make results of different libraries consistent for SRV queries.
@@ -291,6 +291,8 @@ function TXTRecord(aData) {
 }
 
 if (typeof Components === "undefined") {
+  /* eslint-env worker */
+
   // We are in a worker, wait for our message then execute the wanted method.
   importScripts("resource://gre/modules/workers/require.js");
   let PromiseWorker = require("resource://gre/modules/workers/PromiseWorker.js");
@@ -298,7 +300,7 @@ if (typeof Components === "undefined") {
   let worker = new PromiseWorker.AbstractWorker();
   worker.dispatch = function(aMethod, aArgs = []) {
     return self[aMethod](...aArgs);
-  },
+  };
   worker.postMessage = function(...aArgs) {
     self.postMessage(...aArgs);
   };
@@ -307,6 +309,7 @@ if (typeof Components === "undefined") {
   };
   self.addEventListener("message", msg => worker.handleMessage(msg));
 
+  // eslint-disable-next-line no-unused-vars
   function execute(aOS, aMethod, aArgs) {
     let DNS = (aOS == "WINNT" ? new load_dnsapi() : new load_libresolv());
     return DNS[aMethod].apply(DNS, aArgs);
@@ -333,16 +336,16 @@ else {
      * @param aTypeID         The RR type to look up as a constant.
      * @return                A promise resolved when completed.
      */
-    lookup: function(aName, aTypeID) {
+    lookup(aName, aTypeID) {
       let worker = new BasePromiseWorker(LOCATION);
       return worker.post("execute",
                          [Services.appinfo.OS, "lookup", [...arguments]]);
     },
 
     /** Convenience functions */
-    srv: function(aName) { return this.lookup(aName, NS_T_SRV); },
-    txt: function(aName) { return this.lookup(aName, NS_T_TXT); },
-  }
+    srv(aName) { return this.lookup(aName, NS_T_SRV); },
+    txt(aName) { return this.lookup(aName, NS_T_TXT); },
+  };
   this.DNS = dns_async_front;
   this.EXPORTED_SYMBOLS = ["DNS"];
 }

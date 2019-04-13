@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gAddButton;
 var gRemoveButton;
@@ -13,6 +13,10 @@ var gHdrsList;
 var gContainer;
 var gFilterBundle=null;
 var gCustomBundle=null;
+
+document.addEventListener("dialogaccept", onOk);
+document.addEventListener("dialogextra1", onAddHeader);
+document.addEventListener("dialogextra2", onRemoveHeader);
 
 function onLoad()
 {
@@ -74,7 +78,6 @@ function onOk()
   }
 
   window.arguments[0].selectedVal = gHdrsList.selectedItem ? gHdrsList.selectedItem.label : null;
-  return true;
 }
 
 function customHeaderOverflow()
@@ -171,10 +174,7 @@ function GetListItemAttributeStr(listitem)
 
 function addRow(newHdr)
 {
-  var listitem = document.createElement("listitem");
-  listitem.setAttribute("label", newHdr);
-  gHdrsList.appendChild(listitem);
-  return listitem;
+  return gHdrsList.appendItem(newHdr, "");
 }
 
 function updateAddButton(aDisable)

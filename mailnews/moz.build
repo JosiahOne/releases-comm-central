@@ -35,7 +35,7 @@ if CONFIG['OS_ARCH'] == 'WINNT':
     if CONFIG['MOZ_MAPI_SUPPORT']:
         DIRS += ['import/outlook/src']
 
-    if not CONFIG['GNU_CC']:
+    if CONFIG['CC_TYPE'] in ('msvc', 'clang-cl'):
         DIRS += [
             'import/winlivemail',
         ]
@@ -51,6 +51,7 @@ if CONFIG['MOZ_MAPI_SUPPORT']:
         'mapi/mapiDLL',
         'mapi/mapihook',
     ]
+    TEST_DIRS += ['mapi/test']
 
 DIRS += [
     'build',
@@ -76,9 +77,11 @@ TESTING_JS_MODULES.mailnews += [
     'test/resources/IMAPpump.js',
     'test/resources/localAccountUtils.js',
     'test/resources/mailTestUtils.js',
+    'test/resources/messageGenerator.js',
     'test/resources/MockFactory.js',
     'test/resources/NetworkTestUtils.jsm',
     'test/resources/PromiseTestUtils.jsm',
+    'test/resources/smimeUtils.jsm',
 ]
 
 if 'comm' in CONFIG['MOZ_BUILD_APP']:

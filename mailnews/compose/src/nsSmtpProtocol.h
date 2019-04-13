@@ -13,7 +13,6 @@
 #include "nsISmtpUrl.h"
 #include "nsIMsgStatusFeedback.h"
 #include "nsMsgLineBuffer.h"
-#include "nsIAuthModule.h"
 #include "nsIProtocolProxyCallback.h"
 #include "MailNewsTypes2.h" // for nsMsgSocketType
 
@@ -94,7 +93,7 @@ public:
     NS_DECL_NSIPROTOCOLPROXYCALLBACK
 
     // Creating a protocol instance requires the URL which needs to be run.
-    nsSmtpProtocol(nsIURI * aURL);
+    explicit nsSmtpProtocol(nsIURI * aURL);
 
     virtual nsresult LoadUrl(nsIURI * aURL, nsISupports * aConsumer = nullptr) override;
     virtual nsresult SendData(const char * dataBuffer, bool aSuppressLogging = false) override;
@@ -104,7 +103,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////////
 
     // stop binding is a "notification" informing us that the stream associated with aURL is going away.
-    NS_IMETHOD OnStopRequest(nsIRequest *request, nsISupports *ctxt, nsresult status) override;
+    NS_IMETHOD OnStopRequest(nsIRequest *request, nsresult status) override;
 
 private:
     virtual ~nsSmtpProtocol();
@@ -125,10 +124,11 @@ private:
     SmtpState m_nextState;
     SmtpState m_nextStateAfterResponse;
     int32_t m_responseCode;    /* code returned from Smtp server */
+    int32_t m_responseCodeEnhanced;    /* ESMTP code returned from SMTP server (RFC1893) */
     int32_t m_previousResponseCode;
     int32_t m_continuationResponse;
     nsCString m_responseText;   /* text returned from Smtp server */
-    nsMsgLineStreamBuffer *m_lineStreamBuffer; // used to efficiently extract lines from the incoming data stream
+    RefPtr<nsMsgLineStreamBuffer> m_lineStreamBuffer; // used to efficiently extract lines from the incoming data stream
 
     nsTArray<nsCString> m_addresses;
     uint32_t       m_addressesLeft;

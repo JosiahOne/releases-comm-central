@@ -17,7 +17,6 @@
 <?xml-stylesheet href="chrome://lightning/skin/lightning.css" type="text/css"?>
 
 <?xml-stylesheet href="chrome://calendar/content/calendar-view-bindings.css" type="text/css"?>
-<?xml-stylesheet href="chrome://calendar/content/datetimepickers/datetimepickers.css" type="text/css"?>
 
 <?xml-stylesheet href="chrome://calendar/skin/calendar-event-dialog.css" type="text/css"?>
 <?xml-stylesheet href="chrome://calendar/content/calendar-event-dialog.css" type="text/css"?>
@@ -31,7 +30,8 @@
 <?xul-overlay href="chrome://lightning/content/lightning-menus.xul"?>
 
 <overlay id="ltnSidebarOverlay"
-         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
+  <script type="application/javascript" src="chrome://calendar/content/calendar-base-view.js"/>
 
   <!-- NEEDED FOR MULTIPLE CALENDAR SUPPORT -->
   <script type="application/javascript" src="chrome://calendar/content/calendar-management.js"/>
@@ -68,7 +68,7 @@
   <script type="application/javascript" src="chrome://lightning/content/lightning-item-panel.js"/>
 
   <window id="messengerWindow">
-    <!-- Be sure to keep these sets, since they will be overlayed by
+    <!-- Be sure to keep these sets, since they will be overlaid by
          calendar/base/content/calendar-common-sets.xul -->
     <commandset id="calendar_commands">
       <command id="agenda_delete_event_command" oncommand="agendaListbox.deleteSelectedItem(false);"/>
@@ -150,30 +150,30 @@
           <separator id="minimonth-splitter" minwidth="100"/>
           <vbox id="calendar-panel" flex="1">
             <modevbox id="task-filter-pane" mode="task" broadcaster="modeBroadcaster" refcontrol="calendar_toggle_filter_command">
-              <treenode-checkbox id="task-tree-filter-header"
+              <checkbox id="task-tree-filter-header"
                                checked="true"
                                class="treenode-checkbox"
                                label="&calendar.task.filter.title.label;"/>
               <modevbox id="task-filtertree-pane" flex="1" mode="task" broadcaster="modeBroadcaster" refcontrol="task-tree-filter-header">
-                 <radiogroup id="task-tree-filtergroup" class="task-tree-subpane"
-                             persist="value">
-                   <observes element="filterBroadcaster"
-                             attribute="value"
-                             onbroadcast="checkRadioControl(this.parentNode, document.getElementById('filterBroadcaster').getAttribute('value'));"/>
-                   <radio id="opt_throughcurrent_filter" label="&calendar.task.filter.current.label;" value="throughcurrent" command="calendar_task_filter_command"/>
-                   <radio id="opt_today_filter" label="&calendar.task.filter.today.label;" value="throughtoday" command="calendar_task_filter_command"/>
-                   <radio id="opt_next7days_filter" label="&calendar.task.filter.next7days.label;" value="throughsevendays" command="calendar_task_filter_command"/>
-                   <radio id="opt_notstarted_filter" label="&calendar.task.filter.notstarted.label;" value="notstarted" command="calendar_task_filter_command"/>
-                   <radio id="opt_overdue_filter" label="&calendar.task.filter.overdue.label;" value="overdue" command="calendar_task_filter_command"/>
-                   <radio id="opt_completed_filter" label="&calendar.task.filter.completed.label;" value="completed" command="calendar_task_filter_command"/>
-                   <radio id="opt_open_filter" label="&calendar.task.filter.open.label;" value="open" command="calendar_task_filter_command"/>
-                   <radio id="opt_all_filter" label="&calendar.task.filter.all.label;" value="all" command="calendar_task_filter_command"/>
-                 </radiogroup>
+                <radiogroup id="task-tree-filtergroup" class="task-tree-subpane"
+                            persist="value">
+                  <observes element="filterBroadcaster"
+                            attribute="value"
+                            onbroadcast="checkRadioControl(this.parentNode, document.getElementById('filterBroadcaster').getAttribute('value'));"/>
+                  <radio id="opt_throughcurrent_filter" label="&calendar.task.filter.current.label;" value="throughcurrent" command="calendar_task_filter_command"/>
+                  <radio id="opt_today_filter" label="&calendar.task.filter.today.label;" value="throughtoday" command="calendar_task_filter_command"/>
+                  <radio id="opt_next7days_filter" label="&calendar.task.filter.next7days.label;" value="throughsevendays" command="calendar_task_filter_command"/>
+                  <radio id="opt_notstarted_filter" label="&calendar.task.filter.notstarted.label;" value="notstarted" command="calendar_task_filter_command"/>
+                  <radio id="opt_overdue_filter" label="&calendar.task.filter.overdue.label;" value="overdue" command="calendar_task_filter_command"/>
+                  <radio id="opt_completed_filter" label="&calendar.task.filter.completed.label;" value="completed" command="calendar_task_filter_command"/>
+                  <radio id="opt_open_filter" label="&calendar.task.filter.open.label;" value="open" command="calendar_task_filter_command"/>
+                  <radio id="opt_all_filter" label="&calendar.task.filter.all.label;" value="all" command="calendar_task_filter_command"/>
+                </radiogroup>
               </modevbox>
             </modevbox>
             <modevbox id="calendar-list-pane" flex="1" mode="calendar,task" broadcaster="modeBroadcaster"
                       refcontrol="calendar_toggle_calendarlist_command">
-              <treenode-checkbox id="calendar-list-header"
+              <checkbox id="calendar-list-header"
                                checked="true"
                                class="treenode-checkbox"
                                ondrop="return document.getElementById('calendar-list-tree-widget').foreignDrop(event)"
@@ -197,7 +197,7 @@
                   class="calendar-sidebar-splitter"/>
 
         <deck id="calendarDisplayDeck" flex="1">
-          <!-- vbox "calendar-view-box will be overlayed..." -->
+          <!-- vbox "calendar-view-box will be overlaid..." -->
           <vbox id="calendar-view-box"/>
         </deck>
       </hbox>
@@ -215,14 +215,14 @@
     <modevbox id="today-pane-panel" />
   </hbox>
 
-  <statusbar id="status-bar">
+  <hbox id="status-bar">
     <!-- event/task in tab statusbarpanels -->
-    <statusbarpanel id="status-privacy"
-                    class="event-dialog"
-                    align="center"
-                    flex="1"
-                    collapsed="true"
-                    pack="start">
+    <hbox id="status-privacy"
+          class="statusbarpanel event-dialog"
+          align="center"
+          flex="1"
+          collapsed="true"
+          pack="start">
       <label value="&event.statusbarpanel.privacy.label;"/>
       <hbox id="status-privacy-public-box" privacy="PUBLIC">
         <label value="&event.menu.options.privacy.public.label;"/>
@@ -233,13 +233,13 @@
       <hbox id="status-privacy-private-box" privacy="PRIVATE">
         <label value="&event.menu.options.privacy.private.label;"/>
       </hbox>
-    </statusbarpanel>
-    <statusbarpanel id="status-priority"
-                    class="event-dialog"
-                    align="center"
-                    flex="1"
-                    collapsed="true"
-                    pack="start">
+    </hbox>
+    <hbox id="status-priority"
+          class="statusbarpanel event-dialog"
+          align="center"
+          flex="1"
+          collapsed="true"
+          pack="start">
       <label value="&event.priority2.label;"/>
       <image id="image-priority-low"
              class="cal-statusbar-1"
@@ -253,13 +253,13 @@
              class="cal-statusbar-1"
              collapsed="true"
              value="high"/>
-    </statusbarpanel>
-    <statusbarpanel id="status-status"
-                    class="event-dialog"
-                    align="center"
-                    flex="1"
-                    collapsed="true"
-                    pack="start">
+    </hbox>
+    <hbox id="status-status"
+          class="statusbarpanel event-dialog"
+          align="center"
+          flex="1"
+          collapsed="true"
+          pack="start">
       <label value="&task.status.label;"/>
       <label id="status-status-tentative-label"
              value="&newevent.status.tentative.label;"
@@ -270,13 +270,13 @@
       <label id="status-status-cancelled-label"
              value="&newevent.eventStatus.cancelled.label;"
              hidden="true"/>
-    </statusbarpanel>
-    <statusbarpanel id="status-freebusy"
-                    class="event-only event-dialog"
-                    align="center"
-                    flex="1"
-                    collapsed="true"
-                    pack="start">
+    </hbox>
+    <hbox id="status-freebusy"
+          class="statusbarpanel event-only event-dialog"
+          align="center"
+          flex="1"
+          collapsed="true"
+          pack="start">
       <label value="&event.statusbarpanel.freebusy.label;"/>
       <label id="status-freebusy-free-label"
              value="&event.freebusy.legend.free;"
@@ -284,10 +284,11 @@
       <label id="status-freebusy-busy-label"
              value="&event.freebusy.legend.busy;"
              hidden="true"/>
-    </statusbarpanel>
+    </hbox>
     <!-- end event/task in tab statusbarpanels -->
-    <statusbarpanel id="calendar-show-todaypane-panel"
-                    pack="center">
+    <hbox id="calendar-show-todaypane-panel"
+          class="statusbarpanel"
+          pack="center">
       <toolbarbutton id="calendar-status-todaypane-button"
                      todaypane="true"
                      type="checkbox"
@@ -295,14 +296,18 @@
                      tooltiptext="&calendar.todaypane.button.tooltip;"
                      observes="calendar_toggle_todaypane_command"
                      command="calendar_toggle_todaypane_command"/>
-    </statusbarpanel>
-    <statusbarpanel id="calendar-invitations-panel"
-                    insertbefore="unreadMessageCount,totalMessageCount"
-                    oncommand="openInvitationsDialog()">
+    </hbox>
+    <hbox id="calendar-invitations-panel"
+          class="statusbarpanel"
+          insertbefore="unreadMessageCount,totalMessageCount"
+          oncommand="openInvitationsDialog()">
       <label id="calendar-invitations-label"
              class="text-link"
              onclick="openInvitationsDialog()"
              onkeypress="if (event.key == 'Enter') { openInvitationsDialog(); }"/>
-    </statusbarpanel>
-  </statusbar>
+    </hbox>
+    <hbox class="statusbarpanel statusbar-resizerpanel">
+      <resizer dir="bottomend"/>
+    </hbox>
+  </hbox>
 </overlay>

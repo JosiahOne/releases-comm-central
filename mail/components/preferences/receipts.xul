@@ -7,27 +7,20 @@
 <?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/preferences/preferences.css"?>
 
-<!DOCTYPE prefwindow [
+<!DOCTYPE dialog [
 <!ENTITY % receiptsDTD SYSTEM "chrome://messenger/locale/preferences/receipts.dtd">
 %receiptsDTD;
 ]>
 
-<prefwindow id="ReturnReceiptsDialog" type="child"
-            xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-            dlgbuttons="accept,cancel"
-            title="&dialog.title;">
+<dialog id="ReturnReceiptsDialog" type="child"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
+        dlgbuttons="accept,cancel"
+        title="&dialog.title;"
+        onload="enableDisableAllowedReceipts();">
 
-  <prefpane id="ReturnReceiptsDialogPane" onpaneload="enableDisableAllowedReceipts();">
+  <prefpane id="ReturnReceiptsDialogPane">
+    <script type="application/javascript" src="chrome://global/content/preferencesBindings.js"/>
     <script type="application/javascript" src="chrome://messenger/content/preferences/receipts.js"/>
-
-    <preferences id="ReturnReceiptsPreferences">
-      <preference id="mail.receipt.request_return_receipt_on" name="mail.receipt.request_return_receipt_on" type="bool"/>
-      <preference id="mail.incorporate.return_receipt" name="mail.incorporate.return_receipt" type="int"/>
-      <preference id="mail.mdn.report.enabled"     name="mail.mdn.report.enabled" type="bool"/>
-      <preference id="mail.mdn.report.not_in_to_cc" name="mail.mdn.report.not_in_to_cc" type="int"/>
-      <preference id="mail.mdn.report.outside_domain" name="mail.mdn.report.outside_domain" type="int"/>
-      <preference id="mail.mdn.report.other" name="mail.mdn.report.other" type="int"/>
-    </preferences>
 
     <vbox id="returnReceiptSettings" align="start">
       <checkbox id="alwaysRequest" label="&requestReceipt.label;"
@@ -55,47 +48,54 @@
       <radio value="false" label="&never.label;" accesskey="&never.accesskey;"/>
       <radio value="true" label="&returnSome.label;" accesskey="&returnSome.accesskey;"/>
 
-      <grid class="indent">
-        <columns>
-          <column/>
-          <column/>
-        </columns>
-        <rows>
-          <row align="center">
-            <label id="notInToCcLabel" accesskey="&notInToCc.accesskey;" control="notInToCcPref" value="&notInToCc.label;"/>
-            <menulist id="notInToCcPref" preference="mail.mdn.report.not_in_to_cc">
-              <menupopup>
-                <menuitem value="0" label="&neverSend.label;"/>
-                <menuitem value="1" label="&alwaysSend.label;"/>
-                <menuitem value="2" label="&askMe.label;"/>
-              </menupopup>
-            </menulist>
-          </row>
-          <row align="center">
-            <label id="outsideDomainLabel" accesskey="&outsideDomain.accesskey;"
-                   control="outsideDomainPref" value="&outsideDomain.label;"/>
-            <menulist id="outsideDomainPref" preference="mail.mdn.report.outside_domain">
-              <menupopup>
-                <menuitem value="0" label="&neverSend.label;"/>
-                <menuitem value="1" label="&alwaysSend.label;"/>
-                <menuitem value="2" label="&askMe.label;"/>
-              </menupopup>
-            </menulist>
-          </row>
-          <row align="center">
-            <label id="otherCasesLabel" accesskey="&otherCases.accesskey;" control="otherCasesPref"
+      <vbox class="indent">
+        <hbox align="center">
+          <hbox flex="1">
+            <label id="notInToCcLabel"
+                   accesskey="&notInToCc.accesskey;"
+                   control="notInToCcPref"
+                   value="&notInToCc.label;"/>
+          </hbox>
+          <menulist id="notInToCcPref" preference="mail.mdn.report.not_in_to_cc">
+            <menupopup>
+              <menuitem value="0" label="&neverSend.label;"/>
+              <menuitem value="1" label="&alwaysSend.label;"/>
+              <menuitem value="2" label="&askMe.label;"/>
+            </menupopup>
+          </menulist>
+        </hbox>
+        <hbox align="center">
+          <hbox flex="1">
+            <label id="outsideDomainLabel"
+                   accesskey="&outsideDomain.accesskey;"
+                   control="outsideDomainPref"
+                   value="&outsideDomain.label;"/>
+          </hbox>
+          <menulist id="outsideDomainPref" preference="mail.mdn.report.outside_domain">
+            <menupopup>
+              <menuitem value="0" label="&neverSend.label;"/>
+              <menuitem value="1" label="&alwaysSend.label;"/>
+              <menuitem value="2" label="&askMe.label;"/>
+            </menupopup>
+          </menulist>
+        </hbox>
+        <hbox align="center">
+          <hbox flex="1">
+            <label id="otherCasesLabel"
+                   accesskey="&otherCases.accesskey;"
+                   control="otherCasesPref"
                    value="&otherCases.label;"/>
-            <menulist id="otherCasesPref" preference="mail.mdn.report.other">
-              <menupopup>
-                <menuitem value="0" label="&neverSend.label;"/>
-                <menuitem value="1" label="&alwaysSend.label;"/>
-                <menuitem value="2" label="&askMe.label;"/>
-              </menupopup>
-            </menulist>
-          </row>
-        </rows>
-      </grid>
+          </hbox>
+          <menulist id="otherCasesPref" preference="mail.mdn.report.other">
+            <menupopup>
+              <menuitem value="0" label="&neverSend.label;"/>
+              <menuitem value="1" label="&alwaysSend.label;"/>
+              <menuitem value="2" label="&askMe.label;"/>
+            </menupopup>
+          </menulist>
+        </hbox>
+      </vbox>
     </radiogroup>
     <separator/>
   </prefpane>
-</prefwindow>
+</dialog>

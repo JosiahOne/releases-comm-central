@@ -20,6 +20,7 @@
 #include "nsArrayUtils.h"
 #include "mozITXTToHTMLConv.h"
 #include "nsIAbManager.h"
+#include "nsIUUIDGenerator.h"
 
 #include "nsVariant.h"
 #include "nsIProperty.h"
@@ -243,7 +244,7 @@ NS_IMETHODIMP nsAbCardProperty::GetProperties(nsISimpleEnumerator **props)
     propertyArray.AppendObject(new nsAbSimpleProperty(iter.Key(),
                                                       iter.UserData()));
   }
-  return NS_NewArrayEnumerator(props, propertyArray);
+  return NS_NewArrayEnumerator(props, propertyArray, NS_GET_IID(nsIProperty));
 }
 
 NS_IMETHODIMP nsAbCardProperty::GetProperty(const nsACString &name,
@@ -341,6 +342,62 @@ NS_IMETHODIMP nsAbCardProperty::DeleteProperty(const nsACString &name)
 {
   m_properties.Remove(name);
   return NS_OK;
+}
+
+NS_IMETHODIMP nsAbCardProperty::GetUID(nsACString &uid)
+{
+  nsAutoString aString;
+  nsresult rv = GetPropertyAsAString(kUIDProperty, aString);
+  if (NS_SUCCEEDED(rv)) {
+    uid = NS_ConvertUTF16toUTF8(aString);
+    return rv;
+  }
+
+  nsCOMPtr<nsIUUIDGenerator> uuidgen = mozilla::services::GetUUIDGenerator();
+  NS_ENSURE_TRUE(uuidgen, NS_ERROR_FAILURE);
+
+  nsID id;
+  rv = uuidgen->GenerateUUIDInPlace(&id);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  char idString[NSID_LENGTH];
+  id.ToProvidedString(idString);
+
+  uid.AppendASCII(idString + 1, NSID_LENGTH - 3);
+  return SetUID(uid);
+}
+
+NS_IMETHODIMP nsAbCardProperty::SetUID(const nsACString &aUID)
+{
+  nsresult rv = SetPropertyAsAString(kUIDProperty, NS_ConvertUTF8toUTF16(aUID));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (m_directoryId.IsEmpty()) {
+    return NS_OK;
+  }
+
+  int ampIndex = m_directoryId.FindChar('&');
+  const nsACString& directoryId = Substring(m_directoryId, 0, ampIndex);
+
+  nsCOMPtr<nsIAbManager> abManager = do_GetService(NS_ABMANAGER_CONTRACTID, &rv);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsCOMPtr <nsIAbDirectory> directory = nullptr;
+  rv = abManager->GetDirectoryFromId(directoryId, getter_AddRefs(directory));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (!directory) {
+    return NS_OK;
+  }
+
+  bool readOnly;
+  rv = directory->GetReadOnly(&readOnly);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  if (readOnly) {
+    return NS_ERROR_FAILURE;
+  }
+  return directory->ModifyCard(this);
 }
 
 NS_IMETHODIMP nsAbCardProperty::GetFirstName(nsAString &aString)
@@ -787,8 +844,7 @@ nsresult nsAbCardProperty::ConvertToXMLPrintData(nsAString &aXMLSubstr)
   // use ScanTXT to convert < > & to safe values.
   nsString safeText;
   if (!generatedName.IsEmpty()) {
-    rv = conv->ScanTXT(generatedName.get(), mozITXTToHTMLConv::kEntities,
-                       getter_Copies(safeText));
+    rv = conv->ScanTXT(generatedName, mozITXTToHTMLConv::kEntities, safeText);
     NS_ENSURE_SUCCESS(rv,rv);
   }
 
@@ -797,8 +853,7 @@ nsresult nsAbCardProperty::ConvertToXMLPrintData(nsAString &aXMLSubstr)
     GetPrimaryEmail(primaryEmail);
 
     // use ScanTXT to convert < > & to safe values.
-    rv = conv->ScanTXT(primaryEmail.get(), mozITXTToHTMLConv::kEntities,
-                       getter_Copies(safeText));
+    rv = conv->ScanTXT(primaryEmail, mozITXTToHTMLConv::kEntities, safeText);
     NS_ENSURE_SUCCESS(rv,rv);
   }
   xmlStr.Append(safeText);
@@ -858,8 +913,7 @@ nsresult nsAbCardProperty::ConvertToXMLPrintData(nsAString &aXMLSubstr)
 
           // use ScanTXT to convert < > & to safe values.
           nsString safeText;
-          rv = conv->ScanTXT(displayName.get(), mozITXTToHTMLConv::kEntities,
-                             getter_Copies(safeText));
+          rv = conv->ScanTXT(displayName, mozITXTToHTMLConv::kEntities, safeText);
           NS_ENSURE_SUCCESS(rv,rv);
           xmlStr.Append(safeText);
 
@@ -868,8 +922,7 @@ nsresult nsAbCardProperty::ConvertToXMLPrintData(nsAString &aXMLSubstr)
           listCard->GetPrimaryEmail(primaryEmail);
 
           // use ScanTXT to convert < > & to safe values.
-          rv = conv->ScanTXT(primaryEmail.get(), mozITXTToHTMLConv::kEntities,
-                             getter_Copies(safeText));
+          rv = conv->ScanTXT(primaryEmail, mozITXTToHTMLConv::kEntities, safeText);
           NS_ENSURE_SUCCESS(rv,rv);
           xmlStr.Append(safeText);
 
@@ -965,7 +1018,7 @@ nsresult nsAbCardProperty::AppendLine(const AppendItem &aItem,
 
   // use ScanTXT to convert < > & to safe values.
   nsString safeText;
-  rv = aConv->ScanTXT(attrValue.get(), mozITXTToHTMLConv::kEntities, getter_Copies(safeText));
+  rv = aConv->ScanTXT(attrValue, mozITXTToHTMLConv::kEntities, safeText);
   NS_ENSURE_SUCCESS(rv,rv);
   aResult.Append(safeText);
 

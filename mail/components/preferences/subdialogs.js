@@ -4,6 +4,8 @@
 
 "use strict";
 
+/* import-globals-from preferences.js */
+
 /**
  * SubDialog constructor creates a new subdialog from a template and appends
  * it to the parentElement.
@@ -15,10 +17,11 @@ function SubDialog({template, parentElement, id}) {
   this._id = id;
 
   this._overlay = template.cloneNode(true);
-  this._frame = this._overlay.querySelector(".dialogFrame");
   this._box = this._overlay.querySelector(".dialogBox");
-  this._closeButton = this._overlay.querySelector(".dialogClose");
+  this._titleBar = this._overlay.querySelector(".dialogTitleBar");
   this._titleElement = this._overlay.querySelector(".dialogTitle");
+  this._closeButton = this._overlay.querySelector(".dialogClose");
+  this._frame = this._overlay.querySelector(".dialogFrame");
 
   this._overlay.id = `dialogOverlay-${id}`;
   this._frame.setAttribute("name", `dialogFrame-${id}`);
@@ -43,7 +46,8 @@ SubDialog.prototype = {
     "chrome://messenger/skin/preferences/preferences.css",
     "chrome://global/skin/in-content/common.css",
     "chrome://messenger/skin/preferences/aboutPreferences.css",
-    "chrome://messenger/skin/preferences/dialog.css"],
+    "chrome://messenger/skin/preferences/dialog.css",
+  ],
 
   // Store the original instantApply pref for restoring after closing the dialog
   _instantApplyOrig: Services.prefs.getBoolPref("browser.preferences.instantApply"),
@@ -86,8 +90,9 @@ SubDialog.prototype = {
       if (!this._isClosing) {
         this.close();
       }
+      let args = Array.from(arguments);
       this._closingPromise.then(() => {
-        this.open(aURL, aFeatures, aParams, aClosingCallback);
+        this.open.apply(this, args);
       });
       return;
     }
@@ -159,7 +164,9 @@ SubDialog.prototype = {
         }
       };
       this._frame.addEventListener("load", onBlankLoad);
-      this._frame.loadURI("about:blank");
+      this._frame.loadURI("about:blank", {
+        triggeringPrincipal: Services.scriptSecurityManager.createNullPrincipal({}),
+      });
     }, 0);
   },
 
@@ -257,24 +264,32 @@ SubDialog.prototype = {
     this._overlay.style.opacity = "0.01";
   },
 
-  _onLoad(aEvent) {
+  async _onLoad(aEvent) {
     if (aEvent.target.contentWindow.location == "about:blank") {
       return;
     }
 
+    // In order to properly calculate the sizing of the subdialog, we need to
+    // ensure that all of the l10n is done.
+    if (aEvent.target.contentDocument.l10n) {
+      await aEvent.target.contentDocument.l10n.ready;
+    }
+
+    await this.resizeDialog();
+  },
+
+  async resizeDialog() {
     // Do this on load to wait for the CSS to load and apply before calculating the size.
     let docEl = this._frame.contentDocument.documentElement;
 
-    let groupBoxTitle = document.getAnonymousElementByAttribute(this._box, "class", "groupbox-title");
-    let groupBoxTitleHeight = groupBoxTitle.clientHeight +
-                              parseFloat(getComputedStyle(groupBoxTitle).borderBottomWidth);
+    let titleBarHeight = this._titleBar.clientHeight +
+                         parseFloat(getComputedStyle(this._titleBar).borderBottomWidth);
 
-    let groupBoxBody = document.getAnonymousElementByAttribute(this._box, "class", "groupbox-body");
     // These are deduced from styles which we don't change, so it's safe to get them now:
-    let boxVerticalPadding = 2 * parseFloat(getComputedStyle(groupBoxBody).paddingTop);
-    let boxHorizontalPadding = 2 * parseFloat(getComputedStyle(groupBoxBody).paddingLeft);
     let boxHorizontalBorder = 2 * parseFloat(getComputedStyle(this._box).borderLeftWidth);
     let boxVerticalBorder = 2 * parseFloat(getComputedStyle(this._box).borderTopWidth);
+    let frameHorizontalMargin = 2 * parseFloat(getComputedStyle(this._frame).marginLeft);
+    let frameVerticalMargin = 2 * parseFloat(getComputedStyle(this._frame).marginTop);
 
     // The difference between the frame and box shouldn't change, either:
     let boxRect = this._box.getBoundingClientRect();
@@ -282,12 +297,21 @@ SubDialog.prototype = {
     let frameSizeDifference = (frameRect.top - boxRect.top) + (boxRect.bottom - frameRect.bottom);
 
     // Then determine and set a bunch of width stuff:
-    let frameMinWidth = docEl.style.width || docEl.scrollWidth + "px";
+    let frameMinWidth = docEl.style.width;
+    if (!frameMinWidth) {
+      if (docEl.ownerDocument.body) {
+        // HTML documents have a body but XUL documents don't
+        frameMinWidth = docEl.ownerDocument.body.scrollWidth;
+      } else {
+        frameMinWidth = docEl.scrollWidth;
+      }
+      frameMinWidth += "px";
+    }
     let frameWidth = docEl.getAttribute("width") ? docEl.getAttribute("width") + "px" :
                      frameMinWidth;
     this._frame.style.width = frameWidth;
     this._box.style.minWidth = "calc(" +
-                               (boxHorizontalBorder + boxHorizontalPadding) +
+                               (boxHorizontalBorder + frameHorizontalMargin) +
                                "px + " + frameMinWidth + ")";
 
     // Now do the same but for the height. We need to do this afterwards because otherwise
@@ -308,8 +332,7 @@ SubDialog.prototype = {
     } else if (frameHeight.endsWith("px")) {
       comparisonFrameHeight = parseFloat(frameHeight, 10);
     } else {
-      Cu.reportError(
-                     "This dialog (" + this._frame.contentWindow.location.href + ") " +
+      Cu.reportError("This dialog (" + this._frame.contentWindow.location.href + ") " +
                      "set a height in non-px-non-em units ('" + frameHeight + "'), " +
                      "which is likely to lead to bad sizing in in-content preferences. " +
                      "Please consider changing this.");
@@ -328,7 +351,7 @@ SubDialog.prototype = {
 
     this._frame.style.height = frameHeight;
     this._box.style.minHeight = "calc(" +
-                                (boxVerticalBorder + groupBoxTitleHeight + boxVerticalPadding) +
+                                (boxVerticalBorder + titleBarHeight + frameVerticalMargin) +
                                 "px + " + frameMinHeight + ")";
 
     this._overlay.dispatchEvent(new CustomEvent("dialogopen", {
@@ -339,6 +362,7 @@ SubDialog.prototype = {
     this._overlay.style.opacity = ""; // XXX: focus hack continued from _onContentLoaded
 
     if (this._box.getAttribute("resizable") == "true") {
+      this._onResize = this._onResize.bind(this);
       this._resizeObserver = new MutationObserver(this._onResize);
       this._resizeObserver.observe(this._box, {attributes: true});
     }
@@ -485,10 +509,7 @@ SubDialog.prototype = {
   },
 
   _getBrowser() {
-    return window.QueryInterface(Ci.nsIInterfaceRequestor)
-                 .getInterface(Ci.nsIWebNavigation)
-                 .QueryInterface(Ci.nsIDocShell)
-                 .chromeEventHandler;
+    return window.docShell.chromeEventHandler;
   },
 };
 

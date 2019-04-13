@@ -2,12 +2,31 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-treenode-checkbox {
+checkbox.treenode-checkbox {
   -moz-box-align: center;
   padding-top: 4px;
   padding-inline-start: 4px;
   padding-inline-end: 4px;
   font-weight: bold;
+}
+
+checkbox.treenode-checkbox > .checkbox-check {
+  -moz-appearance: none;
+  -moz-box-align: center;
+  border: none;
+  width: 8px; /* The image's width is 8 pixels */
+  height: 8px;
+  background: url(chrome://global/skin/icons/twisty-collapsed.svg) center no-repeat;
+  -moz-context-properties: fill;
+  fill: currentColor;
+}
+
+checkbox.treenode-checkbox[checked="true"] > .checkbox-check {
+  background-image: url("chrome://global/skin/icons/twisty-expanded.svg");
+}
+
+checkbox.treenode-checkbox:-moz-locale-dir(rtl) > .checkbox-check {
+  background-image: url("chrome://global/skin/icons/twisty-collapsed-rtl.svg");
 }
 
 .checkbox-label-box {
@@ -22,7 +41,7 @@ treenode-checkbox {
   margin: 0 !important;
 }
 
-treenode-checkbox > .checkbox-label-center-box > .checkbox-label-box > .checkbox-label {
+checkbox.treenode-checkbox > .checkbox-label-center-box > .checkbox-label-box > .checkbox-label {
   font-weight: bold;
   border-bottom: 1px solid -moz-Dialog;
 }
@@ -32,6 +51,38 @@ treenode-checkbox > .checkbox-label-center-box > .checkbox-label-box > .checkbox
   fill: currentColor;
   list-style-image: url(chrome://calendar-common/skin/view-cycler.svg);
   -moz-user-focus: normal;
+}
+
+:root[lwt-tree] .view-navigation-button {
+  -moz-appearance: none;
+  -moz-user-focus: normal;
+  border: 1px solid transparent;
+  border-radius: var(--toolbarbutton-border-radius);
+}
+
+:root[lwt-tree] .view-navigation-button:not([disabled="true"]):hover {
+  background: var(--toolbarbutton-hover-background);
+  border-color: var(--toolbarbutton-hover-bordercolor);
+  box-shadow: var(--toolbarbutton-hover-boxshadow);
+  color: inherit;
+}
+
+:root[lwt-tree-brighttext] .view-navigation-button:not([disabled="true"]):hover {
+  background: rgba(255, 255, 255, .25);
+  border-color: rgba(255, 255, 255, .5);
+}
+
+:root[lwt-tree] .view-navigation-button:not([disabled="true"]):hover:active {
+  background: var(--toolbarbutton-active-background);
+  border-color: var(--toolbarbutton-active-bordercolor);
+  box-shadow: var(--toolbarbutton-active-boxshadow);
+  transition-duration: 10ms;
+}
+
+:root[lwt-tree-brighttext] .view-navigation-button:not([disabled="true"]):hover:active {
+  background: rgba(255, 255, 255, .4);
+  border-color: rgba(255, 255, 255, .7);
+  box-shadow: rgba(255, 255, 255, .4) inset;
 }
 
 .view-navigation-button[disabled="true"] {
@@ -60,14 +111,6 @@ treenode-checkbox > .checkbox-label-center-box > .checkbox-label-box > .checkbox
     visibility: hidden;
 }
 
-.categories-listbox {
-    -moz-appearance: none;
-    background-color: Menu;
-    color: MenuText;
-    margin: 0 0 4px 0;
-    border: 0;
-}
-
 .categories-textbox .textbox-search-icon {
     list-style-image: none;
     cursor:default;
@@ -75,4 +118,8 @@ treenode-checkbox > .checkbox-label-center-box > .checkbox-label-box > .checkbox
 
 .categories-textbox {
     -moz-appearance: textfield;
+}
+
+calendar-list-tree > tree > treecols {
+  padding-inline-start: 18px;
 }

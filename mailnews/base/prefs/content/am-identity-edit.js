@@ -3,11 +3,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var gIdentity = null;  // the identity we are editing (may be null for a new identity)
 var gAccount = null;   // the account the identity is (or will be) associated with
+
+document.addEventListener("dialogaccept", onOk);
 
 function onLoadIdentityProperties()
 {
@@ -132,10 +134,12 @@ function initCompositionAndAddressing(identity)
   onInitCompositionAndAddressing(); // am-addressing.js method
 }
 
-function onOk()
+function onOk(event)
 {
-  if (!validEmailAddress())
-    return false;
+  if (!validEmailAddress()) {
+    event.preventDefault();
+    return;
+  }
 
   // if we are adding a new identity, create an identity, set the fields and add it to the
   // account.
@@ -144,7 +148,7 @@ function onOk()
     // ask the account manager to create a new identity for us
     gIdentity = MailServices.accounts.createIdentity();
 
-    // copy in the default identity settings so we inherit lots of stuff like the defaul drafts folder, etc.
+    // copy in the default identity settings so we inherit lots of stuff like the default drafts folder, etc.
     gIdentity.copy(gAccount.defaultIdentity);
 
     // assume the identity is valid by default?
@@ -162,8 +166,6 @@ function onOk()
   saveAddressingAndCompositionSettings(gIdentity);
 
   window.arguments[0].result = true;
-
-  return true;
 }
 
 // returns false and prompts the user if

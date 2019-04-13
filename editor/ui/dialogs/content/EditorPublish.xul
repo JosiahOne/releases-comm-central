@@ -6,6 +6,7 @@
 
 <?xml-stylesheet href="chrome://editor/skin/editor.css" type="text/css"?>
 <?xml-stylesheet href="chrome://editor/skin/EditorDialog.css" type="text/css"?>
+<?xml-stylesheet href="chrome://messenger/skin/menulist.css" type="text/css"?>
 
 <?xul-overlay href="chrome://editor/content/EditorPublishOverlay.xul"?>
 
@@ -13,21 +14,19 @@
 
 <dialog title="&windowTitle.label;"
         id="publishDlg"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="Startup()"
         buttons="accept,cancel"
-        buttonlabelaccept="&publishButton.label;"
-        ondialogaccept="return onAccept();"
-        ondialogcancel="return onCancel();">
+        buttonlabelaccept="&publishButton.label;">
 
   <!-- Methods common to all editor dialogs -->
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdDialogCommon.js"/>
   <script type="application/javascript" src="chrome://editor/content/EditorPublish.js"/>
   <script type="application/javascript" src="chrome://editor/content/publishprefs.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/customElements.js"/>
 
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
-  <broadcaster id="args" value=""/>
 
   <tabbox id="TabBox">
     <tabs flex="1">
@@ -80,7 +79,8 @@
                control="DocDirList"/>
         <hbox align="center">
           <!-- Contents filled in at runtime -->
-          <menulist id="DocDirList" class="minWidth20 uri-element" editable="true"  flex="1"
+          <menulist is="menulist-editable" id="DocDirList"
+                    class="minWidth20 uri-element" editable="true" flex="1"
                     tooltiptext="&docDirList.tooltip;" oninput="onInputSettings();"/>
         </hbox>
         <spacer class="spacer"/>
@@ -113,7 +113,8 @@
             <spacer class="checkbox-spacer"/>
             <spacer class="radio-spacer"/>
             <!-- Contents filled in at runtime -->
-            <menulist id="OtherDirList" class="minWidth20 uri-element"
+            <menulist is="menulist-editable" id="OtherDirList"
+                      class="minWidth20 uri-element"
                       editable="true" flex="1" tooltiptext="&otherDirList.tooltip;"
                       oninput="onInputSettings();"/>
           </hbox>

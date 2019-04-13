@@ -3,9 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
+var {BrowserUtils} = ChromeUtils.import("resource://gre/modules/BrowserUtils.jsm");
 
-var gServer;
+var gAccount;
 var gOriginalStoreType;
 
 /**
@@ -23,7 +23,8 @@ function clickStoreTypeMenu(aStoreTypeElement) {
   let response = { newRootFolder: null };
   // Send 'response' as an argument to converterDialog.xhtml.
   window.openDialog("converterDialog.xhtml","mailnews:mailstoreconverter",
-                    "modal,centerscreen,width=800,height=180", gServer,
+                    "modal,centerscreen,width=800,height=180",
+                    gAccount.incomingServer,
                     aStoreTypeElement.value, response);
   changeStoreType(response);
 }
@@ -52,7 +53,6 @@ function changeStoreType(aResponse) {
 }
 
 function onInit(aPageId, aServerId) {
-
   // UI for account store type
   let storeTypeElement = document.getElementById("server.storeTypeMenulist");
   // set the menuitem to match the account
@@ -60,12 +60,16 @@ function onInit(aPageId, aServerId) {
                                .getAttribute("value");
   let targetItem = storeTypeElement.getElementsByAttribute("value", currentStoreID);
   storeTypeElement.selectedItem = targetItem[0];
+  // Disable store type change if store has not been used yet.
+  storeTypeElement.setAttribute("disabled",
+    gAccount.incomingServer.getBoolValue("canChangeStoreType") ?
+      "false" : !Services.prefs.getBoolPref("mail.store_conversion_enabled"));
   // Initialise 'gOriginalStoreType' to the item that was originally selected.
   gOriginalStoreType = storeTypeElement.value;
 }
 
 function onPreInit(account, accountValues) {
-  gServer = account.incomingServer;
+  gAccount = account;
 }
 
 function onSave()

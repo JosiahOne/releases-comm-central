@@ -47,11 +47,13 @@ public:
   NS_DECL_ISUPPORTS_INHERITED
   NS_DECL_MSGIOVERRIDE
 
-  NS_FORWARD_NSIMSGSEND(DELEGATE_JS(nsIMsgSend, mJsIMsgSend)->)
+  NS_FORWARD_NSIMSGSEND(DELEGATE_JS(mJsIMsgSend, mMethods, mCppBase)->)
   NS_FORWARD_NSIMSGOPERATIONLISTENER(
-      DELEGATE_JS(nsIMsgOperationListener, mJsIMsgOperationListener)->)
+    DELEGATE_JS(mJsIMsgOperationListener, mMethods,
+      (nsCOMPtr<nsIMsgOperationListener>(do_QueryInterface(mCppBase))))->)
   NS_FORWARD_NSIINTERFACEREQUESTOR(
-      DELEGATE_JS(nsIInterfaceRequestor, mJsIInterfaceRequestor)->)
+    DELEGATE_JS(mJsIInterfaceRequestor, mMethods,
+      (nsCOMPtr<nsIInterfaceRequestor>(do_QueryInterface(mCppBase))))->)
 
   JaCppSendDelegator();
 
@@ -66,7 +68,7 @@ private:
                 public nsIInterfaceRequestor
   {
     public:
-      Super(JaCppSendDelegator* aFakeThis) {mFakeThis = aFakeThis;}
+      explicit Super(JaCppSendDelegator* aFakeThis) {mFakeThis = aFakeThis;}
       NS_DECL_ISUPPORTS
       // Forward all overridable methods, bypassing JS override.
       NS_FORWARD_NSIMSGSEND(mFakeThis->JaBaseCppSend::)

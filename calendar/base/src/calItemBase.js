@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from calItemModule.js */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 /**
  * calItemBase prototype definition
@@ -45,7 +45,7 @@ calItemBase.prototype = {
      */
     initItemBase: function() {
         this.wrappedJSObject = this;
-        this.mProperties = new cal.data.PropertyMap();
+        this.mProperties = new Map();
         this.mPropertyParams = {};
         this.mProperties.set("CREATED", cal.dtz.jsDateToDateTime(new Date()));
     },
@@ -127,7 +127,7 @@ calItemBase.prototype = {
     },
     set parentItem(value) {
         if (this.mImmutable) {
-            throw Components.results.NS_ERROR_OBJECT_IS_IMMUTABLE;
+            throw Cr.NS_ERROR_OBJECT_IS_IMMUTABLE;
         }
         return (this.mParentItem = cal.unwrapInstance(value));
     },
@@ -167,7 +167,7 @@ calItemBase.prototype = {
      */
     modify: function() {
         if (this.mImmutable) {
-            throw Components.results.NS_ERROR_OBJECT_IS_IMMUTABLE;
+            throw Cr.NS_ERROR_OBJECT_IS_IMMUTABLE;
         }
         this.mDirty = true;
     },
@@ -209,7 +209,7 @@ calItemBase.prototype = {
         }
 
         for (let propValue of this.mProperties.values()) {
-            if (propValue instanceof Components.interfaces.calIDateTime &&
+            if (propValue instanceof Ci.calIDateTime &&
                 propValue.isMutable) {
                 propValue.makeImmutable();
             }
@@ -272,9 +272,9 @@ calItemBase.prototype = {
             cloned.mAttendees.push(att.clone());
         }
 
-        cloned.mProperties = new cal.data.PropertyMap();
+        cloned.mProperties = new Map();
         for (let [name, value] of this.mProperties.entries()) {
-            if (value instanceof Components.interfaces.calIDateTime) {
+            if (value instanceof Ci.calIDateTime) {
                 value = value.clone();
             }
 
@@ -344,19 +344,19 @@ calItemBase.prototype = {
         return this.getProperty("DTSTAMP");
     },
 
-    // readonly attribute nsISimpleEnumerator propertyEnumerator;
-    get propertyEnumerator() {
+    // readonly attribute nsIJSEnumerator properties;
+    get properties() {
         let properties = this.mProperties;
         if (this.mIsProxy) {
             let parentProperties = this.mParentItem.wrappedJSObject.mProperties;
             let thisProperties = this.mProperties;
-            properties = new cal.data.PropertyMap((function* () {
+            properties = new Map((function* () {
                 yield* parentProperties;
                 yield* thisProperties;
             })());
         }
 
-        return properties.simpleEnumerator;
+        return properties.entries();
     },
 
     // nsIVariant getProperty(in AString name);
@@ -436,7 +436,7 @@ calItemBase.prototype = {
             if (this.hasProperty(propName)) {
                 this.mPropertyParams[propName] = {};
             } else {
-                throw "Property " + aPropName + " not set";
+                throw new Error("Property " + aPropName + " not set");
             }
         }
         if (aParamValue || !isNaN(parseInt(aParamValue, 10))) {
@@ -451,10 +451,12 @@ calItemBase.prototype = {
     getParameterEnumerator: function(aPropName) {
         let propName = aPropName.toUpperCase();
         if (!(propName in this.mPropertyParams)) {
-            throw "Property " + aPropName + " not set";
+            throw new Error("Property " + aPropName + " not set");
         }
         let parameters = this.mPropertyParams[propName];
         return { // nsISimpleEnumerator
+            QueryInterface: ChromeUtils.generateQI([Ci.nsISimpleEnumerator]),
+
             mParamNames: Object.keys(parameters),
             hasMoreElements: function() {
                 return (this.mParamNames.length > 0);
@@ -580,7 +582,7 @@ calItemBase.prototype = {
     removeAttachment: function(aAttachment) {
         this.modify();
         for (let attIndex in this.mAttachments) {
-            if (cal.data.compareObjects(this.mAttachments[attIndex], aAttachment, Components.interfaces.calIAttachment)) {
+            if (cal.data.compareObjects(this.mAttachments[attIndex], aAttachment, Ci.calIAttachment)) {
                 this.modify();
                 this.mAttachments.splice(attIndex, 1);
                 break;
@@ -656,7 +658,7 @@ calItemBase.prototype = {
     },
     set calendar(calendar) {
         if (this.mImmutable) {
-            throw Components.results.NS_ERROR_OBJECT_IS_IMMUTABLE;
+            throw Cr.NS_ERROR_OBJECT_IS_IMMUTABLE;
         }
         this.mHashId = null; // recompute hashId
         this.mCalendar = calendar;
@@ -699,10 +701,10 @@ calItemBase.prototype = {
 
     // attribute AUTF8String icalString;
     get icalString() {
-        throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+        throw Cr.NS_ERROR_NOT_IMPLEMENTED;
     },
     set icalString(str) {
-        throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+        throw Cr.NS_ERROR_NOT_IMPLEMENTED;
     },
 
     /**
@@ -758,7 +760,7 @@ calItemBase.prototype = {
         for (let i = 0; i < propmap.length; i++) {
             let prop = propmap[i];
             let val = icalcomp[prop.ics];
-            if (val != null && val != Components.interfaces.calIIcalComponent.INVALID_VALUE) {
+            if (val != null && val != Ci.calIIcalComponent.INVALID_VALUE) {
                 this.setProperty(prop.cal, val);
             }
         }
@@ -776,7 +778,7 @@ calItemBase.prototype = {
         for (let i = 0; i < propmap.length; i++) {
             let prop = propmap[i];
             let val = this.getProperty(prop.cal);
-            if (val != null && val != Components.interfaces.calIIcalComponent.INVALID_VALUE) {
+            if (val != null && val != Ci.calIIcalComponent.INVALID_VALUE) {
                 icalcomp[prop.ics] = val;
             }
         }
@@ -794,7 +796,7 @@ calItemBase.prototype = {
 
         // re-initializing from scratch -- no light proxy anymore:
         this.mIsProxy = false;
-        this.mProperties = new cal.data.PropertyMap();
+        this.mProperties = new Map();
         this.mPropertyParams = {};
 
         this.mapPropsFromICS(icalcomp, this.icsBasePropMap);
@@ -913,10 +915,10 @@ calItemBase.prototype = {
 
     // attribute calIIcalComponent icalComponent;
     get icalComponent() {
-        throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+        throw Cr.NS_ERROR_NOT_IMPLEMENTED;
     },
     set icalComponent(val) {
-        throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+        throw Cr.NS_ERROR_NOT_IMPLEMENTED;
     },
 
     // attribute PRUint32 generation;
@@ -986,7 +988,7 @@ calItemBase.prototype = {
     // void getAlarms(out PRUint32 count, [array, size_is(count), retval] out calIAlarm aAlarms);
     getAlarms: function(aCount) {
         if (typeof aCount != "object") {
-            throw Components.results.NS_ERROR_XPC_NEED_OUT_OBJECT;
+            throw Cr.NS_ERROR_XPC_NEED_OUT_OBJECT;
         }
 
         if (!this.mAlarms && this.mIsProxy) {
@@ -1015,7 +1017,7 @@ calItemBase.prototype = {
                 // Trigger the icalComponent getter to make sure the alarm is valid.
                 aAlarm.icalComponent; // eslint-disable-line no-unused-expressions
             } catch (e) {
-                throw Components.results.NS_ERROR_INVALID_ARG;
+                throw Cr.NS_ERROR_INVALID_ARG;
             }
         }
 
@@ -1029,7 +1031,7 @@ calItemBase.prototype = {
         this.modify();
         this.mAlarms = this.getAlarms({});
         for (let i = 0; i < this.mAlarms.length; i++) {
-            if (cal.data.compareObjects(this.mAlarms[i], aAlarm, Components.interfaces.calIAlarm)) {
+            if (cal.data.compareObjects(this.mAlarms[i], aAlarm, Ci.calIAlarm)) {
                 this.mAlarms.splice(i, 1);
                 break;
             }

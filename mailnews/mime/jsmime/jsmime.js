@@ -636,7 +636,7 @@ function decodeRFC2047Words(headerValue) {
     if (encoding == 'B' || encoding == 'b') {
       // Decode base64. If there's any non-base64 data, treat the string as
       // an illegal token.
-      if (/[^A-Za-z0-9+\/=]/.exec(text))
+      if (/[^ A-Za-z0-9+\/=]/.exec(text))
         return false;
 
       // Decode the string
@@ -821,13 +821,17 @@ function parseAddressingHeader(header, doRFC2047) {
                  addrSpec.substring(addrSpec.lastIndexOf("@"));
     }
 
+    // Replace consecutive whitespace in the name with a single whitespace.
+    displayName = displayName.replace(/\s\s+/g, " ");
+
     if (displayName === '' && lastComment !== '') {
       // Take last comment content as the display-name.
       let offset = lastComment[0] === ' ' ? 2 : 1;
       displayName = lastComment.substr(offset, lastComment.length - offset - 1);
     }
-    if (displayName !== '' || addrSpec !== '')
+    if (displayName !== '' || addrSpec !== '') {
       addrlist.push({name: displayName, email: addrSpec});
+    }
     // Clear pending flags and variables.
     name = localPart = address = lastComment = '';
     inAngle = inComment = needsSpace = false;
@@ -944,7 +948,7 @@ function parseAddressingHeader(header, doRFC2047) {
 
       // We need space for the next token if we aren't some kind of comment or
       // . delimiter.
-      needsSpace = token.toString()[0] != '.';
+      needsSpace = (token.toString().length > 0) && (token.toString()[0] != '.');
       // The fall-through case after this resets needsSpace to false, and we
       // don't want that!
       continue;
@@ -1092,7 +1096,7 @@ function parseParameterHeader(headerValue, doRFC2047, doRFC2231) {
         entry.hasCharset = lastStar;
 
       // Is the continuation number illegal?
-      else if ((number[0] == '0' && number != '0') ||
+      else if (number.length == 0 || (number[0] == '0' && number != '0') ||
           !(/^[0-9]+$/.test(number))) {
         entry.valid = false;
         continue;
@@ -1138,7 +1142,7 @@ function parseParameterHeader(headerValue, doRFC2047, doRFC2231) {
 
       // Concatenate as many parameters as are valid. If we need to decode thec
       // charset, do so now.
-      var value = entry.slice(0, i).join('');
+      let value = entry.slice(0, i).join('');
       if (entry.hasCharset) {
         try {
           value = decode2231Value(value);

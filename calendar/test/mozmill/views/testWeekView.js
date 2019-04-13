@@ -2,13 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+var MODULE_NAME = "testWeekView";
 var RELATIVE_ROOT = "../shared-modules";
-var MODULE_REQUIRES = ["calendar-utils"];
+var MODULE_REQUIRES = ["calendar-utils", "item-editing-helpers"];
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
-var helpersForController, invokeEventDialog, createCalendar, deleteCalendars;
-var CALENDARNAME;
+var CALENDARNAME, CANVAS_BOX, EVENT_BOX, WEEK_VIEW, EVENTPATH;
+var helpersForController, switchToView, invokeEventDialog, getEventDetails, createCalendar;
+var closeAllEventDialogs, deleteCalendars, goToDate, lookupEventBox;
+var helpersForEditUI, setData;
 
 var TITLE1 = "Week View Event";
 var TITLE2 = "Week View Event Changed";
@@ -16,157 +19,99 @@ var DESC = "Week View Event Description";
 
 function setupModule(module) {
     controller = mozmill.getMail3PaneController();
+    ({
+        CALENDARNAME,
+        CANVAS_BOX,
+        EVENT_BOX,
+        WEEK_VIEW,
+        EVENTPATH,
+        helpersForController,
+        switchToView,
+        invokeEventDialog,
+        getEventDetails,
+        createCalendar,
+        closeAllEventDialogs,
+        deleteCalendars,
+        goToDate,
+        lookupEventBox
+    } = collector.getModule("calendar-utils"));
+    collector.getModule("calendar-utils").setupModule(controller);
+    Object.assign(module, helpersForController(controller));
 
     ({
-        helpersForController,
-        invokeEventDialog,
-        createCalendar,
-        deleteCalendars,
-        CALENDARNAME
-    } = collector.getModule("calendar-utils"));
-    collector.getModule("calendar-utils").setupModule();
-    Object.assign(module, helpersForController(controller));
+        helpersForEditUI,
+        setData
+    } = collector.getModule("item-editing-helpers"));
+    collector.getModule("item-editing-helpers").setupModule(module);
 
     createCalendar(controller, CALENDARNAME);
 }
 
 function testWeekView() {
     let dateFormatter = cal.getDateFormatter();
-    // paths
-    let miniMonth = `
-        /id("messengerWindow")/id("tabmail-container")/id("tabmail")/
-        id("tabpanelcontainer")/id("calendarTabPanel")/id("calendarContent")/
-        id("ltnSidebar")/id("minimonth-pane")/{"align":"center"}/
-        id("calMinimonthBox")/id("calMinimonth")/
-    `;
-    let weekView = `
-        /id("messengerWindow")/id("tabmail-container")/id("tabmail")/
-        id("tabpanelcontainer")/id("calendarTabPanel")/id("calendarContent")/
-        id("calendarDisplayDeck")/id("calendar-view-box")/id("view-deck")/
-        id("week-view")/;
-    `;
-    let eventDialog = `
-        /id("calendar-event-dialog")/id("event-grid")/id("event-grid-rows")/
-    `;
-    let eventBox = `
-        ${weekView}/anon({"anonid":"mainbox"})/anon({"anonid":"scrollbox"})/
-        anon({"anonid":"daybox"})/[4]/anon({"anonid":"boxstack"})/
-        anon({"anonid":"topbox"})/{"flex":"1"}/{"flex":"1"}/{"flex":"1"}/
-        {"tooltip":"itemTooltip","calendar":"${CALENDARNAME.toLowerCase()}"}
-    `;
 
-    controller.click(eid("calendar-tab-button"));
-    controller.waitThenClick(eid("calendar-week-view-button"));
+    switchToView(controller, "week");
+    goToDate(controller, 2009, 1, 1);
 
-    // pick year
-    controller.click(lookup(`
-        ${miniMonth}/anon({"anonid":"minimonth-header"})/anon({"anonid":"yearcell"})
-    `));
-    controller.click(lookup(`
-        ${miniMonth}/anon({"anonid":"minimonth-header"})/
-        anon({"anonid":"minmonth-popupset"})/anon({"anonid":"years-popup"})/[0]/
-        {"value":"2009"}
-    `));
-
-    // pick month
-    controller.waitThenClick(lookup(`
-        ${miniMonth}/anon({"anonid":"minimonth-header"})/anon({"anonid":"monthheader"})
-    `));
-    controller.click(lookup(`
-        ${miniMonth}/anon({"anonid":"minimonth-header"})/
-        anon({"anonid":"minmonth-popupset"})/anon({"anonid":"months-popup"})/[0]/
-        {"index":"0"}'
-    `));
-
-    // pick day
-    controller.waitThenClick(lookup(`
-        ${miniMonth}/anon({"anonid":"minimonth-calendar"})/[1]/{"value":"1"}
-    `));
-
-    // verify date
+    // Verify date.
     let day = lookup(`
-        ${weekView}/anon({"anonid":"mainbox"})/anon({"anonid":"labelbox"})/
-        anon({"anonid":"labeldaybox"})/{"selected":"true"}
+        ${WEEK_VIEW}/anon({"anonid":"mainbox"})/anon({"anonid":"headerbox"})/
+        anon({"anonid":"headerdaybox"})/{"selected":"true"}
     `);
     controller.waitFor(() => day.getNode().mDate.icalString == "20090101");
 
-    // create event at 8 AM
-    // Thursday of 2009-01-01 is 4th with default settings
-    eventBox = lookup(`
-        ${weekView}/anon({"anonid":"mainbox"})/anon({"anonid":"scrollbox"})/
-        anon({"anonid":"daybox"})/[4]/anon({"anonid":"boxstack"})/
-        anon({"anonid":"bgbox"})/[8]'), 1, 1
-    `);
+    // Create event at 8 AM.
+    // Thursday of 2009-01-01 is 4th with default settings.
+    let eventBox = lookupEventBox("week", CANVAS_BOX, null, 5, 8);
     invokeEventDialog(controller, eventBox, (event, iframe) => {
-        let { lookup: eventlookup, eid: eventid } = helpersForController(event);
+        let { eid: eventid } = helpersForController(event);
+        let { getDateTimePicker } = helpersForEditUI(iframe);
 
-        // check that the start time is correct
-        let startTimeInput = eventlookup(`
-            ${eventDialog}/id("event-grid-startdate-row")/
-            id("event-grid-startdate-picker-box")/id("event-starttime")/
-            anon({"anonid":"hbox"})/anon({"anonid":"time-picker"})/
-            anon({"class":"timepicker-box-class"})/
-            anon({"class":"timepicker-text-class"})/anon({"flex":"1"})/
-            anon({"anonid":"input"})'
-        `);
+        let startTimeInput = getDateTimePicker("STARTTIME");
+        let startDateInput = getDateTimePicker("STARTDATE");
+
+        // Check that the start time is correct.
         event.waitForElement(startTimeInput);
-        event.assertValue(startTimeInput, "8:00");
-        let someTime = cal.createDateTime();
-        someTime.resetTo(2009, 1, 1);
-        let date = dateFormatter.formatDateShort(someDate);
-        event.assertValue(eventlookup(`
-            ${eventDialog}/id("event-grid-startdate-row")/
-            id("event-grid-startdate-picker-box")/id("event-starttime")/
-            anon({"anonid":"hbox"})/anon({"anonid":"date-picker"})/
-            anon({"flex":"1","id":"hbox","class":"datepicker-box-class"})/
-            {"class":"datepicker-text-class"}/
-            anon({"class":"menulist-editable-box textbox-input-box"})/
-            anon({"anonid":"input"})
-        `), date);
+        let someDate = cal.createDateTime();
+        someDate.resetTo(2009, 0, 1, 8, 0, 0, cal.dtz.floating);
+        event.assertValue(startTimeInput, dateFormatter.formatTime(someDate));
+        event.assertValue(startDateInput, dateFormatter.formatDateShort(someDate));
 
-        // fill in title, description and calendar
-        event.type(eventlookup(`
-            ${eventDialog}/id("event-grid-title-row")/id("item-title")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `), TITLE1);
-        event.type(eventlookup(`
-            ${eventDialog}/id("event-grid-description-row")/id("item-description")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `), DESC);
-        event.select(eventid("item-calendar"), null, CALENDARNAME);
+        // Fill in title, description and calendar.
+        setData(event, iframe, {
+            title: TITLE1,
+            description: DESC,
+            calendar: CALENDARNAME
+        });
 
         // save
         event.click(eventid("button-saveandclose"));
     });
 
+    // If it was created successfully, it can be opened.
+    eventBox = lookupEventBox("week", EVENT_BOX, null, 5, null, EVENTPATH);
     invokeEventDialog(controller, eventBox, (event, iframe) => {
-        let { lookup: eventlookup, eid: eventid } = helpersForController(event);
+        let { eid: eventid } = helpersForController(event);
 
-        // change title and save changes
-        let titleTextBox = eventlookup(`
-            ${eventDialog}/id("event-grid-title-row")/id("item-title")/
-            anon({"class":"textbox-input-box"})/anon({"anonid":"input"})
-        `);
-        event.waitForElement(titleTextBox);
-        event.type(titleTextBox, TITLE2);
+        // Change title and save changes.
+        setData(event, iframe, { title: TITLE2 });
         event.click(eventid("button-saveandclose"));
     });
 
-    // check if name was saved
-    let eventName = lookup(`
-        ${eventBox}//anon({"flex":"1"})/anon({"anonid":"event-container"})/
-        {"class":"calendar-event-selection"}/anon({"anonid":"eventbox"})/
-        {"class":"calendar-event-details"}/anon({"anonid":"event-name"})'
-    `);
+    // Check if name was saved.
+    let eventName = lookupEventBox("week", EVENT_BOX, null, 5, null,
+        `${EVENTPATH}/${getEventDetails("week")}/anon({"flex":"1"})/anon({"anonid":"event-name"})`
+    );
     controller.waitForElement(eventName);
     controller.assertJSProperty(eventName, "textContent", TITLE2);
 
-    // delete event
-    controller.click(lookup(eventBox));
+    // Delete event.
+    controller.click(eventBox);
     controller.keypress(eid("week-view"), "VK_DELETE", {});
-    controller.waitForElementNotPresent(lookup(eventBox));
+    controller.waitForElementNotPresent(eventBox);
 }
 
 function teardownTest(module) {
     deleteCalendars(controller, CALENDARNAME);
+    closeAllEventDialogs();
 }

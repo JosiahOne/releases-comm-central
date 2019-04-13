@@ -12,22 +12,13 @@
   --lwt-additional-images: none;
   --lwt-background-alignment: right top;
   --lwt-background-tiling: no-repeat;
+
+  --toolbar-bgcolor: var(--toolbar-non-lwt-bgcolor);
+  --toolbar-bgimage: var(--toolbar-non-lwt-bgimage);
+  --toolbar-color: var(--toolbar-non-lwt-textcolor);
 }
 
 /* message header widgets */
-
-mail-messageid {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-messageid");
-}
-
-mail-messageids-headerfield {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-messageids-headerfield");
-}
-
-mail-emailaddress {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-emailaddress");
-}
-
 .emailDisplayButton {
   -moz-user-focus: normal;
 }
@@ -40,57 +31,16 @@ mail-emailaddress {
   -moz-user-focus: normal;
 }
 
-mail-emailheaderfield {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-emailheaderfield");
-}
-
-mail-toggle-headerfield {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-toggle-headerfield");
-}
-
-mail-multi-emailHeaderField {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-multi-emailHeaderField");
-}
-
-mail-newsgroup {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-newsgroup");
-}
-
-mail-newsgroups-headerfield {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-newsgroups-headerfield");
-}
-
-mail-headerfield {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-headerfield");
-}
-
-mail-urlfield {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-urlfield");
-}
-
-mail-tagfield {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#mail-headerfield-tags");
-}
-
 mail-tagfield[collapsed="true"] {
   display: none;
 }
 
-#searchTermList > listitem {
-  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#listitem");
+#searchTermList > richlistitem {
+  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#filterlistitem");
 }
 
-searchattribute {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#searchattribute");
-}
-
-searchoperator {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#searchoperator");
-}
-
-searchvalue {
+search-value {
   display: -moz-deck;
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#searchvalue");
 }
 
 searchterm {
@@ -105,38 +55,6 @@ searchterm {
   -moz-binding: url("chrome://messenger/content/searchWidgets.xml#ruleactiontype-menulist");
 }
 
-.ruleactiontarget[type] {
-  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#ruleactiontarget-base");
-}
-
-.ruleactiontarget[type="movemessage"], .ruleactiontarget[type="copymessage"] {
-  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#ruleactiontarget-folder");
-}
-
-.ruleactiontarget[type="addtagtomessage"] {
-  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#ruleactiontarget-tag");
-}
-
-.ruleactiontarget[type="setpriorityto"] {
-  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#ruleactiontarget-priority");
-}
-
-.ruleactiontarget[type="setjunkscore"] {
-  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#ruleactiontarget-junkscore");
-}
-
-.ruleactiontarget[type="forwardmessage"] {
-  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#ruleactiontarget-forwardto");
-}
-
-.ruleactiontarget[type="replytomessage"] {
-  -moz-binding: url("chrome://messenger/content/searchWidgets.xml#ruleactiontarget-replyto");
-}
-
-dummy.usesMailWidgets {
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#dummy");
-}
-
 #searchInput {
   -moz-binding: url("chrome://messenger/content/search.xml#glodaSearch");
 }
@@ -147,42 +65,6 @@ dummy.usesMailWidgets {
 
 .remote-gloda-search-container {
   min-width: 10em;
-}
-
-.quick-search-button {
-  -moz-binding: url("chrome://messenger/content/search.xml#searchBarDropMarker");
-  cursor: default;
-  -moz-user-focus: none;
-}
-
-.quick-search-clearbutton{
-  cursor: default;
-  -moz-user-focus: none;
-}
-
-.folderSummaryPopup
-{
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#folderSummary-popup");
-}
-
-folderSummary
-{
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#folderSummary");
-}
-
-folderSummaryMessage
-{
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#folderSummary-message");
-}
-
-folderSummaryLocation
-{
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#folderSummary-location");
-}
-
-folderSummarySubfoldersSummary
-{
-  -moz-binding: url("chrome://messenger/content/mailWidgets.xml#folderSummary-subfoldersSummary");
 }
 
 tabmail {
@@ -201,29 +83,63 @@ menupopup[type="folder"] {
   -moz-binding: url("chrome://messenger/content/addressbook/addrbookWidgets.xml#map-list");
 }
 
+.chromeclass-toolbar {
+  overflow-x: hidden;
+}
+
 /* Lightweight themes support */
 
 :root:-moz-lwtheme {
-  color: var(--lwt-text-color) !important;
-  background-color: var(--lwt-accent-color) !important;
-  background-image: var(--lwt-additional-images) !important;
-  background-position: var(--lwt-background-alignment) !important;
-  background-repeat: var(--lwt-background-tiling) !important;
+  --toolbar-color: var(--lwt-text-color, inherit);
+
+  background-color: var(--lwt-accent-color);
+  color: var(--lwt-text-color);
 }
 
 :root:-moz-lwtheme[lwtheme-image] {
-  background-image: var(--lwt-header-image), var(--lwt-additional-images) !important;
+  background-image: var(--lwt-header-image) !important;
+  background-repeat: no-repeat;
+  background-position: right top !important;
 }
 
 :root:-moz-lwtheme:-moz-window-inactive {
-  background-color: var(--lwt-accent-color-inactive, var(--lwt-accent-color)) !important;
+  background-color: var(--lwt-accent-color-inactive, var(--lwt-accent-color));
 }
 
-:root[lwthemefooter="true"] #status-bar:-moz-lwtheme {
-  background-repeat: no-repeat;
-  background-position: bottom left;
+/* Add a box to draw additional background images. */
+#LW-background-box {
+  display: none;
+}
+
+#LW-background-box:-moz-lwtheme {
+  display: -moz-box;
+  height: 60px;
+  position: fixed;
+  pointer-events: none;
+  top: 0;
+  width: -moz-available;
+}
+
+#messengerWindow[windowtype="mail:3pane"] > #LW-background-box:-moz-lwtheme {
+  z-index: -1;
+}
+
+/* Set additional backgrounds alignment relative to toolbox.
+   This rule needs to be in content to avoid CSP issues. */
+#LW-background-box:-moz-lwtheme,
+#ab-toolbox:-moz-lwtheme,
+#compose-toolbox:-moz-lwtheme {
+  background-image: var(--lwt-additional-images);
+  background-position: var(--lwt-background-alignment);
+  background-repeat: var(--lwt-background-tiling);
+}
+
+#status-bar:-moz-lwtheme {
+  background-repeat: no-repeat, var(--lwt-background-tiling);
+  background-position: bottom right, var(--lwt-background-alignment);
   background-color: var(--lwt-accent-color);
-  background-image: var(--lwt-footer-image);
+  background-image: var(--lwt-header-image), var(--lwt-additional-images);
+  color: var(--lwt-text-color);
 }
 
 /* AppButton support */
@@ -265,13 +181,17 @@ splitmenu {
   -moz-binding: url("chrome://messenger/content/mailWidgets.xml#appmenu-vertical") !important;
 }
 
-/* Preferences */
-
-preftab,
-preftab:root /* override :root */ {
-  -moz-binding: url("chrome://messenger/content/preferences/aboutPreferences.xml#preftab");
-  -moz-box-orient: vertical;
+%ifndef XP_MACOSX
+toolbar[type="menubar"][autohide="true"] {
+  overflow: hidden;
 }
+
+toolbar[type="menubar"][autohide="true"][inactive="true"]:not([customizing="true"]) {
+  min-height: 0 !important;
+  height: 0 !important;
+  -moz-appearance: none !important;
+}
+%endif
 
 /* WebExtensions icon-variables */
 
@@ -549,10 +469,77 @@ preftab:root /* override :root */ {
   list-style-image: var(--timezones-icon) !important;
 }
 
+/* Rules to help integrate WebExtension buttons */
+
+.webextension-action > .toolbarbutton-badge-stack > .toolbarbutton-icon {
+  height: 16px;
+  width: 16px;
+}
+
+@media not all and (min-resolution: 1.1dppx) {
+  .webextension-action {
+    list-style-image: var(--webextension-toolbar-image, inherit);
+  }
+
+  toolbar[brighttext] .webextension-action {
+    list-style-image: var(--webextension-toolbar-image-light, inherit);
+  }
+
+  toolbar:not([brighttext]) .webextension-action:-moz-lwtheme {
+    list-style-image: var(--webextension-toolbar-image-dark, inherit);
+  }
+
+  .webextension-action[cui-areatype="menu-panel"] {
+    list-style-image: var(--webextension-menupanel-image, inherit);
+  }
+
+  :root[lwt-popup-brighttext] .webextension-action[cui-areatype="menu-panel"] {
+    list-style-image: var(--webextension-menupanel-image-light, inherit);
+  }
+
+  :root:not([lwt-popup-brighttext]) .webextension-action[cui-areatype="menu-panel"]:-moz-lwtheme {
+    list-style-image: var(--webextension-menupanel-image-dark, inherit);
+  }
+
+  .webextension-menuitem {
+    list-style-image: var(--webextension-menuitem-image, inherit) !important;
+  }
+}
+
+@media (min-resolution: 1.1dppx) {
+  .webextension-action {
+    list-style-image: var(--webextension-toolbar-image-2x, inherit);
+  }
+
+  toolbar[brighttext] .webextension-action {
+    list-style-image: var(--webextension-toolbar-image-2x-light, inherit);
+  }
+
+  toolbar:not([brighttext]) .webextension-action:-moz-lwtheme {
+    list-style-image: var(--webextension-toolbar-image-2x-dark, inherit);
+  }
+
+  .webextension-action[cui-areatype="menu-panel"] {
+    list-style-image: var(--webextension-menupanel-image-2x, inherit);
+  }
+
+  :root[lwt-popup-brighttext] .webextension-action[cui-areatype="menu-panel"] {
+    list-style-image: var(--webextension-menupanel-image-2x-light, inherit);
+  }
+
+  :root:not([lwt-popup-brighttext]) .webextension-action[cui-areatype="menu-panel"]:-moz-lwtheme {
+    list-style-image: var(--webextension-menupanel-image-2x-dark, inherit);
+  }
+
+  .webextension-menuitem {
+    list-style-image: var(--webextension-menuitem-image-2x, inherit) !important;
+  }
+}
+
 /* Status bar */
 
 %ifdef XP_MACOSX
-statusbar {
+.statusbar {
   padding-right: 14px;
 }
 
@@ -560,7 +547,7 @@ statusbar {
   display: none;
 }
 %else
-window[sizemode="maximized"] statusbarpanel.statusbar-resizerpanel {
+window[sizemode="maximized"] .statusbar-resizerpanel {
   visibility: collapse;
 }
 %endif
@@ -568,7 +555,6 @@ window[sizemode="maximized"] statusbarpanel.statusbar-resizerpanel {
 /* Status panel */
 
 statuspanel {
-  -moz-binding: url("chrome://messenger/content/tabmail.xml#statuspanel");
   position: fixed;
   margin-top: -3em;
   left: 0;
@@ -583,7 +569,8 @@ statuspanel:-moz-locale-dir(rtl):not([mirror]) {
   right: 0;
 }
 
-statuspanel[label=""] {
+statuspanel[label=""],
+statuspanel:not([label]) {
   opacity: 0;
   pointer-events: none;
 }

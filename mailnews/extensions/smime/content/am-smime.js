@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var nsIX509CertDB = Ci.nsIX509CertDB;
 var nsX509CertDBContractID = "@mozilla.org/security/x509certdb;1";
@@ -28,6 +28,8 @@ var gEncryptionChoicesLocked;
 var gSigningChoicesLocked;
 var kEncryptionCertPref = "identity.encryption_cert_name";
 var kSigningCertPref = "identity.signing_cert_name";
+
+document.addEventListener("dialogaccept", smimeOnAcceptEditor);
 
 function onInit()
 {
@@ -156,17 +158,17 @@ function smimeSave()
   gIdentity.setCharAttribute("signing_cert_dbkey", gSignCertName.dbKey);
 }
 
-function smimeOnAcceptEditor()
+function smimeOnAcceptEditor(event)
 {
   try {
-    if (!onOk())
-      return false;
+    if (!onOk()) {
+      event.preventDefault();
+      return;
+    }
   }
   catch (ex) {}
 
   smimeSave();
-
-  return true;
 }
 
 function onLockPreference()

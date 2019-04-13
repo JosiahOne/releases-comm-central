@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/MailUtils.js");
+var {MailUtils} = ChromeUtils.import("resource:///modules/MailUtils.jsm");
 
 var gMessengerBundle;
 
@@ -24,7 +24,7 @@ function MsgFolderPickerOnLoad(pickerID)
     // verify that the value we are attempting to
     // pre-flight the menu with is valid for this
     // picker type
-    var msgfolder = MailUtils.getFolderForURI(uri, true);
+    var msgfolder = MailUtils.getExistingFolder(uri);
           if (!msgfolder) return;
     
     var verifyFunction = null;
@@ -55,7 +55,7 @@ function PickedMsgFolder(selection,pickerID)
 
 function SetFolderPickerElement(uri, picker)
 {
-  var msgfolder = MailUtils.getFolderForURI(uri, true);
+  var msgfolder = MailUtils.getExistingFolder(uri);
 
   if (!msgfolder)
     return;

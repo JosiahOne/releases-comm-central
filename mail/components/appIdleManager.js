@@ -3,9 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-this.EXPORTED_SYMBOLS = ['appIdleManager'];
+this.EXPORTED_SYMBOLS = ["appIdleManager"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 // This module provides a mechanism to turn window focus and blur events
 // into app idle notifications. If we get a blur notification that is not
@@ -15,38 +15,31 @@ ChromeUtils.import("resource://gre/modules/Services.jsm");
 // notification.
 // The notification topic is "mail:appIdle", the values are "idle", and "back"
 
-var appIdleManager =
-{
+var appIdleManager = {
   _appIdle: false,
   _timerInterval: 5000, // 5 seconds ought to be plenty
-  get _timer()
-  {
+  get _timer() {
     delete this._timer;
     return this._timer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
   },
 
-  _timerCallback: function()
-  {
+  _timerCallback() {
     appIdleManager._appIdle = true;
     Services.obs.notifyObservers(null, "mail:appIdle", "idle");
-
   },
 
-  onBlur: function()
-  {
+  onBlur() {
     appIdleManager._timer.initWithCallback(appIdleManager._timerCallback,
                                  appIdleManager._timerInterval,
                                  Ci.nsITimer.TYPE_ONE_SHOT);
    },
 
-  onFocus: function()
-  {
+  onFocus() {
     appIdleManager._timer.cancel();
-    if (appIdleManager._appIdle)
-    {
+    if (appIdleManager._appIdle) {
       appIdleManager._appIdle = false;
       Services.obs.notifyObservers(null, "mail:appIdle", "back");
     }
-  }
+  },
 };
 

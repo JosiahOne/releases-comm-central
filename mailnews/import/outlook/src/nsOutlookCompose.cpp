@@ -40,7 +40,6 @@
 #include "nsMsgMessageFlags.h"
 #include "nsMsgLocalFolderHdrs.h"
 
-static NS_DEFINE_CID(kMsgSendCID, NS_MSGSEND_CID);
 static NS_DEFINE_CID(kMsgCompFieldsCID, NS_MSGCOMPFIELDS_CID);
 
 #ifdef IMPORT_DEBUG
@@ -77,7 +76,7 @@ public:
   // convertCRs controls if we want to convert standalone CRs to CRLFs
   CCompositionFile(nsIFile* aFile, void* fifoBuffer, uint32_t fifoBufferSize, bool convertCRs=false);
 
-  operator bool() const { return m_fileSize && m_pInputStream; }
+  explicit operator bool() const { return m_fileSize && m_pInputStream; }
 
   // Reads up to and including the term sequence, or entire file if term isn't found
   // termSize may be used to include NULLs in the terminator sequences.
@@ -127,7 +126,7 @@ public:
   NS_IMETHOD OnStopSending(const char *aMsgID, nsresult aStatus, const char16_t *aMsg,
                nsIFile *returnFile) {
     m_done = true;
-    NS_IF_ADDREF(m_location = returnFile);
+    m_location = returnFile;
     return NS_OK;
   }
 
@@ -280,7 +279,8 @@ nsresult nsOutlookCompose::ComposeTheMessage(nsMsgDeliverMode mode, CMapiMessage
   }
 
   nsCString bodyA;
-  nsMsgI18NConvertFromUnicode(nsDependentCString(msg.GetBodyCharset()), bodyW, bodyA);
+  const char *charset = msg.GetBodyCharset();
+  nsMsgI18NConvertFromUnicode(charset ? nsDependentCString(charset) : EmptyCString(), bodyW, bodyA);
 
   nsCOMPtr<nsIImportService> impService(do_GetService(NS_IMPORTSERVICE_CONTRACTID, &rv));
   NS_ENSURE_SUCCESS(rv, rv);
@@ -369,7 +369,7 @@ nsresult nsOutlookCompose::CopyComposedMessage(nsIFile *pSrc,
   nsCString newHeadersStr;
   rv = f.ToString(newHeadersStr, MSG_LINEBREAK MSG_LINEBREAK); // Read all the headers
   NS_ENSURE_SUCCESS(rv, rv);
-  UpdateHeaders(*origMsg.GetHeaders(), newHeadersStr.get());
+  UpdateHeaders(*origMsg.GetHeaders(), CMapiMessageHeaders(newHeadersStr.get()));
   rv = origMsg.GetHeaders()->ToStream(pDst);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -613,7 +613,7 @@ nsresult CCompositionFile::ToDest(_OutFn dest, const char* term, int termSize)
 
 class dest_nsCString {
 public:
-  dest_nsCString(nsCString& str) : m_str(str) { m_str.Truncate(); }
+  explicit dest_nsCString(nsCString& str) : m_str(str) { m_str.Truncate(); }
   void SetCapacity(int32_t sz) { m_str.SetCapacity(sz); }
   nsresult Append(const char* buf, uint32_t count) {
     m_str.Append(buf, count); return NS_OK; }
@@ -623,7 +623,7 @@ private:
 
 class dest_Stream {
 public:
-  dest_Stream(nsIOutputStream *dest) : m_stream(dest) {}
+  explicit dest_Stream(nsIOutputStream *dest) : m_stream(dest) {}
   void SetCapacity(int32_t) { /*do nothing*/ }
   // const_cast here is due to the poor design of the EscapeFromSpaceLine()
   // that requires a non-constant pointer while doesn't modify its data

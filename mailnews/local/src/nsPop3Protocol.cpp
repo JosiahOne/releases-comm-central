@@ -47,6 +47,7 @@
 #include "mozilla/Services.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/Preferences.h"
 
 using namespace mozilla;
 
@@ -458,7 +459,6 @@ nsPop3Protocol::nsPop3Protocol(nsIURI* aURL)
   m_totalFolderSize(0),
   m_totalDownloadSize(0),
   m_totalBytesReceived(0),
-  m_lineStreamBuffer(nullptr),
   m_pop3ConData(nullptr)
 {
 }
@@ -484,7 +484,7 @@ nsresult nsPop3Protocol::Initialize(nsIURI * aURL)
   m_currentAuthMethod = POP3_AUTH_MECH_UNDEFINED;
   m_needToRerunUrl = false;
 
-  m_url = do_QueryInterface(aURL);
+  m_url = aURL;
 
   m_lineStreamBuffer = new nsMsgLineStreamBuffer(OUTPUT_BUFFER_SIZE, true);
 
@@ -619,9 +619,6 @@ void nsPop3Protocol::Cleanup()
   FreeMsgInfo();
   PR_Free(m_pop3ConData->only_uidl);
   PR_Free(m_pop3ConData);
-
-  delete m_lineStreamBuffer;
-  m_lineStreamBuffer = nullptr;
 }
 
 void nsPop3Protocol::SetCapFlag(uint32_t flag)
@@ -700,11 +697,10 @@ void nsPop3Protocol::SetUsername(const char* name)
 
 nsresult nsPop3Protocol::RerunUrl()
 {
-  nsCOMPtr<nsIURI> url = do_QueryInterface(m_url);
   ClearFlag(POP3_PASSWORD_FAILED);
   m_pop3Server->SetRunningProtocol(nullptr);
   Cleanup();
-  return LoadUrl(url, nullptr);
+  return LoadUrl(m_url, nullptr);
 }
 
 Pop3StatesEnum nsPop3Protocol::GetNextPasswordObtainState()
@@ -749,7 +745,7 @@ nsresult nsPop3Protocol::StartGetAsyncPassword(Pop3StatesEnum aNextState)
 
   // We're now going to need to do something that will end up with us either
   // poking the login manager or prompting the user. We need to ensure we only
-  // do one prompt at a time (and loging manager could cause a master password
+  // do one prompt at a time (and login manager could cause a master password
   // prompt), so we need to use the async prompter.
   nsCOMPtr<nsIMsgAsyncPrompter> asyncPrompter =
     do_GetService(NS_MSGASYNCPROMPTER_CONTRACTID, &rv);
@@ -770,6 +766,13 @@ nsresult nsPop3Protocol::StartGetAsyncPassword(Pop3StatesEnum aNextState)
   // hidden.
   NS_ENSURE_SUCCESS(rv, rv);
   return rv;
+}
+
+NS_IMETHODIMP nsPop3Protocol::OnPromptStartAsync(nsIMsgAsyncPromptCallback *aCallback)
+{
+  bool result = false;
+  OnPromptStart(&result);
+  return aCallback->OnAuthResult(result);
 }
 
 NS_IMETHODIMP nsPop3Protocol::OnPromptStart(bool *aResult)
@@ -956,7 +959,7 @@ NS_IMETHODIMP nsPop3Protocol::OnTransportStatus(nsITransport *aTransport, nsresu
 }
 
 // stop binding is a "notification" informing us that the stream associated with aURL is going away.
-NS_IMETHODIMP nsPop3Protocol::OnStopRequest(nsIRequest *aRequest, nsISupports * aContext, nsresult aStatus)
+NS_IMETHODIMP nsPop3Protocol::OnStopRequest(nsIRequest *aRequest, nsresult aStatus)
 {
   // If the server dropped the connection, m_socketIsOpen will be true, before
   // we call nsMsgProtocol::OnStopRequest. The call will force a close socket,
@@ -994,7 +997,7 @@ NS_IMETHODIMP nsPop3Protocol::OnStopRequest(nsIRequest *aRequest, nsISupports * 
 
     return NS_OK;
   }
-  nsresult rv = nsMsgProtocol::OnStopRequest(aRequest, aContext, aStatus);
+  nsresult rv = nsMsgProtocol::OnStopRequest(aRequest, aStatus);
 
   // turn off the server busy flag on stop request - we know we're done, right?
   nsCOMPtr<nsIMsgIncomingServer> server = do_QueryInterface(m_pop3Server);
@@ -1660,7 +1663,7 @@ int32_t nsPop3Protocol::SendTLSResponse()
 
 void nsPop3Protocol::InitPrefAuthMethods(int32_t authMethodPrefValue)
 {
-  // for m_prefAuthMethods, using the same flags as server capablities.
+  // for m_prefAuthMethods, using the same flags as server capabilities.
   switch (authMethodPrefValue)
   {
     case nsMsgAuthMethod::none:
@@ -2205,41 +2208,42 @@ int32_t nsPop3Protocol::SendPassword()
 
   nsAutoCString cmd;
   nsresult rv;
+  NS_ConvertUTF16toUTF8 passwordUTF8(m_passwordResult);
 
   if (m_currentAuthMethod == POP3_HAS_AUTH_NTLM)
     rv = DoNtlmStep2(m_commandResponse, cmd);
   else if (m_currentAuthMethod == POP3_HAS_AUTH_CRAM_MD5)
   {
     MOZ_LOG(POP3LOGMODULE, LogLevel::Debug, (POP3LOG("CRAM login")));
-    char buffer[512]; // TODO nsAutoCString
+    char buffer[255 + 1 + 2 * DIGEST_LENGTH + 1];
     unsigned char digest[DIGEST_LENGTH];
 
     char *decodedChallenge = PL_Base64Decode(m_commandResponse.get(),
-    m_commandResponse.Length(), nullptr);
+                                             m_commandResponse.Length(), nullptr);
 
     if (decodedChallenge)
       rv = MSGCramMD5(decodedChallenge, strlen(decodedChallenge),
-                      NS_ConvertUTF16toUTF8(m_passwordResult).get(),
-                      m_passwordResult.Length(), digest);
+                      passwordUTF8.get(), passwordUTF8.Length(), digest);
     else
       rv = NS_ERROR_NULL_POINTER;
 
     if (NS_SUCCEEDED(rv))
     {
-      nsAutoCString encodedDigest;
-      char hexVal[8];
+      // The encoded digest is the hexadecimal representation of
+      // DIGEST_LENGTH characters, so it will be twice that length.
+      nsAutoCStringN<2 * DIGEST_LENGTH> encodedDigest;
 
-      for (uint32_t j = 0; j < 16; j++)
+      for (uint32_t j = 0; j < DIGEST_LENGTH; j++)
       {
-        PR_snprintf (hexVal,8, "%.2x", 0x0ff & (unsigned short)digest[j]);
+        char hexVal[3];
+        PR_snprintf (hexVal, 3, "%.2x", 0x0ff & (unsigned short)digest[j]);
         encodedDigest.Append(hexVal);
       }
 
-      PR_snprintf(buffer, sizeof(buffer), "%s %s", m_username.get(),
+      PR_snprintf(buffer, sizeof(buffer), "%.255s %s", m_username.get(),
                   encodedDigest.get());
       char *base64Str = PL_Base64Encode(buffer, strlen(buffer), nullptr);
-      cmd = base64Str;
-      PR_Free(base64Str);
+      cmd.Adopt(base64Str);
     }
 
     if (NS_FAILED(rv))
@@ -2248,25 +2252,26 @@ int32_t nsPop3Protocol::SendPassword()
   else if (m_currentAuthMethod == POP3_HAS_AUTH_APOP)
   {
     MOZ_LOG(POP3LOGMODULE, LogLevel::Debug, (POP3LOG("APOP login")));
-    char buffer[512];
+    char buffer[5 + 255 + 1 + 2 * DIGEST_LENGTH + 1];
     unsigned char digest[DIGEST_LENGTH];
 
     rv = MSGApopMD5(m_ApopTimestamp.get(), m_ApopTimestamp.Length(),
-                    NS_ConvertUTF16toUTF8(m_passwordResult).get(),  // Or ASCII?
-                    m_passwordResult.Length(), digest);
+                    passwordUTF8.get(), passwordUTF8.Length(), digest);
 
     if (NS_SUCCEEDED(rv))
     {
-      nsAutoCString encodedDigest;
-      char hexVal[8];
+      // The encoded digest is the hexadecimal representation of
+      // DIGEST_LENGTH characters, so it will be twice that length.
+      nsAutoCStringN<2 * DIGEST_LENGTH> encodedDigest;
 
-      for (uint32_t j=0; j<16; j++)
+      for (uint32_t j = 0; j < DIGEST_LENGTH; j++)
       {
-        PR_snprintf (hexVal,8, "%.2x", 0x0ff & (unsigned short)digest[j]);
+        char hexVal[3];
+        PR_snprintf (hexVal, 3, "%.2x", 0x0ff & (unsigned short)digest[j]);
         encodedDigest.Append(hexVal);
       }
 
-      PR_snprintf(buffer, sizeof(buffer), "APOP %s %s", m_username.get(),
+      PR_snprintf(buffer, sizeof(buffer), "APOP %.255s %s", m_username.get(),
                   encodedDigest.get());
       cmd = buffer;
     }
@@ -2293,34 +2298,35 @@ int32_t nsPop3Protocol::SendPassword()
       return 0;
     }
 
-    char plain_string[512]; // TODO nsCString
-    int len = 1; /* first <NUL> char */
-    memset(plain_string, 0, 512);
-    PR_snprintf(&plain_string[1], 510, "%s", m_username.get());
-    len += m_username.Length();
-    len++; /* second <NUL> char */
-    NS_ConvertUTF16toUTF8 uniPassword(m_passwordResult);
-    PR_snprintf(&plain_string[len], 511-len, "%s", uniPassword.get());
-    len += uniPassword.Length();
+    char plain_string[513];
+    memset(plain_string, 0, 513);
+    PR_snprintf(&plain_string[1], 256, "%.255s", m_username.get());
+    uint32_t len = std::min(m_username.Length(), 255u) + 2;  // We include two <NUL> characters.
+    if (passwordUTF8.Length() > 255)  // RFC 4616: passwd; up to 255 octets
+      passwordUTF8.Truncate(255);
+    PR_snprintf(&plain_string[len], 256, "%s", passwordUTF8.get());
+    len += passwordUTF8.Length();
 
     char *base64Str = PL_Base64Encode(plain_string, len, nullptr);
-    cmd = base64Str;
-    PR_Free(base64Str);
+    cmd.Adopt(base64Str);
   }
   else if (m_currentAuthMethod == POP3_HAS_AUTH_LOGIN)
   {
     MOZ_LOG(POP3LOGMODULE, LogLevel::Debug, (POP3LOG("LOGIN password")));
-    NS_LossyConvertUTF16toASCII asciiPassword(m_passwordResult);
-    char * base64Str = PL_Base64Encode(asciiPassword.get(),
-                                       asciiPassword.Length(), nullptr);
-    cmd = base64Str;
-    PR_Free(base64Str);
+    char *base64Str = PL_Base64Encode(passwordUTF8.get(),
+                                      passwordUTF8.Length(), nullptr);
+    cmd.Adopt(base64Str);
   }
   else if (m_currentAuthMethod == POP3_HAS_AUTH_USER)
   {
     MOZ_LOG(POP3LOGMODULE, LogLevel::Debug, (POP3LOG("PASS password")));
     cmd = "PASS ";
-    cmd += NS_LossyConvertUTF16toASCII(m_passwordResult);
+    bool useLatin1 =
+      mozilla::Preferences::GetBool("mail.smtp_login_pop3_user_pass_auth_is_latin1", true);
+    if (useLatin1)
+      cmd += NS_LossyConvertUTF16toASCII(m_passwordResult);
+    else
+      cmd += passwordUTF8;
   }
   else
   {

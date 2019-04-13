@@ -14,10 +14,8 @@
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/smtpEditOverlay.dtd">
 
 <dialog title="&smtpEditTitle.label;"
-        xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-        onload="onLoad();"
-        ondialogaccept="return onAccept();">
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
+        onload="onLoad();">
   <stringbundle id="bundle_prefs"
                 src="chrome://messenger/locale/prefs.properties"/>
   <stringbundle id="bundle_brand"
@@ -28,7 +26,7 @@
           src="chrome://messenger/content/SmtpServerEdit.js"/>
   <vbox id="smtpServerEditor">
     <groupbox>
-      <caption label="&settings.caption;"/>
+      <label class="header">&settings.caption;</label>
       <grid flex="1">
         <columns>
           <column/>
@@ -77,7 +75,7 @@
     <separator class="thin"/>
 
     <groupbox>
-      <caption label="&security.caption;"/>
+      <label class="header">&security.caption;</label>
 
       <grid flex="1">
         <columns>

@@ -87,6 +87,8 @@ nsImapFlagAndUidState::nsImapFlagAndUidState(int32_t numberOfMessages)
   fSupportedUserFlags = 0;
   fNumberDeleted = 0;
   fPartialUIDFetch = true;
+  fStartCapture = false;
+  fNumAdded = 0;
 }
 
 nsImapFlagAndUidState::~nsImapFlagAndUidState()
@@ -108,6 +110,27 @@ nsImapFlagAndUidState::GetSupportedUserFlags(uint16_t *aFlags)
   return NS_OK;
 }
 
+NS_IMETHODIMP
+nsImapFlagAndUidState::SetOtherKeywords(uint16_t index, const nsACString &otherKeyword)
+{
+  if (index == 0)
+    fOtherKeywords.Clear();
+  nsAutoCString flag(otherKeyword);
+  ToLowerCase(flag);
+  fOtherKeywords.AppendElement(flag);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsImapFlagAndUidState::GetOtherKeywords(uint16_t index, nsACString &aKeyword)
+{
+  if (index < fOtherKeywords.Length())
+    aKeyword = fOtherKeywords[index];
+  else
+    aKeyword = EmptyCString();
+  return NS_OK;
+}
+
 // we need to reset our flags, (re-read all) but chances are the memory allocation needed will be
 // very close to what we were already using
 
@@ -119,6 +142,8 @@ NS_IMETHODIMP nsImapFlagAndUidState::Reset()
   fUids.Clear();
   fFlags.Clear();
   fPartialUIDFetch = true;
+  fStartCapture = false;
+  fNumAdded = 0;
   PR_CExitMonitor(this);
   return NS_OK;
 }
@@ -161,6 +186,14 @@ NS_IMETHODIMP nsImapFlagAndUidState::AddUidFlagPair(uint32_t uid, imapMessageFla
     int32_t sizeToGrowBy = zeroBasedIndex - fUids.Length() + 1;
     fUids.InsertElementsAt(fUids.Length(), sizeToGrowBy, 0);
     fFlags.InsertElementsAt(fFlags.Length(), sizeToGrowBy, 0);
+    if (fStartCapture)
+    {
+      // A new partial (CONDSTORE/CHANGEDSINCE) fetch response is occurring
+      // so need to start the count of number of uid/flag combos added.
+      fNumAdded = 0;
+      fStartCapture = false;
+    }
+    fNumAdded++;
   }
 
   fUids[zeroBasedIndex] = uid;
@@ -280,7 +313,7 @@ NS_IMETHODIMP nsImapFlagAndUidState::GetCustomFlags(uint32_t uid, char **customF
   nsCString value;
   if (m_customFlagsHash.Get(uid, &value))
   {
-    *customFlags = NS_strdup(value.get());
+    *customFlags = NS_xstrdup(value.get());
     return (*customFlags) ? NS_OK : NS_ERROR_FAILURE;
   }
   *customFlags = nullptr;

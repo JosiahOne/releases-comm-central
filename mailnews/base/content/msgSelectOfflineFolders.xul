@@ -7,15 +7,13 @@
 
 <!DOCTYPE dialog SYSTEM "chrome://messenger/locale/msgSynchronize.dtd" >
 
-<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<dialog xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         id="select-offline"
         windowtype="mailnews:selectOffline"
         title="&MsgSelect.label;"
         width="450" height="400"
         persist="width height"
-        onload="gSelectOffline.load();"
-        ondialogaccept="return gSelectOffline.onAccept();"
-        ondialogcancel="return gSelectOffline.onCancel();">
+        onload="gSelectOffline.load();">
 
   <stringbundle id="bundle_messenger" src="chrome://messenger/locale/messenger.properties"/>
   <stringbundle id="bundle_brand" src="chrome://branding/locale/brand.properties"/>

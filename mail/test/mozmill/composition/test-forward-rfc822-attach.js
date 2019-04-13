@@ -9,15 +9,16 @@
 
 // mozmake SOLO_TEST=composition/test-forward-rfc822-attach.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-forward-rfc822-attach";
 
 var RELATIVE_ROOT = "../shared-modules";
 var MODULE_REQUIRES = ["folder-display-helpers", "compose-helpers", "window-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-var os = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/os.js", os);
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var os = ChromeUtils.import("chrome://mozmill/content/stdlib/os.jsm");
 
 var gDrafts;
 

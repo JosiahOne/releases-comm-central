@@ -12,7 +12,7 @@
  * the nuke path! oh the irony!) so we don't need to get all hardcore.
  **/
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
  * The DB version to use.  We set this as a non-const variable so that
@@ -57,8 +57,8 @@ function run_test() {
 
   // - tickle gloda
   // public.js loads gloda.js which self-initializes and initializes the datastore
-  ChromeUtils.import("resource:///modules/gloda/public.js");
-  ChromeUtils.import("resource:///modules/gloda/datastore.js");
+  let {Gloda} = ChromeUtils.import("resource:///modules/gloda/public.js");
+  let {GlodaDatastore} = ChromeUtils.import("resource:///modules/gloda/datastore.js");
 
   Assert.notEqual(GlodaDatastore.asyncConnection, null);
 }

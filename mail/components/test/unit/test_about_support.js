@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
+// mail/components/about-support/content/accounts.js
+/* globals AboutSupport, AboutSupportPlatform */
+
+var {localAccountUtils} = ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
 
 /*
  * Test the about:support module.
@@ -55,10 +58,10 @@ var gAccountList = [{
   }],
 }];
 
-/// A map of account keys to servers. Populated by setup_accounts.
-var gAccountMap = {};
-/// A map of SMTP server names to SMTP servers. Populated by setup_accounts.
-var gSMTPMap = {};
+// A map of account keys to servers. Populated by setup_accounts.
+var gAccountMap = new Map();
+// A map of SMTP server names to SMTP servers. Populated by setup_accounts.
+var gSMTPMap = new Map();
 
 /**
  * A list of sensitive data: it shouldn't be present in the account
@@ -80,22 +83,22 @@ function setup_accounts() {
     server.socketType = details.socketType;
     server.authMethod = details.authMethod;
     gSensitiveData.push(details.password);
+    let account = MailServices.accounts.FindAccountForServer(server);
     for (let smtpDetails of details.smtpServers) {
       let outgoing = localAccountUtils.create_outgoing_server(smtpDetails.port,
                                                               smtpDetails.user,
                                                               smtpDetails.password);
       outgoing.socketType = smtpDetails.socketType;
       outgoing.authMethod = smtpDetails.authMethod;
-      localAccountUtils.associate_servers(server, outgoing, smtpDetails.isDefault);
+      localAccountUtils.associate_servers(account, outgoing, smtpDetails.isDefault);
       gSensitiveData.push(smtpDetails.password);
 
       // Add the SMTP server to our server name -> server map
-      gSMTPMap["localhost:" + smtpDetails.port] = smtpDetails;
+      gSMTPMap.set("localhost:" + smtpDetails.port, smtpDetails);
     }
 
     // Add the server to our account -> server map
-    let account = MailServices.accounts.FindAccountForServer(server);
-    gAccountMap[account.key] = details;
+    gAccountMap.set(account.key, details);
   }
 }
 
@@ -103,7 +106,7 @@ function setup_accounts() {
  * Verify that the given account's details match our details for the key.
  */
 function verify_account_details(aDetails) {
-  let expectedDetails = gAccountMap[aDetails.key];
+  let expectedDetails = gAccountMap.get(aDetails.key);
   // All our servers are at localhost
   let expectedHostDetails = "(" + expectedDetails.type + ") localhost:" +
     expectedDetails.port;
@@ -120,7 +123,7 @@ function verify_account_details(aDetails) {
     Assert.notEqual(toSeeIndex, -1);
     smtpToSee.splice(toSeeIndex, 1);
 
-    let expectedSMTPDetails = gSMTPMap[smtpDetails.name];
+    let expectedSMTPDetails = gSMTPMap.get(smtpDetails.name);
     Assert.equal(smtpDetails.socketType, expectedSMTPDetails.socketType);
     Assert.equal(smtpDetails.authMethod, expectedSMTPDetails.authMethod);
     Assert.equal(smtpDetails.isDefault, expectedSMTPDetails.isDefault);
@@ -154,7 +157,7 @@ function test_get_account_details() {
   let accountDetails = AboutSupport.getAccountDetails();
   let accountDetailsText = uneval(accountDetails);
   // The list of accounts we are looking for
-  let accountsToSee = Object.keys(gAccountMap);
+  let accountsToSee = [...gAccountMap.keys()];
 
   // Our first check is to see that no sensitive data has crept in
   for (let data of gSensitiveData)

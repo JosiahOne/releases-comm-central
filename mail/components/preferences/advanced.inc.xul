@@ -1,126 +1,21 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-  <prefpane id="paneAdvanced" label="&paneAdvanced.title;" onpaneload="gAdvancedPane.init();">
+  <prefpane id="paneAdvanced" label="&paneAdvanced.title;">
 #ifdef MOZ_UPDATER
     <script type="application/javascript" src="chrome://messenger/content/aboutDialog-appUpdater.js"/>
 #endif
     <script type="application/javascript" src="chrome://messenger/content/preferences/advanced.js"/>
     <script type="application/javascript" src="chrome://communicator/content/utilityOverlay.js"/>
 
-    <preferences id="advancedPreferences">
-      <preference id="mail.preferences.advanced.selectedTabIndex"
-                  name="mail.preferences.advanced.selectedTabIndex" type="int"/>
-      <!-- General tab -->
-
-      <preference id="general.autoScroll"
-                  name="general.autoScroll"
-                  type="bool"/>
-      <preference id="general.smoothScroll"
-                  name="general.smoothScroll"
-                  type="bool"/>
-      <preference id="intl.regional_prefs.use_os_locales"
-                  name="intl.regional_prefs.use_os_locales"
-                  type="bool"/>
-
-      <preference id="mailnews.database.global.indexer.enabled"
-                  name="mailnews.database.global.indexer.enabled"
-                  type="bool"/>
-
-      <preference id="layers.acceleration.disabled"
-                  name="layers.acceleration.disabled"
-                  type="bool"
-                  inverted="true"
-                  onchange="gAdvancedPane.updateHardwareAcceleration(this.value);"/>
-
-#ifdef HAVE_SHELL_SERVICE
-      <preference id="mail.shell.checkDefaultClient"
-                  name="mail.shell.checkDefaultClient"
-                  type="bool"/>
-      <preference id="pref.general.disable_button.default_mail"
-                  name="pref.general.disable_button.default_mail"
-                  type="bool"/>
-#endif
-      <!-- Keep one id, so that we don't have to do platform specific stuff later -->
-#ifdef XP_WIN
-      <preference id="searchintegration.enable"
-                  name="mail.winsearch.enable"
-                  type="bool"/>
-#else
-#ifdef XP_MACOSX
-      <preference id="searchintegration.enable"
-                  name="mail.spotlight.enable"
-                  type="bool"/>
-#else
-      <!-- We don't have any OS search integration for linux yet. -->
-      <preference id="searchintegration.enable"
-                  name="mail.XXX.enable"
-                  type="bool"/>
-#endif
-#endif
-
-      <!-- Data Choices tab -->
-#ifdef MOZ_TELEMETRY_REPORTING
-      <preference id="toolkit.telemetry.enabled"
-                  name="toolkit.telemetry.enabled"
-                  type="bool"/>
-#endif
-
-      <!-- Network tab -->
-      <preference id="mail.prompt_purge_threshhold"
-                  name="mail.prompt_purge_threshhold" type="bool"/>
-      <preference id="mail.purge_threshhold_mb"
-                  name="mail.purge_threshhold_mb" type="int"/>
-      <preference id="browser.cache.disk.capacity"
-                  name="browser.cache.disk.capacity" type="int"/>
-      <preference id="browser.cache.disk.smart_size.enabled"
-                  name="browser.cache.disk.smart_size.enabled"
-                  inverted="true"
-                  type="bool"/>
-#ifdef MOZ_UPDATER
-      <!-- Update tab -->
-      <preference id="app.update.enabled" name="app.update.enabled"
-type="bool"/>
-      <preference id="app.update.auto" name="app.update.auto"
-type="bool"/>
-      <preference id="app.update.disable_button.showUpdateHistory"
-                  name="app.update.disable_button.showUpdateHistory"
-                  type="bool"/>
-
-#ifdef MOZ_MAINTENANCE_SERVICE
-      <preference id="app.update.service.enabled"
-                  name="app.update.service.enabled"
-                  type="bool"/>
-#endif
-#endif
-      <!-- Certificates tab -->
-      <preference id="security.default_personal_cert"
-                  name="security.default_personal_cert"
-                  type="string"/>
-      <preference id="security.disable_button.openCertManager"
-                  name="security.disable_button.openCertManager"
-                  type="bool"/>
-      <preference id="security.disable_button.openDeviceManager"
-                  name="security.disable_button.openDeviceManager"
-                  type="bool"/>
-      <preference id="security.OCSP.enabled"
-                  name="security.OCSP.enabled"
-                  type="int"/>
-    </preferences>
-
 #ifdef HAVE_SHELL_SERVICE
     <stringbundle id="bundlePreferences" src="chrome://messenger/locale/preferences/preferences.properties"/>
     <stringbundle id="bundleBrand" src="chrome://branding/locale/brand.properties"/>
 #endif
 
-    <commandset id="networkTabCommandSet">
-      <command id="cmd_toggleCompact"
-               oncommand="gAdvancedPane.updateCompactOptions();"/>
-    </commandset>
-
     <tabbox id="advancedPrefs" flex="1" onselect="gAdvancedPane.tabSelectionChanged();">
       <tabs id="advancedPrefsTabs">
-        <tab id="generalTab" label="&itemGeneral.label;"/>
+        <tab id="advancedGeneralTab" label="&itemGeneral.label;"/>
 #ifdef MOZ_DATA_REPORTING
         <tab id="dataChoicesTab" label="&dataChoicesTab.label;"/>
 #endif
@@ -144,7 +39,7 @@ type="bool"/>
 
           <!-- Scrolling -->
           <groupbox id="scrollingGroup">
-            <caption label="&scrolling.label;"/>
+            <label><html:h2>&scrolling.label;</html:h2></label>
             <hbox>
               <checkbox id="useAutoScroll"
                         label="&useAutoScroll.label;"
@@ -163,7 +58,7 @@ type="bool"/>
 
           <!-- Date and time formatting -->
           <groupbox>
-            <caption label="&dateTimeFormatting.label;"/>
+            <label><html:h2>&dateTimeFormatting.label;</html:h2></label>
             <hbox>
             <radiogroup id="formatLocale"
                         preference="intl.regional_prefs.use_os_locales"
@@ -184,9 +79,35 @@ type="bool"/>
             </hbox>
           </groupbox>
 
+          <groupbox id="messengerLanguagesBox" hidden="true">
+            <label><html:h2>&languageSelector.label;</html:h2></label>
+             <vbox align="start">
+              <description flex="1"
+                           controls="chooseMessengerLanguage"
+                           data-l10n-id="choose-messenger-language-description"/>
+              <hbox>
+                <menulist id="defaultMessengerLanguage"
+                          oncommand="gAdvancedPane.onMessengerLanguageChange(event)">
+                  <menupopup/>
+                </menulist>
+                <button id="manageMessengerLanguagesButton"
+                        class="accessory-button"
+                        data-l10n-id="manage-messenger-languages-button"
+                        oncommand="gAdvancedPane.showMessengerLanguages({search: false})"/>
+              </hbox>
+            </vbox>
+            <hbox id="confirmMessengerLanguage"
+                  class="message-bar"
+                  align="center"
+                  hidden="true">
+              <image class="message-bar-icon"/>
+              <vbox class="message-bar-content-container" align="stretch" flex="1"/>
+            </hbox>
+          </groupbox>
+
 #ifdef HAVE_SHELL_SERVICE
           <groupbox id="systemDefaultsGroup" orient="vertical">
-            <caption label="&systemIntegration.label;"/>
+            <label><html:h2>&systemIntegration.label;</html:h2></label>
             <hbox id="checkDefaultBox" align="center">
               <checkbox id="alwaysCheckDefault"
                         preference="mail.shell.checkDefaultClient"
@@ -207,7 +128,7 @@ type="bool"/>
           </groupbox>
 #endif
           <groupbox>
-            <caption label="&configEditDesc.label;"/>
+            <label><html:h2>&configEditDesc.label;</html:h2></label>
             <vbox>
               <hbox>
                 <checkbox id="enableGloda"
@@ -253,7 +174,7 @@ type="bool"/>
         <tabpanel id="dataChoicesPanel" orient="vertical">
 #ifdef MOZ_TELEMETRY_REPORTING
           <groupbox>
-            <caption label="&telemetrySection.label;"/>
+            <label><html:h2>&telemetrySection.label;</html:h2></label>
             <description>&telemetryDesc.label;</description>
             <hbox>
               <checkbox id="submitTelemetryBox"
@@ -270,7 +191,7 @@ type="bool"/>
 #endif
 #ifdef MOZ_CRASHREPORTER
           <groupbox>
-            <caption label="&crashReporterSection.label;"/>
+            <label><html:h2>&crashReporterSection.label;</html:h2></label>
             <description>&crashReporterDesc.label;</description>
             <hbox>
               <checkbox id="submitCrashesBox"
@@ -292,7 +213,7 @@ type="bool"/>
         <tabpanel orient="vertical">
           <!-- Networking & Disk Space -->
           <groupbox>
-            <caption label="&connectionsInfo.caption;"/>
+            <label><html:h2>&connectionsInfo.caption;</html:h2></label>
             <hbox align="center">
               <description flex="1" control="catProxiesButton">&proxiesConfigure.label;</description>
               <button id="catProxiesButton" icon="network" label="&showSettings.label;"
@@ -302,7 +223,7 @@ type="bool"/>
           </groupbox>
 
           <groupbox>
-            <caption label="&offlineInfo.caption;"/>
+            <label><html:h2>&offlineInfo.caption;</html:h2></label>
             <hbox align="center">
               <description flex="1" control="offlineSettingsButton">&offlineInfo.label;</description>
               <button id="offlineSettingsButton" label="&showOffline.label;"
@@ -312,7 +233,7 @@ type="bool"/>
           </groupbox>
 
           <groupbox>
-            <caption label="&Diskspace;"/>
+            <label><html:h2>&Diskspace;</html:h2></label>
             <hbox align="center">
               <label id="actualDiskCacheSize" flex="1"/>
               <button id="clearCacheButton" icon="clear"
@@ -340,9 +261,9 @@ type="bool"/>
                 <checkbox id="offlineCompactFolder"
                           label="&offlineCompactFolders.label;"
                           accesskey="&offlineCompactFolders.accesskey;"
-                          command="cmd_toggleCompact"
                           aria-labelledby="offlineCompactFolder offlineCompactFolderMin compactFolderMB"
-                          preference="mail.prompt_purge_threshhold"/>
+                          preference="mail.prompt_purge_threshhold"
+                          oncommand="gAdvancedPane.updateCompactOptions(this.checked);"/>
                 <textbox id="offlineCompactFolderMin" size="4" value="20"
                          type="number" min="1" max="2048" increment="10"
                          preference="mail.purge_threshhold_mb"
@@ -356,12 +277,12 @@ type="bool"/>
         <!-- Update -->
         <tabpanel orient="vertical">
           <groupbox id="updateApp">
-            <caption label="&updateApp2.label;"/>
+            <label><html:h2>&updateApp2.label;</html:h2></label>
             <hbox align="center">
               <vbox>
                 <description>
                   &updateApp.version.pre;<label id="version"/>&updateApp.version.post;
-                  <label id="releasenotes" class="text-link" hidden="true">&releaseNotes.link;</label>
+                  <label is="text-link" id="releasenotes" hidden="true">&releaseNotes.link;</label>
                 </description>
                 <description id="distribution" class="text-blurb" hidden="true"/>
                 <description id="distributionId" class="text-blurb" hidden="true"/>
@@ -405,19 +326,22 @@ type="bool"/>
                           disabled="true"/>
                 </hbox>
                 <hbox id="downloading" align="center">
-                  <image class="update-throbber"/><label>&update.downloading.start;</label><label id="downloadStatus"/><label>&update.downloading.end;</label>
+                  <image class="update-throbber"/><label>&update.downloading.start;</label>
+                  <label id="downloadStatus"/><label>&update.downloading.end;</label>
                 </hbox>
                 <hbox id="applying" align="center">
                   <image class="update-throbber"/><label>&update.applying;</label>
                 </hbox>
                <hbox id="downloadFailed" align="center">
-                  <label>&update.failed.start;</label><label id="failedLink" class="text-link">&update.failed.linkText;</label><label>&update.failed.end;</label>
+                  <label>&update.failed.start;</label>
+                  <label is="text-link" id="failedLink">&update.failed.linkText;</label>
+                  <label>&update.failed.end;</label>
                   <spacer flex="1"/>
                   <button label="&update.checkForUpdatesButton.label;"
                           accesskey="&update.checkForUpdatesButton.accesskey;"
                           oncommand="gAppUpdater.checkForUpdates();"/>
                 </hbox>
-                <hbox id="adminDisabled" align="center">
+                <hbox id="policyDisabled" align="center">
                   <label>&update.adminDisabled;</label>
                 </hbox>
                 <hbox id="noUpdatesFound" align="center">
@@ -431,31 +355,43 @@ type="bool"/>
                   <label>&update.otherInstanceHandlingUpdates;</label>
                 </hbox>
                 <hbox id="manualUpdate" align="center">
-                  <label>&update.manual.start;</label><label id="manualLink" class="text-link">&update.manual.linkText;</label><label>&update.manual.end;</label>
+                  <label>&update.manual.start;</label><label is="text-link" id="manualLink">
+                    &update.manual.linkText;
+                  </label>
+                  <label>&update.manual.end;</label>
                   <spacer flex="1"/>
                   <button label="&update.checkForUpdatesButton.label;"
                           accesskey="&update.checkForUpdatesButton.accesskey;"
                           disabled="true"/>
                 </hbox>
                 <hbox id="unsupportedSystem" align="center">
-                  <label>&update.unsupported.start;</label><label id="unsupportedLink" class="text-link">&update.unsupported.linkText;</label><label>&update.unsupported.end;</label>
+                  <label>&update.unsupported.start;</label>
+                  <label is="text-link" id="unsupportedLink">&update.unsupported.linkText;</label>
+                  <label>&update.unsupported.end;</label>
+                </hbox>
+                <hbox id="restarting" align="center">
+                  <image class="update-throbber"/><label>&update.restarting;</label>
                 </hbox>
               </deck>
             </vbox>
             <separator/>
-            <radiogroup id="updateRadioGroup"
-                        align="start"
-                        oncommand="gAdvancedPane.updateWritePrefs();">
-              <radio value="auto"
-                     label="&updateAuto.label;"
-                     accesskey="&updateAuto.accesskey;"/>
-              <radio value="checkOnly"
-                     label="&updateCheck.label;"
-                     accesskey="&updateCheck.accesskey;"/>
-              <radio value="manual"
-                     label="&updateManual.label;"
-                     accesskey="&updateManual.accesskey;"/>
-            </radiogroup>
+            <description id="updateAllowDescription">&updateAppAllow.description;</description>
+            <vbox id="updateSettingsContainer">
+              <radiogroup id="updateRadioGroup"
+                          align="start">
+                <radio id="autoDesktop"
+                       value="true"
+                       label="&updateAuto.label;"
+                       accesskey="&updateAuto.accesskey;"/>
+                <radio id="manualDesktop"
+                       value="false"
+                       label="&updateCheck.label;"
+                       accesskey="&updateCheck.accesskey;"/>
+              </radiogroup>
+              <description id="updateSettingCrossUserWarning" hidden="true">
+                &updateCrossUserSettingWarning.description;
+              </description>
+            </vbox>
           </groupbox>
 
 #ifdef MOZ_MAINTENANCE_SERVICE
@@ -481,10 +417,12 @@ type="bool"/>
                       orient="horizontal" preftype="string"
                       preference="security.default_personal_cert"
                       aria-labelledby="CertGroupCaption CertSelectionDesc">
-            <radio label="&certs.auto;" accesskey="&certs.auto.accesskey;"
-                    value="Select Automatically"/>
-            <radio label="&certs.ask;" accesskey="&certs.ask.accesskey;"
-                    value="Ask Every Time"/>
+            <radio id="certSelectionAuto"
+                   label="&certs.auto;" accesskey="&certs.auto.accesskey;"
+                   value="Select Automatically"/>
+            <radio id="certSelectionAsk"
+                   label="&certs.ask;" accesskey="&certs.ask.accesskey;"
+                   value="Ask Every Time"/>
           </radiogroup>
 
           <separator/>
@@ -518,4 +456,3 @@ type="bool"/>
     </tabbox>
     <separator/>
   </prefpane>
-

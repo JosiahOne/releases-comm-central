@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 const FEEDWRITER_CID = Components.ID("{49bb6593-3aff-4eb3-a068-2712c28bd58e}");
 const FEEDWRITER_CONTRACTID = "@mozilla.org/browser/feeds/result-writer;1";
@@ -208,15 +208,6 @@ FeedWriter.prototype = {
     catch (e) {
       // Not allowed to load this link because checkLoadURIStrWithPrincipal threw
     }
-  },
-
-  __faviconService: null,
-  get _faviconService() {
-    if (!this.__faviconService)
-      this.__faviconService = Cc["@mozilla.org/browser/favicon-service;1"]
-                                .getService(Ci.mozIAsyncFavicons);
-
-    return this.__faviconService;
   },
 
   __bundle: null,
@@ -923,8 +914,6 @@ FeedWriter.prototype = {
         menuItem.setAttribute("handlerType", "web");
         menuItem.setAttribute("webhandlerurl", handlers[i].uri);
         handlersMenuPopup.appendChild(menuItem);
-
-        this._setFaviconForWebReader(handlers[i].uri, menuItem);
       }
     }
 
@@ -1090,7 +1079,6 @@ FeedWriter.prototype = {
     Services.prefs.removeObserver(PREF_AUDIO_SELECTED_APP, this);
 
     this._removeFeedFromCache();
-    this.__faviconService = null;
     this.__bundle = null;
     this._feedURI = null;
     this._selectedAppMenuItem = null;
@@ -1216,46 +1204,6 @@ FeedWriter.prototype = {
           this._setAlwaysUseCheckedState(feedType);
       }
     }
-  },
-
-  /**
-   * Sets the icon for the given web-reader item in the readers menu.
-   * The icon is fetched and stored through the favicon service.
-   *
-   * @param aReaderUrl
-   *        the reader url.
-   * @param aMenuItem
-   *        the reader item in the readers menulist.
-   *
-   * @note For privacy reasons we cannot set the image attribute directly
-   *       to the icon url.  See Bug 358878 for details.
-   */
-  _setFaviconForWebReader: function setFaviconForWebReader(aReaderUrl, aMenuItem) {
-    let readerURI = makeURI(aReaderUrl);
-    if (!/^https?/.test(readerURI.scheme)) {
-      // Don't try to get a favicon for non http(s) URIs.
-      return;
-    }
-    let faviconURI = makeURI(readerURI.resolve("/favicon.ico"));
-    var isPB = this._window.QueryInterface(Ci.nsIInterfaceRequestor)
-                   .getInterface(Ci.nsIWebNavigation)
-                   .QueryInterface(Ci.nsIDocShell)
-                   .QueryInterface(Ci.nsILoadContext)
-                   .usePrivateBrowsing;
-    var flags = isPB ? this._faviconService.FAVICON_LOAD_PRIVATE :
-                       this._faviconService.FAVICON_LOAD_NON_PRIVATE;
-    var nullPrincipal = Cc["@mozilla.org/nullprincipal;1"]
-                          .createInstance(Ci.nsIPrincipal);
-    this._faviconService.setAndFetchFaviconForPage(
-      readerURI, faviconURI, false, flags,
-      function(aURI, aDataLen, aData, aMimeType) {
-        if (aDataLen > 0) {
-          let dataURL = "data:" + aMimeType + ";base64," +
-                        btoa(String.fromCharCode.apply(null, aData));
-          aMenuItem.setAttribute("image", dataURL);
-        }
-      },
-      nullPrincipal);
   },
 
   classID: FEEDWRITER_CID,

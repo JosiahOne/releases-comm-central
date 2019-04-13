@@ -15,9 +15,8 @@
 this.EXPORTED_SYMBOLS = ["ircWATCH", "isupportWATCH", "ircMONITOR",
                           "isupportMONITOR"];
 
-ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/ircHandlers.jsm");
-ChromeUtils.import("resource:///modules/ircUtils.jsm");
+var {clearTimeout} = ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+const {ircHandlers} = ChromeUtils.import("resource:///modules/ircHandlers.jsm");
 
 function setStatus(aAccount, aNick, aStatus) {
   if (!aAccount.watchEnabled && !aAccount.monitorEnabled)
@@ -120,7 +119,7 @@ var isupportWATCH = {
     "WATCHOPTS": function(aMessage) {
       const watchOptToOption = {
         "H": "watchMasksEnabled",
-        "A": "watchAwayEnabled"
+        "A": "watchAwayEnabled",
       };
 
       // For each option, mark it as supported.
@@ -130,8 +129,8 @@ var isupportWATCH = {
       }, this);
 
       return true;
-    }
-  }
+    },
+  },
 };
 
 var ircWATCH = {
@@ -139,7 +138,7 @@ var ircWATCH = {
   // Slightly above default IRC priority.
   priority: ircHandlers.DEFAULT_PRIORITY + 10,
   // Use WATCH if it is supported.
-  isEnabled: function() { return !!this.watchEnabled; },
+  isEnabled() { return !!this.watchEnabled; },
 
   commands: {
     "251": function(aMessage) { // RPL_LUSERCLIENT
@@ -258,8 +257,8 @@ var ircWATCH = {
     "609": function(aMessage) { // RPL_NOWISAWAY
       // <nickname> <username> <hostname> <awaysince> :<away reason>
       return setStatus(this, aMessage.params[1], "AWAY");
-    }
-  }
+    },
+  },
 };
 
 var isupportMONITOR = {
@@ -289,8 +288,8 @@ var isupportMONITOR = {
       clearTimeout(this._isOnTimer);
 
       return true;
-    }
-  }
+    },
+  },
 };
 
 function trackBuddyMonitor(aNicks) {
@@ -343,7 +342,7 @@ var ircMONITOR = {
   priority: ircHandlers.DEFAULT_PRIORITY + 10,
   // Use MONITOR only if MONITOR is enabled and WATCH is not enabled, as WATCH
   // supports more features.
-  isEnabled: function() { return this.monitorEnabled && !this.watchEnabled; },
+  isEnabled() { return this.monitorEnabled && !this.watchEnabled; },
 
   commands: {
     "251": function(aMessage) { // RPL_LUSERCLIENT
@@ -406,6 +405,6 @@ var ircMONITOR = {
       this.ERROR("Maximum size for MONITOR list exceeded (" + this.params[1] +
                  ").");
       return true;
-    }
-  }
+    },
+  },
 };

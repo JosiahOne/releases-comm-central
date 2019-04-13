@@ -1,4 +1,4 @@
-/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*-
+/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -32,7 +32,6 @@
 #include "MailNewsTypes.h"
 #include "nsIMessengerWindowService.h"
 #include "prprf.h"
-#include "nsIWeakReference.h"
 #include "nsIStringBundle.h"
 #include "nsIAlertsService.h"
 #include "nsIPrefService.h"
@@ -46,10 +45,11 @@
 #include "nsMsgUtils.h"
 #include "mozilla/LookAndFeel.h"
 #include "mozilla/Services.h"
+#include "mozilla/DebugOnly.h"
 #include "nsIMutableArray.h"
 #include "nsArrayUtils.h"
 
-#include "nsToolkitCompsCID.h"
+#include "mozilla/Components.h"
 #include <stdlib.h>
 #define PROFILE_COMMANDLINE_ARG u" -profile "
 
@@ -257,7 +257,7 @@ nsMessengerWinIntegration::~nsMessengerWinIntegration()
   }
 
   // one last attempt, update the registry
-  nsresult rv = UpdateRegistryWithCurrent();
+  mozilla::DebugOnly<nsresult> rv = UpdateRegistryWithCurrent();
   NS_ASSERTION(NS_SUCCEEDED(rv), "failed to update registry on shutdown");
   DestroyBiffIcon();
 }
@@ -286,7 +286,7 @@ nsMessengerWinIntegration::ResetCurrent()
   return NS_OK;
 }
 
-NOTIFYICONDATAW sBiffIconData = { NOTIFYICONDATAW_V2_SIZE,
+NOTIFYICONDATAW sBiffIconData = { (DWORD)NOTIFYICONDATAW_V2_SIZE,
                                   0,
                                   2,
                                   NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_INFO,
@@ -296,7 +296,7 @@ NOTIFYICONDATAW sBiffIconData = { NOTIFYICONDATAW_V2_SIZE,
                                   0,
                                   0,
                                   L"",
-                                  30000,
+                                  { 30000 },
                                   L"",
                                   NIIF_USER | NIIF_NOSOUND };
 // allow for the null terminator
@@ -421,8 +421,8 @@ nsresult nsMessengerWinIntegration::ShowAlertMessage(const nsString& aAlertTitle
 
   if (showAlert)
   {
-    nsCOMPtr<nsIAlertsService> alertsService (do_GetService(NS_ALERTSERVICE_CONTRACTID, &rv));
-    if (NS_SUCCEEDED(rv))
+    nsCOMPtr<nsIAlertsService> alertsService = mozilla::components::Alerts::Service();
+    if (alertsService)
     {
       rv = alertsService->ShowAlertNotification(NS_LITERAL_STRING(NEW_MAIL_ALERT_ICON), aAlertTitle,
                                                 aAlertText, true,
@@ -590,7 +590,7 @@ nsresult nsMessengerWinIntegration::AlertClickedSimple()
   mSuppressBiffIcon = true;
   return NS_OK;
 }
-#endif MOZ_SUITE
+#endif
 
 NS_IMETHODIMP
 nsMessengerWinIntegration::Observe(nsISupports* aSubject, const char* aTopic, const char16_t* aData)
@@ -648,7 +648,7 @@ void nsMessengerWinIntegration::FillToolTipInfo()
   nsAutoString toolTipText;
   nsAutoString animatedAlertText;
   nsCOMPtr<nsIMsgFolder> folder;
-  nsCOMPtr<nsIWeakReference> weakReference;
+  nsWeakPtr weakReference;
   int32_t numNewMessages = 0;
 
   uint32_t count = 0;
@@ -731,7 +731,7 @@ nsresult nsMessengerWinIntegration::GetFirstFolderWithNewMail(nsACString& aFolde
   NS_ENSURE_TRUE(mFoldersWithNewMail, NS_ERROR_FAILURE);
 
   nsCOMPtr<nsIMsgFolder> folder;
-  nsCOMPtr<nsIWeakReference> weakReference;
+  nsWeakPtr weakReference;
   int32_t numNewMessages = 0;
 
   uint32_t count = 0;
@@ -845,7 +845,7 @@ nsMessengerWinIntegration::OnItemIntPropertyChanged(nsIMsgFolder *aItem, const n
   // if we got new mail show a icon in the system tray
   if (aProperty.Equals(kBiffState) && mFoldersWithNewMail)
   {
-    nsCOMPtr<nsIWeakReference> weakFolder = do_GetWeakReference(aItem);
+    nsWeakPtr weakFolder = do_GetWeakReference(aItem);
     uint32_t indexInNewArray;
     nsresult rv = mFoldersWithNewMail->IndexOf(0, weakFolder, &indexInNewArray);
     bool folderFound = NS_SUCCEEDED(rv);
@@ -929,7 +929,7 @@ nsMessengerWinIntegration::OnUnreadCountUpdateTimer(nsITimer *timer, void *osInt
   nsMessengerWinIntegration *winIntegration = (nsMessengerWinIntegration*)osIntegration;
 
   winIntegration->mUnreadTimerActive = false;
-  nsresult rv = winIntegration->UpdateUnreadCount();
+  mozilla::DebugOnly<nsresult> rv = winIntegration->UpdateUnreadCount();
   NS_ASSERTION(NS_SUCCEEDED(rv), "updating unread count failed");
 }
 
@@ -1016,9 +1016,9 @@ nsMessengerWinIntegration::UpdateRegistryWithCurrent()
       CopyASCIItoUTF16(mEmail, pBuffer);
 
     // Write the info into the registry
-    HRESULT hr = SHSetUnreadMailCountW(pBuffer.get(),
-                                       mCurrentUnreadCount,
-                                       commandLinerForAppLaunch.get());
+    SHSetUnreadMailCountW(pBuffer.get(),
+                          mCurrentUnreadCount,
+                          commandLinerForAppLaunch.get());
   }
 
   // do this last
@@ -1039,7 +1039,8 @@ nsMessengerWinIntegration::SetupInbox()
 
   nsCOMPtr <nsIMsgAccount> account;
   rv = accountManager->GetDefaultAccount(getter_AddRefs(account));
-  if (NS_FAILED(rv)) {
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (!account) {
     // this can happen if we launch mail on a new profile
     // we don't have a default account yet
     mDefaultAccountMightHaveAnInbox = false;

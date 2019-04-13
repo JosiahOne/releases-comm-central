@@ -8,13 +8,10 @@
 #include "nsIAbDirectory.idl"
 
 interface nsIFile;
-interface nsIMdbTableRowCursor;
-interface nsIMdbEnv;
 [ptr] native nsIMdbRow (nsIMdbRow);
 %{C++
 class nsIMdbRow;
 %}
-interface nsIArray;
 interface nsISimpleEnumerator;
 
 %{C++
@@ -176,7 +173,7 @@ interface nsIAddrDatabase : nsIAddrDBAnnouncer {
    *                          instance of the database.
    * @param  aName            The attribute to look up the value in.
    * @param  aUTF8Value       The value to look up in UTF8 format.
-   * @param  aCaseInsensitive Set to true for case-insenstive matching.
+   * @param  aCaseInsensitive Set to true for case-insensitive matching.
    * @result                  Returns an nsIAbCard if one is found, otherwise
    *                          NULL.
    */
@@ -191,7 +188,7 @@ interface nsIAddrDatabase : nsIAddrDBAnnouncer {
    *                          instance of the database.
    * @param  aName            The attribute to look up the value in.
    * @param  aUTF8Value       The value to look up in UTF8 format.
-   * @param  aCaseInsensitive Set to true for case-insenstive matching.
+   * @param  aCaseInsensitive Set to true for case-insensitive matching.
    * @result                  Returns an nsISimpleEnumerator of nsIAbCard
    *                          instances.
    */
@@ -208,6 +205,7 @@ interface nsIAddrDatabase : nsIAddrDBAnnouncer {
   [noscript] readonly attribute nsIMdbRow newListRow;
   [noscript] void addCardRowToDB(in nsIMdbRow newRow);
   [noscript] void addLdifListMember(in nsIMdbRow row, in string value);
+  [noscript] void addUID(in nsIMdbRow row, in string value);
   [noscript] void addFirstName(in nsIMdbRow row, in string value);
   [noscript] void addLastName(in nsIMdbRow row, in string value);
   [noscript] void addPhoneticFirstName(in nsIMdbRow row, in string value);

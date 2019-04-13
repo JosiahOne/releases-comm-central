@@ -5,7 +5,6 @@
 
 EXPORTS += [
     'nsMailDirServiceDefs.h',
-    'nsMsgRDFDataSource.h',
     'nsMsgRDFUtils.h',
 ]
 
@@ -35,10 +34,8 @@ SOURCES += [
     'nsMsgProgress.cpp',
     'nsMsgPurgeService.cpp',
     'nsMsgQuickSearchDBView.cpp',
-    'nsMsgRDFDataSource.cpp',
     'nsMsgRDFUtils.cpp',
     'nsMsgSearchDBView.cpp',
-    'nsMsgServiceProvider.cpp',
     'nsMsgSpecialViews.cpp',
     'nsMsgStatusFeedback.cpp',
     'nsMsgTagService.cpp',
@@ -48,8 +45,7 @@ SOURCES += [
     'nsMsgXFVirtualFolderDBView.cpp',
     'nsSpamSettings.cpp',
     'nsStatusBarBiffManager.cpp',
-    'nsSubscribableServer.cpp',
-    'nsSubscribeDataSource.cpp',
+    'nsSubscribableServer.cpp'
 ]
 
 if CONFIG['NS_PRINTING']:

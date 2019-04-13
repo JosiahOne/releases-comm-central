@@ -3,33 +3,44 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-//****************************************************************************//
+"use strict";
+
+/* import-globals-from preferences.js */
+/* import-globals-from subdialogs.js */
+
+// applications.inc.xul
+/* globals ICON_URL_APP */
+
+// ------------------------------
 // Constants & Enumeration Values
 
-var PREF_DISABLED_PLUGIN_TYPES = "plugin.disable_full_page_plugin_for_types";
-
-// Preferences that affect which entries to show in the list.
-var PREF_SHOW_PLUGINS_IN_LIST = "browser.download.show_plugins_in_list";
-var PREF_HIDE_PLUGINS_WITHOUT_EXTENSIONS =
-  "browser.download.hide_plugins_without_extensions";
-
-// The nsHandlerInfoAction enumeration values in nsIHandlerInfo identify
-// the actions the application can take with content of various types.
-// But since nsIHandlerInfo doesn't support plugins, there's no value
-// identifying the "use plugin" action, so we use this constant instead.
-var kActionUsePlugin = 5;
-
-// For CSS. Can be one of "ask", "save", "plugin" or "feed". If absent, the icon URL
+// For CSS. Can be one of "ask", "save", or "feed". If absent, the icon URL
 // was set by us to a custom handler icon and CSS should not try to override it.
 var APP_ICON_ATTR_NAME = "appHandlerIcon";
 
-// CloudFile account tools used by gCloudFileTab.
-ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var gNodeToObjectMap = new WeakMap();
 
-//****************************************************************************//
+// CloudFile account tools used by gCloudFileTab.
+var {cloudFileAccounts} = ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {AppConstants} = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+
+XPCOMUtils.defineLazyServiceGetters(this, {
+  gHandlerService: ["@mozilla.org/uriloader/handler-service;1", "nsIHandlerService"],
+  gMIMEService: ["@mozilla.org/mime;1", "nsIMIMEService"],
+});
+
+Preferences.addAll([
+  { id: "mail.preferences.applications.selectedTabIndex", type: "int" },
+  { id: "mail.compose.big_attachments.notify", type: "bool" },
+  { id: "mail.compose.big_attachments.threshold_kb", type: "int" },
+]);
+
+document.getElementById("paneApplications")
+        .addEventListener("paneload", function() { gApplicationsTabController.init(); });
+
+// ---------
 // Utilities
 
 function getDisplayNameForFile(aFile) {
@@ -37,18 +48,15 @@ function getDisplayNameForFile(aFile) {
     if (aFile instanceof Ci.nsILocalFileWin) {
       try {
         return aFile.getVersionInfoField("FileDescription");
-      }
-      catch(ex) {
+      } catch (ex) {
         // fall through to the file name
       }
     }
-  }
-  else if (AppConstants.platform == "macosx") {
+  } else if (AppConstants.platform == "macosx") {
     if (aFile instanceof Ci.nsILocalFileMac) {
       try {
         return aFile.bundleDisplayName;
-      }
-      catch(ex) {
+      } catch (ex) {
         // fall through to the file name
       }
     }
@@ -66,32 +74,88 @@ function getLocalHandlerApp(aFile) {
   return localHandlerApp;
 }
 
+// eslint-disable-next-line no-undef
+let gHandlerListItemFragment = MozXULElement.parseXULToFragment(`
+  <richlistitem>
+    <hbox flex="1" equalsize="always">
+      <hbox class="typeContainer" flex="1" align="center">
+        <image class="typeIcon" width="16" height="16"
+               src="moz-icon://goat?size=16"/>
+        <label class="typeDescription" flex="1" crop="end"/>
+      </hbox>
+      <hbox class="actionContainer" flex="1" align="center">
+        <image class="actionIcon" width="16" height="16"/>
+        <label class="actionDescription" flex="1" crop="end"/>
+      </hbox>
+      <hbox class="actionsMenuContainer" flex="1">
+        <menulist class="actionsMenu" flex="1" crop="end" selectedIndex="1">
+          <menupopup/>
+        </menulist>
+      </hbox>
+    </hbox>
+  </richlistitem>
+`);
+
 /**
- * An enumeration of items in a JS array.
- *
- * FIXME: use ArrayConverter once it lands (bug 380839).
- *
- * @constructor
+ * This is associated to <richlistitem> elements in the handlers view.
  */
-function ArrayEnumerator(aItems) {
-  this._index = 0;
-  this._contents = aItems;
-}
-
-ArrayEnumerator.prototype = {
-  _index: 0,
-
-  hasMoreElements: function() {
-    return this._index < this._contents.length;
-  },
-
-  getNext: function() {
-    return this._contents[this._index++];
+class HandlerListItem {
+  static forNode(node) {
+    return gNodeToObjectMap.get(node);
   }
-};
 
-//****************************************************************************//
-// HandlerInfoWrapper
+  constructor(handlerInfoWrapper) {
+    this.handlerInfoWrapper = handlerInfoWrapper;
+    }
+
+  setOrRemoveAttributes(iterable) {
+    for (let [selector, name, value] of iterable) {
+      let node = selector ? this.node.querySelector(selector) : this.node;
+      if (value) {
+        node.setAttribute(name, value);
+      } else {
+        node.removeAttribute(name);
+      }
+    }
+  }
+
+  connectAndAppendToList(list) {
+    list.appendChild(document.importNode(gHandlerListItemFragment, true));
+    this.node = list.lastChild;
+    gNodeToObjectMap.set(this.node, this);
+
+    this.node.querySelector(".actionsMenu").addEventListener("command",
+      event => gApplicationsPane.onSelectAction(event.originalTarget));
+
+    let typeDescription = this.handlerInfoWrapper.typeDescription;
+    this.setOrRemoveAttributes([
+      [null, "type", this.handlerInfoWrapper.type],
+      [".typeContainer", "tooltiptext", typeDescription],
+      [".typeDescription", "value", typeDescription],
+      [".typeIcon", "src", this.handlerInfoWrapper.smallIcon],
+    ]);
+    this.refreshAction();
+    this.showActionsMenu = false;
+  }
+
+  refreshAction() {
+    let { actionIconClass, actionDescription } = this.handlerInfoWrapper;
+    this.setOrRemoveAttributes([
+      [null, APP_ICON_ATTR_NAME, actionIconClass],
+      [".actionContainer", "tooltiptext", actionDescription],
+      [".actionDescription", "value", actionDescription],
+      [".actionIcon", "src", actionIconClass ? null :
+                             this.handlerInfoWrapper.actionIcon],
+    ]);
+  }
+
+  set showActionsMenu(value) {
+    this.setOrRemoveAttributes([
+      [".actionContainer", "hidden", value],
+      [".actionsMenuContainer", "hidden", !value],
+    ]);
+  }
+}
 
 /**
  * This object wraps nsIHandlerInfo with some additional functionality
@@ -100,42 +164,17 @@ ArrayEnumerator.prototype = {
  *
  * We create an instance of this wrapper for each entry we might display
  * in the prefpane, and we compose the instances from various sources,
- * including navigator.plugins and the handler service.
+ * including the handler service.
  *
  * We don't implement all the original nsIHandlerInfo functionality,
  * just the stuff that the prefpane needs.
- *
- * In theory, all of the custom functionality in this wrapper should get
- * pushed down into nsIHandlerInfo eventually.
  */
-function HandlerInfoWrapper(aType, aHandlerInfo) {
-  this._type = aType;
-  this.wrappedHandlerInfo = aHandlerInfo;
-}
-
-HandlerInfoWrapper.prototype = {
-  // The wrapped nsIHandlerInfo object.  In general, this object is private,
-  // but there are a couple cases where callers access it directly for things
-  // we haven't (yet?) implemented, so we make it a public property.
-  wrappedHandlerInfo: null,
-
-  //**************************************************************************//
-  // Convenience Utils
-
-  _handlerSvc: Cc["@mozilla.org/uriloader/handler-service;1"]
-                 .getService(Ci.nsIHandlerService),
-
-  _categoryMgr: Cc["@mozilla.org/categorymanager;1"]
-                  .getService(Ci.nsICategoryManager),
-
-  //**************************************************************************//
-  // nsIHandlerInfo
-
-  // The MIME type or protocol scheme.
-  _type: null,
-  get type() {
-    return this._type;
-  },
+class HandlerInfoWrapper {
+  constructor(type, handlerInfo) {
+    this.type = type;
+    this.wrappedHandlerInfo = handlerInfo;
+    this.disambiguateDescription = false;
+  }
 
   get description() {
     if (this.wrappedHandlerInfo.description)
@@ -147,33 +186,160 @@ HandlerInfoWrapper.prototype = {
                      .getFormattedString("fileEnding", [extension]);
     }
     return this.type;
-  },
+  }
+
+  /**
+   * Describe, in a human-readable fashion, the type represented by the given
+   * handler info object.  Normally this is just the description, but if more
+   * than one object presents the same description, "disambiguateDescription"
+   * is set and we annotate the duplicate descriptions with the type itself
+   * to help users distinguish between those types.
+   */
+  get typeDescription() {
+    if (this.disambiguateDescription) {
+      return this._prefsBundle.getFormattedString(
+        "typeDetailsWithTypeAndExt", [this.description, this.type]);
+    }
+
+    return this.description;
+  }
+
+  /**
+   * Describe, in a human-readable fashion, the preferred action to take on
+   * the type represented by the given handler info object.
+   */
+  get actionDescription() {
+    // alwaysAskBeforeHandling overrides the preferred action, so if that flag
+    // is set, then describe that behavior instead.  For most types, this is
+    // the "alwaysAsk" string, but for the feed type we show something special.
+    if (this.alwaysAskBeforeHandling) {
+      return gApplicationsPane._prefsBundle.getString("alwaysAsk");
+    }
+
+    switch (this.preferredAction) {
+      case Ci.nsIHandlerInfo.saveToDisk:
+        return gApplicationsPane._prefsBundle.getString("saveFile");
+
+      case Ci.nsIHandlerInfo.useHelperApp:
+        var preferredApp = this.preferredApplicationHandler;
+        var name;
+        if (preferredApp instanceof Ci.nsILocalHandlerApp)
+          name = getDisplayNameForFile(preferredApp.executable);
+        else
+          name = preferredApp.name;
+        return gApplicationsPane._prefsBundle.getFormattedString("useApp", [name]);
+
+      case Ci.nsIHandlerInfo.handleInternally:
+        if (this instanceof InternalHandlerInfoWrapper) {
+          return gApplicationsPane._prefsBundle.getFormattedString("previewInApp",
+            [gApplicationsPane._brandShortName]);
+        }
+
+        // For other types, handleInternally looks like either useHelperApp
+        // or useSystemDefault depending on whether or not there's a preferred
+        // handler app.
+        if (gApplicationsPane.isValidHandlerApp(this.preferredApplicationHandler))
+          return this.preferredApplicationHandler.name;
+
+        return this.defaultDescription;
+
+      // XXX Why don't we say the app will handle the type internally?
+      // Is it because the app can't actually do that?  But if that's true,
+      // then why would a preferredAction ever get set to this value
+      // in the first place?
+
+      case Ci.nsIHandlerInfo.useSystemDefault:
+        return gApplicationsPane._prefsBundle.getFormattedString("useDefault",
+          [this.defaultDescription]);
+
+      default:
+        throw new Error(`Unexpected preferredAction: ${this.preferredAction}`);
+    }
+  }
+
+  get actionIconClass() {
+    if (this.alwaysAskBeforeHandling) {
+      return "ask";
+    }
+
+    switch (this.preferredAction) {
+      case Ci.nsIHandlerInfo.saveToDisk:
+        return "save";
+
+      case Ci.nsIHandlerInfo.handleInternally:
+        if (this instanceof InternalHandlerInfoWrapper) {
+          return "ask";
+        }
+    }
+
+    return "";
+  }
+
+  get actionIcon() {
+    switch (this.preferredAction) {
+      case Ci.nsIHandlerInfo.useSystemDefault:
+        return this.iconURLForSystemDefault;
+
+      case Ci.nsIHandlerInfo.useHelperApp:
+        let preferredApp = this.preferredApplicationHandler;
+        if (gApplicationsPane.isValidHandlerApp(preferredApp)) {
+          return gApplicationsPane._getIconURLForHandlerApp(preferredApp);
+        }
+      // Explicit fall-through
+
+      // This should never happen, but if preferredAction is set to some weird
+      // value, then fall back to the generic application icon.
+      default:
+        return ICON_URL_APP;
+    }
+  }
+
+  get iconURLForSystemDefault() {
+    // Handler info objects for MIME types on some OSes implement a property bag
+    // interface from which we can get an icon for the default app, so if we're
+    // dealing with a MIME type on one of those OSes, then try to get the icon.
+    if (this.wrappedHandlerInfo instanceof Ci.nsIMIMEInfo &&
+        this.wrappedHandlerInfo instanceof Ci.nsIPropertyBag) {
+      try {
+        let url = this.wrappedHandlerInfo.getProperty("defaultApplicationIconURL");
+        if (url) {
+          return url + "?size=16";
+        }
+      } catch (ex) { }
+    }
+
+    // If this isn't a MIME type object on an OS that supports retrieving
+    // the icon, or if we couldn't retrieve the icon for some other reason,
+    // then use a generic icon.
+    return ICON_URL_APP;
+  }
 
   get preferredApplicationHandler() {
     return this.wrappedHandlerInfo.preferredApplicationHandler;
-  },
+  }
 
   set preferredApplicationHandler(aNewValue) {
     this.wrappedHandlerInfo.preferredApplicationHandler = aNewValue;
 
     // Make sure the preferred handler is in the set of possible handlers.
     if (aNewValue)
-      this.addPossibleApplicationHandler(aNewValue)
-  },
+      this.addPossibleApplicationHandler(aNewValue);
+  }
 
   get possibleApplicationHandlers() {
     return this.wrappedHandlerInfo.possibleApplicationHandlers;
-  },
+  }
 
-  addPossibleApplicationHandler: function(aNewHandler) {
-    try {
-      if (this.possibleApplicationHandlers.indexOf(0, aNewHandler) != -1)
+  addPossibleApplicationHandler(aNewHandler) {
+    var possibleApps = this.possibleApplicationHandlers.enumerate();
+    while (possibleApps.hasMoreElements()) {
+      if (possibleApps.getNext().equals(aNewHandler))
         return;
-    } catch (e) { }
+    }
     this.possibleApplicationHandlers.appendElement(aNewHandler);
-  },
+  }
 
-  removePossibleApplicationHandler: function(aHandler) {
+  removePossibleApplicationHandler(aHandler) {
     var defaultApp = this.preferredApplicationHandler;
     if (defaultApp && aHandler.equals(defaultApp)) {
       // If the app we remove was the default app, we must make sure
@@ -182,26 +348,26 @@ HandlerInfoWrapper.prototype = {
       this.preferredApplicationHandler = null;
     }
 
-    try {
-      var handlerIdx = this.possibleApplicationHandlers.indexOf(0, aHandler);
-      this.possibleApplicationHandlers.removeElementAt(handlerIdx);
-    } catch (e) { }
-  },
+    var handlers = this.possibleApplicationHandlers;
+    for (var i = 0; i < handlers.length; ++i) {
+      var handler = handlers.queryElementAt(i, Ci.nsIHandlerApp);
+      if (handler.equals(aHandler)) {
+        handlers.removeElementAt(i);
+        break;
+      }
+    }
+  }
 
   get hasDefaultHandler() {
     return this.wrappedHandlerInfo.hasDefaultHandler;
-  },
+  }
 
   get defaultDescription() {
     return this.wrappedHandlerInfo.defaultDescription;
-  },
+  }
 
   // What to do with content of this type.
   get preferredAction() {
-    // If we have an enabled plugin, then the action is to use that plugin.
-    if (this.plugin && !this.isDisabledPluginType)
-      return kActionUsePlugin;
-
     // If the action is to use a helper app, but we don't have a preferred
     // handler app, then switch to using the system default, if any; otherwise
     // fall back to saving to disk, which is the default action in nsMIMEInfo.
@@ -213,32 +379,17 @@ HandlerInfoWrapper.prototype = {
         !gApplicationsPane.isValidHandlerApp(this.preferredApplicationHandler)) {
       if (this.wrappedHandlerInfo.hasDefaultHandler)
         return Ci.nsIHandlerInfo.useSystemDefault;
-      else
-        return Ci.nsIHandlerInfo.saveToDisk;
+      return Ci.nsIHandlerInfo.saveToDisk;
     }
 
     return this.wrappedHandlerInfo.preferredAction;
-  },
+  }
 
   set preferredAction(aNewValue) {
-    // We don't modify the preferred action if the new action is to use a plugin
-    // because handler info objects don't understand our custom "use plugin"
-    // value.  Also, leaving it untouched means that we can automatically revert
-    // to the old setting if the user ever removes the plugin.
-
-    if (aNewValue != kActionUsePlugin)
-      this.wrappedHandlerInfo.preferredAction = aNewValue;
-  },
+    this.wrappedHandlerInfo.preferredAction = aNewValue;
+  }
 
   get alwaysAskBeforeHandling() {
-    // If this type is handled only by a plugin, we can't trust the value
-    // in the handler info object, since it'll be a default based on the absence
-    // of any user configuration, and the default in that case is to always ask,
-    // even though we never ask for content handled by a plugin, so special case
-    // plugin-handled types by returning false here.
-    if (this.plugin && this.handledOnlyByPlugin)
-      return false;
-
     // If this is a protocol type and the preferred action is "save to disk",
     // which is invalid for such types, then return true here to override that
     // action.  This could happen when the preferred action is to use a helper
@@ -250,129 +401,46 @@ HandlerInfoWrapper.prototype = {
       return true;
 
     return this.wrappedHandlerInfo.alwaysAskBeforeHandling;
-  },
+  }
 
   set alwaysAskBeforeHandling(aNewValue) {
     this.wrappedHandlerInfo.alwaysAskBeforeHandling = aNewValue;
-  },
-
-
-  //**************************************************************************//
-  // nsIMIMEInfo
+  }
 
   // The primary file extension associated with this type, if any.
-  //
-  // XXX Plugin objects contain an array of MimeType objects with "suffixes"
-  // properties; if this object has an associated plugin, shouldn't we check
-  // those properties for an extension?
   get primaryExtension() {
     try {
       if (this.wrappedHandlerInfo instanceof Ci.nsIMIMEInfo &&
           this.wrappedHandlerInfo.primaryExtension)
         return this.wrappedHandlerInfo.primaryExtension;
-    } catch(ex) {}
+    } catch (ex) {}
 
     return null;
-  },
+  }
 
-
-  //**************************************************************************//
-  // Plugin Handling
-
-  // A plugin that can handle this type, if any.
-  //
-  // Note: just because we have one doesn't mean it *will* handle the type.
-  // That depends on whether or not the type is in the list of types for which
-  // plugin handling is disabled.
-  plugin: null,
-
-  // Whether or not this type is only handled by a plugin or is also handled
-  // by some user-configured action as specified in the handler info object.
-  //
-  // Note: we can't just check if there's a handler info object for this type,
-  // because OS and user configuration is mixed up in the handler info object,
-  // so we always need to retrieve it for the OS info and can't tell whether
-  // it represents only OS-default information or user-configured information.
-  //
-  // FIXME: once handler info records are broken up into OS-provided records
-  // and user-configured records, stop using this boolean flag and simply
-  // check for the presence of a user-configured record to determine whether
-  // or not this type is only handled by a plugin.  Filed as bug 395142.
-  handledOnlyByPlugin: undefined,
-
-  get isDisabledPluginType() {
-    return this._getDisabledPluginTypes().includes(this.type);
-  },
-
-  _getDisabledPluginTypes: function() {
-    var types = "";
-
-    if (Services.prefs.prefHasUserValue(PREF_DISABLED_PLUGIN_TYPES))
-      types = Services.prefs.getCharPref(PREF_DISABLED_PLUGIN_TYPES);
-
-    // Only split if the string isn't empty so we don't end up with an array
-    // containing a single empty string.
-    return types ? types.split(",") : [];
-  },
-
-  disablePluginType: function() {
-    var disabledPluginTypes = this._getDisabledPluginTypes();
-
-    if (!disabledPluginTypes.includes(this.type))
-      disabledPluginTypes.push(this.type);
-
-    Services.prefs.setCharPref(PREF_DISABLED_PLUGIN_TYPES,
-                               disabledPluginTypes.join(","));
-
-    // Update the category manager so existing browser windows update.
-    this._categoryMgr.deleteCategoryEntry("Gecko-Content-Viewers",
-                                          this.type,
-                                          false);
-  },
-
-  enablePluginType: function() {
-    var disabledPluginTypes = this._getDisabledPluginTypes();
-
-    var type = this.type;
-    disabledPluginTypes = disabledPluginTypes.filter(v => v != type);
-
-    Services.prefs.setCharPref(PREF_DISABLED_PLUGIN_TYPES,
-                               disabledPluginTypes.join(","));
-
-    // Update the category manager so existing browser windows update.
-    this._categoryMgr.
-      addCategoryEntry("Gecko-Content-Viewers",
-                       this.type,
-                       "@mozilla.org/content/plugin/document-loader-factory;1",
-                       false,
-                       true);
-  },
-
-
-  //**************************************************************************//
+  // -------
   // Storage
 
-  store: function() {
-    this._handlerSvc.store(this.wrappedHandlerInfo);
-  },
+  store() {
+    gHandlerService.store(this.wrappedHandlerInfo);
+  }
 
-  remove: function() {
-    this._handlerSvc.remove(this.wrappedHandlerInfo);
-  },
+  remove() {
+    gHandlerService.remove(this.wrappedHandlerInfo);
+  }
 
-
-  //**************************************************************************//
+  // -----
   // Icons
 
   get smallIcon() {
     return this._getIcon(16);
-  },
+  }
 
   get largeIcon() {
     return this._getIcon(32);
-  },
+  }
 
-  _getIcon: function(aSize) {
+  _getIcon(aSize) {
     if (this.primaryExtension)
       return "moz-icon://goat." + this.primaryExtension + "?size=" + aSize;
 
@@ -383,7 +451,7 @@ HandlerInfoWrapper.prototype = {
     // one (for example in the case of protocol schemes).  Filed as bug 395141.
     return null;
   }
-};
+}
 
 var gApplicationsTabController = {
   mInitialized: false,
@@ -391,19 +459,19 @@ var gApplicationsTabController = {
   // of the attachmentPrefs tabs.
   mDefaultIndex: 1,
 
-  init: function() {
+  init() {
     if (this.mInitialized)
       return;
 
     gApplicationsPane.init();
 
-    let tabbox = document.getElementById("attachmentPrefs");
+    this.mTabBox = document.getElementById("attachmentPrefs");
 
     // If BigFiles is disabled, hide the "Outgoing" tab, and the tab
     // selectors, and bail out.
     if (!Services.prefs.getBoolPref("mail.cloud_files.enabled")) {
       // Default to the first tab, "Incoming"
-      tabbox.selectedIndex = 0;
+      this.mTabBox.selectedIndex = 0;
       // Hide the tab selector
       let tabs = document.getElementById("attachmentPrefsTabs");
       tabs.hidden = true;
@@ -412,351 +480,280 @@ var gApplicationsTabController = {
     }
 
     gCloudFileTab.init();
+    this.paneSelectionChanged = this.paneSelectionChanged.bind(this);
+    window.addEventListener("paneSelected", this.paneSelectionChanged);
 
     if (!(("arguments" in window) && window.arguments[1])) {
       // If no tab was specified, select the last used tab.
-      let preference = document.getElementById("mail.preferences.applications.selectedTabIndex");
-      tabbox.selectedIndex = preference.value != null ? preference.value : this.mDefaultIndex;
+      let preference = Preferences.get("mail.preferences.applications.selectedTabIndex");
+      this.mTabBox.selectedIndex = preference.value != null ? preference.value : this.mDefaultIndex;
     }
 
     this.mInitialized = true;
   },
 
-  tabSelectionChanged: function() {
-    if (this.mInitialized)
-      document.getElementById("mail.preferences.applications.selectedTabIndex")
-              .valueFromPreferences = document.getElementById("attachmentPrefs")
-              .selectedIndex;
+  paneSelectionChanged() {
+    gCloudFileTab.init();
   },
 
-}
+  tabSelectionChanged() {
+    if (this.mInitialized) {
+      Preferences.get("mail.preferences.applications.selectedTabIndex")
+                 .valueFromPreferences = this.mTabBox.selectedIndex;
+    }
 
-var gCloudFileController = {
-  commands: {
-    cmd_addCloudfileAccount: {
-      isEnabled: function() {
-        return true;
-      },
-      doCommand: function() {
-        gCloudFileTab.addCloudFileAccount();
-      },
-    },
-
-    cmd_removeCloudfileAccount: {
-      isEnabled: function() {
-        let listbox = document.getElementById("cloudFileView");
-        return listbox.selectedCount > 0;
-      },
-      doCommand: function() {
-        gCloudFileTab.removeCloudFileAccount();
-      },
-    },
-
-    cmd_reauthCloudfileAccount: {
-      isEnabled: function() {
-        return true;
-      },
-      doCommand: function() {
-        gCloudFileTab.authSelected();
-      },
-    },
-
+    gCloudFileTab.init();
   },
-
-  supportsCommand: function(aCommand) {
-    return (aCommand in this.commands);
-  },
-
-  isCommandEnabled: function(aCommand) {
-    if (!this.supportsCommand(aCommand))
-      return false;
-    return this.commands[aCommand].isEnabled();
-  },
-
-  doCommand: function(aCommand) {
-    if (!this.supportsCommand(aCommand))
-      return;
-
-    let cmd = this.commands[aCommand];
-
-    if (!cmd.isEnabled())
-      return;
-
-    cmd.doCommand();
-  },
-  onEvent: function(event) {},
-}
-
-function CommandUpdate_CloudFile() {
-  goUpdateCommand("cmd_removeCloudfileAccount");
-  goUpdateCommand("cmd_addCloudfileAccount");
-}
+};
 
 var gCloudFileTab = {
   _initialized: false,
+  _initializationStarted: false,
   _list: null,
+  _buttonContainer: null,
   _settings: null,
   _settingsDeck: null,
   _tabpanel: null,
-  _accountCache: {},
   _settingsPanelWrap: null,
   _defaultPanel: null,
-  _loadingPanel: null,
-  _authErrorPanel: null,
+  _blacklist: new Set(["YouSendIt"]),
 
   get _strings() {
     return Services.strings
                    .createBundle("chrome://messenger/locale/preferences/applications.properties");
   },
 
-  init: function() {
-    if (this._initialized)
+  init() {
+    // Because this leads to another document being loaded, do it only when really necessary.
+    if (this._initializationStarted) {
       return;
+    }
+    if (getCurrentPaneID() != "paneApplications") {
+      return;
+    }
+    if (gApplicationsTabController.mTabBox.selectedIndex != 1) {
+      return;
+    }
+
+    this._initializationStarted = true;
+    window.removeEventListener("paneSelected", gApplicationsTabController.paneSelectionChanged);
 
     this._list = document.getElementById("cloudFileView");
+    this._buttonContainer = document.getElementById("addCloudFileAccountButtons");
+    this._removeAccountButton = document.getElementById("removeCloudFileAccount");
     this._settingsDeck = document.getElementById("cloudFileSettingsDeck");
     this._defaultPanel = document.getElementById("cloudFileDefaultPanel");
     this._settingsPanelWrap = document.getElementById("cloudFileSettingsWrapper");
-    this._loadingPanel = document.getElementById("cloudFileLoadingPanel");
-    this._authErrorPanel = document.getElementById("cloudFileAuthErrorPanel");
-
-    top.controllers.appendController(gCloudFileController);
-
-    this.rebuildView();
-
-    if (this._list.itemCount > 0)
-      this._list.selectedIndex = 0;
-
-    window.addEventListener("unload", this, {capture: false, once: true});
-    CommandUpdate_CloudFile();
 
     this.updateThreshold();
+    this.rebuildView();
+
+    window.addEventListener("unload", this, {capture: false, once: true});
+
+    this._onAccountConfigured = this._onAccountConfigured.bind(this);
+    this._onProviderRegistered = this._onProviderRegistered.bind(this);
+    this._onProviderUnregistered = this._onProviderUnregistered.bind(this);
+    cloudFileAccounts.on("accountConfigured", this._onAccountConfigured);
+    cloudFileAccounts.on("providerRegistered", this._onProviderRegistered);
+    cloudFileAccounts.on("providerUnregistered", this._onProviderUnregistered);
 
     this._initialized = true;
   },
 
-  destroy: function CFT_destroy() {
+  destroy() {
     // Remove any controllers or observers here.
-    top.controllers.removeController(gCloudFileController);
+    cloudFileAccounts.off("accountConfigured", this._onAccountConfigured);
+    cloudFileAccounts.off("providerRegistered", this._onProviderRegistered);
+    cloudFileAccounts.off("providerUnregistered", this._onProviderUnregistered);
   },
 
-  makeRichListItemForAccount: function CFT_makeRichListItemForAccount(aAccount) {
+  _onAccountConfigured(event, account) {
+    for (let item of this._list.children) {
+      if (item.value == account.accountKey) {
+        item.querySelector("image.configuredWarning").hidden = account.configured;
+      }
+    }
+  },
+
+  _onProviderRegistered(event, provider) {
+    let accounts = cloudFileAccounts.getAccountsForType(provider.type);
+    accounts.sort(this._sortDisplayNames);
+
+    // Always add newly-enabled accounts to the end of the list, this makes
+    // it clearer to users what's happening.
+    for (let account of accounts) {
+      let item = this.makeRichListItemForAccount(account);
+      this._list.appendChild(item);
+    }
+
+    if (!this._blacklist.has(provider.type)) {
+      this._buttonContainer.appendChild(this.makeButtonForProvider(provider));
+    }
+  },
+
+  _onProviderUnregistered(event, type) {
+    for (let item of this._list.children) {
+      // If the provider is unregistered, getAccount returns null.
+      if (!cloudFileAccounts.getAccount(item.value)) {
+        if (item.hasAttribute("selected")) {
+          this._settingsDeck.selectedPanel = this._defaultPanel;
+          if (this._settings) {
+            this._settings.remove();
+          }
+          this._removeAccountButton.disabled = true;
+        }
+        item.remove();
+      }
+    }
+
+    for (let button of this._buttonContainer.children) {
+      if (button.getAttribute("value") == type) {
+        button.remove();
+      }
+    }
+  },
+
+  makeRichListItemForAccount(aAccount) {
     let rli = document.createElement("richlistitem");
     rli.value = aAccount.accountKey;
-    rli.setAttribute("value", aAccount.accountKey);
+    rli.setAttribute("align", "center");
     rli.setAttribute("class", "cloudfileAccount");
-    rli.setAttribute("state", "waiting-to-connect");
+    rli.setAttribute("value", aAccount.accountKey);
 
-    if (aAccount.iconClass)
-      rli.style.listStyleImage = "url('" + aAccount.iconClass + "')";
+    if (aAccount.iconURL)
+      rli.style.listStyleImage = "url('" + aAccount.iconURL + "')";
 
-    let displayName = cloudFileAccounts.getDisplayName(aAccount.accountKey);
-    // Quick and ugly - accountKey:displayName for now
-    let status = document.createElement("image");
-    status.setAttribute("class", "typeIcon");
+    let icon = document.createElement("image");
+    icon.setAttribute("class", "typeIcon");
+    rli.appendChild(icon);
 
-    rli.appendChild(status);
-    let descr = document.createElement("label");
-    descr.setAttribute("value", displayName);
-    rli.appendChild(descr);
+    let label = document.createElement("label");
+    label.setAttribute("crop", "end");
+    label.setAttribute("flex", "1");
+    label.setAttribute("value", cloudFileAccounts.getDisplayName(aAccount.accountKey));
+    label.addEventListener("click", this, true);
+    rli.appendChild(label);
 
-    // Set the state of the richlistitem, if applicable
-    if (aAccount.accountKey in this._accountCache) {
-      let result = this._accountCache[aAccount.accountKey].result;
-      this._mapResultToState(rli, result);
-      this._accountCache[aAccount.accountKey].listItem = rli;
+    let textBox = document.createElement("textbox");
+    textBox.setAttribute("flex", "1");
+    textBox.hidden = true;
+    textBox.addEventListener("blur", this);
+    textBox.addEventListener("keypress", this);
+    rli.appendChild(textBox);
+
+    let warningIcon = document.createElement("image");
+    warningIcon.setAttribute("class", "configuredWarning typeIcon");
+    warningIcon.setAttribute("src", "chrome://global/skin/icons/warning.svg");
+    warningIcon.setAttribute("tooltiptext", this._strings.GetStringFromName("notConfiguredYet"));
+    if (aAccount.configured) {
+      warningIcon.hidden = true;
     }
+    rli.appendChild(warningIcon);
 
     return rli;
   },
 
-  clearEntries: function CFT_clearEntries() {
+  makeButtonForProvider(provider) {
+    let button = document.createElement("button");
+    button.setAttribute("value", provider.type);
+    button.setAttribute(
+      "label", this._strings.formatStringFromName("addProvider", [provider.displayName], 1)
+    );
+    button.setAttribute("oncommand", `gCloudFileTab.addCloudFileAccount("${provider.type}")`);
+    button.style.listStyleImage = `url("${provider.iconURL}")`;
+    return button;
+  },
+
+  // Sort the accounts by displayName.
+  _sortDisplayNames(a, b) {
+    let aName = a.displayName.toLowerCase();
+    let bName = b.displayName.toLowerCase();
+    return aName.localeCompare(bName);
+  },
+
+  rebuildView() {
     // Clear the list of entries.
     while (this._list.hasChildNodes())
       this._list.lastChild.remove();
-  },
 
-  rebuildView: function CFT_rebuildView() {
-    this.clearEntries();
     let accounts = cloudFileAccounts.accounts;
-
-    // Sort the accounts by displayName.
-    function sortAccounts(a, b) {
-      let aName = cloudFileAccounts.getDisplayName(a.accountKey)
-                                   .toLowerCase();
-      let bName = cloudFileAccounts.getDisplayName(b.accountKey)
-                                   .toLowerCase();
-
-      if (aName < bName)
-        return -1;
-      if (aName > bName)
-        return 1;
-      return 0;
-    }
-
-    accounts.sort(sortAccounts);
+    accounts.sort(this._sortDisplayNames);
 
     for (let account of accounts) {
       let rli = this.makeRichListItemForAccount(account);
       this._list.appendChild(rli);
-      if (!(account.accountKey in this._accountCache))
-        this.requestUserInfoForItem(rli, false);
+    }
+
+    while (this._buttonContainer.hasChildNodes())
+      this._buttonContainer.lastChild.remove();
+
+    let providers = cloudFileAccounts.providers;
+    providers.sort(this._sortDisplayNames);
+    for (let provider of providers) {
+      if (this._blacklist.has(provider.type)) {
+        continue;
+      }
+
+      this._buttonContainer.appendChild(this.makeButtonForProvider(provider));
     }
   },
 
-  requestUserInfoForItem: function CFT_requestUserInfoForItem(aItem, aWithUI) {
-    let accountKey = aItem.value;
-    let account = cloudFileAccounts.getAccount(accountKey);
-
-    let observer = {
-      onStopRequest: function(aRequest, aContext, aStatusCode) {
-        gCloudFileTab._accountCache[accountKey].result = aStatusCode;
-        gCloudFileTab.onUserInfoRequestDone(accountKey);
-      },
-      onStartRequest: function(aRequest, aContext) {
-        aItem.setAttribute("state", "connecting");
-      },
-    };
-
-    let accountInfo = {account: account,
-                       listItem: aItem,
-                       result: Cr.NS_ERROR_NOT_AVAILABLE}
-
-    this._accountCache[accountKey] = accountInfo;
-
-    this._settingsDeck.selectedPanel = this._loadingPanel;
-    account.refreshUserInfo(aWithUI, observer);
-  },
-
-  onUserInfoRequestDone: function CFT_onUserInfoRequestDone(aAccountKey) {
-    this.updateRichListItem(aAccountKey);
-
-    if (this._list.selectedItem &&
-        this._list.selectedItem.value == aAccountKey)
-      this._showAccountInfo(aAccountKey);
-  },
-
-  updateRichListItem: function CFT_updateRichListItem(aAccountKey) {
-    let accountInfo = this._accountCache[aAccountKey];
-    if (!accountInfo)
+  onSelectionChanged(aEvent) {
+    if (!this._initialized || aEvent.target != this._list) {
       return;
+    }
 
-    let item = accountInfo.listItem;
-    let result = accountInfo.result;
-    this._mapResultToState(item, result);
-  },
-
-  _mapResultToState: function CFT__mapResultToState(aItem, aResult) {
-    let itemState = "no-connection";
-
-    if (aResult == Cr.NS_OK)
-      itemState = "connected";
-    else if (aResult == Ci.nsIMsgCloudFileProvider.authErr)
-      itemState = "auth-error";
-    else if (aResult == Cr.NS_ERROR_NOT_AVAILABLE)
-      itemState = "no-connection";
-    // TODO: What other states are there?
-
-    aItem.setAttribute("state", itemState);
-  },
-
-
-  onSelectionChanged: function CFT_onSelectionChanged() {
     // Get the selected item
     let selection = this._list.selectedItem;
-    if (!selection)
+    this._removeAccountButton.disabled = !selection;
+    if (!selection) {
+      this._settingsDeck.selectedPanel = this._defaultPanel;
+      if (this._settings) {
+        this._settings.remove();
+      }
       return;
+    }
 
-    // The selection tells us the key.  We need the actual
-    // provider here.
-    let accountKey = selection.value;
-    this._showAccountInfo(accountKey);
+    this._showAccountInfo(selection.value);
   },
 
-  _showAccountInfo: function CFT__showAccountInfo(aAccountKey) {
-    let account = this._accountCache[aAccountKey].account;
-    let result = this._accountCache[aAccountKey].result;
+  _showAccountInfo(aAccountKey) {
+    let account = cloudFileAccounts.getAccount(aAccountKey);
+    this._settingsDeck.selectedPanel = this._settingsPanelWrap;
 
-    if (result == Cr.NS_ERROR_NOT_AVAILABLE)
-      this._settingsDeck.selectedPanel = this._loadingPanel;
-    else if (result == Cr.NS_OK) {
-      this._settingsDeck.selectedPanel = this._settingsPanelWrap;
-      this._showAccountManagement(account);
-    }
-    else if (result == Ci.nsIMsgCloudFileProvider.authErr) {
-      this._settingsDeck.selectedPanel = this._authErrorPanel;
-    }
-    else {
-      Cu.reportError("Unexpected connection error.");
-    }
-  },
+    let url = account.managementURL + `?accountId=${account.accountKey}`;
 
-  _showAccountManagement: function CFT__showAccountManagement(aProvider) {
-    let iframe = document.createElement('iframe');
-
-    iframe.setAttribute("src", aProvider.managementURL);
+    let iframe = document.createElement("iframe");
     iframe.setAttribute("flex", "1");
+    // allows keeping dialog background color without hoops
+    iframe.setAttribute("transparent", "true");
+
+    let type = url.startsWith("chrome:") ? "chrome" : "content";
+    iframe.setAttribute("type", type);
+    iframe.setAttribute("src", url);
 
     // If we have a past iframe, we replace it. Else append
     // to the wrapper.
-    if (this._settings)
+    if (this._settings) {
       this._settings.remove();
+    }
 
     this._settingsPanelWrap.appendChild(iframe);
     this._settings = iframe;
-
-    // When the iframe loads, populate it with the provider.
-    this._settings.contentWindow.addEventListener("load",
-      function loadProvider() {
-        try {
-          iframe.contentWindow
-                .wrappedJSObject
-                .onLoadProvider(aProvider);
-        } catch(e) {
-          Cu.reportError(e);
-        }
-      }, {capture: false, once: true});
-
-    // When the iframe (or any subcontent) fires the DOMContentLoaded event,
-    // attach the _onClickLink handler to any anchor elements that we can find.
-    this._settings.contentWindow.addEventListener("DOMContentLoaded",
-      function addClickListeners(e) {
-        let doc = e.originalTarget;
-        let links = doc.getElementsByTagName("a");
-
-        for (let link of links)
-          link.addEventListener("click", gCloudFileTab._onClickLink);
-      }, {capture: false, once: true});
-
-    CommandUpdate_CloudFile();
   },
 
-  _onClickLink: function CFT__onClickLink(aEvent) {
-    aEvent.preventDefault();
-    let href = aEvent.target.getAttribute("href");
-    openLinkExternally(href);
-  },
-
-  authSelected: function CFT_authSelected() {
-    let item = this._list.selectedItem;
-
-    if (!item)
+  addCloudFileAccount(aType) {
+    let account = cloudFileAccounts.createAccount(aType);
+    if (!account)
       return;
 
-    this.requestUserInfoForItem(item, true);
+    let rli = this.makeRichListItemForAccount(account);
+    this._list.appendChild(rli);
+    this._list.selectItem(rli);
+    this._removeAccountButton.disabled = false;
   },
 
-  addCloudFileAccount: function CFT_addCloudFileAccount() {
-    let accountKey = cloudFileAccounts.addAccountDialog();
-    if (!accountKey)
-      return;
-
-    this.rebuildView();
-    let newItem = this._list.querySelector("richlistitem[value='" + accountKey + "']");
-    this._list.selectItem(newItem);
-  },
-
-  removeCloudFileAccount: function CFT_removeCloudFileAccount() {
+  removeCloudFileAccount() {
     // Get the selected account key
     let selection = this._list.selectedItem;
     if (!selection)
@@ -772,41 +769,86 @@ var gCloudFileTab = {
     if (Services.prompt.confirm(null, "", confirmMessage)) {
       this._list.clearSelection();
       cloudFileAccounts.removeAccount(accountKey);
-      this.rebuildView();
+      let rli = this._list.querySelector("richlistitem[value='" + accountKey + "']");
+      rli.remove();
       this._settingsDeck.selectedPanel = this._defaultPanel;
-      delete this._accountCache[accountKey];
-      // For some reason, the focus event isn't fired, so I think
-      // we have to update the buttons manually...
-      CommandUpdate_CloudFile();
+      if (this._settings) {
+        this._settings.remove();
+      }
     }
   },
 
-  handleEvent: function CFT_handleEvent(aEvent) {
-    if (aEvent.type == "unload")
-      this.destroy();
+  handleEvent(aEvent) {
+    switch (aEvent.type) {
+      case "unload":
+        this.destroy();
+        break;
+      case "click": {
+        let label = aEvent.target;
+        let item = label.parentNode;
+        let textBox = item.querySelector("textbox");
+        if (!item.selected) {
+          return;
+        }
+        label.hidden = true;
+        textBox.value = label.value;
+        textBox.hidden = false;
+        textBox.select();
+        break;
+      }
+      case "blur": {
+        let textBox = aEvent.target;
+        let item = textBox.parentNode;
+        let label = item.querySelector("label");
+        cloudFileAccounts.setDisplayName(item.value, textBox.value);
+        label.value = textBox.value;
+        label.hidden = false;
+        textBox.hidden = true;
+        break;
+      }
+      case "keypress": {
+        let textBox = aEvent.target;
+        let item = textBox.parentNode;
+        let label = item.querySelector("label");
+
+        if (aEvent.key == "Enter") {
+          cloudFileAccounts.setDisplayName(item.value, textBox.value);
+          label.value = textBox.value;
+          label.hidden = false;
+          textBox.hidden = true;
+          gCloudFileTab._list.focus();
+
+          aEvent.preventDefault();
+        } else if (aEvent.key == "Escape") {
+          textBox.value = label.value;
+          label.hidden = false;
+          textBox.hidden = true;
+          gCloudFileTab._list.focus();
+
+          aEvent.preventDefault();
+        }
+      }
+    }
   },
 
-  readThreshold: function CFT_readThreshold() {
-    let pref = document.getElementById("mail.compose.big_attachments.threshold_kb");
+  readThreshold() {
+    let pref = Preferences.get("mail.compose.big_attachments.threshold_kb");
     return pref.value / 1024;
   },
 
-  writeThreshold: function CFT_writeThreshold() {
+  writeThreshold() {
     let threshold = document.getElementById("cloudFileThreshold");
     let intValue = parseInt(threshold.value, 10);
     return isNaN(intValue) ? 0 : intValue * 1024;
   },
 
-  updateThreshold: function CFT_updateThreshold() {
+  updateThreshold() {
     document.getElementById("cloudFileThreshold").disabled =
-    !document.getElementById("enableThreshold").checked;
+      !document.getElementById("enableThreshold").checked;
   },
+};
 
-  QueryInterface: ChromeUtils.generateQI(["nsIObserver",
-                                          "nsISupportsWeakReference"])
-}
-
-//****************************************************************************//
+// -------------------
 // Prefpane Controller
 
 var gApplicationsPane = {
@@ -823,35 +865,25 @@ var gApplicationsPane = {
   // that match that string.
   _visibleTypes: [],
 
-  // A count of the number of times each visible type description appears.
-  // We use these counts to determine whether or not to annotate descriptions
-  // with their types to distinguish duplicate descriptions from each other.
-  // A hash of integer counts, indexed by string description.
-  _visibleTypeDescriptionCount: new Map(),
+  // Map whose keys are string descriptions and values are references to the
+  // first visible HandlerInfoWrapper that has this description. We use this
+  // to determine whether or not to annotate descriptions with their types to
+  // distinguish duplicate descriptions from each other.
+  _visibleDescriptions: new Map(),
 
-
-  //**************************************************************************//
+  // -----------------------------------
   // Convenience & Performance Shortcuts
 
   // These get defined by init().
-  _brandShortName : null,
-  _prefsBundle    : null,
-  _list           : null,
-  _filter         : null,
+  _brandShortName: null,
+  _prefsBundle: null,
+  _list: null,
+  _filter: null,
 
-  _mimeSvc      : Cc["@mozilla.org/mime;1"]
-                    .getService(Ci.nsIMIMEService),
-
-  _helperAppSvc : Cc["@mozilla.org/uriloader/external-helper-app-service;1"]
-                    .getService(Ci.nsIExternalHelperAppService),
-
-  _handlerSvc   : Cc["@mozilla.org/uriloader/handler-service;1"]
-                    .getService(Ci.nsIHandlerService),
-
-  //**************************************************************************//
+  // ----------------------------
   // Initialization & Destruction
 
-  init: function() {
+  init() {
     // Initialize shortcuts to some commonly accessed elements & values.
     this._brandShortName =
       document.getElementById("bundleBrand").getString("brandShortName");
@@ -859,18 +891,10 @@ var gApplicationsPane = {
     this._list = document.getElementById("handlersView");
     this._filter = document.getElementById("filter");
 
-    // Observe preferences that influence what we display so we can rebuild
-    // the view when they change.
-    Services.prefs.addObserver(PREF_SHOW_PLUGINS_IN_LIST, this);
-    Services.prefs.addObserver(PREF_HIDE_PLUGINS_WITHOUT_EXTENSIONS, this);
-
-    // Listen for window unload so we can remove our preference observers.
-    window.addEventListener("unload", this, {capture: false, once: true});
-
     // Figure out how we should be sorting the list.  We persist sort settings
     // across sessions, so we can't assume the default sort column/direction.
     // XXX should we be using the XUL sort service instead?
-    this._sortColumn = document.getElementById("typeColumn")
+    this._sortColumn = document.getElementById("typeColumn");
     if (document.getElementById("actionColumn").hasAttribute("sortDirection")) {
       this._sortColumn = document.getElementById("actionColumn");
       // The typeColumn element always has a sortDirection attribute,
@@ -887,114 +911,30 @@ var gApplicationsPane = {
     // the dialog might stretch too much in an attempt to fit them all in.
     // XXX Shouldn't we perhaps just set a max-height on the richlistbox?
     var _delayedPaneLoad = function(self) {
+      self._initListEventHandlers();
       self._loadData();
       self._rebuildVisibleTypes();
       self._sortVisibleTypes();
-      self.rebuildView();
+      self._rebuildView();
 
       // Notify observers that the UI is now ready
       Services.obs.notifyObservers(window, "app-handler-pane-loaded");
-    }
+    };
     setTimeout(_delayedPaneLoad, 0, this);
   },
 
-  destroy: function() {
-    Services.prefs.removeObserver(PREF_SHOW_PLUGINS_IN_LIST, this);
-    Services.prefs.removeObserver(PREF_HIDE_PLUGINS_WITHOUT_EXTENSIONS, this);
-  },
-
-
-  //**************************************************************************//
-  // nsISupports
-
-  QueryInterface: ChromeUtils.generateQI(["nsIObserver"]),
-
-  //**************************************************************************//
-  // nsIObserver
-
-  observe: function (aSubject, aTopic, aData) {
-    // Rebuild the list when there are changes to preferences that influence
-    // whether or not to show certain entries in the list.
-    if (aTopic == "nsPref:changed" && !this._storingAction) {
-      // These two prefs alter the list of visible types, so we have to rebuild
-      // that list when they change.
-      if (aData == PREF_SHOW_PLUGINS_IN_LIST ||
-          aData == PREF_HIDE_PLUGINS_WITHOUT_EXTENSIONS) {
-        this._rebuildVisibleTypes();
-        this._sortVisibleTypes();
-      }
-
-      // All the prefs we observe can affect what we display, so we rebuild
-      // the view when any of them changes.
-      this.rebuildView();
-    }
-  },
-
-
-  //**************************************************************************//
-  // EventListener
-
-  handleEvent: function(aEvent) {
-    if (aEvent.type == "unload")
-      this.destroy();
-  },
-
-
-  //**************************************************************************//
+  // ---------------------------
   // Composed Model Construction
 
-  _loadData: function() {
-    this._loadPluginHandlers();
+  _loadData() {
     this._loadApplicationHandlers();
-  },
-
-  /**
-   * Load the set of handlers defined by plugins.
-   *
-   * Note: if there's more than one plugin for a given MIME type, we assume
-   * the last one is the one that the application will use.  That may not be
-   * correct, but it's how we've been doing it for years.
-   *
-   * Perhaps we should instead query navigator.mimeTypes for the set of types
-   * supported by the application and then get the plugin from each MIME type's
-   * enabledPlugin property.  But if there's a plugin for a type, we need
-   * to know about it even if it isn't enabled, since we're going to give
-   * the user an option to enable it.
-   *
-   * I'll also note that my reading of nsPluginTag::RegisterWithCategoryManager
-   * suggests that enabledPlugin is only determined during registration
-   * and does not get updated when plugin.disable_full_page_plugin_for_types
-   * changes (unless modification of that preference spawns reregistration).
-   * So even if we could use enabledPlugin to get the plugin that would be used,
-   * we'd still need to check the pref ourselves to find out if it's enabled.
-   */
-  _loadPluginHandlers: function() {
-    for (let i = 0; i < navigator.plugins.length; ++i) {
-      let plugin = navigator.plugins[i];
-      for (let j = 0; j < plugin.length; ++j) {
-        let type = plugin[j].type;
-
-        let handlerInfoWrapper;
-        if (type in this._handledTypes)
-          handlerInfoWrapper = this._handledTypes[type];
-        else {
-          let wrappedHandlerInfo =
-            this._mimeSvc.getFromTypeAndExtension(type, null);
-          handlerInfoWrapper = new HandlerInfoWrapper(type, wrappedHandlerInfo);
-          handlerInfoWrapper.handledOnlyByPlugin = true;
-          this._handledTypes[type] = handlerInfoWrapper;
-        }
-
-        handlerInfoWrapper.plugin = plugin;
-      }
-    }
   },
 
   /**
    * Load the set of handlers defined by the application datastore.
    */
-  _loadApplicationHandlers: function() {
-    var wrappedHandlerInfos = this._handlerSvc.enumerate();
+  _loadApplicationHandlers() {
+    var wrappedHandlerInfos = gHandlerService.enumerate();
     while (wrappedHandlerInfos.hasMoreElements()) {
       let wrappedHandlerInfo =
         wrappedHandlerInfos.getNext().QueryInterface(Ci.nsIHandlerInfo);
@@ -1003,61 +943,77 @@ var gApplicationsPane = {
       let handlerInfoWrapper;
       if (type in this._handledTypes) {
         handlerInfoWrapper = this._handledTypes[type];
-      }
-      else {
+      } else {
         handlerInfoWrapper = new HandlerInfoWrapper(type, wrappedHandlerInfo);
         this._handledTypes[type] = handlerInfoWrapper;
       }
-
-      handlerInfoWrapper.handledOnlyByPlugin = false;
     }
   },
 
-  //**************************************************************************//
+  // -----------------
   // View Construction
 
-  _rebuildVisibleTypes: function() {
-    // Reset the list of visible types and the visible type description counts.
-    this._visibleTypes.length = 0;
-    this._visibleTypeDescriptionCount.clear();
+  selectedHandlerListItem: null,
 
-    // Get the preferences that help determine what types to show.
-    var showPlugins = Services.prefs.getBoolPref(PREF_SHOW_PLUGINS_IN_LIST);
-    var hidePluginsWithoutExtensions =
-      Services.prefs.getBoolPref(PREF_HIDE_PLUGINS_WITHOUT_EXTENSIONS);
+  _initListEventHandlers() {
+    this._list.addEventListener("select", event => {
+      if (event.target != this._list) {
+        return;
+      }
+
+      let handlerListItem = this._list.selectedItem &&
+                            HandlerListItem.forNode(this._list.selectedItem);
+      if (this.selectedHandlerListItem == handlerListItem) {
+        return;
+      }
+
+      if (this.selectedHandlerListItem) {
+        this.selectedHandlerListItem.showActionsMenu = false;
+      }
+      this.selectedHandlerListItem = handlerListItem;
+      if (handlerListItem) {
+        this.rebuildActionsMenu();
+        handlerListItem.showActionsMenu = true;
+      }
+    });
+  },
+
+  _rebuildVisibleTypes() {
+    // Reset the list of visible types and the visible type description.
+    this._visibleTypes.length = 0;
+    this._visibleDescriptions.clear();
 
     for (let type in this._handledTypes) {
       let handlerInfo = this._handledTypes[type];
 
-      // Hide plugins without associated extensions if so prefed so we don't
-      // show a whole bunch of obscure types handled by plugins on Mac.
-      // Note: though protocol types don't have extensions, we still show them;
-      // the pref is only meant to be applied to MIME types, since plugins are
-      // only associated with MIME types.
-      // FIXME: should we also check the "suffixes" property of the plugin?
-      // Filed as bug 395135.
-      if (hidePluginsWithoutExtensions && handlerInfo.handledOnlyByPlugin &&
-          handlerInfo.wrappedHandlerInfo instanceof Ci.nsIMIMEInfo &&
-          !handlerInfo.primaryExtension)
-        continue;
-
-      // Hide types handled only by plugins if so prefed.
-      if (handlerInfo.handledOnlyByPlugin && !showPlugins)
-        continue;
-
       // We couldn't find any reason to exclude the type, so include it.
       this._visibleTypes.push(handlerInfo);
 
-      let descCount = this._visibleTypeDescriptionCount.has(handlerInfo.description) ?
-        (this._visibleTypeDescriptionCount.get(handlerInfo.description) + 1) : 1;
-      this._visibleTypeDescriptionCount.set(handlerInfo.description, descCount);
+      let otherHandlerInfo = this._visibleDescriptions
+                                 .get(handlerInfo.description);
+      if (!otherHandlerInfo) {
+        // This is the first type with this description that we encountered
+        // while rebuilding the _visibleTypes array this time. Make sure the
+        // flag is reset so we won't add the type to the description.
+        handlerInfo.disambiguateDescription = false;
+        this._visibleDescriptions.set(handlerInfo.description, handlerInfo);
+      } else {
+        // There is at least another type with this description. Make sure we
+        // add the type to the description on both HandlerInfoWrapper objects.
+        handlerInfo.disambiguateDescription = true;
+        otherHandlerInfo.disambiguateDescription = true;
+      }
     }
   },
 
-  rebuildView: function() {
+  _rebuildView() {
+    let lastSelectedType = this.selectedHandlerListItem &&
+                           this.selectedHandlerListItem.handlerInfoWrapper.type;
+    this.selectedHandlerListItem = null;
+
     // Clear the list of entries.
-    while (this._list.childNodes.length > 1)
-      this._list.lastChild.remove();
+    this._list.textContent = "";
+
     var visibleTypes = this._visibleTypes;
 
     // If the user is filtering the list, then only show matching types.
@@ -1065,73 +1021,41 @@ var gApplicationsPane = {
       visibleTypes = visibleTypes.filter(this._matchesFilter, this);
 
     for (let visibleType of visibleTypes) {
-      let item = document.createElement("richlistitem");
-      item.setAttribute("type", visibleType.type);
-      item.setAttribute("typeDescription", this._describeType(visibleType));
-      item.setAttribute("shortTypeDescription", visibleType.description);
-      item.setAttribute("shortTypeDetails", this._typeDetails(visibleType));
-      if (visibleType.smallIcon)
-        item.setAttribute("typeIcon", visibleType.smallIcon);
-      item.setAttribute("actionDescription",
-                        this._describePreferredAction(visibleType));
+      let item = new HandlerListItem(visibleType);
+      item.connectAndAppendToList(this._list);
 
-      if (!this._setIconClassForPreferredAction(visibleType, item)) {
-        item.setAttribute("actionIcon",
-                          this._getIconURLForPreferredAction(visibleType));
+      if (visibleType.type === lastSelectedType) {
+        this._list.selectedItem = item.node;
       }
-
-      this._list.appendChild(item);
     }
-
-    this._selectLastSelectedType();
   },
 
-  _matchesFilter: function(aType) {
+  _matchesFilter(aType) {
     var filterValue = this._filter.value.toLowerCase();
-    return this._describeType(aType).toLowerCase().includes(filterValue) ||
-           this._describePreferredAction(aType).toLowerCase().includes(filterValue);
+    return aType.typeDescription.toLowerCase().includes(filterValue) ||
+           aType.actionDescription.toLowerCase().includes(filterValue);
   },
 
-  /**
-   * Describe, in a human-readable fashion, the type represented by the given
-   * handler info object.  Normally this is just the description provided by
-   * the info object, but if more than one object presents the same description,
-   * then we annotate the duplicate descriptions with the type itself to help
-   * users distinguish between those types.
-   *
-   * @param aHandlerInfo {nsIHandlerInfo} the type being described
-   * @return {string} a description of the type
-   */
-  _describeType: function(aHandlerInfo) {
-    let details = this._typeDetails(aHandlerInfo);
-
-    if (details)
-      return this._prefsBundle.getFormattedString("typeDescriptionWithDetails",
-                                                  [aHandlerInfo.description,
-                                                   details]);
-    return aHandlerInfo.description;
-  },
-
-  /**
-   * Get the details for the type represented by the given handler info
-   * object.
-   *
-   * @param aHandlerInfo {nsIHandlerInfo} the type to get the extensions for.
-   * @return {string} the extensions for the type
-   */
-  _typeDetails: function(aHandlerInfo) {
+ /**
+  * Get the details for the type represented by the given handler info
+  * object.
+  *
+  * @param aHandlerInfo {nsIHandlerInfo} the type to get the extensions for.
+  * @return {string} the extensions for the type
+  */
+  _typeDetails(aHandlerInfo) {
     let exts = [];
     if (aHandlerInfo.wrappedHandlerInfo instanceof Ci.nsIMIMEInfo) {
       let extIter = aHandlerInfo.wrappedHandlerInfo.getFileExtensions();
-      while(extIter.hasMore()) {
-        let ext = "."+extIter.getNext();
+      while (extIter.hasMore()) {
+        let ext = "." + extIter.getNext();
         if (!exts.includes(ext))
           exts.push(ext);
       }
     }
     exts.sort();
     exts = exts.join(", ");
-    if (this._visibleTypeDescriptionCount.has(aHandlerInfo.description)) {
+    if (this._visibleDescriptions.has(aHandlerInfo.description)) {
       if (exts)
         return this._prefsBundle.getFormattedString("typeDetailsWithTypeAndExt",
                                                     [aHandlerInfo.type,
@@ -1144,92 +1068,13 @@ var gApplicationsPane = {
                                                   [exts]);
     return exts;
   },
-  /**
-   * Describe, in a human-readable fashion, the preferred action to take on
-   * the type represented by the given handler info object.
-   *
-   * XXX Should this be part of the HandlerInfoWrapper interface?  It would
-   * violate the separation of model and view, but it might make more sense
-   * nonetheless (f.e. it would make sortTypes easier).
-   *
-   * @param aHandlerInfo {nsIHandlerInfo} the type whose preferred action
-   *                                      is being described
-   * @return {string} a description of the action
-   */
-  _describePreferredAction: function(aHandlerInfo) {
-    // alwaysAskBeforeHandling overrides the preferred action, so if that flag
-    // is set, then describe that behavior instead.  For most types, this is
-    // the "alwaysAsk" string, but for the feed type we show something special.
-    if (aHandlerInfo.alwaysAskBeforeHandling)
-        return this._prefsBundle.getString("alwaysAsk");
-
-    switch (aHandlerInfo.preferredAction) {
-      case Ci.nsIHandlerInfo.saveToDisk:
-        return this._prefsBundle.getString("saveFile");
-
-      case Ci.nsIHandlerInfo.useHelperApp:
-        var preferredApp = aHandlerInfo.preferredApplicationHandler;
-        var name;
-        if (preferredApp instanceof Ci.nsILocalHandlerApp)
-          name = getDisplayNameForFile(preferredApp.executable);
-        else
-          name = preferredApp.name;
-        return this._prefsBundle.getFormattedString("useApp", [name]);
-
-      case Ci.nsIHandlerInfo.handleInternally:
-        // For other types, handleInternally looks like either useHelperApp
-        // or useSystemDefault depending on whether or not there's a preferred
-        // handler app.
-        if (this.isValidHandlerApp(aHandlerInfo.preferredApplicationHandler))
-          return aHandlerInfo.preferredApplicationHandler.name;
-
-        return aHandlerInfo.defaultDescription;
-
-        // XXX Why don't we say the app will handle the type internally?
-        // Is it because the app can't actually do that?  But if that's true,
-        // then why would a preferredAction ever get set to this value
-        // in the first place?
-
-      case Ci.nsIHandlerInfo.useSystemDefault:
-        return this._prefsBundle.getFormattedString("useDefault",
-                                                    [aHandlerInfo.defaultDescription]);
-
-      case kActionUsePlugin:
-        return this._prefsBundle.getFormattedString("usePluginIn",
-                                                    [aHandlerInfo.plugin.name,
-                                                     this._brandShortName]);
-      default:
-        // Hopefully this never happens.
-        Cu.reportError("No description for action " + aHandlerInfo.preferredAction + " found!");
-        return "";
-    }
-  },
-
-  _selectLastSelectedType: function() {
-    // If the list is disabled by the pref.downloads.disable_button.edit_actions
-    // preference being locked, then don't select the type, as that would cause
-    // it to appear selected, with a different background and an actions menu
-    // that makes it seem like you can choose an action for the type.
-    if (this._list.disabled)
-      return;
-
-    var lastSelectedType = this._list.getAttribute("lastSelectedType");
-    if (!lastSelectedType)
-      return;
-
-    let item = this._list.querySelector('[type="' + lastSelectedType + '"]');
-    if (!item)
-      return;
-
-    this._list.selectedItem = item;
-  },
 
   /**
    * Whether or not the given handler app is valid.
    * @param aHandlerApp {nsIHandlerApp} the handler app in question
    * @return {boolean} whether or not it's valid
    */
-  isValidHandlerApp: function(aHandlerApp) {
+  isValidHandlerApp(aHandlerApp) {
     if (!aHandlerApp)
       return false;
 
@@ -1245,7 +1090,7 @@ var gApplicationsPane = {
     return false;
   },
 
-  _isValidHandlerExecutable: function(aExecutable) {
+  _isValidHandlerExecutable(aExecutable) {
     let isExecutable = aExecutable &&
                        aExecutable.exists() &&
                        aExecutable.isExecutable();
@@ -1265,15 +1110,14 @@ var gApplicationsPane = {
    * Rebuild the actions menu for the selected entry.  Gets called by
    * the richlistitem constructor when an entry in the list gets selected.
    */
-  rebuildActionsMenu: function() {
+  rebuildActionsMenu() {
     var typeItem = this._list.selectedItem;
 
     if (!typeItem)
       return;
 
-    var handlerInfo = this._handledTypes[typeItem.type];
-    var menu =
-      document.getAnonymousElementByAttribute(typeItem, "class", "actionsMenu");
+    var handlerInfo = this.selectedHandlerListItem.handlerInfoWrapper;
+    var menu = typeItem.querySelector(".actionsMenu");
     var menuPopup = menu.menupopup;
 
     // Clear out existing items.
@@ -1316,7 +1160,7 @@ var gApplicationsPane = {
                                                        [handlerInfo.defaultDescription]);
       defaultMenuItem.setAttribute("label", label);
       defaultMenuItem.setAttribute("tooltiptext", handlerInfo.defaultDescription);
-      defaultMenuItem.setAttribute("image", this._getIconURLForSystemDefault(handlerInfo));
+      defaultMenuItem.setAttribute("image", handlerInfo.iconURLForSystemDefault);
 
       menuPopup.appendChild(defaultMenuItem);
     }
@@ -1327,7 +1171,7 @@ var gApplicationsPane = {
     var possibleAppMenuItems = [];
     while (possibleApps.hasMoreElements()) {
       let possibleApp = possibleApps.getNext();
-      if (!this.isValidHandlerApp(possibleApp))
+      if (!gApplicationsPane.isValidHandlerApp(possibleApp))
         continue;
 
       let menuItem = document.createElement("menuitem");
@@ -1340,7 +1184,8 @@ var gApplicationsPane = {
       label = this._prefsBundle.getFormattedString("useApp", [label]);
       menuItem.setAttribute("label", label);
       menuItem.setAttribute("tooltiptext", label);
-      menuItem.setAttribute("image", this._getIconURLForHandlerApp(possibleApp));
+      menuItem.setAttribute("image", gApplicationsPane
+                            ._getIconURLForHandlerApp(possibleApp));
 
       // Attach the handler app object to the menu item so we can use it
       // to make changes to the datastore when the user selects the item.
@@ -1348,19 +1193,6 @@ var gApplicationsPane = {
 
       menuPopup.appendChild(menuItem);
       possibleAppMenuItems.push(menuItem);
-    }
-
-    // Create a menu item for the plugin.
-    if (handlerInfo.plugin) {
-      var pluginMenuItem = document.createElement("menuitem");
-      pluginMenuItem.setAttribute("action", kActionUsePlugin);
-      let label = this._prefsBundle.getFormattedString("usePluginIn",
-                                                       [handlerInfo.plugin.name,
-                                                        this._brandShortName]);
-      pluginMenuItem.setAttribute("label", label);
-      pluginMenuItem.setAttribute("tooltiptext", label);
-      pluginMenuItem.setAttribute(APP_ICON_ATTR_NAME, "plugin");
-      menuPopup.appendChild(pluginMenuItem);
     }
 
     // Create a menu item for selecting a local application.
@@ -1375,8 +1207,7 @@ var gApplicationsPane = {
         createItem = false;
     }
 
-    if (createItem)
-    {
+    if (createItem) {
       let menuItem = document.createElement("menuitem");
       menuItem.setAttribute("oncommand", "gApplicationsPane.chooseApp(event)");
       let label = this._prefsBundle.getString("useOtherApp");
@@ -1406,26 +1237,22 @@ var gApplicationsPane = {
     // ask flag is set, it overrides the preferred action.  Otherwise we pick
     // the item identified by the preferred action (when the preferred action
     // is to use a helper app, we have to pick the specific helper app item).
-    if (handlerInfo.alwaysAskBeforeHandling)
+    if (handlerInfo.alwaysAskBeforeHandling) {
       menu.selectedItem = askMenuItem;
-    else switch (handlerInfo.preferredAction) {
-      case Ci.nsIHandlerInfo.handleInternally:
-        menu.selectedItem = internalMenuItem;
-        break;
-      case Ci.nsIHandlerInfo.useSystemDefault:
-        menu.selectedItem = defaultMenuItem;
-        break;
-      case Ci.nsIHandlerInfo.useHelperApp:
-        if (preferredApp)
-          menu.selectedItem =
-            possibleAppMenuItems.filter(v => v.handlerApp.equals(preferredApp))[0];
-        break;
-      case kActionUsePlugin:
-        menu.selectedItem = pluginMenuItem;
-        break;
-      case Ci.nsIHandlerInfo.saveToDisk:
-        menu.selectedItem = saveMenuItem;
-        break;
+    } else {
+      switch (handlerInfo.preferredAction) {
+        case Ci.nsIHandlerInfo.useSystemDefault:
+          menu.selectedItem = defaultMenuItem;
+          break;
+        case Ci.nsIHandlerInfo.useHelperApp:
+          if (preferredApp)
+            menu.selectedItem =
+              possibleAppMenuItems.filter(v => v.handlerApp.equals(preferredApp))[0];
+          break;
+        case Ci.nsIHandlerInfo.saveToDisk:
+          menu.selectedItem = saveMenuItem;
+          break;
+      }
     }
     // menu.selectedItem may be null if the preferredAction is
     // useSystemDefault, but handlerInfo.hasDefaultHandler returns false.
@@ -1433,8 +1260,7 @@ var gApplicationsPane = {
     menu.previousSelectedItem = menu.selectedItem || askMenuItem;
   },
 
-
-  //**************************************************************************//
+  // -------------------
   // Sorting & Filtering
 
   _sortColumn: null,
@@ -1442,7 +1268,7 @@ var gApplicationsPane = {
   /**
    * Sort the list when the user clicks on a column header.
    */
-  sort: function (event) {
+  sort(event) {
     var column = event.target;
 
     // If the user clicked on a new sort column, remove the direction indicator
@@ -1459,26 +1285,24 @@ var gApplicationsPane = {
       column.setAttribute("sortDirection", "ascending");
 
     this._sortVisibleTypes();
-    this.rebuildView();
+    this._rebuildView();
   },
 
   /**
    * Sort the list of visible types by the current sort column/direction.
    */
-  _sortVisibleTypes: function() {
+  _sortVisibleTypes() {
     if (!this._sortColumn)
       return;
 
-    var t = this;
-
     function sortByType(a, b) {
-      return t._describeType(a).toLowerCase()
-              .localeCompare(t._describeType(b).toLowerCase());
+      return a.typeDescription.toLowerCase()
+              .localeCompare(b.typeDescription.toLowerCase());
     }
 
     function sortByAction(a, b) {
-      return t._describePreferredAction(a).toLowerCase()
-              .localeCompare(t._describePreferredAction(b).toLowerCase());
+      return a.actionDescription.toLowerCase()
+              .localeCompare(b.actionDescription.toLowerCase());
     }
 
     switch (this._sortColumn.getAttribute("value")) {
@@ -1494,44 +1318,42 @@ var gApplicationsPane = {
       this._visibleTypes.reverse();
   },
 
-  focusFilterBox: function() {
+  focusFilterBox() {
     this._filter.focus();
     this._filter.select();
   },
 
-  //**************************************************************************//
+  // -------
   // Changes
 
-  onSelectAction: function(aActionItem) {
+  // Whether or not we are currently storing the action selected by the user.
+  // We use this to suppress notification-triggered updates to the list when
+  // we make changes that may spawn such updates, specifically when we change
+  // the action for the feed type, which results in feed preference updates,
+  // which spawn "pref changed" notifications that would otherwise cause us
+  // to rebuild the view unnecessarily.
+  _storingAction: false,
+
+  onSelectAction(aActionItem) {
     this._storingAction = true;
 
     let typeItem = this._list.selectedItem;
-    let menu = document.getAnonymousElementByAttribute(typeItem, "class",
-                                                       "actionsMenu");
+    let menu = typeItem.querySelector(".actionsMenu");
     menu.previousSelectedItem = aActionItem;
     try {
       this._storeAction(aActionItem);
-    }
-    finally {
+    } finally {
       this._storingAction = false;
     }
   },
 
-  _storeAction: function(aActionItem) {
-    var typeItem = this._list.selectedItem;
-    var handlerInfo = this._handledTypes[typeItem.type];
+  _storeAction(aActionItem) {
+    var handlerInfo = this.selectedHandlerListItem.handlerInfoWrapper;
 
     if (aActionItem.hasAttribute("alwaysAsk")) {
       handlerInfo.alwaysAskBeforeHandling = true;
-    }
-    else if (aActionItem.hasAttribute("action")) {
+    } else if (aActionItem.hasAttribute("action")) {
       let action = parseInt(aActionItem.getAttribute("action"));
-
-      // Set the plugin state if we're enabling or disabling a plugin.
-      if (action == kActionUsePlugin)
-        handlerInfo.enablePluginType();
-      else if (handlerInfo.plugin && !handlerInfo.isDisabledPluginType)
-        handlerInfo.disablePluginType();
 
       // Set the preferred application handler.
       // We leave the existing preferred app in the list when we set
@@ -1551,26 +1373,16 @@ var gApplicationsPane = {
 
     handlerInfo.store();
 
-    // Make sure the handler info object is flagged to indicate that there is
-    // now some user configuration for the type.
-    handlerInfo.handledOnlyByPlugin = false;
-
     // Update the action label and image to reflect the new preferred action.
-    typeItem.setAttribute("actionDescription",
-                          this._describePreferredAction(handlerInfo));
-    if (!this._setIconClassForPreferredAction(handlerInfo, typeItem)) {
-      typeItem.setAttribute("actionIcon",
-                            this._getIconURLForPreferredAction(handlerInfo));
-    }
+    this.selectedHandlerListItem.refreshAction();
   },
 
-  manageApp: function(aEvent) {
+  manageApp(aEvent) {
     // Don't let the normal "on select action" handler get this event,
     // as we handle it specially ourselves.
     aEvent.stopPropagation();
 
-    var typeItem = this._list.selectedItem;
-    var handlerInfo = this._handledTypes[typeItem.type];
+    var handlerInfo = this.selectedHandlerListItem.handlerInfoWrapper;
 
     let closingCallback = () => {
       // Rebuild the actions menu so that we revert to the previous selection,
@@ -1578,12 +1390,7 @@ var gApplicationsPane = {
       this.rebuildActionsMenu();
 
       // Update the richlistitem too. Will be visible when selecting another row.
-      typeItem.setAttribute("actionDescription",
-                            this._describePreferredAction(handlerInfo));
-      if (!this._setIconClassForPreferredAction(handlerInfo, typeItem)) {
-        typeItem.setAttribute("actionIcon",
-                              this._getIconURLForPreferredAction(handlerInfo));
-      }
+      this.selectedHandlerListItem.refreshAction();
     };
 
     gSubDialog.open(
@@ -1591,7 +1398,7 @@ var gApplicationsPane = {
       "resizable=no", handlerInfo, closingCallback);
   },
 
-  chooseApp: function(aEvent) {
+  chooseApp(aEvent) {
     // Don't let the normal "on select action" handler get this event,
     // as we handle it specially ourselves.
     aEvent.stopPropagation();
@@ -1606,8 +1413,7 @@ var gApplicationsPane = {
       // If the user picked a new app from the menu, select it.
       if (handlerApp) {
         let typeItem = this._list.selectedItem;
-        let actionsMenu =
-          document.getAnonymousElementByAttribute(typeItem, "class", "actionsMenu");
+        let actionsMenu = typeItem.querySelector(".actionsMenu");
         let menuItems = actionsMenu.menupopup.childNodes;
         for (let i = 0; i < menuItems.length; i++) {
           let menuItem = menuItems[i];
@@ -1622,7 +1428,7 @@ var gApplicationsPane = {
 
     if (AppConstants.platform == "win") {
       let params = {};
-      let handlerInfo = this._handledTypes[this._list.selectedItem.type];
+      let handlerInfo = this.selectedHandlerListItem.handlerInfoWrapper;
 
       params.mimeInfo = handlerInfo.wrappedHandlerInfo;
 
@@ -1664,7 +1470,7 @@ var gApplicationsPane = {
           handlerApp.executable = fp.file;
 
           // Add the app to the type's list of possible handlers.
-          let handlerInfo = this._handledTypes[this._list.selectedItem.type];
+          let handlerInfo = this.selectedHandlerListItem.handlerInfoWrapper;
           handlerInfo.addPossibleApplicationHandler(handlerApp);
         }
         onSelectionDone();
@@ -1672,30 +1478,21 @@ var gApplicationsPane = {
     }
   },
 
-  // Mark which item in the list was last selected so we can reselect it
-  // when we rebuild the list or when the user returns to the prefpane.
-  onSelectionChanged: function() {
-    if (this._list.selectedItem)
-      this._list.setAttribute("lastSelectedType",
-                              this._list.selectedItem.getAttribute("type"));
-  },
-
-  confirmDelete: function(aEvent) {
+  confirmDelete(aEvent) {
     aEvent.stopPropagation();
     if (Services.prompt.confirm(null,
                                 this._prefsBundle.getString("confirmDeleteTitle"),
-                                this._prefsBundle.getString("confirmDeleteText")))
+                                this._prefsBundle.getString("confirmDeleteText"))) {
       this.onDelete(aEvent);
-    else {
+    } else {
       // They hit cancel, so return them to the previously selected item.
       let typeItem = this._list.selectedItem;
-      let menu = document.getAnonymousElementByAttribute(this._list.selectedItem,
-                                                         "class", "actionsMenu");
+      let menu = typeItem.querySelector(".actionsMenu");
       menu.selectedItem = menu.previousSelectedItem;
     }
   },
 
-  onDelete: function(aEvent) {
+  onDelete(aEvent) {
     // We want to delete if either the request came from the confirmDelete
     // method (which is the only thing that populates the aEvent parameter),
     // or we've hit the delete/backspace key while the list has focus.
@@ -1712,49 +1509,7 @@ var gApplicationsPane = {
     }
   },
 
-  _setIconClassForPreferredAction: function(aHandlerInfo, aElement) {
-    // If this returns true, the attribute that CSS sniffs for was set to something
-    // so you shouldn't manually set an icon URI.
-    // This removes the existing actionIcon attribute if any, even if returning false.
-    aElement.removeAttribute("actionIcon");
-
-    if (aHandlerInfo.alwaysAskBeforeHandling) {
-      aElement.setAttribute(APP_ICON_ATTR_NAME, "ask");
-      return true;
-    }
-
-    switch (aHandlerInfo.preferredAction) {
-      case Ci.nsIHandlerInfo.saveToDisk:
-        aElement.setAttribute(APP_ICON_ATTR_NAME, "save");
-        return true;
-
-      case Ci.nsIHandlerInfo.handleInternally:
-        break;
-
-      case kActionUsePlugin:
-        aElement.setAttribute(APP_ICON_ATTR_NAME, "plugin");
-        return true;
-    }
-    aElement.removeAttribute(APP_ICON_ATTR_NAME);
-    return false;
-  },
-
-  _getIconURLForPreferredAction: function(aHandlerInfo) {
-    switch (aHandlerInfo.preferredAction) {
-      case Ci.nsIHandlerInfo.useSystemDefault:
-        return this._getIconURLForSystemDefault(aHandlerInfo);
-
-      case Ci.nsIHandlerInfo.useHelperApp:
-        let preferredApp = aHandlerInfo.preferredApplicationHandler;
-        if (this.isValidHandlerApp(preferredApp))
-          return this._getIconURLForHandlerApp(preferredApp);
-    }
-    // This should never happen, but if preferredAction is set to some weird
-    // value, then fall back to the generic application icon.
-    return ICON_URL_APP;
-  },
-
-  _getIconURLForHandlerApp: function(aHandlerApp) {
+  _getIconURLForHandlerApp(aHandlerApp) {
     if (aHandlerApp instanceof Ci.nsILocalHandlerApp)
       return this._getIconURLForFile(aHandlerApp.executable);
 
@@ -1762,13 +1517,13 @@ var gApplicationsPane = {
       return this._getIconURLForWebApp(aHandlerApp.uriTemplate);
 
     if (aHandlerApp instanceof Ci.nsIWebContentHandlerInfo)
-      return this._getIconURLForWebApp(aHandlerApp.uri)
+      return this._getIconURLForWebApp(aHandlerApp.uri);
 
     // We know nothing about other kinds of handler apps.
     return "";
   },
 
-  _getIconURLForFile: function(aFile) {
+  _getIconURLForFile(aFile) {
     let urlSpec = Services.io.getProtocolHandler("file")
       .QueryInterface(Ci.nsIFileProtocolHandler)
       .getURLSpecFromFile(aFile);
@@ -1776,7 +1531,7 @@ var gApplicationsPane = {
     return "moz-icon://" + urlSpec + "?size=16";
   },
 
-  _getIconURLForWebApp: function(aWebAppURITemplate) {
+  _getIconURLForWebApp(aWebAppURITemplate) {
     var uri = Services.io.newURI(aWebAppURITemplate);
 
     // Unfortunately we can't use the favicon service to get the favicon,
@@ -1791,28 +1546,30 @@ var gApplicationsPane = {
 
     return /^https?/.test(uri.scheme) ? uri.resolve("/favicon.ico") : "";
   },
-
-  _getIconURLForSystemDefault: function(aHandlerInfo) {
-    // Handler info objects for MIME types on some OSes implement a property bag
-    // interface from which we can get an icon for the default app, so if we're
-    // dealing with a MIME type on one of those OSes, then try to get the icon.
-    if ("wrappedHandlerInfo" in aHandlerInfo) {
-      let wrappedHandlerInfo = aHandlerInfo.wrappedHandlerInfo;
-
-      if (wrappedHandlerInfo instanceof Ci.nsIMIMEInfo &&
-          wrappedHandlerInfo instanceof Ci.nsIPropertyBag) {
-        try {
-          let url = wrappedHandlerInfo.getProperty("defaultApplicationIconURL");
-          if (url)
-            return url + "?size=16";
-        }
-        catch(ex) { }
-      }
-    }
-
-    // If this isn't a MIME type object on an OS that supports retrieving
-    // the icon, or if we couldn't retrieve the icon for some other reason,
-    // then use a generic icon.
-    return ICON_URL_APP;
-  }
 };
+
+/**
+ * InternalHandlerInfoWrapper provides a basic mechanism to create an internal
+ * mime type handler that can be enabled/disabled in the applications preference
+ * menu.
+ */
+class InternalHandlerInfoWrapper extends HandlerInfoWrapper {
+  constructor(mimeType) {
+    super(mimeType, gMIMEService.getFromTypeAndExtension(mimeType, null));
+  }
+
+  // Override store so we so we can notify any code listening for registration
+  // or unregistration of this handler.
+  store() {
+    super.store();
+    Services.obs.notifyObservers(null, this._handlerChanged);
+  }
+
+  get enabled() {
+    throw Cr.NS_ERROR_NOT_IMPLEMENTED;
+  }
+
+  get description() {
+    return gApplicationsPane._prefsBundle.getString(this._appPrefLabel);
+  }
+}

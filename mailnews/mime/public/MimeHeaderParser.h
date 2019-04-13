@@ -30,6 +30,10 @@ nsCOMArray<msgIAddressObject> DecodedHeader(const nsAString &aHeader);
  */
 nsCOMArray<msgIAddressObject> EncodedHeader(const nsACString &aHeader,
                                             const char *aCharset = nullptr);
+/**
+ * Same deal, but we're starting with an nsAString.
+ */
+nsCOMArray<msgIAddressObject> EncodedHeaderW(const nsAString &aHeader);
 
 namespace detail {
 void DoConversion(const nsTArray<nsString> &aUTF16, nsTArray<nsCString> &aUTF8);
@@ -47,7 +51,7 @@ template <uint32_t N = 5>
 class UTF16ArrayAdapter
 {
 public:
-  UTF16ArrayAdapter(nsTArray<nsCString> &aUTF8Array)
+  explicit UTF16ArrayAdapter(nsTArray<nsCString> &aUTF8Array)
   : mUTF8Array(aUTF8Array) {}
   ~UTF16ArrayAdapter() { detail::DoConversion(mUTF16Array, mUTF8Array); }
   operator nsTArray<nsString>&() { return mUTF16Array; }

@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
 
 function calCalendarSearchListener(numOperations, finalListener) {
     this.mFinalListener = finalListener;
@@ -50,20 +50,20 @@ function calCalendarSearchService() {
 }
 var calCalendarSearchServiceClassID = Components.ID("{f5f743cd-8997-428e-bc1b-644e73f61203}");
 var calCalendarSearchServiceInterfaces = [
-    Components.interfaces.calICalendarSearchProvider,
-    Components.interfaces.calICalendarSearchService
+    Ci.calICalendarSearchProvider,
+    Ci.calICalendarSearchService
 ];
 calCalendarSearchService.prototype = {
     mProviders: null,
 
     classID: calCalendarSearchServiceClassID,
     QueryInterface: cal.generateQI(calCalendarSearchServiceInterfaces),
-    classInfo: XPCOMUtils.generateCI({
+    classInfo: cal.generateCI({
         classID: calCalendarSearchServiceClassID,
         contractID: "@mozilla.org/calendar/calendarsearch-service;1",
         classDescription: "Calendar Search Service",
         interfaces: calCalendarSearchServiceInterfaces,
-        flags: Components.interfaces.nsIClassInfo.SINGLETON
+        flags: Ci.nsIClassInfo.SINGLETON
     }),
 
     // calICalendarSearchProvider:
@@ -76,7 +76,7 @@ calCalendarSearchService.prototype = {
                                                                       aMaxResults,
                                                                       groupListener));
             } catch (exc) {
-                Components.utils.reportError(exc);
+                Cu.reportError(exc);
                 groupListener.onResult(null, []); // dummy to adopt mNumOperations
             }
         }
@@ -89,9 +89,9 @@ calCalendarSearchService.prototype = {
         return [...this.mProviders];
     },
     addProvider: function(aProvider) {
-        this.mProviders.add(aProvider.QueryInterface(Components.interfaces.calICalendarSearchProvider));
+        this.mProviders.add(aProvider.QueryInterface(Ci.calICalendarSearchProvider));
     },
     removeProvider: function(aProvider) {
-        this.mProviders.delete(aProvider.QueryInterface(Components.interfaces.calICalendarSearchProvider));
+        this.mProviders.delete(aProvider.QueryInterface(Ci.calICalendarSearchProvider));
     }
 };

@@ -12,7 +12,6 @@
 #include "nsIMsgIdentity.h"
 #include "nsIMsgAccount.h"
 #include "nsIMsgFolder.h"
-#include "nsMsgFolderFlags.h"
 #include "nsMsgDBFolder.h"
 #include "nsCOMPtr.h"
 #include "nsMsgBaseCID.h"
@@ -33,7 +32,6 @@
 #include "prprf.h"
 #include "nsIAlertsService.h"
 #include "nsIStringBundle.h"
-#include "nsToolkitCompsCID.h"
 #include "nsIMsgDatabase.h"
 #include "nsIMsgHdr.h"
 #include "nsISupportsPrimitives.h"
@@ -50,6 +48,7 @@
 #include "mozilla/mailnews/MimeHeaderParser.h"
 #include "nsGlobalWindow.h"
 #include "mozilla/ErrorResult.h"
+#include "mozilla/Components.h"
 
 #include <Carbon/Carbon.h>
 #import <Cocoa/Cocoa.h>
@@ -384,9 +383,8 @@ nsMessengerOSXIntegration::ShowAlertMessage(const nsAString& aAlertTitle,
                                             const nsAString& aAlertText,
                                             const nsACString& aFolderURI)
 {
-  nsresult rv;
-
-  nsCOMPtr<nsIAlertsService> alertsService (do_GetService(NS_ALERTSERVICE_CONTRACTID, &rv));
+  nsCOMPtr<nsIAlertsService> alertsService = mozilla::components::Alerts::Service();
+  nsresult rv = alertsService ? NS_OK : NS_ERROR_UNEXPECTED;
   // If we have an nsIAlertsService implementation, use it:
   if (NS_SUCCEEDED(rv))
   {

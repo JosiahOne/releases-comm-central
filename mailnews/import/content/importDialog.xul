@@ -12,8 +12,8 @@
 %importDTD;
 ]>
 
-<window xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
         onload="OnLoadImportDialog()"
 #ifdef XP_MACOSX
         style="width: &window.macWidth; !important;"
@@ -85,35 +85,32 @@
                    value="&selectDescriptionB.label;"
                    accesskey="&selectDescription.accesskey;"/>
           </deck>
-          <listbox id="moduleList" flex="3"
-                   onselect="ImportSelectionChanged(); enableAdvance();"/>
+          <richlistbox id="moduleList"
+                       class="theme-listbox"
+                       height="200px"
+                       onselect="ImportSelectionChanged(); enableAdvance();"/>
         </vbox>
         <label>&noModulesFound.label;</label>
       </deck>
-      <grid flex="1">
-        <columns><column flex="1"/></columns>
-        <rows>
-          <row>
-            <description control="moduleList" id="description" class="box-padded"/>
-          </row>
-          <row>
-            <hbox id="acctName-box" flex="1" style="visibility: hidden;">
-              <label control="acctName" class="box-padded"
-                     accesskey="&acctName.accesskey;"
-                     value="&acctName.label;"/>
-              <textbox id="acctName" clickSelectsAll="true"/>
-            </hbox>
-          </row>
-        </rows>
-      </grid>
+      <vbox>
+        <hbox flex="1">
+          <description flex="1" control="moduleList" id="description" class="box-padded"/>
+        </hbox>
+        <hbox id="acctName-box" flex="1" style="visibility: hidden;">
+          <label control="acctName" class="box-padded"
+                 accesskey="&acctName.accesskey;"
+                 value="&acctName.label;"/>
+          <textbox id="acctName" clickSelectsAll="true"/>
+        </hbox>
+      </vbox>
     </vbox>
     <vbox class="wizard-box">
       <spacer flex="1"/>
       <groupbox>
-        <caption id="progressTitle" label="&title.label;"/>
+        <label id="progressTitle" class="header">&title.label;</label>
         <label class="indent" id="progressStatus" value="&processing.label;"/>
         <vbox class="box-padded">
-          <progressmeter id="progressMeter" mode="determined" value="5"/>
+          <html:progress id="progressMeter" value="5" max="100"/>
         </vbox>
       </groupbox>
     </vbox>

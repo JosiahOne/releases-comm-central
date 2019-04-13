@@ -3,8 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/extensionSupport.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {ExtensionSupport} = ChromeUtils.import("resource:///modules/ExtensionSupport.jsm");
 
 var addonID;
 
@@ -14,12 +14,10 @@ function uninstall() {}
 
 function startup(data, reason) {
   addonID = data.id;
-  ExtensionSupport.registerWindowListener(
-    addonID,
-    {
-      chromeURLs: [ "chrome://messenger/content/messenger.xul" ],
-      onLoadWindow: setupServer
-    });
+  ExtensionSupport.registerWindowListener(addonID, {
+    chromeURLs: ["chrome://messenger/content/messenger.xul"],
+    onLoadWindow: setupServer,
+  });
 }
 
 function shutdown(data, reason) {
@@ -29,12 +27,12 @@ function shutdown(data, reason) {
 }
 
 function setupServer(domWindow) {
-  loadScript("chrome://jsbridge/content/overlay.js", domWindow);
+  Services.scriptloader.loadSubScript("chrome://jsbridge/content/overlay.js", domWindow);
 
   // The server used to be started via the command line (cmdarg.js) which
   // doesn't work for a bootstrapped add-on, so let's do it here.
   let server = {};
-  ChromeUtils.import('chrome://jsbridge/content/modules/server.js', server);
+  ChromeUtils.import("chrome://jsbridge/content/modules/server.js", server);
   console.log("=== JS Bridge: Starting server");
   server.startServer(24242);
 
@@ -42,14 +40,9 @@ function setupServer(domWindow) {
   ExtensionSupport.unregisterWindowListener(addonID);
 }
 
-function loadScript(url, targetWindow) {
-  let loader = Cc["@mozilla.org/moz/jssubscript-loader;1"].getService(Ci.mozIJSSubScriptLoader);
-  loader.loadSubScript(url, targetWindow);
-}
-
 function logException(exc) {
   try {
     Services.console.logStringMessage(exc.toString() + "\n" + exc.stack);
+  } catch (x) {
   }
-  catch (x) {}
 }

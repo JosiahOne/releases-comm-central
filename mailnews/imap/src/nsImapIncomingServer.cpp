@@ -24,8 +24,6 @@
 #include "nsIMsgFolder.h"
 #include "nsIMsgWindow.h"
 #include "nsImapMailFolder.h"
-#include "nsIRDFService.h"
-#include "nsRDFCID.h"
 #include "nsIMsgMailNewsUrl.h"
 #include "nsIImapService.h"
 #include "nsMsgI18N.h"
@@ -51,7 +49,6 @@ using namespace mozilla;
 #define DEFAULT_TRASH_FOLDER_PATH "Trash"  // XXX Is this a useful default?
 
 static NS_DEFINE_CID(kImapProtocolCID, NS_IMAPPROTOCOL_CID);
-static NS_DEFINE_CID(kRDFServiceCID, NS_RDFSERVICE_CID);
 static NS_DEFINE_CID(kSubscribableServerCID, NS_SUBSCRIBABLESERVER_CID);
 static NS_DEFINE_CID(kCImapHostSessionListCID, NS_IIMAPHOSTSESSIONLIST_CID);
 
@@ -449,7 +446,7 @@ nsImapIncomingServer::GetImapConnectionAndLoadUrl(nsIImapUrl* aImapUrl,
   {
     rv = aProtocol->LoadImapUrl(mailnewsurl, aConsumer);
     // *** jt - in case of the time out situation or the connection gets
-    // terminated by some unforseen problems let's give it a second chance
+    // terminated by some unforeseen problems let's give it a second chance
     // to run the url
     if (NS_FAILED(rv) && rv != NS_ERROR_ILLEGAL_VALUE)
     {
@@ -539,7 +536,6 @@ nsImapIncomingServer::LoadNextQueuedUrl(nsIImapProtocol *aProtocol, bool *aResul
   while (cnt > 0 && !urlRun && keepGoing)
   {
     nsCOMPtr<nsIImapUrl> aImapUrl(m_urlQueue[0]);
-    nsCOMPtr<nsIMsgMailNewsUrl> aMailNewsUrl(do_QueryInterface(aImapUrl, &rv));
 
     bool removeUrlFromQueue = false;
     if (aImapUrl)
@@ -635,10 +631,7 @@ nsresult nsImapIncomingServer::DoomUrlIfChannelHasError(nsIImapUrl *aImapUrl, bo
     if (NS_SUCCEEDED(aImapUrl->GetMockChannel(getter_AddRefs(mockChannel))) && mockChannel)
     {
       nsresult requestStatus;
-      nsCOMPtr<nsIRequest> request = do_QueryInterface(mockChannel);
-      if (!request)
-        return NS_ERROR_FAILURE;
-      request->GetStatus(&requestStatus);
+      mockChannel->GetStatus(&requestStatus);
       if (NS_FAILED(requestStatus))
       {
         nsresult res;
@@ -694,14 +687,9 @@ nsImapIncomingServer::ConnectionTimeOut(nsIImapProtocol* aConnection)
 
   if (PR_Now() - lastActiveTimeStamp >= cacheTimeoutLimits)
   {
-      nsCOMPtr<nsIImapProtocol> aProtocol(do_QueryInterface(aConnection,
-                                                            &rv));
-      if (NS_SUCCEEDED(rv) && aProtocol)
-      {
-        RemoveConnection(aConnection);
-        aProtocol->TellThreadToDie(false);
-        retVal = true;
-      }
+    RemoveConnection(aConnection);
+    aConnection->TellThreadToDie(false);
+    retVal = true;
   }
   return retVal;
 }
@@ -1306,16 +1294,7 @@ nsresult nsImapIncomingServer::GetFolder(const nsACString& name, nsIMsgFolder** 
       nsAutoCString uriString(uri);
       uriString.Append('/');
       uriString.Append(name);
-      nsCOMPtr<nsIRDFService> rdf(do_GetService(kRDFServiceCID, &rv));
-      NS_ENSURE_SUCCESS(rv, rv);
-      nsCOMPtr<nsIRDFResource> res;
-      rv = rdf->GetResource(uriString, getter_AddRefs(res));
-      if (NS_SUCCEEDED(rv))
-      {
-        nsCOMPtr<nsIMsgFolder> folder(do_QueryInterface(res, &rv));
-        if (NS_SUCCEEDED(rv) && folder)
-          folder.forget(pFolder);
-      }
+      rv = GetOrCreateFolder(uriString, pFolder);
     }
   }
   return rv;
@@ -1449,9 +1428,6 @@ NS_IMETHODIMP nsImapIncomingServer::DiscoveryDone()
     // folders later on in the imap server, the subsequent GetResource() of the
     // same uri will get us the cached rdf resource which should have the folder
     // flag set appropriately.
-    nsCOMPtr<nsIRDFService> rdf(do_GetService("@mozilla.org/rdf/rdf-service;1",
-                                              &rv));
-    NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsIMsgAccountManager> accountMgr = do_GetService(NS_MSGACCOUNTMANAGER_CONTRACTID, &rv);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -1464,14 +1440,14 @@ NS_IMETHODIMP nsImapIncomingServer::DiscoveryDone()
       identity->GetFccFolder(folderUri);
       nsCString existingUri;
 
-      if (CheckSpecialFolder(rdf, folderUri, nsMsgFolderFlags::SentMail,
+      if (CheckSpecialFolder(folderUri, nsMsgFolderFlags::SentMail,
                              existingUri))
       {
         identity->SetFccFolder(existingUri);
         identity->SetFccFolderPickerMode(NS_LITERAL_CSTRING("1"));
       }
       identity->GetDraftFolder(folderUri);
-      if (CheckSpecialFolder(rdf, folderUri, nsMsgFolderFlags::Drafts,
+      if (CheckSpecialFolder(folderUri, nsMsgFolderFlags::Drafts,
                              existingUri))
       {
         identity->SetDraftFolder(existingUri);
@@ -1482,7 +1458,7 @@ NS_IMETHODIMP nsImapIncomingServer::DiscoveryDone()
       if (archiveEnabled)
       {
         identity->GetArchiveFolder(folderUri);
-        if (CheckSpecialFolder(rdf, folderUri, nsMsgFolderFlags::Archive,
+        if (CheckSpecialFolder(folderUri, nsMsgFolderFlags::Archive,
                                existingUri))
         {
           identity->SetArchiveFolder(existingUri);
@@ -1490,10 +1466,9 @@ NS_IMETHODIMP nsImapIncomingServer::DiscoveryDone()
         }
       }
       identity->GetStationeryFolder(folderUri);
-      nsCOMPtr<nsIRDFResource> res;
-      if (!folderUri.IsEmpty() && NS_SUCCEEDED(rdf->GetResource(folderUri, getter_AddRefs(res))))
-      {
-        nsCOMPtr<nsIMsgFolder> folder(do_QueryInterface(res, &rv));
+      if (!folderUri.IsEmpty()) {
+        nsCOMPtr<nsIMsgFolder> folder;
+        rv = GetOrCreateFolder(folderUri, getter_AddRefs(folder));
         if (NS_SUCCEEDED(rv))
           rv = folder->SetFlag(nsMsgFolderFlags::Templates);
       }
@@ -1505,7 +1480,7 @@ NS_IMETHODIMP nsImapIncomingServer::DiscoveryDone()
     {
       nsCString spamFolderUri, existingUri;
       spamSettings->GetSpamFolderURI(getter_Copies(spamFolderUri));
-      if (CheckSpecialFolder(rdf, spamFolderUri, nsMsgFolderFlags::Junk,
+      if (CheckSpecialFolder(spamFolderUri, nsMsgFolderFlags::Junk,
                              existingUri))
       {
         // This only sets the cached values in the spam settings object.
@@ -1645,12 +1620,10 @@ NS_IMETHODIMP nsImapIncomingServer::DiscoveryDone()
 // it will be there if and when the folder is created.
 // Return true if we found an existing special folder different than
 // the one specified in prefs, and the one specified by prefs doesn't exist.
-bool nsImapIncomingServer::CheckSpecialFolder(nsIRDFService *rdf,
-                                                nsCString &folderUri,
-                                                uint32_t folderFlag,
-                                                nsCString &existingUri)
+bool nsImapIncomingServer::CheckSpecialFolder(nsCString &folderUri,
+                                              uint32_t folderFlag,
+                                              nsCString &existingUri)
 {
-  nsCOMPtr<nsIRDFResource> res;
   nsCOMPtr<nsIMsgFolder> folder;
   nsCOMPtr<nsIMsgFolder> rootMsgFolder;
   nsresult rv = GetRootFolder(getter_AddRefs(rootMsgFolder));
@@ -1658,27 +1631,24 @@ bool nsImapIncomingServer::CheckSpecialFolder(nsIRDFService *rdf,
   nsCOMPtr<nsIMsgFolder> existingFolder;
   rootMsgFolder->GetFolderWithFlags(folderFlag, getter_AddRefs(existingFolder));
 
-  if (!folderUri.IsEmpty() && NS_SUCCEEDED(rdf->GetResource(folderUri, getter_AddRefs(res))))
+  if (!folderUri.IsEmpty() &&
+    NS_SUCCEEDED(GetOrCreateFolder(folderUri, getter_AddRefs(folder))))
   {
-    folder = do_QueryInterface(res, &rv);
-    if (NS_SUCCEEDED(rv))
+    nsCOMPtr<nsIMsgFolder> parent;
+    folder->GetParent(getter_AddRefs(parent));
+    if (parent)
     {
-      nsCOMPtr<nsIMsgFolder> parent;
-      folder->GetParent(getter_AddRefs(parent));
-      if (parent)
-      {
-        existingFolder = nullptr;
-      }
-      if (!existingFolder)
-      {
-        folder->SetFlag(folderFlag);
-      }
-
-      nsString folderName;
-      folder->GetPrettyName(folderName);
-      // this will set the localized name based on the folder flag.
-      folder->SetPrettyName(folderName);
+      existingFolder = nullptr;
     }
+    if (!existingFolder)
+    {
+      folder->SetFlag(folderFlag);
+    }
+
+    nsString folderName;
+    folder->GetPrettyName(folderName);
+    // this will set the localized name based on the folder flag.
+    folder->SetPrettyName(folderName);
   }
 
   if (existingFolder)
@@ -2650,12 +2620,12 @@ nsImapIncomingServer::GetFirstChildURI(const nsACString &path, nsACString &aResu
 
 
 NS_IMETHODIMP
-nsImapIncomingServer::GetChildren(const nsACString &aPath,
-                                  nsISimpleEnumerator **aResult)
+nsImapIncomingServer::GetChildURIs(const nsACString &aPath,
+                                   nsIUTF8StringEnumerator **aResult)
 {
   nsresult rv = EnsureInner();
   NS_ENSURE_SUCCESS(rv,rv);
-  return mInner->GetChildren(aPath, aResult);
+  return mInner->GetChildURIs(aPath, aResult);
 }
 
 nsresult
@@ -3283,24 +3253,17 @@ nsImapIncomingServer::GetMsgFolderFromURI(nsIMsgFolder *aFolderResource,
     // we didn't find the folder so we will have to create a new one.
     if (namespacePrefixAdded)
     {
-      nsCOMPtr <nsIRDFService> rdf = do_GetService("@mozilla.org/rdf/rdf-service;1", &rv);
-      NS_ENSURE_SUCCESS(rv,rv);
-
-      nsCOMPtr<nsIRDFResource> resource;
-      rv = rdf->GetResource(folderUriWithNamespace, getter_AddRefs(resource));
-      NS_ENSURE_SUCCESS(rv,rv);
-
-      nsCOMPtr <nsIMsgFolder> folderResource;
-      folderResource = do_QueryInterface(resource, &rv);
-      NS_ENSURE_SUCCESS(rv,rv);
-      msgFolder = folderResource;
+      nsCOMPtr<nsIMsgFolder> folder;
+      rv = GetOrCreateFolder(folderUriWithNamespace, getter_AddRefs(folder));
+      NS_ENSURE_SUCCESS(rv, rv);
+      msgFolder = folder;
     }
     else
       msgFolder = aFolderResource;
   }
 
   msgFolder.forget(aFolder);
-  return NS_OK;
+  return (aFolder ? NS_OK : NS_ERROR_FAILURE);
 }
 
 nsresult

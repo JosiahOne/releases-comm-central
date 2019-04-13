@@ -2,10 +2,31 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/imServices.jsm");
-ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
-ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/jsProtoHelper.jsm");
+var {Services} = ChromeUtils.import("resource:///modules/imServices.jsm");
+var {Status} = ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
+var {
+  XPCOMUtils,
+  setTimeout,
+  clearTimeout,
+  executeSoon,
+  nsSimpleEnumerator,
+  EmptyEnumerator,
+  ClassInfo,
+  l10nHelper,
+  initLogModule,
+} = ChromeUtils.import("resource:///modules/imXPCOMUtils.jsm");
+var {
+  GenericAccountPrototype,
+  GenericAccountBuddyPrototype,
+  GenericConvIMPrototype,
+  GenericConvChatPrototype,
+  GenericConvChatBuddyPrototype,
+  GenericConversationPrototype,
+  GenericMessagePrototype,
+  GenericProtocolPrototype,
+  Message,
+  TooltipInfo,
+} = ChromeUtils.import("resource:///modules/jsProtoHelper.jsm");
 
 var gLastUIConvId = 0;
 var gLastPrplConvId = 0;
@@ -21,7 +42,7 @@ function OutgoingMessage(aMsg, aConversation) {
 OutgoingMessage.prototype = {
   __proto__: ClassInfo("imIOutgoingMessage", "Outgoing Message"),
   cancelled: false,
-  action: false
+  action: false,
 };
 
 function imMessage(aPrplMessage) {
@@ -65,7 +86,7 @@ imMessage.prototype = {
   get notification() { return this.prplMessage.notification; },
   get noLinkification() { return this.prplMessage.noLinkification; },
   get originalMessage() { return this.prplMessage.originalMessage; },
-  getActions: function(aCount) { return this.prplMessage.getActions(aCount || {}); }
+  getActions(aCount) { return this.prplMessage.getActions(aCount || {}); },
 };
 
 function UIConversation(aPrplConversation)
@@ -93,7 +114,7 @@ UIConversation.prototype = {
       return target.buddy.buddy.contact;
     return null;
   },
-  updateContactObserver: function() {
+  updateContactObserver() {
     let contact = this.contact;
     if (contact && !this._observedContact) {
       contact.addObserver(this);
@@ -109,7 +130,7 @@ UIConversation.prototype = {
     this.changeTargetTo(aPrplConversation);
   },
   get hasMultipleTargets() { return Object.keys(this._prplConv).length > 1; },
-  getTargetByAccount: function(aAccount) {
+  getTargetByAccount(aAccount) {
     let accountId = aAccount.id;
     for (let id in this._prplConv) {
       let prplConv = this._prplConv[id];
@@ -119,7 +140,7 @@ UIConversation.prototype = {
     return null;
   },
   _currentTargetId: 0,
-  changeTargetTo: function(aPrplConversation) {
+  changeTargetTo(aPrplConversation) {
     let id = aPrplConversation.id;
     if (this._currentTargetId == id)
       return;
@@ -147,10 +168,10 @@ UIConversation.prototype = {
   // Returns a boolean indicating if the ui-conversation was closed.
   // If the conversation was closed, aContactId.value is set to the contact id
   // or 0 if no contact was associated with the conversation.
-  removeTarget: function(aPrplConversation, aContactId) {
+  removeTarget(aPrplConversation, aContactId) {
     let id = aPrplConversation.id;
     if (!(id in this._prplConv))
-      throw "unknown prpl conversation";
+      throw new Error("unknown prpl conversation");
 
     delete this._prplConv[id];
     if (this._currentTargetId != id)
@@ -180,14 +201,14 @@ UIConversation.prototype = {
   get unreadTargetedMessageCount() { return this._unreadTargetedMessageCount; },
   _unreadIncomingMessageCount: 0,
   get unreadIncomingMessageCount() { return this._unreadIncomingMessageCount; },
-  markAsRead: function() {
+  markAsRead() {
     delete this._unreadMessageCount;
     delete this._unreadTargetedMessageCount;
     delete this._unreadIncomingMessageCount;
     this._notifyUnreadCountChanged();
   },
   _lastNotifiedUnreadCount: 0,
-  _notifyUnreadCountChanged: function() {
+  _notifyUnreadCountChanged() {
     if (this._unreadIncomingMessageCount == this._lastNotifiedUnreadCount)
       return;
 
@@ -196,12 +217,12 @@ UIConversation.prototype = {
       observer.observe(this, "unread-message-count-changed",
                        this._unreadIncomingMessageCount.toString());
   },
-  getMessages: function(aMessageCount) {
+  getMessages(aMessageCount) {
     if (aMessageCount)
       aMessageCount.value = this._messages.length;
     return this._messages;
   },
-  checkClose: function() {
+  checkClose() {
     if (!this._currentTargetId)
       return true; // already closed.
 
@@ -215,7 +236,7 @@ UIConversation.prototype = {
     return true;
   },
 
-  observe: function(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     if (aTopic == "contact-no-longer-dummy") {
       let oldId = parseInt(aData);
       // gConversationsService is ugly... :(
@@ -247,13 +268,13 @@ UIConversation.prototype = {
   },
 
   _iconUpdatePending: false,
-  updateIcon: function() {
+  updateIcon() {
     delete this._iconUpdatePending;
     this.notifyObservers(this, "update-buddy-icon");
   },
 
   _statusUpdatePending: false,
-  updateBuddyStatus: function() {
+  updateBuddyStatus() {
     delete this._statusUpdatePending;
     let {statusType: statusType, statusText: statusText} = this.buddy;
 
@@ -289,7 +310,7 @@ UIConversation.prototype = {
   },
 
   _disconnected: false,
-  disconnecting: function() {
+  disconnecting() {
     if (this._disconnected)
       return;
 
@@ -303,7 +324,7 @@ UIConversation.prototype = {
       this.systemMessage(bundle.GetStringFromName("accountDisconnected"));
     this.notifyObservers(this, "update-buddy-status");
   },
-  connected: function() {
+  connected() {
     if (this._disconnected) {
       delete this._disconnected;
       let msg = bundle.GetStringFromName("accountReconnected");
@@ -328,7 +349,7 @@ UIConversation.prototype = {
     this.notifyObservers(this, "update-buddy-status");
   },
 
-  observeConv: function(aTargetId, aSubject, aTopic, aData) {
+  observeConv(aTargetId, aSubject, aTopic, aData) {
     if (aTargetId != this._currentTargetId &&
         (aTopic == "new-text" ||
          (aTopic == "update-typing" &&
@@ -338,7 +359,7 @@ UIConversation.prototype = {
     this.notifyObservers(aSubject, aTopic, aData);
   },
 
-  systemMessage: function(aText, aIsError) {
+  systemMessage(aText, aIsError) {
     let flags = {system: true, noLog: true, error: !!aIsError};
     (new Message("system", aText, flags)).conversation = this;
   },
@@ -350,7 +371,7 @@ UIConversation.prototype = {
   get normalizedName() { return this.target.normalizedName; },
   get title() { return this.target.title; },
   get startDate() { return this.target.startDate; },
-  sendMsg: function(aMsg) {
+  sendMsg(aMsg) {
     // Add-ons (eg. pastebin) have an opportunity to cancel the message at this
     // point, or change the text content of the message.
     // If an add-on wants to split a message, it should truncate the first
@@ -380,7 +401,7 @@ UIConversation.prototype = {
       this.target.sendMsg(om.message);
     }
   },
-  unInit: function() {
+  unInit() {
     for (let id in this._prplConv) {
       let conv = this._prplConv[id];
       gConversationsService.forgetConversation(conv);
@@ -393,7 +414,7 @@ UIConversation.prototype = {
     delete this._currentTargetId;
     this.notifyObservers(this, "ui-conversation-destroyed");
   },
-  close: function() {
+  close() {
     for (let id in this._prplConv) {
       let conv = this._prplConv[id];
       conv.close();
@@ -404,14 +425,14 @@ UIConversation.prototype = {
     this.notifyObservers(this, "ui-conversation-closed");
     Services.obs.notifyObservers(this, "ui-conversation-closed");
   },
-  addObserver: function(aObserver) {
+  addObserver(aObserver) {
     if (!this._observers.includes(aObserver))
       this._observers.push(aObserver);
   },
-  removeObserver: function(aObserver) {
+  removeObserver(aObserver) {
     this._observers = this._observers.filter(o => o !== aObserver);
   },
-  notifyObservers: function(aSubject, aTopic, aData) {
+  notifyObservers(aSubject, aTopic, aData) {
     if (aTopic == "new-text") {
       aSubject = new imMessage(aSubject);
       this.notifyObservers(aSubject, "received-message");
@@ -449,15 +470,15 @@ UIConversation.prototype = {
   // Used above when notifying of new-texts originating in the
   // UIConversation. This happens when this.systemMessage() is called. The
   // conversation for the message is set as the UIConversation.
-  prepareForDisplaying: function(aMsg) {},
+  prepareForDisplaying(aMsg) {},
 
   // prplIConvIM
   get buddy() { return this.target.buddy; },
   get typingState() { return this.target.typingState; },
-  sendTyping: function(aString) { return this.target.sendTyping(aString); },
+  sendTyping(aString) { return this.target.sendTyping(aString); },
 
   // Chat only
-  getParticipants: function() { return this.target.getParticipants(); },
+  getParticipants() { return this.target.getParticipants(); },
   get topic() { return this.target.topic; },
   set topic(aTopic) { this.target.topic = aTopic; },
   get topicSetter() { return this.target.topicSetter; },
@@ -465,7 +486,7 @@ UIConversation.prototype = {
   get noTopicString() { return bundle.GetStringFromName("noTopic"); },
   get nick() { return this.target.nick; },
   get left() { return this.target.left; },
-  get joining() { return this.target.joining; }
+  get joining() { return this.target.joining; },
 };
 
 var gConversationsService;
@@ -473,7 +494,7 @@ function ConversationsService() { gConversationsService = this; }
 ConversationsService.prototype = {
   get wrappedJSObject() { return this; },
 
-  initConversations: function() {
+  initConversations() {
     this._uiConv = {};
     this._uiConvByContactId = {};
     this._prplConversations = [];
@@ -483,7 +504,7 @@ ConversationsService.prototype = {
     Services.obs.addObserver(this, "account-buddy-removed");
   },
 
-  unInitConversations: function() {
+  unInitConversations() {
     let UIConvs = this.getUIConversations();
     for (let UIConv of UIConvs)
       UIConv.unInit();
@@ -499,7 +520,7 @@ ConversationsService.prototype = {
     Services.obs.removeObserver(this, "account-buddy-removed");
   },
 
-  observe: function(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     if (aTopic == "account-connected") {
       for (let id in this._uiConv) {
         let conv = this._uiConv[id];
@@ -562,7 +583,7 @@ ConversationsService.prototype = {
     }
   },
 
-  addConversation: function(aPrplConversation) {
+  addConversation(aPrplConversation) {
     // Give an id to the new conversation.
     aPrplConversation.id = ++gLastPrplConvId;
     this._prplConversations.push(aPrplConversation);
@@ -592,7 +613,7 @@ ConversationsService.prototype = {
     if (contactId)
       this._uiConvByContactId[contactId] = newUIConv;
   },
-  removeConversation: function(aPrplConversation) {
+  removeConversation(aPrplConversation) {
     Services.obs.notifyObservers(aPrplConversation, "conversation-closed");
 
     let uiConv = this.getUIConversation(aPrplConversation);
@@ -605,14 +626,14 @@ ConversationsService.prototype = {
     }
     this.forgetConversation(aPrplConversation);
   },
-  forgetConversation: function(aPrplConversation) {
+  forgetConversation(aPrplConversation) {
     aPrplConversation.unInit();
 
     this._prplConversations =
       this._prplConversations.filter(c => c !== aPrplConversation);
   },
 
-  getUIConversations: function(aConvCount) {
+  getUIConversations(aConvCount) {
     let rv = [];
     if (this._uiConv) {
       for (let prplConvId in this._uiConv) {
@@ -628,28 +649,28 @@ ConversationsService.prototype = {
       aConvCount.value = rv.length;
     return rv;
   },
-  getUIConversation: function(aPrplConversation) {
+  getUIConversation(aPrplConversation) {
     let id = aPrplConversation.id;
     if (this._uiConv && id in this._uiConv)
       return this._uiConv[id];
-    throw "Unknown conversation";
+    throw new Error("Unknown conversation");
   },
-  getUIConversationByContactId: function(aId) {
+  getUIConversationByContactId(aId) {
     return (aId in this._uiConvByContactId) ? this._uiConvByContactId[aId] : null;
   },
 
-  getConversations: function() { return new nsSimpleEnumerator(this._prplConversations); },
-  getConversationById: function(aId) {
+  getConversations() { return new nsSimpleEnumerator(this._prplConversations); },
+  getConversationById(aId) {
     for (let conv of this._prplConversations)
       if (conv.id == aId)
         return conv;
     return null;
   },
-  getConversationByNameAndAccount: function(aName, aAccount, aIsChat) {
+  getConversationByNameAndAccount(aName, aAccount, aIsChat) {
     let normalizedName = aAccount.normalize(aName);
     for (let conv of this._prplConversations) {
       if (aAccount.normalize(conv.name) == normalizedName &&
-          aAccount.numericId == aAccount.numericId &&
+          aAccount.numericId == conv.account.numericId &&
           conv.isChat == aIsChat)
         return conv;
     }
@@ -659,7 +680,7 @@ ConversationsService.prototype = {
   QueryInterface: ChromeUtils.generateQI([Ci.imIConversationsService]),
   classDescription: "Conversations",
   classID: Components.ID("{b2397cd5-c76d-4618-8410-f344c7c6443a}"),
-  contractID: "@mozilla.org/chat/conversations-service;1"
+  contractID: "@mozilla.org/chat/conversations-service;1",
 };
 
 var NSGetFactory = XPCOMUtils.generateNSGetFactory([ConversationsService]);

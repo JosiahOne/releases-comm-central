@@ -50,7 +50,7 @@ public:
   // flush last line, though it won't be CRLF terminated.
   virtual nsresult FlushLastLine();
 protected:
-  nsMsgLineBuffer(bool convertNewlinesP);
+  explicit nsMsgLineBuffer(bool convertNewlinesP);
 
   nsresult ConvertAndSendBuffer();
   void SetLookingForCRLF(bool b);
@@ -70,6 +70,8 @@ class nsIInputStream;
 class NS_MSG_BASE nsMsgLineStreamBuffer
 {
 public:
+  NS_INLINE_DECL_REFCOUNTING(nsMsgLineStreamBuffer)
+
   // aBufferSize -- size of the buffer you want us to use for buffering stream data
   // aEndOfLinetoken -- The delimiter string to be used for determining the end of line. This
   //              allows us to parse platform specific end of line endings by making it
@@ -83,16 +85,17 @@ public:
   //            lines are terminated with a CR only, you need to set aLineToken to CR ('\r')
   nsMsgLineStreamBuffer(uint32_t aBufferSize, bool aAllocateNewLines,
                         bool aEatCRLFs = true, char aLineToken = '\n'); // specify the size of the buffer you want the class to use....
-  virtual ~nsMsgLineStreamBuffer();
 
   // Caller must free the line returned using PR_Free
   // aEndOfLinetoken -- delimiter used to denote the end of a line.
   // aNumBytesInLine -- The number of bytes in the line returned
   // aPauseForMoreData -- There is not enough data in the stream to make a line at this time...
   char * ReadNextLine(nsIInputStream * aInputStream, uint32_t &anumBytesInLine, bool &aPauseForMoreData, nsresult *rv = nullptr, bool addLineTerminator = false);
-  nsresult GrowBuffer(int32_t desiredSize);
+  nsresult GrowBuffer(uint32_t desiredSize);
   void ClearBuffer();
   bool NextLineAvailable();
+private:
+  virtual ~nsMsgLineStreamBuffer();
 protected:
   bool m_eatCRLFs;
   bool m_allocateNewLines;

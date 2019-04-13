@@ -2,10 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
+var { Status } = ChromeUtils.import("resource:///modules/imStatusUtils.jsm");
+var { Services } = ChromeUtils.import("resource:///modules/imServices.jsm");
 
 var statusSelector = {
-  observe: function ss_observe(aSubject, aTopic, aMsg) {
+  observe(aSubject, aTopic, aMsg) {
     if (aTopic == "status-changed")
       this.displayCurrentStatus();
     else if (aTopic == "user-icon-changed")
@@ -14,17 +15,17 @@ var statusSelector = {
       this.displayUserDisplayName();
   },
 
-  displayUserIcon: function ss_displayUserIcon() {
+  displayUserIcon() {
     let icon = Services.core.globalUserStatus.getUserIcon();
     document.getElementById("userIcon").src = icon ? icon.spec : "";
   },
 
-  displayUserDisplayName: function ss_displayUserDisplayName() {
+  displayUserDisplayName() {
     let displayName = Services.core.globalUserStatus.displayName;
     let elt = document.getElementById("displayName");
-    if (displayName)
+    if (displayName) {
       elt.removeAttribute("usingDefault");
-    else {
+    } else {
       let bundle = document.getElementById("chatBundle");
       displayName = bundle.getString("displayNameEmptyText");
       elt.setAttribute("usingDefault", displayName);
@@ -32,7 +33,7 @@ var statusSelector = {
     elt.setAttribute("value", displayName);
   },
 
-  displayStatusType: function ss_displayStatusType(aStatusType) {
+  displayStatusType(aStatusType) {
     document.getElementById("statusMessage")
             .setAttribute("statusType", aStatusType);
     let statusString = Status.toLabel(aStatusType);
@@ -42,16 +43,16 @@ var statusSelector = {
     return statusString;
   },
 
-  displayCurrentStatus: function ss_displayCurrentStatus() {
+  displayCurrentStatus() {
     let us = Services.core.globalUserStatus;
     let status = Status.toAttribute(us.statusType);
     let message = status == "offline" ? "" : us.statusText;
     let statusMessage = document.getElementById("statusMessage");
     if (!statusMessage) // Chat toolbar not in the DOM yet
       return;
-    if (message)
+    if (message) {
       statusMessage.removeAttribute("usingDefault");
-    else {
+    } else {
       let statusString = this.displayStatusType(status);
       statusMessage.setAttribute("usingDefault", statusString);
       message = statusString;
@@ -60,7 +61,7 @@ var statusSelector = {
     statusMessage.setAttribute("tooltiptext", message);
   },
 
-  editStatus: function ss_editStatus(aEvent) {
+  editStatus(aEvent) {
     let status = aEvent.originalTarget.getAttribute("status");
     if (status == "offline")
       Services.core.globalUserStatus.setStatus(Ci.imIStatusInfo.STATUS_OFFLINE, "");
@@ -68,7 +69,7 @@ var statusSelector = {
       this.startEditStatus(status);
   },
 
-  startEditStatus: function ss_startEditStatus(aStatusType) {
+  startEditStatus(aStatusType) {
     let currentStatusType =
       document.getElementById("statusTypeIcon").getAttribute("status");
     if (aStatusType != currentStatusType) {
@@ -79,7 +80,7 @@ var statusSelector = {
     this.statusMessageClick();
   },
 
-  statusMessageClick: function ss_statusMessageClick() {
+  statusMessageClick() {
     let elt = document.getElementById("statusMessage");
     let statusType =
       document.getElementById("statusTypeIcon").getAttribute("status");
@@ -96,9 +97,13 @@ var statusSelector = {
         else
           elt.removeAttribute("value");
       }
-      if (!("TextboxSpellChecker" in window))
-        ChromeUtils.import("resource:///modules/imTextboxUtils.jsm");
-      TextboxSpellChecker.registerTextbox(elt);
+
+      if (Services.prefs.getBoolPref("mail.spellcheck.inline")) {
+        elt.setAttribute("spellcheck", "true");
+      } else {
+        elt.removeAttribute("spellcheck");
+      }
+
       // force binding attachment by forcing layout
       elt.getBoundingClientRect();
       elt.select();
@@ -107,7 +112,7 @@ var statusSelector = {
     this.statusMessageRefreshTimer();
   },
 
-  statusMessageRefreshTimer: function ss_statusMessageRefreshTimer() {
+  statusMessageRefreshTimer() {
     const timeBeforeAutoValidate = 20 * 1000;
     if ("_stopEditStatusTimeout" in this)
       clearTimeout(this._stopEditStatusTimeout);
@@ -115,12 +120,12 @@ var statusSelector = {
                                              timeBeforeAutoValidate, true);
   },
 
-  statusMessageBlur: function ss_statusMessageBlur(aEvent) {
+  statusMessageBlur(aEvent) {
     if (aEvent.originalTarget == document.getElementById("statusMessage").inputField)
       statusSelector.finishEditStatusMessage(true);
   },
 
-  statusMessageKeyPress: function ss_statusMessageKeyPress(aEvent) {
+  statusMessageKeyPress(aEvent) {
     if (!this.hasAttribute("editing")) {
       if (aEvent.keyCode == aEvent.DOM_VK_DOWN) {
         let button = document.getElementById("statusTypeIcon");
@@ -143,7 +148,7 @@ var statusSelector = {
     }
   },
 
-  finishEditStatusMessage: function ss_finishEditStatusMessage(aSave) {
+  finishEditStatusMessage(aSave) {
     clearTimeout(this._stopEditStatusTimeout);
     delete this._stopEditStatusTimeout;
     let elt = document.getElementById("statusMessage");
@@ -164,8 +169,7 @@ var statusSelector = {
       if (newStatus != Ci.imIStatusInfo.STATUS_UNKNOWN ||
           elt.value != elt.getAttribute("value"))
         Services.core.globalUserStatus.setStatus(newStatus, elt.value);
-    }
-    else if ("_statusTypeBeforeEditing" in this) {
+    } else if ("_statusTypeBeforeEditing" in this) {
       this.displayStatusType(this._statusTypeBeforeEditing);
       delete this._statusTypeBeforeEditing;
       delete this._statusTypeEditing;
@@ -173,7 +177,7 @@ var statusSelector = {
 
     if (elt.hasAttribute("usingDefault"))
       elt.setAttribute("value", elt.getAttribute("usingDefault"));
-    TextboxSpellChecker.unregisterTextbox(elt);
+
     elt.removeAttribute("editing");
     elt.removeEventListener("blur", this.statusMessageBlur);
 
@@ -185,7 +189,7 @@ var statusSelector = {
     elt.focus();
   },
 
-  userIconClick: function ss_userIconClick() {
+  userIconClick() {
     const nsIFilePicker = Ci.nsIFilePicker;
     let fp = Cc["@mozilla.org/filepicker;1"]
                .createInstance(nsIFilePicker);
@@ -201,7 +205,7 @@ var statusSelector = {
     });
   },
 
-  displayNameClick: function ss_displayNameClick() {
+  displayNameClick() {
     let elt = document.getElementById("displayName");
     if (!elt.hasAttribute("editing")) {
       elt.setAttribute("editing", "true");
@@ -218,19 +222,19 @@ var statusSelector = {
   },
 
   _stopEditDisplayNameTimeout: 0,
-  displayNameRefreshTimer: function ss_displayNameRefreshTimer() {
+  displayNameRefreshTimer() {
     const timeBeforeAutoValidate = 20 * 1000;
     clearTimeout(this._stopEditDisplayNameTimeout);
     this._stopEditDisplayNameTimeout =
       setTimeout(this.finishEditDisplayName, timeBeforeAutoValidate, true);
   },
 
-  displayNameBlur: function ss_displayNameBlur(aEvent) {
+  displayNameBlur(aEvent) {
     if (aEvent.originalTarget == document.getElementById("displayName").inputField)
       statusSelector.finishEditDisplayName(true);
   },
 
-  displayNameKeyPress: function ss_displayNameKeyPress(aEvent) {
+  displayNameKeyPress(aEvent) {
     switch (aEvent.keyCode) {
       case aEvent.DOM_VK_RETURN:
         statusSelector.finishEditDisplayName(true);
@@ -245,7 +249,7 @@ var statusSelector = {
     }
   },
 
-  finishEditDisplayName: function ss_finishEditDisplayName(aSave) {
+  finishEditDisplayName(aSave) {
     clearTimeout(this._stopEditDisplayNameTimeout);
     let elt = document.getElementById("displayName");
     // Apply the new display name only if it is different from the current one.
@@ -259,7 +263,7 @@ var statusSelector = {
     elt.removeEventListener("blur", this.displayNameBlur);
   },
 
-  init: function ss_load() {
+  init() {
     let events = ["status-changed"];
     statusSelector.displayCurrentStatus();
 
@@ -284,8 +288,8 @@ var statusSelector = {
     window.addEventListener("unload", statusSelector.unload);
   },
 
-  unload: function ss_unload() {
+  unload() {
     for (let event of statusSelector._events)
       Services.obs.removeObserver(statusSelector, event);
-   }
+   },
 };

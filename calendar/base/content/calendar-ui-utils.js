@@ -12,9 +12,11 @@
  *          getOtherOrientation, updateSelectedLabel, setupAttendanceMenu
  */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+/* import-globals-from ../../../../toolkit/content/globalOverlay.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { PluralForm } = ChromeUtils.import("resource://gre/modules/PluralForm.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /**
  * Helper function for filling the form,
@@ -243,7 +245,7 @@ function removeChildren(aElement) {
 function sortCalendarArray(calendars) {
     let ret = calendars.concat([]);
     let sortOrder = {};
-    let sortOrderPref = Preferences.get("calendar.list.sortOrder", "").split(" ");
+    let sortOrderPref = Services.prefs.getStringPref("calendar.list.sortOrder", "").split(" ");
     for (let i = 0; i < sortOrderPref.length; ++i) {
         sortOrder[sortOrderPref[i]] = i;
     }
@@ -260,11 +262,12 @@ function sortCalendarArray(calendars) {
     }
     ret.sort(sortFunc);
 
-    // check and repair pref:
-    let sortOrderString = Preferences.get("calendar.list.sortOrder", "");
+    // check and repair pref when an array of all calendars has been passed:
+    let sortOrderString = Services.prefs.getStringPref("calendar.list.sortOrder", "");
     let wantedOrderString = ret.map(calendar => calendar.id).join(" ");
-    if (wantedOrderString != sortOrderString) {
-        Preferences.set("calendar.list.sortOrder", wantedOrderString);
+    if (wantedOrderString != sortOrderString &&
+        cal.getCalendarManager().getCalendars({}).length == ret.length) {
+        Services.prefs.setStringPref("calendar.list.sortOrder", wantedOrderString);
     }
 
     return ret;
@@ -325,7 +328,7 @@ function appendCalendarItems(aItem, aCalendarMenuParent, aCalendarToUse, aOnComm
 function addMenuItem(aParent, aLabel, aValue, aCommand) {
     let item = null;
     if (aParent.localName == "menupopup") {
-        item = createXULElement("menuitem");
+        item = document.createXULElement("menuitem");
         item.setAttribute("label", aLabel);
         if (aValue) {
             item.setAttribute("value", aValue);
@@ -428,7 +431,7 @@ function updateListboxDeleteButton(listboxId, buttonId) {
  * @param aUnit           The unit to find the plural form of
  * @param aIncludeLength  (optional) If true, the length will be included in the
  *                          result. If false, only the pluralized unit is returned.
- * @return                A string containg the pluralized version of the unit
+ * @return                A string containing the pluralized version of the unit
  */
 function unitPluralForm(aLength, aUnit, aIncludeLength=true) {
     let unitProp = {
@@ -491,7 +494,7 @@ function menuListSelectItem(menuListId, value) {
     let menuList = document.getElementById(menuListId);
     let index = menuListIndexOf(menuList, value);
     if (index == -1) {
-        throw "menuListSelectItem: No such Element: " + value;
+        throw new Error("menuListSelectItem: No such Element: " + value);
     } else {
         menuList.selectedIndex = index;
     }
@@ -517,16 +520,6 @@ function menuListIndexOf(menuList, value) {
         }
     }
     return -1; // not found
-}
-
-/**
- * Creates the given element in the XUL namespace.
- *
- * @param elem      The local name of the element to create.
- * @return          The XUL element requested.
- */
-function createXULElement(elem) {
-    return document.createElementNS("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul", elem);
 }
 
 /**
@@ -614,7 +607,7 @@ function updateSelectedLabel(aElement) {
  *
  * @param {Node}  aMenu   The context menu item containing the required
  *                          menu or menuitem elements
- * @param {Array} aItems  An array of the selecetd calEvent or calTodo
+ * @param {Array} aItems  An array of the selected calEvent or calTodo
  *                          items to display the context menu for
  */
 function setupAttendanceMenu(aMenu, aItems) {
@@ -650,7 +643,7 @@ function setupAttendanceMenu(aMenu, aItems) {
      * that scenario here.
      *
      * Now the following matrix applies to take action of the users choice for
-     * the relevant participant (for columns, see explaination below):
+     * the relevant participant (for columns, see explanation below):
      * +---+------------------+-------------+--------+-----------------+
      * | # |     SELECTED     |  DISPLAYED  | STATUS | MENU ACTION     |
      * |   |    CAL ITEMS     |   SUBMENU   | PRESET | APPLIES ON      |
@@ -808,7 +801,7 @@ function setupAttendanceMenu(aMenu, aItems) {
             party = cal.itip.getInvitedAttendee(aItem);
         } else if (aItem.organizer && aItem.getAttendees({}).length) {
             let calOrgId = aItem.calendar.getProperty("organizerId");
-            if (calOrgId.toLowerCase() == aItem.organizer.id.toLowerCase()) {
+            if (calOrgId && calOrgId.toLowerCase() == aItem.organizer.id.toLowerCase()) {
                 party = aItem.organizer;
             }
         }
@@ -832,8 +825,8 @@ function setupAttendanceMenu(aMenu, aItems) {
 
     if (aItems.length == 1) {
         // we offer options for both single and recurring items. In case of the
-        // latter and the item is an occurence, we offer status information and
-        // actions for both, the occurence and the series
+        // latter and the item is an occurrence, we offer status information and
+        // actions for both, the occurrence and the series
         let thisPartStat = getInvitationStatus(aItems[0]);
 
         if (aItems[0].recurrenceId) {

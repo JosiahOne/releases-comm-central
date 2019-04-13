@@ -5,15 +5,19 @@
 
 /* Insert Source HTML dialog */
 
+/* import-globals-from ../../composer/content/editorUtilities.js */
+/* import-globals-from EdDialogCommon.js */
+
 var gFullDataStrings = new Map();
 var gShortDataStrings = new Map();
 var gListenerAttached = false;
 
-function Startup()
-{
+document.addEventListener("dialogaccept", onAccept);
+document.addEventListener("dialogcancel", onCancel);
+
+function Startup() {
   let editor = GetCurrentEditor();
-  if (!editor)
-  {
+  if (!editor) {
     window.close();
     return;
   }
@@ -30,9 +34,8 @@ function Startup()
   try {
     selection = editor.outputToString("text/html", kOutputFormatted | kOutputSelectionOnly | kOutputWrap);
   } catch (e) {}
-  if (selection)
-  {
-    selection = (selection.replace(/<body[^>]*>/,"")).replace(/<\/body>/,"");
+  if (selection) {
+    selection = (selection.replace(/<body[^>]*>/, "")).replace(/<\/body>/, "");
 
     // Shorten data URIs for display.
     selection = replaceDataURIs(selection);
@@ -42,21 +45,19 @@ function Startup()
   }
   // Set initial focus
   gDialog.srcInput.focus();
-  // Note: We can't set the caret location in a multiline textbox
   SetWindowLocation();
 }
 
-function replaceDataURIs(input)
-{
+function replaceDataURIs(input) {
   return input.replace(/(data:.+;base64,)([^"' >]+)/gi,
     function(match, nonDataPart, dataPart) {
-
       if (gShortDataStrings.has(dataPart)) {
           // We found the exact same data URI, just return the shortened URI.
           return nonDataPart + gShortDataStrings.get(dataPart);
       }
 
       let l = 5;
+      let key;
       // Normally we insert the ellipsis after five characters but if it's not unique
       // we include more data.
       do {
@@ -78,8 +79,7 @@ function replaceDataURIs(input)
     });
 }
 
-function onCopyOrCut(event)
-{
+function onCopyOrCut(event) {
   let startPos = gDialog.srcInput.selectionStart;
   if (startPos == undefined)
     return;
@@ -102,8 +102,7 @@ function onCopyOrCut(event)
   event.preventDefault();
 }
 
-function onPaste(event)
-{
+function onPaste(event) {
   let startPos = gDialog.srcInput.selectionStart;
   if (startPos == undefined)
     return;
@@ -118,11 +117,12 @@ function onPaste(event)
   event.preventDefault();
 }
 
-function onAccept()
-{
+function onAccept(event) {
   let html = gDialog.srcInput.value;
-  if (!html)
-    return false;
+  if (!html) {
+    event.preventDefault();
+    return;
+  }
 
   // Add back the original data URIs we stashed away earlier.
   html = html.replace(/(data:.+;base64,)([^"' >]+)/gi,
@@ -136,7 +136,5 @@ function onAccept()
     GetCurrentEditor().insertHTML(html);
   } catch (e) {}
   SaveWindowLocation();
-
-  return true;
 }
 

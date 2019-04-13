@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /*
  * Helpers for permission checks and other ACL features
@@ -81,6 +81,6 @@ var calacl = {
     userCanRespondToInvitation: function(aItem) {
         let aclEntry = aItem.aclEntry;
         // TODO check if || is really wanted here
-        return aclUtils.userCanModifyItem(aItem) || aclEntry.userCanRespond;
+        return calacl.userCanModifyItem(aItem) || aclEntry.userCanRespond;
     }
 };

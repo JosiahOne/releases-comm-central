@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var { XPCOMUtils } = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "cal", "resource://calendar/modules/calUtils.jsm", "cal");
 
@@ -154,14 +154,14 @@ var calview = {
      */
     getCompositeCalendar: function(aWindow) {
         if (typeof aWindow._compositeCalendar == "undefined") {
-            let comp = aWindow._compositeCalendar = Components.classes["@mozilla.org/calendar/calendar;1?type=composite"]
-                                                              .createInstance(Components.interfaces.calICompositeCalendar);
+            let comp = aWindow._compositeCalendar = Cc["@mozilla.org/calendar/calendar;1?type=composite"]
+                                                      .createInstance(Ci.calICompositeCalendar);
             comp.prefPrefix = "calendar-main";
 
             if (typeof aWindow.gCalendarStatusFeedback != "undefined") {
                 // If we are in a window that has calendar status feedback, set
                 // up our status observer.
-                let chromeWindow = aWindow.QueryInterface(Components.interfaces.nsIDOMChromeWindow);
+                let chromeWindow = aWindow.QueryInterface(Ci.nsIDOMChromeWindow);
                 comp.setStatusObserver(aWindow.gCalendarStatusFeedback, chromeWindow);
             }
         }

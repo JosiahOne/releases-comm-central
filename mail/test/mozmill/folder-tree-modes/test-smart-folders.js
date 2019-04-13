@@ -8,6 +8,10 @@
  * properly, opening the right folders.
  */
 
+"use strict";
+
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+
 var MODULE_NAME = "test-smart-folders";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -22,8 +26,6 @@ var smartInboxFolder;
 
 var inboxSet;
 
-var nsMsgFolderFlags = Ci.nsMsgFolderFlags;
-
 function setupModule(module) {
   let fdh = collector.getModule("folder-display-helpers");
   fdh.installInto(module);
@@ -35,7 +37,7 @@ function setupModule(module) {
   inboxSubfolder = inboxFolder.getChildNamed("SmartFoldersA");
 
   trashFolder = inboxFolder.server.rootFolder.getFolderWithFlags(
-    nsMsgFolderFlags.Trash);
+    Ci.nsMsgFolderFlags.Trash);
   trashFolder.createSubfolder("SmartFoldersB", null);
   trashSubfolder = trashFolder.getChildNamed("SmartFoldersB");
 
@@ -163,7 +165,7 @@ function test_folder_flag_changes() {
   select_click_row(0);
   archive_selected_messages();
 
-  smartArchiveFolder = get_smart_folder_named("Archives");
+  let smartArchiveFolder = get_smart_folder_named("Archives");
   let archiveScope = "|" + smartArchiveFolder.msgDatabase.dBFolderInfo
                      .getCharProperty("searchFolderUri") + "|";
   // We should have both this account, and a folder corresponding
@@ -176,7 +178,7 @@ function test_folder_flag_changes() {
 
   // Remove the archive flag, and make sure the archive folder and
   // its children are no longer in the search scope.
-  archiveFolder.clearFlag(nsMsgFolderFlags.Archive);
+  archiveFolder.clearFlag(Ci.nsMsgFolderFlags.Archive);
 
   // Refresh the archive scope because clearing the flag should have
   // changed it.
@@ -187,13 +189,13 @@ function test_folder_flag_changes() {
   rootFolder = inboxFolder.server.rootFolder;
   let localArchiveFolder = rootFolder.getChildNamed("Archives");
   let allDescendants = localArchiveFolder.descendants;
-  desiredScope = "|" + localArchiveFolder.URI + "|";
+  let desiredScope = "|" + localArchiveFolder.URI + "|";
   for (let folder of fixIterator(allDescendants, Ci.nsIMsgFolder)) {
     desiredScope += folder.URI + "|";
   }
 
   if (archiveScope != desiredScope)
-    throw "archive scope wrong after removing folder";
+    throw new Error("archive scope wrong after removing folder");
   assert_folder_and_children_not_in_scope(archiveFolder, archiveScope);
 }
 

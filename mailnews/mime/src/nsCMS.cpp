@@ -21,9 +21,11 @@
 #include "nsNSSComponent.h"
 #include "nsNSSHelper.h"
 #include "nsServiceManagerUtils.h"
-#include "pkix/Result.h"
-#include "pkix/pkixtypes.h"
+#include "mozpkix/Result.h"
+#include "mozpkix/pkixtypes.h"
+#include "sechash.h"
 #include "smime.h"
+#include "mozilla/StaticMutex.h"
 
 using namespace mozilla;
 using namespace mozilla::psm;
@@ -31,7 +33,7 @@ using namespace mozilla::pkix;
 
 extern mozilla::LazyLogModule gPIPNSSLog;
 
-NS_IMPL_ISUPPORTS(nsCMSMessage, nsICMSMessage, nsICMSMessage2)
+NS_IMPL_ISUPPORTS(nsCMSMessage, nsICMSMessage)
 
 nsCMSMessage::nsCMSMessage()
 {
@@ -63,7 +65,7 @@ void nsCMSMessage::destructorSafeDestroyNSSReference()
 
 NS_IMETHODIMP nsCMSMessage::VerifySignature()
 {
-  return CommonVerifySignature(nullptr, 0);
+  return CommonVerifySignature(nullptr, 0, 0);
 }
 
 NSSCMSSignerInfo* nsCMSMessage::GetTopLevelSignerInfo()
@@ -172,15 +174,21 @@ NS_IMETHODIMP nsCMSMessage::GetEncryptionCert(nsIX509Cert**)
   return NS_ERROR_NOT_IMPLEMENTED;
 }
 
-NS_IMETHODIMP nsCMSMessage::VerifyDetachedSignature(unsigned char* aDigestData, uint32_t aDigestDataLen)
+NS_IMETHODIMP
+nsCMSMessage::VerifyDetachedSignature(unsigned char* aDigestData,
+                                      uint32_t aDigestDataLen,
+                                      int16_t aDigestType)
 {
   if (!aDigestData || !aDigestDataLen)
     return NS_ERROR_FAILURE;
 
-  return CommonVerifySignature(aDigestData, aDigestDataLen);
+  return CommonVerifySignature(aDigestData, aDigestDataLen, aDigestType);
 }
 
-nsresult nsCMSMessage::CommonVerifySignature(unsigned char* aDigestData, uint32_t aDigestDataLen)
+nsresult
+nsCMSMessage::CommonVerifySignature(unsigned char* aDigestData,
+                                    uint32_t aDigestDataLen,
+                                    int16_t aDigestType)
 {
   MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("nsCMSMessage::CommonVerifySignature, content level count %d\n", NSS_CMSMessage_ContentLevelCount(m_cmsMsg)));
   NSSCMSContentInfo *cinfo = nullptr;
@@ -197,8 +205,20 @@ nsresult nsCMSMessage::CommonVerifySignature(unsigned char* aDigestData, uint32_
 
   cinfo = NSS_CMSMessage_ContentLevel(m_cmsMsg, 0);
   if (cinfo) {
-    // I don't like this hard cast. We should check in some way, that we really have this type.
-    sigd = (NSSCMSSignedData*)NSS_CMSContentInfo_GetContent(cinfo);
+    switch (NSS_CMSContentInfo_GetContentTypeTag(cinfo)) {
+      case SEC_OID_PKCS7_SIGNED_DATA:
+        sigd = reinterpret_cast<NSSCMSSignedData*>(NSS_CMSContentInfo_GetContent(cinfo));
+        break;
+
+      case SEC_OID_PKCS7_ENVELOPED_DATA:
+      case SEC_OID_PKCS7_ENCRYPTED_DATA:
+      case SEC_OID_PKCS7_DIGESTED_DATA:
+      default: {
+        MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("nsCMSMessage::CommonVerifySignature - unexpected ContentTypeTag\n"));
+        rv = NS_ERROR_CMS_VERIFY_NO_CONTENT_INFO;
+        goto loser;
+      }
+    }
   }
 
   if (!sigd) {
@@ -209,11 +229,30 @@ nsresult nsCMSMessage::CommonVerifySignature(unsigned char* aDigestData, uint32_
 
   if (aDigestData && aDigestDataLen)
   {
+    SECOidTag oidTag;
     SECItem digest;
     digest.data = aDigestData;
     digest.len = aDigestDataLen;
 
-    if (NSS_CMSSignedData_SetDigestValue(sigd, SEC_OID_SHA1, &digest)) {
+    if (NSS_CMSSignedData_HasDigests(sigd)) {
+      SECAlgorithmID **existingAlgs = NSS_CMSSignedData_GetDigestAlgs(sigd);
+      if (existingAlgs) {
+        while (*existingAlgs) {
+          SECAlgorithmID *alg = *existingAlgs;
+          SECOidTag algOIDTag = SECOID_FindOIDTag(&alg->algorithm);
+          NSS_CMSSignedData_SetDigestValue(sigd, algOIDTag, NULL);
+          ++existingAlgs;
+        }
+      }
+    }
+
+    oidTag = HASH_GetHashOidTagByHashType(static_cast<HASH_HashType>(aDigestType));
+    if (oidTag == SEC_OID_UNKNOWN) {
+      rv = NS_ERROR_CMS_VERIFY_BAD_DIGEST;
+      goto loser;
+    }
+
+    if (NSS_CMSSignedData_SetDigestValue(sigd, oidTag, &digest)) {
       MOZ_LOG(gPIPNSSLog, LogLevel::Debug, ("nsCMSMessage::CommonVerifySignature - bad digest\n"));
       rv = NS_ERROR_CMS_VERIFY_BAD_DIGEST;
       goto loser;
@@ -244,7 +283,9 @@ nsresult nsCMSMessage::CommonVerifySignature(unsigned char* aDigestData, uint32_
                                Now(),
                                nullptr /*XXX pinarg*/,
                                nullptr /*hostname*/,
-                               builtChain);
+                               builtChain,
+                               // Only local checks can run on the main thread.
+                               CertVerifier::FLAG_LOCAL_ONLY);
     if (result != mozilla::pkix::Success) {
       MOZ_LOG(gPIPNSSLog, LogLevel::Debug,
              ("nsCMSMessage::CommonVerifySignature - signing cert not trusted now\n"));
@@ -315,17 +356,19 @@ loser:
 NS_IMETHODIMP nsCMSMessage::AsyncVerifySignature(
                               nsISMimeVerificationListener *aListener)
 {
-  return CommonAsyncVerifySignature(aListener, nullptr, 0);
+  return CommonAsyncVerifySignature(aListener, nullptr, 0, 0);
 }
 
 NS_IMETHODIMP nsCMSMessage::AsyncVerifyDetachedSignature(
                               nsISMimeVerificationListener *aListener,
-                              unsigned char* aDigestData, uint32_t aDigestDataLen)
+                              unsigned char* aDigestData,
+                              uint32_t aDigestDataLen,
+                              int16_t aDigestType)
 {
   if (!aDigestData || !aDigestDataLen)
     return NS_ERROR_FAILURE;
 
-  return CommonAsyncVerifySignature(aListener, aDigestData, aDigestDataLen);
+  return CommonAsyncVerifySignature(aListener, aDigestData, aDigestDataLen, aDigestType);
 }
 
 class SMimeVerificationTask final : public CryptoTask
@@ -333,12 +376,15 @@ class SMimeVerificationTask final : public CryptoTask
 public:
   SMimeVerificationTask(nsICMSMessage *aMessage,
                         nsISMimeVerificationListener *aListener,
-                        unsigned char *aDigestData, uint32_t aDigestDataLen)
+                        unsigned char *aDigestData,
+                        uint32_t aDigestDataLen,
+                        int16_t aDigestType)
   {
     MOZ_ASSERT(NS_IsMainThread());
     mMessage = aMessage;
     mListener = aListener;
     mDigestData.Assign(reinterpret_cast<char *>(aDigestData), aDigestDataLen);
+    mDigestType = aDigestType;
   }
 
 private:
@@ -346,11 +392,12 @@ private:
   {
     MOZ_ASSERT(!NS_IsMainThread());
 
+    mozilla::StaticMutexAutoLock lock(sMutex);
     nsresult rv;
     if (!mDigestData.IsEmpty()) {
       rv = mMessage->VerifyDetachedSignature(
         reinterpret_cast<uint8_t*>(const_cast<char *>(mDigestData.get())),
-        mDigestData.Length());
+        mDigestData.Length(), mDigestType);
     } else {
       rv = mMessage->VerifySignature();
     }
@@ -360,20 +407,24 @@ private:
   virtual void CallCallback(nsresult rv) override
   {
     MOZ_ASSERT(NS_IsMainThread());
-
-    nsCOMPtr<nsICMSMessage2> m2 = do_QueryInterface(mMessage);
-    mListener->Notify(m2, rv);
+    mListener->Notify(mMessage, rv);
   }
 
   nsCOMPtr<nsICMSMessage> mMessage;
   nsCOMPtr<nsISMimeVerificationListener> mListener;
   nsCString mDigestData;
+  int16_t mDigestType;
+
+  static mozilla::StaticMutex sMutex;
 };
 
+mozilla::StaticMutex SMimeVerificationTask::sMutex;
+
 nsresult nsCMSMessage::CommonAsyncVerifySignature(nsISMimeVerificationListener *aListener,
-                                                  unsigned char* aDigestData, uint32_t aDigestDataLen)
+                                                  unsigned char* aDigestData, uint32_t aDigestDataLen,
+                                                  int16_t aDigestType)
 {
-  RefPtr<CryptoTask> task = new SMimeVerificationTask(this, aListener, aDigestData, aDigestDataLen);
+  RefPtr<CryptoTask> task = new SMimeVerificationTask(this, aListener, aDigestData, aDigestDataLen, aDigestType);
   return task->Dispatch("SMimeVerify");
 }
 
@@ -551,6 +602,19 @@ loser:
   return rv;
 }
 
+bool nsCMSMessage::IsAllowedHash(const int16_t aCryptoHashInt)
+{
+  switch (aCryptoHashInt) {
+    case nsICryptoHash::SHA1:
+    case nsICryptoHash::SHA256:
+    case nsICryptoHash::SHA384:
+    case nsICryptoHash::SHA512:
+      return true;
+    default:
+      return false;
+  }
+}
+
 NS_IMETHODIMP
 nsCMSMessage::CreateSigned(nsIX509Cert* aSigningCert, nsIX509Cert* aEncryptCert,
                            unsigned char* aDigestData, uint32_t aDigestDataLen,
@@ -573,21 +637,12 @@ nsCMSMessage::CreateSigned(nsIX509Cert* aSigningCert, nsIX509Cert* aEncryptCert,
     ecert = UniqueCERTCertificate(aEncryptCert->GetCert());
   }
 
-  SECOidTag digestType;
-  switch (aDigestType) {
-    case nsICryptoHash::SHA1:
-      digestType = SEC_OID_SHA1;
-      break;
-    case nsICryptoHash::SHA256:
-      digestType = SEC_OID_SHA256;
-      break;
-    case nsICryptoHash::SHA384:
-      digestType = SEC_OID_SHA384;
-      break;
-    case nsICryptoHash::SHA512:
-      digestType = SEC_OID_SHA512;
-      break;
-    default:
+  if (!IsAllowedHash(aDigestType)) {
+      return NS_ERROR_INVALID_ARG;
+  }
+
+  SECOidTag digestType = HASH_GetHashOidTagByHashType(static_cast<HASH_HashType>(aDigestType));
+  if (digestType == SEC_OID_UNKNOWN) {
       return NS_ERROR_INVALID_ARG;
   }
 

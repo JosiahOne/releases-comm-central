@@ -9,7 +9,7 @@
 #chatTabPanel {
   --imbox-selected-text-color: -moz-FieldText;
   --imbox-selected-background-color: -moz-Field;
-  --imbox-selected-border-color: ThreeDShadow;
+  --imbox-selected-border-color: var(--splitter-color);
   --imgroup-selected-background-color: ThreeDLightShadow;
 }
 
@@ -21,40 +21,15 @@
   margin-top: 2px;
 }
 
-/* Adaptation of #folderpane_splitter -> #listSplitter, #threadpane-splitter -> #contextSplitter */
-#listSplitter, #contextSplitter {
+#listSplitter,
+#contextSplitter,
+.splitter[orient="vertical"],
+ #logsSplitter {
   -moz-appearance: none;
-  /* splitter grip area */
-  width: 5px;
-  margin-top: 0;
-  /* because of the negative margin needed to make the splitter visible */
-  position: relative;
-  z-index: 10;
-  transition: border-width .3s ease-in;
-}
-
-#listSplitter {
-  border-inline-start: 1px solid transparent;
-  /* make only the splitter border visible */
-  margin-inline-end: -5px;
-}
-
-#listSplitter[state="collapsed"]:hover {
-  border-inline-start: 4px solid highlight;
-}
-
-#contextSplitter {
-  border-inline-end: 1px solid ThreeDShadow;
-  /* make only the splitter border visible */
-  margin-inline-start: -5px;
-}
-
-#contextSplitter[state="collapsed"]:hover {
-  border-inline-end: 4px solid highlight;
 }
 
 /* Adaptation from #folderTree */
-#listPaneBox {
+:root:not([lwt-tree]) #listPaneBox {
   background-color: -moz-OddTreeRow;
 }
 
@@ -65,12 +40,13 @@
 }
 
 .conv-textbox {
-  margin-inline-start: 1px;
+  margin: 0;
   -moz-appearance: none;
 }
 
-#conv-top-info {
+:root:not([lwt-tree]) #conv-top-info {
   -moz-appearance: none;
+  background-color: -moz-Dialog;
   color: -moz-DialogText;
 }
 
@@ -90,43 +66,9 @@
   -moz-box-align: center;
 }
 
-#statusTypeIcon[status="available"],
-#statusTypeAvailable,
-.statusTypeIcon[status="available"],
-#imStatusAvailable,
-#appmenu_imStatusAvailable,
-richlistitem[state="connected"] .accountStateIcon {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0px 16px 16px 0px);
-}
-
-#statusTypeIcon[status="idle"],
-.statusTypeIcon[status="idle"] {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0px 32px 16px 16px);
-}
-
-#statusTypeIcon[status="offline"],
-#statusTypeIcon[status="invisible"],
-#statusTypeOffline,
-.statusTypeIcon[status="offline"],
-.statusTypeIcon[status="invisible"],
-#imStatusOffline,
-#appmenu_imStatusOffline,
-richlistitem[state="disconnected"] .accountStateIcon {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0px 48px 16px 32px);
-}
-
-#statusTypeIcon[status="unavailable"],
-#statusTypeIcon[status="away"],
-#statusTypeUnavailable,
-.statusTypeIcon[status="unavailable"],
-.statusTypeIcon[status="away"],
-#imStatusUnavailable,
-#appmenu_imStatusUnavailable {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0px 64px 16px 48px);
+.statusMessage[editing] {
+  color: -moz-dialogtext;
+  margin: 29px 0 -3px -4px;
 }
 
 #displayNameAndstatusMessageStack #statusMessage {

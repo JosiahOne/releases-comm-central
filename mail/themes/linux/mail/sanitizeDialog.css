@@ -53,31 +53,27 @@
 .expander-up,
 .expander-down {
   min-width: 0;
-  padding: 2px 0;
+  padding: 0;
   padding-inline-start: 2px;
+  -moz-context-properties: fill;
+  fill: currentColor;
 }
 
 .expander-up {
-  list-style-image: url("chrome://global/skin/arrow/arrow-up.gif");
+  list-style-image: url("chrome://global/skin/icons/arrow-up-12.svg");
 }
 
 .expander-down {
-  list-style-image: url("chrome://global/skin/arrow/arrow-dn.gif");
+  list-style-image: url("chrome://global/skin/icons/arrow-dropdown-12.svg");
 }
-
-.expander-down:hover:active {
-  list-style-image: url("chrome://global/skin/arrow/arrow-dn-hov.gif");
-}
-
-.expander-up:hover:active {
-  list-style-image: url("chrome://global/skin/arrow/arrow-up-hov.gif");
-}
-
 
 /* Make the item list the same width as the warning box */
 #itemList {
   margin-inline-start: 0;
   margin-inline-end: 0;
+  border: 1px solid ThreeDShadow;
+  background-color: -moz-Field;
+  color: -moz-FieldText;
 }
 
 /* Without this a useless scrollbar appears in the listbox when its rows

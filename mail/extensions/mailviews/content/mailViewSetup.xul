@@ -15,10 +15,9 @@
 ]>
 
 <dialog id="mailViewSetupDialog"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
         onload="mailViewOnLoad();"
         onunload="mailViewOnUnLoad();"
-        ondialogaccept="return onOK();"
         buttons="accept,cancel"
         buttonalign="right"
         windowtype="mailnews:mailview"
@@ -35,8 +34,6 @@
   <script type="application/javascript" src="chrome://messenger/content/searchTerm.js"/>
   <script type="application/javascript" src="chrome://messenger/content/dateFormat.js"/>
 
-  <dummy class="usesMailWidgets"/>
-
   <vbox flex="1">
     <separator class="thin"/>
     <vbox>
@@ -50,7 +47,7 @@
     <label value="&searchTermCaption.label;"/>
     <hbox flex="1">
       <vbox id="searchTermListBox" flex="1">
-#include ../../../../mailnews/base/search/content/searchTerm.inc
+#include ../../../../mailnews/base/search/content/searchTerm.inc.xul
     </hbox>
   </vbox>
 

@@ -2,8 +2,8 @@
  * http://creativecommons.org/publicdomain/zero/1.0/ */
 // Tests that NNTP over a SOCKS proxy works.
 
-ChromeUtils.import("resource://testing-common/mailnews/NetworkTestUtils.jsm");
-ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+const {NetworkTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/NetworkTestUtils.jsm");
+const {PromiseTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 const PORT = 119;
 
@@ -32,8 +32,3 @@ add_task(async function cleanUp() {
   NetworkTestUtils.shutdownServers();
   localserver.closeCachedConnections();
 });
-
-function run_test() {
-  run_next_test();
-}
-

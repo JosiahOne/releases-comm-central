@@ -280,10 +280,6 @@ nsMsgXFVirtualFolderDBView::OnSearchHit(nsIMsgDBHdr* aMsgHdr,
   NS_ENSURE_ARG(aMsgHdr);
   NS_ENSURE_ARG(aFolder);
 
-  nsCOMPtr<nsIMsgDatabase> dbToUse;
-  nsCOMPtr<nsIDBFolderInfo> folderInfo;
-  aFolder->GetDBFolderInfoAndDB(getter_AddRefs(folderInfo), getter_AddRefs(dbToUse));
-
   if (m_curFolderGettingHits != aFolder && m_doingSearch && !m_doingQuickSearch)
   {
     m_curFolderHasCachedHits = false;
@@ -297,11 +293,16 @@ nsMsgXFVirtualFolderDBView::OnSearchHit(nsIMsgDBHdr* aMsgHdr,
   }
 
   bool hdrInCache = false;
-  nsCString searchUri;
   if (!m_doingQuickSearch)
   {
-    m_viewFolder->GetURI(searchUri);
-    dbToUse->HdrIsInCache(searchUri.get(), aMsgHdr, &hdrInCache);
+    nsCOMPtr<nsIMsgDatabase> dbToUse;
+    nsCOMPtr<nsIDBFolderInfo> dummyInfo;
+    nsresult rv = aFolder->GetDBFolderInfoAndDB(getter_AddRefs(dummyInfo), getter_AddRefs(dbToUse));
+    if (NS_SUCCEEDED(rv)) {
+      nsCString searchUri;
+      m_viewFolder->GetURI(searchUri);
+      dbToUse->HdrIsInCache(searchUri.get(), aMsgHdr, &hdrInCache);
+    }
   }
 
   if (!m_doingSearch || !m_curFolderHasCachedHits || !hdrInCache)
@@ -437,7 +438,7 @@ nsMsgXFVirtualFolderDBView::OnNewSearch()
 
   rv = MsgTermListToString(searchTerms, curSearchAsString);
   // Trim off the initial AND/OR, which is irrelevant and inconsistent between
-  // what searchSpec.js generates, and what's in virtualFolders.dat.
+  // what SearchSpec.jsm generates, and what's in virtualFolders.dat.
   curSearchAsString.Cut(0, StringBeginsWith(curSearchAsString,
                                             NS_LITERAL_CSTRING("AND")) ? 3 : 2);
   terms.Cut(0, StringBeginsWith(terms, NS_LITERAL_CSTRING("AND")) ? 3 : 2);

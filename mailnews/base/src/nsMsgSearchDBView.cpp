@@ -49,7 +49,7 @@ nsMsgSearchDBView::Open(nsIMsgFolder *folder,
                         nsMsgViewFlagsTypeValue viewFlags,
                         int32_t *pCount)
 {
-  // dbViewWrapper.js likes to create search views with a sort order
+  // DBViewWrapper.jsm likes to create search views with a sort order
   // of byNone, in order to have the order be the order the search results
   // are returned. But this doesn't work with threaded view, so make the
   // sort order be byDate if we're threaded.
@@ -287,7 +287,7 @@ nsMsgSearchDBView::OnHdrFlagsChanged(nsIMsgDBHdr *aHdrChanged,
 {
   // Defer to base class if we're grouped or not threaded at all.
   if (m_viewFlags & nsMsgViewFlagsType::kGroupBySort ||
-      !(m_viewFlags && nsMsgViewFlagsType::kThreadedDisplay))
+      !(m_viewFlags & nsMsgViewFlagsType::kThreadedDisplay))
   {
     return nsMsgGroupView::OnHdrFlagsChanged(aHdrChanged, aOldFlags,
                                              aNewFlags, aInstigator);
@@ -447,7 +447,7 @@ nsMsgSearchDBView::AddHdrFromFolder(nsIMsgDBHdr *msgHdr,
       if (!viewThread)
         return NS_ERROR_OUT_OF_MEMORY;
 
-      thread = do_QueryInterface(viewThread);
+      thread = viewThread;
     }
     else
     {
@@ -642,7 +642,7 @@ void nsMsgSearchDBView::MoveThreadAt(nsMsgViewIndex threadIndex)
   NS_ASSERTION(newIndex == m_levels.Length() ||
                (IsValidIndex(newIndex) && !m_levels[newIndex]),
                "inserting into middle of thread");
-  if (!IsValidIndex(newIndex))
+  if (newIndex == nsMsgViewIndex_None)
     newIndex = 0;
 
   nsMsgKey msgKey;

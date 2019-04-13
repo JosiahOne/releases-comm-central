@@ -11,22 +11,20 @@ imgroup {
   -moz-box-align: center;
 }
 
-imcontact {
-  -moz-binding: url("chrome://messenger/content/chat/imcontact.xml#contact");
+richlistitem[is="chat-contact"] {
   -moz-box-align: center;
 }
 
 .startChatBubble, .closeConversationButton {
   cursor: pointer;
   -moz-user-focus: ignore;
-  color: initial;
 }
 
 .startChatBubble {
   display: none;
 }
 
-imcontact[cansend]:hover .startChatBubble {
+richlistitem[is="chat-contact"][cansend]:hover .startChatBubble {
   display: -moz-box;
 }
 
@@ -44,20 +42,12 @@ tooltip[type="im"] {
   -moz-binding: url("chrome://chat/content/imtooltip.xml#tooltip");
 }
 
-browser[browser-type="conversation"] {
-  -moz-binding: url("chrome://chat/content/convbrowser.xml#browser");
-}
-
 #contextPaneFlexibleBox {
   overflow: hidden;
 }
 
 #contextPane:not([chat]) > vbox > .conv-chat {
   display: none;
-}
-
-.conv-top-info {
-  -moz-binding: url("chrome://messenger/content/chat/imconversation.xml#conv-info-large") !important;
 }
 
 #IMSearchInput {
@@ -78,7 +68,6 @@ browser[browser-type="conversation"] {
 
 #statusMessage[editing], .statusMessage[editing] {
   -moz-appearance: textfield;
-  -moz-binding: url('chrome://global/content/bindings/textbox.xml#textbox');
 }
 
 #button-chat {
@@ -114,4 +103,8 @@ toolbar[mode="text"] .badgeButton-badge {
 
 #button-chat[showingBadge="true"] > stack > .badgeButton-badge {
   display: block;
+}
+
+.badgeButton-badgeLabel {
+  margin: 0;
 }

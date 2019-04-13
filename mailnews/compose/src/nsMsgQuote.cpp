@@ -171,16 +171,15 @@ nsMsgQuote::QuoteMessage(const char *msgURI, bool quoteHeaders,
   mQuoteChannel = nullptr;
   nsCOMPtr<nsIIOService> netService = mozilla::services::GetIOService();
   NS_ENSURE_TRUE(netService, NS_ERROR_UNEXPECTED);
-  rv = netService->NewChannelFromURI2(newURI,
-                                      nullptr,
-                                      nsContentUtils::GetSystemPrincipal(),
-                                      nullptr,
-                                      nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
-                                      nsIContentPolicy::TYPE_OTHER,
-                                      getter_AddRefs(mQuoteChannel));
+  rv = netService->NewChannelFromURI(newURI,
+                                     nullptr,
+                                     nsContentUtils::GetSystemPrincipal(),
+                                     nullptr,
+                                     nsILoadInfo::SEC_ALLOW_CROSS_ORIGIN_DATA_IS_NULL,
+                                     nsIContentPolicy::TYPE_OTHER,
+                                     getter_AddRefs(mQuoteChannel));
 
   if (NS_FAILED(rv)) return rv;
-  nsCOMPtr<nsISupports> ctxt = do_QueryInterface(newURI);
 
   nsCOMPtr<nsIStreamConverterService> streamConverterService =
            do_GetService("@mozilla.org/streamConverters;1", &rv);
@@ -195,7 +194,7 @@ nsMsgQuote::QuoteMessage(const char *msgURI, bool quoteHeaders,
   if (NS_FAILED(rv)) return rv;
 
   //  now try to open the channel passing in our display consumer as the listener
-  rv = mQuoteChannel->AsyncOpen(convertedListener, ctxt);
+  rv = mQuoteChannel->AsyncOpen(convertedListener);
   return rv;
 }
 

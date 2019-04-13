@@ -7,13 +7,15 @@
  * updated in mailing lists that that contact belongs to.
  */
 
+"use strict";
+
 var MODULE_NAME = 'test-update-mailing-list';
 
 var RELATIVE_ROOT = '../shared-modules';
 var MODULE_REQUIRES = ['address-book-helpers',
                        'folder-display-helpers',];
 
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 function setupModule(module) {
   collector.getModule('folder-display-helpers').installInto(module);

@@ -8,6 +8,8 @@
 
 // make SOLO_TEST=composition/test-attachment-reminder.js mozmill-one
 
+"use strict";
+
 var MODULE_NAME = "test-attachment-reminder";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -17,8 +19,8 @@ var MODULE_REQUIRES = ["folder-display-helpers",
                          "notificationbox-helpers",
                          "keyboard-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 var kBoxId = "attachmentNotificationBox";
 var kNotificationId = "attachmentReminder";
@@ -357,6 +359,7 @@ function test_manual_attachment_reminder() {
   // Delete the leftover draft message.
   press_delete();
 }
+test_manual_attachment_reminder.EXCLUDED_PLATFORMS = ["winnt", "linux"];  // See bug 1535292.
 
 /**
  * Bug 938759

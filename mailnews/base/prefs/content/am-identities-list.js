@@ -3,8 +3,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Gloda} = ChromeUtils.import("resource:///modules/gloda/gloda.js");
+var {fixIterator} = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gIdentityListBox;                 // the root <listbox> node
 var gAddButton;
@@ -13,6 +14,9 @@ var gSetDefaultButton;
 var gDeleteButton;
 
 var gAccount = null;  // the account we are showing the identities for
+
+document.addEventListener("dialogaccept", onOk);
+document.addEventListener("dialogcancel", onOk);
 
 function onLoad()
 {
@@ -50,8 +54,11 @@ function refreshIdentityList(aSelectIndex)
   {
     if (identity.valid)
     {
-      let listitem = document.createElement("listitem");
-      listitem.setAttribute("label", identity.identityName);
+      let label = document.createElement("label");
+      label.setAttribute("value", identity.identityName);
+
+      let listitem = document.createElement("richlistitem");
+      listitem.appendChild(label);
       listitem.setAttribute("key", identity.key);
       gIdentityListBox.appendChild(listitem);
     }
@@ -143,6 +150,8 @@ function onSetDefault(event)
   gAccount.defaultIdentity = identity;
   // Rebuilt the identity list and select the moved identity again.
   refreshIdentityList(0);
+  // Update gloda's myContact with the new default identity.
+  Gloda._initMyIdentities();
 }
 
 function onDelete(event)
@@ -176,5 +185,4 @@ function onDelete(event)
 function onOk()
 {
   window.arguments[0].result = true;
-  return true;
 }

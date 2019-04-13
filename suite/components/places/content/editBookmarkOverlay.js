@@ -2,7 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 const LAST_USED_ANNO = "bookmarkPropertiesDialog/folderLastUsed";
 const MAX_FOLDER_ITEM_IN_MENU_LIST = 5;
@@ -39,7 +40,7 @@ var gEditItemOverlay = {
       // so we'll need to fetch it later.
     }
     let isURI = node && PlacesUtils.nodeIsURI(node);
-    let uri = isURI ? NetUtil.newURI(node.uri) : null;
+    let uri = isURI ? Services.io.newURI(node.uri) : null;
     let title = node ? node.title : null;
     let isBookmark = isItem && isURI;
     let bulkTagging = !node;
@@ -437,7 +438,10 @@ var gEditItemOverlay = {
       var lastUsed =
         PlacesUtils.annotations.getItemAnnotation(folderId, LAST_USED_ANNO);
       let guid = await PlacesUtils.promiseItemGuid(folderId);
-      let title = (await PlacesUtils.bookmarks.fetch(guid)).title;
+      let bm = await PlacesUtils.bookmarks.fetch(guid);
+      // Since this could be a root mobile folder, we should get the proper
+      // title.
+      let title = PlacesUtils.bookmarks.getLocalizedTitle(bm);
       this._recentFolders.push({ folderId, guid, title, lastUsed });
     }
     this._recentFolders.sort(function(a, b) {
@@ -931,7 +935,7 @@ var gEditItemOverlay = {
 
     // default to the bookmarks menu folder
     if (!ip) {
-      ip = new InsertionPoint({
+      ip = new PlacesInsertionPoint({
         parentId: PlacesUtils.bookmarksMenuFolderId,
         parentGuid: PlacesUtils.bookmarks.menuGuid
       });
@@ -1071,7 +1075,7 @@ var gEditItemOverlay = {
 
     switch (aProperty) {
     case "uri":
-      let newURI = NetUtil.newURI(aValue);
+      let newURI = Services.io.newURI(aValue);
       if (!newURI.equals(this._paneInfo.uri)) {
         this._paneInfo.uri = newURI;
         if (this._paneInfo.visibleRows.has("locationRow"))

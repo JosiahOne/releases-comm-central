@@ -3,18 +3,37 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
+/* import-globals-from preferences.js */
+/* import-globals-from subdialogs.js */
+
 ChromeUtils.defineModuleGetter(this, "LoginHelper", "resource://gre/modules/LoginHelper.jsm");
+
+Preferences.addAll([
+  { id: "mail.preferences.security.selectedTabIndex", type: "int" },
+  { id: "mail.spam.manualMark", type: "bool" },
+  { id: "mail.spam.manualMarkMode", type: "int" },
+  { id: "mail.spam.markAsReadOnSpam", type: "bool" },
+  { id: "mail.spam.logging.enabled", type: "bool" },
+  { id: "mail.phishing.detection.enabled", type: "bool" },
+  { id: "browser.safebrowsing.enabled", type: "bool" },
+  { id: "mailnews.downloadToTempFile", type: "bool" },
+  { id: "pref.privacy.disable_button.view_passwords", type: "bool" },
+]);
+
+document.getElementById("paneSecurity")
+        .addEventListener("paneload", function() { gSecurityPane.init(); });
 
 var gSecurityPane = {
   mPane: null,
   mInitialized: false,
 
-  init: function ()
-  {
+  init() {
     this.mPane = document.getElementById("paneSecurity");
 
-    this.updateManualMarkMode(document.getElementById('manualMark').checked);
-    this.updateJunkLogButton(document.getElementById('enableJunkLogging').checked);
+    this.updateManualMarkMode(Preferences.get("mail.spam.manualMark").value);
+    this.updateJunkLogButton(Preferences.get("mail.spam.logging.enabled").value);
 
     this._initMasterPasswordUI();
 
@@ -23,7 +42,7 @@ var gSecurityPane = {
 
     if (!(("arguments" in window) && window.arguments[1])) {
       // If no tab was specified, select the last used tab.
-      let preference = document.getElementById("mail.preferences.security.selectedTabIndex");
+      let preference = Preferences.get("mail.preferences.security.selectedTabIndex");
       if (preference.value)
         document.getElementById("securityPrefs").selectedIndex = preference.value;
     }
@@ -31,30 +50,25 @@ var gSecurityPane = {
     this.mInitialized = true;
   },
 
-  tabSelectionChanged: function ()
-  {
+  tabSelectionChanged() {
     if (this.mInitialized)
-      document.getElementById("mail.preferences.security.selectedTabIndex")
-              .valueFromPreferences = document.getElementById("securityPrefs").selectedIndex;
+      Preferences.get("mail.preferences.security.selectedTabIndex")
+                 .valueFromPreferences = document.getElementById("securityPrefs").selectedIndex;
   },
 
-  updateManualMarkMode: function(aEnableRadioGroup)
-  {
-    document.getElementById('manualMarkMode').disabled = !aEnableRadioGroup;
+  updateManualMarkMode(aEnableRadioGroup) {
+    document.getElementById("manualMarkMode").disabled = !aEnableRadioGroup;
   },
 
-  updateJunkLogButton: function(aEnableButton)
-  {
-    document.getElementById('openJunkLogButton').disabled = !aEnableButton;
+  updateJunkLogButton(aEnableButton) {
+    document.getElementById("openJunkLogButton").disabled = !aEnableButton;
   },
 
-  openJunkLog: function()
-  {
+  openJunkLog() {
     gSubDialog.open("chrome://messenger/content/junkLog.xul");
   },
 
-  resetTrainingData: function()
-  {
+  resetTrainingData() {
     // make sure the user really wants to do this
     var bundle = document.getElementById("bundlePreferences");
     var title = bundle.getString("confirmResetJunkTrainingTitle");
@@ -73,11 +87,11 @@ var gSecurityPane = {
    * Reload the current message after a preference affecting the view
    * has been changed and we are in instantApply mode.
    */
-  reloadMessageInOpener: function()
-  {
-    if(Services.prefs.getBoolPref("browser.preferences.instantApply") &&
-       window.opener && typeof(window.opener.ReloadMessage) == "function")
+  reloadMessageInOpener() {
+    if (Services.prefs.getBoolPref("browser.preferences.instantApply") &&
+        window.opener && typeof(window.opener.ReloadMessage) == "function") {
       window.opener.ReloadMessage();
+    }
   },
 
   /**
@@ -86,8 +100,7 @@ var gSecurityPane = {
    * The master password is controlled by various bits of NSS functionality,
    * so the UI for it can't be controlled by the normal preference bindings.
    */
-  _initMasterPasswordUI: function ()
-  {
+  _initMasterPasswordUI() {
     var noMP = !LoginHelper.isMasterPasswordSet();
 
     document.getElementById("changeMasterPassword").disabled = noMP;
@@ -100,8 +113,7 @@ var gSecurityPane = {
    * "use master password" checkbox, and prompts for master password removal
    * if one is set.
    */
-  updateMasterPasswordButton: function ()
-  {
+  updateMasterPasswordButton() {
     var checkbox = document.getElementById("useMasterPassword");
     var button = document.getElementById("changeMasterPassword");
     button.disabled = !checkbox.checked;
@@ -124,8 +136,7 @@ var gSecurityPane = {
    * the current master password.  When the dialog is dismissed, master password
    * UI is automatically updated.
    */
-  _removeMasterPassword: function ()
-  {
+  _removeMasterPassword() {
     var secmodDB = Cc["@mozilla.org/security/pkcs11moduledb;1"].
                    getService(Ci.nsIPKCS11ModuleDB);
     if (secmodDB.isFIPSEnabled) {
@@ -133,8 +144,7 @@ var gSecurityPane = {
       Services.prompt.alert(window,
                             bundle.getString("pw_change_failed_title"),
                             bundle.getString("pw_change2empty_in_fips_mode"));
-    }
-    else {
+    } else {
       gSubDialog.open("chrome://mozapps/content/preferences/removemp.xul",
                       null, null, this._initMasterPasswordUI.bind(this));
     }
@@ -144,8 +154,7 @@ var gSecurityPane = {
   /**
    * Displays a dialog in which the master password may be changed.
    */
-  changeMasterPassword: function ()
-  {
+  changeMasterPassword() {
     gSubDialog.open("chrome://mozapps/content/preferences/changemp.xul",
                     null, null, this._initMasterPasswordUI.bind(this));
   },
@@ -154,14 +163,15 @@ var gSecurityPane = {
    * Shows the sites where the user has saved passwords and the associated
    * login information.
    */
-  showPasswords: function ()
-  {
+  showPasswords() {
     gSubDialog.open("chrome://passwordmgr/content/passwordManager.xul");
   },
 
-  updateDownloadedPhishingListState: function()
-  {
-    document.getElementById('useDownloadedList').disabled = !document.getElementById('enablePhishingDetector').checked;
+  updateDownloadedPhishingListState() {
+    document.getElementById("useDownloadedList").disabled =
+      !document.getElementById("enablePhishingDetector").checked;
   },
 
 };
+
+Preferences.get("mail.phishing.detection.enabled").on("change", gSecurityPane.reloadMessageInOpener);

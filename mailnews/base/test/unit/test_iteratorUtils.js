@@ -11,7 +11,6 @@
 
 var iteratorUtils = {};
 ChromeUtils.import("resource:///modules/iteratorUtils.jsm", iteratorUtils);
-Cu.importGlobalProperties(["DOMParser"]);
 
 var gDOMParser = new DOMParser();
 
@@ -100,7 +99,7 @@ function test_fixIterator() {
 
   thrown = false;
   try {
-    let result = iteratorUtils.toXPCOMArray(tryIterate, Ci.nsIArray);
+    iteratorUtils.toXPCOMArray(tryIterate, Ci.nsIArray);
   } catch (e) {
     // A specific exception is the correct behaviour here.
     if (e.message == "An unsupported interface requested from toXPCOMArray: nsIArray")
@@ -128,15 +127,15 @@ function test_toArray_NodeList() {
 }
 
 /**
- * Test that toArray works correctly with the build-in generator construct.
+ * Test that toArray works correctly with the built-in generator construct.
  */
 function test_toArray_builtin_generator() {
   let arr = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-  let generator = function*() {
+  let generator = function* () {
     for (let elem of arr) {
       yield elem;
     }
-  }
+  };
   // The resulting array should be the same as 'arr'.
   let generatorArray = iteratorUtils.toArray(generator);
   Assert.equal(arr.length, generatorArray.length);
@@ -148,7 +147,7 @@ function test_toArray_builtin_generator() {
   let thrown = false;
   let tryIterate = { item: "An object, that is not supported by toArray." };
   try {
-    let result = iteratorUtils.toArray(tryIterate);
+    iteratorUtils.toArray(tryIterate);
   } catch (e) {
     // A specific exception is the correct behaviour here.
     if (e.message == "An unsupported object sent to toArray: [object Object]")

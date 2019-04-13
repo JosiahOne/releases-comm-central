@@ -11,13 +11,7 @@ TEST_HARNESS_FILES.mozmill += [
 
 TEST_HARNESS_FILES.mozmill.resources += [
     '/{}/mail/base/test/unit/resources/viewWrapperTestUtils.js'.format(CONFIG['commreltopsrcdir']),
-]
-
-TEST_HARNESS_FILES.mozmill.resources += [
     '/{}/mail/test/resources/*'.format(CONFIG['commreltopsrcdir']),
-]
-TEST_HARNESS_FILES.mozmill.resources.virtualenv += [
-    '/{}/third_party/python/virtualenv/*'.format(CONFIG['mozreltopsrcdir']),
 ]
 
 
@@ -47,3 +41,7 @@ TEST_HARNESS_FILES.mozmill.resources += mailnews_files([
     'test/resources/messageInjection.js',
     'test/resources/messageModifier.js',
 ])
+
+DIRS += [
+    'shared-modules',
+]

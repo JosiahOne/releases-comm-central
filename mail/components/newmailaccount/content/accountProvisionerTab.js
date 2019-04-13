@@ -2,8 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/gloda/log4moz.js");
+// mail/base/content/contentAreaClick.js
+/* globals hRefForClickEvent, openLinkExternally */
+// mail/base/content/specialTabs.js
+/* globals specialTabs */
+
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { Log4Moz } = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
 
 /**
  * A content tab for the account provisioner.  We use Javascript-y magic to
@@ -18,7 +23,7 @@ var accountProvisionerTabType = Object.create(specialTabs.contentTabType, {
     accountProvisionerTab: {
       type: "accountProvisionerTab",
       maxTabs: 1,
-    }
+    },
   }},
   _log: {value: Log4Moz.getConfiguredLogger("mail.provider")},
 });
@@ -41,7 +46,7 @@ accountProvisionerTabType.openTab = function(aTab, aArgs) {
 
   this._setMonitoring(aTab.browser, aArgs.realName, aArgs.email,
                       aArgs.searchEngine);
-}
+};
 
 /**
  * We're overriding closeTab - first, we call the closeTab of contentTab,
@@ -54,10 +59,10 @@ accountProvisionerTabType.closeTab = function(aTab) {
   this._log.info("Removing httpRequestObserver");
   Services.obs.removeObserver(this._observer, "http-on-examine-response");
   Services.obs.removeObserver(this._observer, "http-on-examine-cached-response");
-  Services.obs.removeObserver(this.quitObserver, "mail-unloading-messenger", false);
+  Services.obs.removeObserver(this.quitObserver, "mail-unloading-messenger");
   delete this._observer;
   this._log.info("Account provisioner cleanup is done.");
-}
+};
 
 /**
  * Serialize our tab into something we can restore later.
@@ -67,9 +72,9 @@ accountProvisionerTabType.persistTab = function(aTab) {
     tabURI: aTab.browser.currentURI.spec,
     realName: this._realName,
     email: this._email,
-    searchEngine: this._searchEngine
+    searchEngine: this._searchEngine,
   };
-}
+};
 
 /**
  * Re-open the accountProvisionerTab with all of the stuff we stashed in
@@ -77,12 +82,14 @@ accountProvisionerTabType.persistTab = function(aTab) {
  */
 accountProvisionerTabType.restoreTab = function(aTabmail, aPersistedState) {
   aTabmail.openTab("accountProvisionerTab",
-                   { contentPage: aPersistedState.tabURI,
+                   {
+                     contentPage: aPersistedState.tabURI,
                      realName: aPersistedState.realName,
                      email: aPersistedState.email,
                      searchEngine: aPersistedState.searchEngine,
-                     background: true } );
-}
+                     background: true,
+                   });
+};
 
 /**
  * This function registers an observer to watch for HTTP requests where the
@@ -107,7 +114,7 @@ accountProvisionerTabType._setMonitoring = function(aBrowser, aRealName,
   Services.obs.addObserver(this.quitObserver, "mail-unloading-messenger");
 
   this._log.info("httpRequestObserver wired up.");
-}
+};
 
 /**
  * Click handler for the Account Provisioner tab that allows all links
@@ -120,7 +127,7 @@ accountProvisionerTabType.clickHandler = function(aEvent) {
   if (!aEvent.isTrusted || aEvent.defaultPrevented || aEvent.button)
     return true;
 
-  let href = hRefForClickEvent(aEvent, true);
+  let href = hRefForClickEvent(aEvent, true)[0];
 
   // Check to see if we're set to open the link externally...
   if (aEvent.target.hasAttribute("target")) {
@@ -131,7 +138,7 @@ accountProvisionerTabType.clickHandler = function(aEvent) {
   }
 
   return false;
-}
+};
 
 /**
  * This observer listens for the mail-unloading-messenger event fired by each
@@ -141,7 +148,7 @@ accountProvisionerTabType.clickHandler = function(aEvent) {
  * dialog again.
  */
 accountProvisionerTabType.quitObserver = {
-  observe: function(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     // Make sure we saw the right topic, and that the window that is closing
     // is the 3pane window that the accountProvisionerTab belongs to.
     if (aTopic == "mail-unloading-messenger" && (aSubject === window)) {
@@ -150,5 +157,5 @@ accountProvisionerTabType.quitObserver = {
       Services.prefs.setBoolPref("mail.provider.suppress_dialog_on_startup",
                                  true);
     }
-  }
-}
+  },
+};

@@ -1,3 +1,11 @@
+job-defaults:
+    run:
+        using: mozharness
+        use-caches: false
+        comm-checkout: true
+        config-paths:
+            - comm/mozharness
+
 win32/opt:
     description: "Win32 Opt"
     index:
@@ -13,20 +21,20 @@ win32/opt:
         env:
             TOOLTOOL_MANIFEST: "comm/mail/config/tooltool-manifests/win32/releng.manifest"
     run:
-        using: mozharness
-        comm-checkout: true
-        actions: [build, check-test, update]
+        actions: [build, check-test]
         options: [append-env-variables-from-configs]
         script: mozharness/scripts/fx_desktop_build.py
-        config-paths:
-            - comm/mozharness
         config:
             - builds/taskcluster_base_thunderbird.py
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win32.py
-            - builds/taskcluster_sub_win32/opt.py
+        extra-config:
+            stage_platform: win32
     toolchains:
+        - win64-cbindgen
         - win64-clang-cl
+        - win64-nasm
+        - win64-node
         - win64-rust
         - win64-sccache
 
@@ -34,6 +42,7 @@ win32-nightly/opt:
     description: "Win32 Nightly"
     attributes:
         nightly: true
+        enable-full-crashsymbols: true
     shipping-phase: build
     shipping-product: thunderbird
     index:
@@ -50,21 +59,21 @@ win32-nightly/opt:
         env:
             TOOLTOOL_MANIFEST: "comm/mail/config/tooltool-manifests/win32/releng.manifest"
     run:
-        using: mozharness
-        comm-checkout: true
-        actions: [build, check-test, update]
+        actions: [build, check-test]
         options: [append-env-variables-from-configs]
         script: mozharness/scripts/fx_desktop_build.py
-        config-paths:
-            - comm/mozharness
         config:
             - builds/taskcluster_base_thunderbird.py
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win32.py
-            - builds/taskcluster_sub_win32/opt.py
             - taskcluster_nightly.py
+        extra-config:
+            stage_platform: win32
     toolchains:
+        - win64-cbindgen
         - win64-clang-cl
+        - win64-nasm
+        - win64-node
         - win64-rust
 
 win32/debug:
@@ -82,20 +91,20 @@ win32/debug:
         env:
             TOOLTOOL_MANIFEST: "comm/mail/config/tooltool-manifests/win32/releng.manifest"
     run:
-        using: mozharness
-        comm-checkout: true
-        actions: [build, check-test, update]
+        actions: [build, check-test]
         options: [append-env-variables-from-configs]
         script: mozharness/scripts/fx_desktop_build.py
-        config-paths:
-            - comm/mozharness
         config:
             - builds/taskcluster_base_thunderbird.py
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win32.py
             - builds/taskcluster_sub_win32/debug.py
+        mozconfig-variant: debug
     toolchains:
+        - win64-cbindgen
         - win64-clang-cl
+        - win64-nasm
+        - win64-node
         - win64-rust
         - win64-sccache
 
@@ -114,19 +123,20 @@ win64/opt:
         env:
             TOOLTOOL_MANIFEST: "comm/mail/config/tooltool-manifests/win64/releng.manifest"
     run:
-        using: mozharness
-        comm-checkout: true
+        actions: [build, check-test]
         options: [append-env-variables-from-configs]
         script: mozharness/scripts/fx_desktop_build.py
-        config-paths:
-            - comm/mozharness
         config:
             - builds/taskcluster_base_thunderbird.py
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win64.py
-            - builds/taskcluster_sub_win64/opt.py
+        extra-config:
+            stage_platform: win64
     toolchains:
+        - win64-cbindgen
         - win64-clang-cl
+        - win64-nasm
+        - win64-node
         - win64-rust
         - win64-sccache
 
@@ -134,6 +144,7 @@ win64-nightly/opt:
     description: "Win64 Nightly"
     attributes:
         nightly: true
+        enable-full-crashsymbols: true
     shipping-phase: build
     shipping-product: thunderbird
     index:
@@ -150,21 +161,21 @@ win64-nightly/opt:
         env:
             TOOLTOOL_MANIFEST: "comm/mail/config/tooltool-manifests/win64/releng.manifest"
     run:
-        using: mozharness
-        comm-checkout: true
-        actions: [build, check-test, update]
+        actions: [build, check-test]
         options: [append-env-variables-from-configs]
         script: mozharness/scripts/fx_desktop_build.py
-        config-paths:
-            - comm/mozharness
         config:
             - builds/taskcluster_base_thunderbird.py
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win64.py
-            - builds/taskcluster_sub_win64/opt.py
             - taskcluster_nightly.py
+        extra-config:
+            stage_platform: win64
     toolchains:
+        - win64-cbindgen
         - win64-clang-cl
+        - win64-nasm
+        - win64-node
         - win64-rust
 
 win64/debug:
@@ -182,18 +193,19 @@ win64/debug:
         env:
             TOOLTOOL_MANIFEST: "comm/mail/config/tooltool-manifests/win64/releng.manifest"
     run:
-        using: mozharness
-        comm-checkout: true
+        actions: [build, check-test]
         options: [append-env-variables-from-configs]
         script: mozharness/scripts/fx_desktop_build.py
-        config-paths:
-            - comm/mozharness
         config:
             - builds/taskcluster_base_thunderbird.py
             - builds/taskcluster_base_windows.py
             - builds/taskcluster_base_win64.py
             - builds/taskcluster_sub_win64/debug.py
+        mozconfig-variant: debug
     toolchains:
+        - win64-cbindgen
         - win64-clang-cl
+        - win64-nasm
+        - win64-node
         - win64-rust
         - win64-sccache

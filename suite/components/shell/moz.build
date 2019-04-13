@@ -8,9 +8,13 @@ XPIDL_SOURCES += [
     'nsIShellService.idl',
 ]
 
-if CONFIG['OS_ARCH'] == 'WINNT':
+if CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     XPIDL_SOURCES += [
-        'nsIWindowsShellService.idl',
+        'nsIMacShellService.idl',
+    ]
+elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'gtk3':
+    XPIDL_SOURCES += [
+        'nsIGNOMEShellService.idl',
     ]
 
 XPIDL_MODULE = 'shellservice'
@@ -20,13 +24,7 @@ if CONFIG['OS_ARCH'] == 'WINNT':
         'nsWindowsShellService.cpp',
     ]
     LOCAL_INCLUDES += [
-        '/%s/other-licenses/nsis/Contrib/CityHash/cityhash' % (CONFIG['mozreltopsrcdir'],),
-    ]
-    OS_LIBS += [
-        'ole32',
-        'version',
-        'uuid',
-        'shell32',
+        '/other-licenses/nsis/Contrib/CityHash/cityhash',
     ]
 elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'cocoa':
     SOURCES += ['nsMacShellService.cpp']
@@ -38,6 +36,10 @@ if SOURCES:
         'nsSetDefault.js',
         'nsSetDefault.manifest',
     ]
+
+EXTRA_JS_MODULES += [
+    'ShellService.jsm',
+]
 
 FINAL_LIBRARY = 'suite'
 

@@ -2,10 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { recurrenceRule2String } = ChromeUtils.import("resource://calendar/modules/calRecurrenceUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { MailServices } = ChromeUtils.import("resource:///modules/MailServices.jsm");
 
 this.EXPORTED_SYMBOLS = ["ltn"]; /* exported ltn */
 var ltn = {};
@@ -78,7 +78,7 @@ ltn.invitation = {
      * Returns the html representation of the event as a DOM document.
      *
      * @param  {calIItemBase} aEvent     The event to parse into html.
-     * @param  {calItipItem}  aItipItem  The itip item, which containes aEvent.
+     * @param  {calItipItem}  aItipItem  The itip item, which contains aEvent.
      * @return {DOM}                     The html representation of aEvent.
      */
     createInvitationOverlay: function(aEvent, aItipItem) {
@@ -86,8 +86,7 @@ ltn.invitation = {
         let doc = cal.xml.parseFile("chrome://lightning/content/lightning-invitation.xhtml");
         let formatter = cal.getDateFormatter();
 
-        let linkConverter = Components.classes["@mozilla.org/txttohtmlconv;1"]
-                                      .getService(Components.interfaces.mozITXTToHTMLConv);
+        let linkConverter = Cc["@mozilla.org/txttohtmlconv;1"].getService(Ci.mozITXTToHTMLConv);
 
         let field = function(aField, aContentText, aConvert) {
             let descr = doc.getElementById("imipHtml-" + aField + "-descr");
@@ -101,18 +100,18 @@ ltn.invitation = {
                 doc.getElementById("imipHtml-" + aField + "-row").hidden = false;
                 if (aConvert) {
                     // we convert special characters first to not mix up html conversion
-                    let mode = Components.interfaces.mozITXTToHTMLConv.kEntities;
+                    let mode = Ci.mozITXTToHTMLConv.kEntities;
                     let contentText = linkConverter.scanTXT(aContentText, mode);
                     try {
                         // kGlyphSubstitution may lead to unexpected results when used in scanHTML
-                        mode = Components.interfaces.mozITXTToHTMLConv.kStructPhrase +
-                               Components.interfaces.mozITXTToHTMLConv.kGlyphSubstitution +
-                               Components.interfaces.mozITXTToHTMLConv.kURLs;
+                        mode = Ci.mozITXTToHTMLConv.kStructPhrase +
+                               Ci.mozITXTToHTMLConv.kGlyphSubstitution +
+                               Ci.mozITXTToHTMLConv.kURLs;
                         // eslint-disable-next-line no-unsanitized/property
                         content.innerHTML = linkConverter.scanHTML(contentText, mode);
                     } catch (e) {
-                        mode = Components.interfaces.mozITXTToHTMLConv.kStructPhrase +
-                               Components.interfaces.mozITXTToHTMLConv.kURLs;
+                        mode = Ci.mozITXTToHTMLConv.kStructPhrase +
+                               Ci.mozITXTToHTMLConv.kURLs;
                         // eslint-disable-next-line no-unsanitized/property
                         content.innerHTML = linkConverter.scanHTML(contentText, mode);
                     }
@@ -154,7 +153,7 @@ ltn.invitation = {
 
             // Show removed instances
             for (let exc of aEvent.recurrenceInfo.getRecurrenceItems({})) {
-                if (exc instanceof Components.interfaces.calIRecurrenceDate) {
+                if (exc instanceof Ci.calIRecurrenceDate) {
                     if (exc.isNegative) {
                         // This is an EXDATE
                         let excDate = exc.date.getInTimezone(kDefaultTimezone);
@@ -177,6 +176,7 @@ ltn.invitation = {
 
                 // Only show modified occurrence if start, duration or location
                 // has changed.
+                exc.QueryInterface(Ci.calIEvent);
                 if (exc.startDate.compare(exc.recurrenceId) != 0 ||
                     exc.duration.compare(aEvent.duration) != 0 ||
                     excLocation != aEvent.getProperty("LOCATION")) {
@@ -289,7 +289,7 @@ ltn.invitation = {
      */
     compareInvitationOverlay: function(aOldDoc, aNewDoc, aIgnoreId) {
         /**
-         * Transforms text node content to formated child nodes. Decorations are defined in imip.css
+         * Transforms text node content to formatted child nodes. Decorations are defined in imip.css
          * @param {Node}    aToNode text node to change
          * @param {String}  aType   use 'newline' for the same, 'added' or 'removed' for decoration
          * @param {String}  aText   [optional]
@@ -306,7 +306,7 @@ ltn.invitation = {
                 case "modified":
                 case "removed":
                     n.className = aType;
-                    if (Preferences.get("calendar.view.useSystemColors", false)) {
+                    if (Services.prefs.getBoolPref("calendar.view.useSystemColors", false)) {
                         n.setAttribute("systemcolors", true);
                     }
                     break;
@@ -496,8 +496,8 @@ ltn.invitation = {
      * @return {String}            the converted string
      */
     convertFromUnicode: function(aCharset, aSrc) {
-        let unicodeConverter = Components.classes["@mozilla.org/intl/scriptableunicodeconverter"]
-                                         .createInstance(Components.interfaces.nsIScriptableUnicodeConverter);
+        let unicodeConverter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
+                                 .createInstance(Ci.nsIScriptableUnicodeConverter);
         unicodeConverter.charset = aCharset;
         return unicodeConverter.ConvertFromUnicode(aSrc);
     },
@@ -515,9 +515,7 @@ ltn.invitation = {
                            .encodeMimePartIIStr_UTF8(aHeader,
                                                      aIsEmail,
                                                      fieldNameLen,
-                                                     Components.interfaces
-                                                               .nsIMimeConverter
-                                                               .MIME_ENCODED_WORD_SIZE);
+                                                     Ci.nsIMimeConverter.MIME_ENCODED_WORD_SIZE);
     },
 
     /**

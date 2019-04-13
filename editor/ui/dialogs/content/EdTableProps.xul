@@ -16,15 +16,12 @@
 
 <dialog title="&tableWindow.title;"
     id="tableDlg"
-    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
     onload="Startup()"
     buttons="accept,extra1,cancel"
     buttonlabelclose="&closeButton.label;"
     buttonlabelextra1="&applyButton.label;"
-    buttonaccesskeyextra1="&applyButton.accesskey;"
-    ondialogaccept="return onAccept();"
-    ondialogextra1="return Apply();"
-    ondialogcancel="return onCancel();">
+    buttonaccesskeyextra1="&applyButton.accesskey;">
 
   <!-- Methods common to all editor dialogs -->
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
@@ -32,7 +29,6 @@
   <script type="application/javascript" src="chrome://editor/content/EdTableProps.js"/>
 
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
-  <broadcaster id="args" value=""/>
 
   <tabbox id="TabBox">
     <tabs flex="1">
@@ -43,7 +39,7 @@
 
       <!-- TABLE PANEL -->
       <vbox>
-        <groupbox orient="horizontal"><caption label="&size.label;"/>
+        <groupbox orient="horizontal"><label class="header">&size.label;</label>
           <grid>
             <columns><column/><column/><column/><column/><column/></columns>
               <rows>
@@ -68,7 +64,7 @@
             <!-- KEEP GRID LAYOUT here since we will be adding back support for table HEIGHT via CSS -->
           </grid>
         </groupbox>
-        <groupbox><caption label="&tableBorderSpacing.label;"/>
+        <groupbox><label class="header">&tableBorderSpacing.label;</label>
         <grid>
           <columns><column/><column/><column/></columns>
           <rows>
@@ -146,7 +142,7 @@
       <!-- CELL PANEL -->
       <vbox>
         <groupbox orient="horizontal" align="center">
-          <caption label="&cellSelection.label;"/>
+          <label class="header">&cellSelection.label;</label>
           <vbox>
             <menulist id="SelectionList" oncommand="ChangeSelection(event.target.value)" flex="1">
               <menupopup>
@@ -183,20 +179,20 @@
         </groupbox>
         <hbox align="center">
           <!-- cell size groupbox -->
-          <groupbox><caption label="&size.label;"/>
+          <groupbox><label class="header">&size.label;</label>
             <grid>
               <columns><column/><column/><column flex="1"/></columns>
               <rows>
                 <row align="center">
                   <checkbox id="CellHeightCheckbox" label="&tableHeight.label;" accesskey="&tableHeight.accessKey;"/>
                   <textbox class="narrow" id="CellHeightInput"
-                           oninput="ChangeIntTextbox(this.id,'CellHeightCheckbox');"/>
+                           oninput="ChangeIntTextbox(this.id, 'CellHeightCheckbox');"/>
                   <menulist id="CellHeightUnits" oncommand="SetCheckbox('CellHeightCheckbox');"/>
                 </row>
                 <row align="center">
                   <checkbox id="CellWidthCheckbox" label="&tableWidth.label;" accesskey="&tableWidth.accessKey;"/>
                   <textbox class="narrow" id="CellWidthInput"
-                           oninput="ChangeIntTextbox(this.id,'CellWidthCheckbox');"/>
+                           oninput="ChangeIntTextbox(this.id, 'CellWidthCheckbox');"/>
                   <menulist id="CellWidthUnits" oncommand="SetCheckbox('CellWidthCheckbox');"/>
                 </row>
               </rows>
@@ -204,7 +200,7 @@
             <spacer class="bigspacer"/>
           </groupbox>
           <!-- Alignment -->
-          <groupbox><caption label="&cellContentAlignment.label;"/>
+          <groupbox><label class="header">&cellContentAlignment.label;</label>
             <grid>
               <columns><column/><column flex="1"/><column/></columns>
               <rows>

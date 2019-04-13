@@ -22,6 +22,7 @@
 #include "nsIMsgMailSession.h"
 #include "nsNetUtil.h"
 #include "nsIFileURL.h"
+#include "nsIStandardURL.h"
 
 // this is totally lame and MUST be removed by M6
 // the real fix is to attach the URI to the URL as it runs through netlib
@@ -123,7 +124,7 @@ nsresult nsMailboxUrl::SetMessageSize(uint32_t aMessageSize)
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMailboxUrl::GetPrincipalSpec(nsACString& aPrincipalSpec)
+NS_IMETHODIMP nsMailboxUrl::GetNormalizedSpec(nsACString& aPrincipalSpec)
 {
   nsCOMPtr<nsIMsgMailNewsUrl> mailnewsURL;
   QueryInterface(NS_GET_IID(nsIMsgMailNewsUrl), getter_AddRefs(mailnewsURL));
@@ -131,7 +132,7 @@ NS_IMETHODIMP nsMailboxUrl::GetPrincipalSpec(nsACString& aPrincipalSpec)
   nsAutoCString spec;
   mailnewsURL->GetSpecIgnoringRef(spec);
 
-  // mailbox: URLs contain a lot of query parts. We want need a normalised form:
+  // mailbox: URLs contain a lot of query parts. We want need a normalized form:
   // mailbox:///path/to/folder?number=nn.
   // We also need to translate the second form mailbox://user@domain@server/folder?number=nn.
 
@@ -158,11 +159,37 @@ NS_IMETHODIMP nsMailboxUrl::GetPrincipalSpec(nsACString& aPrincipalSpec)
     }
   }
 
-  spec += NS_LITERAL_CSTRING("?number=");
-  spec.Append(messageKey);
-  PR_Free(messageKey);
+  if (messageKey) {
+    spec += NS_LITERAL_CSTRING("?number=");
+    spec.Append(messageKey);
+    PR_Free(messageKey);
+  }
 
   aPrincipalSpec.Assign(spec);
+  return NS_OK;
+}
+
+nsresult nsMailboxUrl::CreateURL(const nsACString& aSpec, nsIURL **aURL)
+{
+  nsresult rv;
+  nsCOMPtr<nsIURL> url;
+  // Check whether the URL is of the form
+  // mailbox://user@domain@server/folder?number=nn and contains a hostname.
+  // Check for format lacking absolute path.
+  if (PromiseFlatCString(aSpec).Find("///") == kNotFound) {
+    rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID).SetSpec(aSpec).Finalize(url);
+    NS_ENSURE_SUCCESS(rv, rv);
+  } else {
+    // The URL is more like a file URL without a hostname.
+    rv = NS_MutateURI(NS_STANDARDURLMUTATOR_CONTRACTID)
+      .Apply(NS_MutatorMethod(&nsIStandardURLMutator::Init,
+                              nsIStandardURL::URLTYPE_NO_AUTHORITY, -1,
+                              PromiseFlatCString(aSpec),
+                              nullptr, nullptr, nullptr))
+      .Finalize(url);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+  url.forget(aURL);
   return NS_OK;
 }
 
@@ -172,12 +199,9 @@ NS_IMETHODIMP nsMailboxUrl::SetUri(const char * aURI)
   return NS_OK;
 }
 
-NS_IMETHODIMP nsMailboxUrl::CloneInternal(uint32_t aRefHandlingMode,
-                                          const nsACString& newRef,
-                                          nsIURI **_retval)
+nsresult nsMailboxUrl::Clone(nsIURI **_retval)
 {
-  nsresult rv = nsMsgMailNewsUrl::CloneInternal(aRefHandlingMode,
-                                                newRef, _retval);
+  nsresult rv = nsMsgMailNewsUrl::Clone(_retval);
   NS_ENSURE_SUCCESS(rv, rv);
   // also clone the mURI member, because GetUri below won't work if
   // mURI isn't set due to nsIFile fun.
@@ -406,8 +430,8 @@ nsresult nsMailboxUrl::ParseUrl()
     NS_ENSURE_SUCCESS(rv, rv);
     nsCOMPtr <nsIFile> fileURLFile;
     fileURL->GetFile(getter_AddRefs(fileURLFile));
-    m_filePath = do_QueryInterface(fileURLFile, &rv);
-    NS_ENSURE_SUCCESS(rv, rv);
+    NS_ENSURE_TRUE(fileURLFile, NS_ERROR_NULL_POINTER);
+    m_filePath = fileURLFile;
   }
 
   GetPathQueryRef(m_file);
@@ -417,8 +441,18 @@ nsresult nsMailboxUrl::ParseUrl()
 nsresult nsMailboxUrl::SetSpecInternal(const nsACString &aSpec)
 {
   nsresult rv = nsMsgMailNewsUrl::SetSpecInternal(aSpec);
-  if (NS_SUCCEEDED(rv))
-    rv = ParseUrl();
+  if (NS_SUCCEEDED(rv)) {
+    // Do not try to parse URLs of the form
+    // mailbox://user@domain@server/folder?number=nn since this will fail.
+    // Check for format lacking absolute path.
+    if (PromiseFlatCString(aSpec).Find("///") != kNotFound) {
+      rv = ParseUrl();
+    } else {
+      // We still need to parse the search part to populate
+      // m_messageKey etc.
+      ParseSearchPart();
+    }
+  }
   return rv;
 }
 

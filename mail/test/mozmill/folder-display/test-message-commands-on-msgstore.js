@@ -8,6 +8,9 @@
  * markings on the messages are stored in the msgStore, not only in the database.
  * For now, it checks for bug 840418.
  */
+
+"use strict";
+
 var MODULE_NAME = "test-message-commands-on-msgstore";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -15,9 +18,9 @@ var MODULE_REQUIRES = ["folder-display-helpers",
                          "compose-helpers",
                          "window-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource:///modules/IOUtils.js");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {IOUtils} = ChromeUtils.import("resource:///modules/IOUtils.js");
 
 var statusHeader = "X-Mozilla-Status: ";
 var nsMsgMessageFlags = Ci.nsMsgMessageFlags;

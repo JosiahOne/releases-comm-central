@@ -69,8 +69,6 @@
 #include "nsMsgStatusFeedback.h"
 #include "nsMsgFilterService.h"
 #include "nsMsgWindow.h"
-#include "nsMsgServiceProvider.h"
-#include "nsSubscribeDataSource.h"
 #include "nsSubscribableServer.h"
 #ifdef NS_PRINTING
 #include "nsMsgPrintEngine.h"
@@ -191,6 +189,12 @@
 ////////////////////////////////////////////////////////////////////////////////
 //  jsAccount includes
 ////////////////////////////////////////////////////////////////////////////////
+
+// Warning: When you re-enable this, be sure to touch msgIDelegateList.idl
+// or else msgIDelegateList.h is not generated again and you get inexplicable
+// compile errors.
+#define JSACCOUNT_ENABLED 1
+#if JSACCOUNT_ENABLED
 #include "msgJsAccountCID.h"
 #include "JaAbDirectory.h"
 #include "JaCompose.h"
@@ -198,6 +202,7 @@
 #include "JaMsgFolder.h"
 #include "JaSend.h"
 #include "JaUrl.h"
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // imap includes
@@ -340,8 +345,6 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgFolderCache)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgStatusFeedback)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgKeyArray)
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMsgWindow,Init)
-NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsMsgServiceProviderService, Init)
-NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsSubscribeDataSource, Init)
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsSubscribableServer, Init)
 #ifdef NS_PRINTING
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgPrintEngine)
@@ -400,8 +403,6 @@ NS_DEFINE_NAMED_CID(NS_MSGKEYARRAY_CID);
 #ifdef NS_PRINTING
 NS_DEFINE_NAMED_CID(NS_MSG_PRINTENGINE_CID);
 #endif
-NS_DEFINE_NAMED_CID(NS_MSGSERVICEPROVIDERSERVICE_CID);
-NS_DEFINE_NAMED_CID(NS_SUBSCRIBEDATASOURCE_CID);
 NS_DEFINE_NAMED_CID(NS_SUBSCRIBABLESERVER_CID);
 NS_DEFINE_NAMED_CID(NS_MSGLOCALFOLDERCOMPACTOR_CID);
 NS_DEFINE_NAMED_CID(NS_MSG_OFFLINESTORECOMPACTOR_CID);
@@ -582,6 +583,7 @@ NS_DEFINE_NAMED_CID(NS_MSGCOMPUTILS_CID);
 ////////////////////////////////////////////////////////////////////////////////
 // jsAccount factories
 ////////////////////////////////////////////////////////////////////////////////
+#if JSACCOUNT_ENABLED
 NS_GENERIC_FACTORY_CONSTRUCTOR(JaCppAbDirectoryDelegator)
 NS_GENERIC_FACTORY_CONSTRUCTOR(JaCppComposeDelegator)
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(JaCppIncomingServerDelegator, Init)
@@ -595,6 +597,7 @@ NS_DEFINE_NAMED_CID(JACPPINCOMINGSERVERDELEGATOR_CID);
 NS_DEFINE_NAMED_CID(JACPPMSGFOLDERDELEGATOR_CID);
 NS_DEFINE_NAMED_CID(JACPPSENDDELEGATOR_CID);
 NS_DEFINE_NAMED_CID(JACPPURLDELEGATOR_CID);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // imap factories
@@ -621,6 +624,7 @@ NS_DEFINE_NAMED_CID(NS_AUTOSYNCMANAGER_CID);
 // local factories
 ////////////////////////////////////////////////////////////////////////////////
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMailboxUrl)
+NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgMailNewsUrl)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsPop3URL)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgMailboxParser)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMailboxService)
@@ -640,6 +644,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgBrkMBoxStore)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgMaildirStore)
 
 NS_DEFINE_NAMED_CID(NS_MAILBOXURL_CID);
+NS_DEFINE_NAMED_CID(NS_MSGMAILNEWSURL_CID);
 NS_DEFINE_NAMED_CID(NS_MAILBOXSERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_MAILBOXPARSER_CID);
 NS_DEFINE_NAMED_CID(NS_POP3URL_CID);
@@ -744,7 +749,6 @@ NS_DEFINE_NAMED_CID(NS_MSGMDNGENERATOR_CID);
 // smime factories
 ////////////////////////////////////////////////////////////////////////////////
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgComposeSecure)
-NS_GENERIC_FACTORY_CONSTRUCTOR(nsMsgSMIMEComposeFields)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsSMimeJSHelper)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsEncryptedSMIMEURIsService)
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsCMSDecoder, Init)
@@ -754,7 +758,6 @@ NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsCMSSecureMessage, Init)
 NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsCertPicker, Init)
 
 NS_DEFINE_NAMED_CID(NS_MSGCOMPOSESECURE_CID);
-NS_DEFINE_NAMED_CID(NS_MSGSMIMECOMPFIELDS_CID);
 NS_DEFINE_NAMED_CID(NS_SMIMEJSJELPER_CID);
 NS_DEFINE_NAMED_CID(NS_SMIMEENCRYPTURISERVICE_CID);
 NS_DEFINE_NAMED_CID(NS_CMSDECODER_CID);
@@ -866,8 +869,6 @@ const mozilla::Module::CIDEntry kMailNewsCIDs[] = {
 #ifdef NS_PRINTING
   { &kNS_MSG_PRINTENGINE_CID, false, NULL, nsMsgPrintEngineConstructor},
 #endif
-  { &kNS_MSGSERVICEPROVIDERSERVICE_CID, false, NULL, nsMsgServiceProviderServiceConstructor},
-  { &kNS_SUBSCRIBEDATASOURCE_CID, false, NULL, nsSubscribeDataSourceConstructor},
   { &kNS_SUBSCRIBABLESERVER_CID, false, NULL, nsSubscribableServerConstructor},
   { &kNS_MSGLOCALFOLDERCOMPACTOR_CID, false, NULL, nsFolderCompactStateConstructor},
   { &kNS_MSG_OFFLINESTORECOMPACTOR_CID, false, NULL, nsOfflineStoreCompactStateConstructor},
@@ -965,12 +966,14 @@ const mozilla::Module::CIDEntry kMailNewsCIDs[] = {
   { &kNS_URLFETCHER_CID, false, NULL, nsURLFetcherConstructor},
   { &kNS_MSGCOMPUTILS_CID, false, NULL, nsMsgCompUtilsConstructor},
   // JsAccount Entries
+#if JSACCOUNT_ENABLED
   { &kJACPPABDIRECTORYDELEGATOR_CID, false, nullptr, JaCppAbDirectoryDelegatorConstructor },
   { &kJACPPCOMPOSEDELEGATOR_CID, false, nullptr, JaCppComposeDelegatorConstructor },
   { &kJACPPINCOMINGSERVERDELEGATOR_CID, false, nullptr, JaCppIncomingServerDelegatorConstructor },
   { &kJACPPMSGFOLDERDELEGATOR_CID, false, nullptr, JaCppMsgFolderDelegatorConstructor },
   { &kJACPPSENDDELEGATOR_CID, false, nullptr, JaCppSendDelegatorConstructor },
   { &kJACPPURLDELEGATOR_CID, false, nullptr, JaCppUrlDelegatorConstructor },
+#endif
   // Imap Entries
   { &kNS_IMAPURL_CID, false, NULL, nsImapUrlConstructor },
   { &kNS_IMAPPROTOCOL_CID, false, nullptr, nsImapProtocolConstructor },
@@ -982,6 +985,7 @@ const mozilla::Module::CIDEntry kMailNewsCIDs[] = {
   { &kNS_AUTOSYNCMANAGER_CID, false, nullptr, nsAutoSyncManagerConstructor },
   // Local Entries
   { &kNS_MAILBOXURL_CID, false, NULL, nsMailboxUrlConstructor },
+  { &kNS_MSGMAILNEWSURL_CID, false, NULL, nsMsgMailNewsUrlConstructor },
   { &kNS_MAILBOXSERVICE_CID, false, NULL, nsMailboxServiceConstructor },
   { &kNS_MAILBOXPARSER_CID, false, NULL, nsMsgMailboxParserConstructor },
   { &kNS_POP3URL_CID, false, NULL, nsPop3URLConstructor },
@@ -1032,7 +1036,6 @@ const mozilla::Module::CIDEntry kMailNewsCIDs[] = {
   { &kNS_MSGMDNGENERATOR_CID, false, NULL, nsMsgMdnGeneratorConstructor },
   // SMime Entries
   { &kNS_MSGCOMPOSESECURE_CID, false, NULL, nsMsgComposeSecureConstructor },
-  { &kNS_MSGSMIMECOMPFIELDS_CID, false, NULL, nsMsgSMIMEComposeFieldsConstructor },
   { &kNS_SMIMEJSJELPER_CID, false, NULL, nsSMimeJSHelperConstructor },
   { &kNS_SMIMEENCRYPTURISERVICE_CID, false, NULL, nsEncryptedSMIMEURIsServiceConstructor },
   { &kNS_CMSDECODER_CID, false, NULL, nsCMSDecoderConstructor },
@@ -1076,8 +1079,6 @@ const mozilla::Module::ContractIDEntry kMailNewsContracts[] = {
 #ifdef NS_PRINTING
   { NS_MSGPRINTENGINE_CONTRACTID, &kNS_MSG_PRINTENGINE_CID },
 #endif
-  { NS_MSGSERVICEPROVIDERSERVICE_CONTRACTID, &kNS_MSGSERVICEPROVIDERSERVICE_CID },
-  { NS_SUBSCRIBEDATASOURCE_CONTRACTID, &kNS_SUBSCRIBEDATASOURCE_CID },
   { NS_SUBSCRIBABLESERVER_CONTRACTID, &kNS_SUBSCRIBABLESERVER_CID },
   { NS_MSGLOCALFOLDERCOMPACTOR_CONTRACTID, &kNS_MSGLOCALFOLDERCOMPACTOR_CID },
   { NS_MSGOFFLINESTORECOMPACTOR_CONTRACTID, &kNS_MSG_OFFLINESTORECOMPACTOR_CID },
@@ -1180,12 +1181,14 @@ const mozilla::Module::ContractIDEntry kMailNewsContracts[] = {
   { NS_URLFETCHER_CONTRACTID, &kNS_URLFETCHER_CID },
   { NS_MSGCOMPUTILS_CONTRACTID, &kNS_MSGCOMPUTILS_CID },
   // JsAccount Entries
+#if JSACCOUNT_ENABLED
   { JACPPABDIRECTORYDELEGATOR_CONTRACTID, &kJACPPABDIRECTORYDELEGATOR_CID },
   { JACPPCOMPOSEDELEGATOR_CONTRACTID, &kJACPPCOMPOSEDELEGATOR_CID },
   { JACPPINCOMINGSERVERDELEGATOR_CONTRACTID, &kJACPPINCOMINGSERVERDELEGATOR_CID },
   { JACPPMSGFOLDERDELEGATOR_CONTRACTID, &kJACPPMSGFOLDERDELEGATOR_CID },
   { JACPPSENDDELEGATOR_CONTRACTID, &kJACPPSENDDELEGATOR_CID },
   { JACPPURLDELEGATOR_CONTRACTID, &kJACPPURLDELEGATOR_CID },
+#endif
   // Imap Entries
   { NS_IMAPINCOMINGSERVER_CONTRACTID, &kNS_IMAPINCOMINGSERVER_CID },
   { NS_RDF_RESOURCE_FACTORY_CONTRACTID_PREFIX "imap", &kNS_IMAPRESOURCE_CID },
@@ -1198,6 +1201,7 @@ const mozilla::Module::ContractIDEntry kMailNewsContracts[] = {
   { NS_AUTOSYNCMANAGER_CONTRACTID, &kNS_AUTOSYNCMANAGER_CID },
   // Local Entries
   { NS_MAILBOXURL_CONTRACTID, &kNS_MAILBOXURL_CID },
+  { NS_MSGMAILNEWSURL_CONTRACTID, &kNS_MSGMAILNEWSURL_CID },
   { NS_MAILBOXSERVICE_CONTRACTID1, &kNS_MAILBOXSERVICE_CID },
   { NS_MAILBOXSERVICE_CONTRACTID2, &kNS_MAILBOXSERVICE_CID },
   { NS_MAILBOXSERVICE_CONTRACTID3, &kNS_MAILBOXSERVICE_CID },
@@ -1270,7 +1274,6 @@ const mozilla::Module::ContractIDEntry kMailNewsContracts[] = {
   { NS_MSGMDNGENERATOR_CONTRACTID, &kNS_MSGMDNGENERATOR_CID },
   // SMime Entries
   { NS_MSGCOMPOSESECURE_CONTRACTID, &kNS_MSGCOMPOSESECURE_CID },
-  { NS_MSGSMIMECOMPFIELDS_CONTRACTID, &kNS_MSGSMIMECOMPFIELDS_CID },
   { NS_SMIMEJSHELPER_CONTRACTID, &kNS_SMIMEJSJELPER_CID },
   { NS_SMIMEENCRYPTURISERVICE_CONTRACTID, &kNS_SMIMEENCRYPTURISERVICE_CID },
   { NS_CMSSECUREMESSAGE_CONTRACTID, &kNS_CMSSECUREMESSAGE_CID },
@@ -1324,7 +1327,7 @@ msgMailNewsModuleDtor()
   nsAddrDatabase::CleanupCache();
 }
 
-static const mozilla::Module kMailNewsModule = {
+extern const mozilla::Module kMailNewsModule = {
   mozilla::Module::kVersion,
   kMailNewsCIDs,
   kMailNewsContracts,
@@ -1333,5 +1336,3 @@ static const mozilla::Module kMailNewsModule = {
   NULL,
   msgMailNewsModuleDtor
 };
-
-NSMODULE_DEFN(nsMailModule) = &kMailNewsModule;

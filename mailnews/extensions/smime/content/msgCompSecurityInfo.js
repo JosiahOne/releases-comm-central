@@ -2,14 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 var gListBox;
 var gViewButton;
 var gBundle;
 
 var gEmailAddresses;
-var gCertStatusSummaries;
 var gCertIssuedInfos;
 var gCertExpiresInfos;
 var gCerts;
@@ -20,33 +19,6 @@ var gISMimeJSHelper = Ci.nsISMimeJSHelper;
 var gIX509Cert = Ci.nsIX509Cert;
 var nsICertificateDialogs = Ci.nsICertificateDialogs;
 var nsCertificateDialogs = "@mozilla.org/nsCertificateDialogs;1"
-
-function getStatusExplanation(value)
-{
-  switch (value)
-  {
-    case gIX509Cert.VERIFIED_OK:
-      return gBundle.getString("StatusValid");
-
-    case gIX509Cert.NOT_VERIFIED_UNKNOWN:
-    case gIX509Cert.INVALID_CA:
-    case gIX509Cert.USAGE_NOT_ALLOWED:
-      return gBundle.getString("StatusInvalid");
-
-    case gIX509Cert.CERT_REVOKED:
-      return gBundle.getString("StatusRevoked");
-
-    case gIX509Cert.CERT_EXPIRED:
-      return gBundle.getString("StatusExpired");
-
-    case gIX509Cert.CERT_NOT_TRUSTED:
-    case gIX509Cert.ISSUER_NOT_TRUSTED:
-    case gIX509Cert.ISSUER_UNKNOWN:
-      return gBundle.getString("StatusUntrusted");
-  }
-
-  return "";
-}
 
 function onLoad()
 {
@@ -64,23 +36,13 @@ function onLoad()
   gBundle = document.getElementById("bundle_smime_comp_info");
 
   gEmailAddresses = new Object();
-  gCertStatusSummaries = new Object();
   gCertIssuedInfos = new Object();
   gCertExpiresInfos = new Object();
   gCerts = new Object();
   gCount = new Object();
   var canEncrypt = new Object();
 
-  var allow_ldap_cert_fetching = false;
-
-  try {
-    if (params.compFields.securityInfo.requireEncryptMessage) {
-      allow_ldap_cert_fetching = true;
-    }
-  }
-  catch (e)
-  {
-  }
+  var allow_ldap_cert_fetching = params.smFields.requireEncryptMessage;
 
   while (true)
   {
@@ -90,7 +52,7 @@ function onLoad()
         params.compFields,
         gCount,
         gEmailAddresses,
-        gCertStatusSummaries,
+        {}, // certStatusSummaries - provide no useful info anymore
         gCertIssuedInfos,
         gCertExpiresInfos,
         gCerts,
@@ -191,24 +153,126 @@ function onLoad()
 
   for (var i = 0; i < imax; ++i)
   {
-    var listitem  = document.createElement("listitem");
+    let email = document.createElement("label");
+    email.setAttribute("value", gEmailAddresses.value[i]);
+    email.setAttribute("crop", "end");
+    email.setAttribute("style", "width: var(--recipientWidth)");
 
-    listitem.appendChild(createCell(gEmailAddresses.value[i]));
+    let listitem = document.createElement("richlistitem");
+    listitem.appendChild(email);
 
     if (!gCerts.value[i])
     {
-      listitem.appendChild(createCell(gBundle.getString("StatusNotFound")));
+      let notFound = document.createElement("label");
+      notFound.setAttribute("value", gBundle.getString("StatusNotFound"));
+      notFound.setAttribute("style", "width: var(--statusWidth)");
+
+      listitem.appendChild(notFound);
     }
     else
     {
-      listitem.appendChild(createCell(getStatusExplanation(gCertStatusSummaries.value[i])));
-      listitem.appendChild(createCell(gCertIssuedInfos.value[i]));
-      listitem.appendChild(createCell(gCertExpiresInfos.value[i]));
+      let status = document.createElement("label");
+      status.setAttribute("value", "?"); // temporary placeholder
+      status.setAttribute("crop", "end");
+      status.setAttribute("style", "width: var(--statusWidth)");
+      let issued = document.createElement("label");
+      issued.setAttribute("value", gCertIssuedInfos.value[i]);
+      issued.setAttribute("crop", "end");
+      issued.setAttribute("style", "width: var(--issuedWidth)");
+      let expire = document.createElement("label");
+      expire.setAttribute("value", gCertExpiresInfos.value[i]);
+      expire.setAttribute("crop", "end");
+      expire.setAttribute("style", "width: var(--expireWidth)");
+
+      listitem.appendChild(status);
+      listitem.appendChild(issued);
+      listitem.appendChild(expire);
+
+      asyncDetermineUsages(gCerts.value[i]).then(results => {
+        let someError = results.some(result =>
+          result.errorCode !== PRErrorCodeSuccess
+        );
+        if (!someError) {
+          status.setAttribute("value", gBundle.getString("StatusValid"));
+          return;
+        }
+
+        // Keep in sync with certViewer.js.
+        const SEC_ERROR_BASE = Ci.nsINSSErrorsService.NSS_SEC_ERROR_BASE;
+        const SEC_ERROR_EXPIRED_CERTIFICATE               = SEC_ERROR_BASE + 11;
+        const SEC_ERROR_REVOKED_CERTIFICATE               = SEC_ERROR_BASE + 12;
+        const SEC_ERROR_UNKNOWN_ISSUER                    = SEC_ERROR_BASE + 13;
+        const SEC_ERROR_UNTRUSTED_ISSUER                  = SEC_ERROR_BASE + 20;
+        const SEC_ERROR_UNTRUSTED_CERT                    = SEC_ERROR_BASE + 21;
+        const SEC_ERROR_EXPIRED_ISSUER_CERTIFICATE        = SEC_ERROR_BASE + 30;
+        const SEC_ERROR_CERT_SIGNATURE_ALGORITHM_DISABLED = SEC_ERROR_BASE + 176;
+
+        const errorRankings = [
+          { error: SEC_ERROR_REVOKED_CERTIFICATE,
+            bundleString: "StatusRevoked" },
+          { error: SEC_ERROR_UNTRUSTED_CERT,
+            bundleString: "StatusUntrusted" },
+          { error: SEC_ERROR_UNTRUSTED_ISSUER,
+            bundleString: "StatusUntrusted" },
+          { error: SEC_ERROR_CERT_SIGNATURE_ALGORITHM_DISABLED,
+            bundleString: "StatusInvalid" },
+          { error: SEC_ERROR_EXPIRED_CERTIFICATE,
+            bundleString: "StatusExpired" },
+          { error: SEC_ERROR_EXPIRED_ISSUER_CERTIFICATE,
+            bundleString: "StatusExpired" },
+          { error: SEC_ERROR_UNKNOWN_ISSUER,
+            bundleString: "StatusUntrusted" },
+         ];
+
+         let bs = "StatusInvalid";
+         for (let errorRanking of errorRankings) {
+           let errorPresent = results.some(result =>
+             result.errorCode == errorRanking.error
+           );
+           if (errorPresent) {
+             bs = errorRanking.bundleString;
+             break;
+           }
+         }
+
+         status.setAttribute("value", gBundle.getString(bs));
+      });
     }
 
     gListBox.appendChild(listitem);
   }
 }
+
+// --- borrowed from pippki.js ---
+const PRErrorCodeSuccess = 0;
+
+const certificateUsageEmailSigner            = 0x0010;
+const certificateUsageEmailRecipient         = 0x0020;
+
+// A map from the name of a certificate usage to the value of the usage.
+const certificateUsages = {
+  certificateUsageEmailRecipient,
+};
+
+function asyncDetermineUsages(cert) {
+  let promises = [];
+  let now = Date.now() / 1000;
+  let certdb = Cc["@mozilla.org/security/x509certdb;1"]
+                 .getService(Ci.nsIX509CertDB);
+  Object.keys(certificateUsages).forEach(usageString => {
+    promises.push(new Promise((resolve, reject) => {
+      let usage = certificateUsages[usageString];
+      certdb.asyncVerifyCertAtTime(cert, usage, 0, null, now,
+        (aPRErrorCode, aVerifiedChain, aHasEVPolicy) => {
+          resolve({ usageString,
+                    errorCode: aPRErrorCode,
+                    chain: aVerifiedChain });
+        });
+    }));
+  });
+  return Promise.all(promises);
+}
+// --- /borrowed from pippki.js ---
 
 function onSelectionChange(event)
 {
@@ -217,8 +281,8 @@ function onSelectionChange(event)
 }
 
 function viewCertHelper(parent, cert) {
-  var cd = Cc[nsCertificateDialogs].getService(nsICertificateDialogs);
-  cd.viewCert(parent, cert);
+  Services.ww.openWindow(parent, "chrome://pippki/content/certViewer.xul",
+                         "_blank", "centerscreen,chrome,titlebar", cert);
 }
 
 function certForRow(aRowIndex) {

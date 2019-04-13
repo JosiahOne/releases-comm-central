@@ -35,14 +35,14 @@
 #
 # ***** END LICENSE BLOCK *****
 
-import sys
 from setuptools import setup, find_packages
 
 desc = """Python to JavaScript bridge interface."""
 summ = """A powerful and extensible Python to JavaScript bridge interface."""
 
-PACKAGE_NAME = "jsbridge"
-PACKAGE_VERSION = "2.4.14"
+PACKAGE_NAME = "jsbridge_thunderbird"
+# You must update the required version in mozmill's setup.py to match this.
+PACKAGE_VERSION = "2.5.1"
 
 requires = ['mozrunner >= 6.0']
 
@@ -56,19 +56,22 @@ setup(name=PACKAGE_NAME,
       license='http://www.apache.org/licenses/LICENSE-2.0',
       packages=find_packages(exclude=['test']),
       include_package_data=True,
-      package_data = {'': ['*.js', '*.css', '*.html', '*.txt', '*.xpi', '*.rdf', '*.xul', '*.jsm', '*.xml' 'extension'],},
+      package_data={
+          '': ['*.js', '*.css', '*.html', '*.txt', '*.xpi', '*.rdf', '*.xul', '*.jsm', '*.xml' 'extension'],
+      },
       zip_safe=False,
       entry_points="""
           [console_scripts]
           jsbridge = jsbridge:cli
         """,
-      platforms =['Any'],
-      install_requires = requires,
-      classifiers=['Development Status :: 4 - Beta',
-                   'Environment :: Console',
-                   'Intended Audience :: Developers',
-                   'License :: OSI Approved :: Apache Software License',
-                   'Operating System :: OS Independent',
-                   'Topic :: Software Development :: Libraries :: Python Modules',
-                  ]
-     )
+      platforms=['Any'],
+      install_requires=requires,
+      classifiers=[
+          'Development Status :: 4 - Beta',
+          'Environment :: Console',
+          'Intended Audience :: Developers',
+          'License :: OSI Approved :: Apache Software License',
+          'Operating System :: OS Independent',
+          'Topic :: Software Development :: Libraries :: Python Modules',
+      ]
+      )

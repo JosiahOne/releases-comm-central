@@ -2,25 +2,31 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+/* import-globals-from ../../lightning/content/messenger-overlay-sidebar.js */
+/* import-globals-from calendar-common-sets.js */
+/* import-globals-from calendar-management.js */
+/* import-globals-from calendar-unifinder-todo.js */
+/* import-globals-from calendar-ui-utils.js */
+/* import-globals-from calendar-views.js */
+
+var { fixIterator } = ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { AppConstants } = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 /* exported commonInitCalendar, commonFinishCalendar */
 
 /**
  * Common initialization steps for calendar chrome windows.
  */
-function commonInitCalendar() {
+async function commonInitCalendar() {
+    // load locale specific default values for preferences
+    setLocaleDefaultPreferences();
+
     // Move around toolbarbuttons and whatever is needed in the UI.
     migrateCalendarUI();
 
     // Load the Calendar Manager
-    loadCalendarManager();
-
-    // Restore the last shown calendar view
-    switchCalendarView(getLastCalendarView(), false);
+    await loadCalendarManager();
 
     // set up the unifinder
     prepareCalendarToDoUnifinder();
@@ -36,9 +42,7 @@ function commonInitCalendar() {
     getViewDeck().addEventListener("itemselect", calendarController.onSelectionChanged, true);
 
     // Start alarm service
-    Components.classes["@mozilla.org/calendar/alarm-service;1"]
-              .getService(Components.interfaces.calIAlarmService)
-              .startup();
+    Cc["@mozilla.org/calendar/alarm-service;1"].getService(Ci.calIAlarmService).startup();
     document.getElementById("calsidebar_splitter").addEventListener("command", onCalendarViewResize);
     window.addEventListener("resize", onCalendarViewResize, true);
 
@@ -138,7 +142,7 @@ var calendarWindowPrefs = {
         if (aTopic == "nsPref:changed") {
             switch (aData) {
                 case "calendar.view.useSystemColors": {
-                    let attributeValue = Preferences.get("calendar.view.useSystemColors", false) && "true";
+                    let attributeValue = Services.prefs.getBoolPref("calendar.view.useSystemColors", false) && "true";
                     for (let win of fixIterator(Services.ww.getWindowEnumerator())) {
                         setElementValue(win.document.documentElement, attributeValue, "systemcolors");
                     }
@@ -146,9 +150,9 @@ var calendarWindowPrefs = {
                 }
             }
         } else if (aTopic == "domwindowopened") {
-            let win = aSubject.QueryInterface(Components.interfaces.nsIDOMWindow);
+            let win = aSubject.QueryInterface(Ci.nsIDOMWindow);
             win.addEventListener("load", () => {
-                let attributeValue = Preferences.get("calendar.view.useSystemColors", false) && "true";
+                let attributeValue = Services.prefs.getBoolPref("calendar.view.useSystemColors", false) && "true";
                 setElementValue(win.document.documentElement, attributeValue, "systemcolors");
             });
         }
@@ -161,7 +165,7 @@ var calendarWindowPrefs = {
  */
 function migrateCalendarUI() {
     const UI_VERSION = 3;
-    let currentUIVersion = Preferences.get("calendar.ui.version");
+    let currentUIVersion = Services.prefs.getIntPref("calendar.ui.version", 0);
     if (currentUIVersion >= UI_VERSION) {
         return;
     }
@@ -177,8 +181,7 @@ function migrateCalendarUI() {
             // If the user has customized the event/task window dialog toolbar,
             // we copy that custom set of toolbar items to the event/task tab
             // toolbar and add the app menu button and a spring for alignment.
-            let xulStore = Components.classes["@mozilla.org/xul/xulstore;1"]
-                                     .getService(Components.interfaces.nsIXULStore);
+            let xulStore = Services.xulStore;
             let uri = "chrome://calendar/content/calendar-event-dialog.xul";
 
             if (xulStore.hasValue(uri, "event-toolbar", "currentset")) {
@@ -202,8 +205,7 @@ function migrateCalendarUI() {
         if (currentUIVersion < 3) {
             // Rename toolbar button id "button-save" to
             // "button-saveandclose" in customized toolbars
-            let xulStore = Components.classes["@mozilla.org/xul/xulstore;1"]
-                                     .getService(Components.interfaces.nsIXULStore);
+            let xulStore = Services.xulStore;
             let windowUri = "chrome://calendar/content/calendar-event-dialog.xul";
             let tabUri = "chrome://messenger/content/messenger.xul";
 
@@ -222,9 +224,57 @@ function migrateCalendarUI() {
                 tabBar.setAttribute("currentset", newSet);
             }
         }
-        Preferences.set("calendar.ui.version", UI_VERSION);
+        Services.prefs.setIntPref("calendar.ui.version", UI_VERSION);
     } catch (e) {
         cal.ERROR("Error upgrading UI from " + currentUIVersion + " to " +
                   UI_VERSION + ": " + e);
     }
+}
+
+function setLocaleDefaultPreferences() {
+    function setDefaultLocaleValue(aName) {
+        let startDefault = calendarInfo.firstDayOfWeek - 1;
+        if (aName == "calendar.categories.names" &&
+            defaultBranch.getStringPref(aName) == "") {
+            defaultBranch.setStringPref(aName, cal.l10n.getString("categories", "categories2"));
+        } else if (aName == "calendar.week.start" &&
+                   defaultBranch.getIntPref(aName) != startDefault) {
+            defaultBranch.setIntPref(aName, startDefault);
+        } else if (aName.startsWith("calendar.week.d")) {
+            let weStart = calendarInfo.weekendStart - 1;
+            let weEnd = calendarInfo.weekendEnd - 1;
+            if (weStart > weEnd) {
+                weEnd += 7;
+            }
+            let weekend = [];
+            for (let i = weStart; i <= weEnd; i++) {
+                weekend.push(i > 6 ? i - 7 : i);
+            }
+            if (defaultBranch.getBoolPref(aName) === weekend.includes(aName[15])) {
+                defaultBranch.setBoolPref(aName, weekend.includes(aName[15]));
+            }
+        }
+    }
+
+    cal.LOG("Start loading of locale dependent preference default values...");
+
+    let defaultBranch = Services.prefs.getDefaultBranch("");
+    let calendarInfo = cal.l10n.calendarInfo();
+
+    let prefDefaults = [
+        "calendar.week.start",
+        "calendar.week.d0sundaysoff",
+        "calendar.week.d1mondaysoff",
+        "calendar.week.d2tuesdaysoff",
+        "calendar.week.d3wednesdaysoff",
+        "calendar.week.d4thursdaysoff",
+        "calendar.week.d5fridaysoff",
+        "calendar.week.d6saturdaysoff",
+        "calendar.categories.names"
+    ];
+    for (let prefDefault of prefDefaults) {
+        setDefaultLocaleValue(prefDefault);
+    }
+
+    cal.LOG("Loading of locale sensitive preference default values completed.");
 }

@@ -33,9 +33,9 @@
 const EXPORTED_SYMBOLS = ["JSAccountUtils"];
 var JSAccountUtils = {};
 
-ChromeUtils.import("resource://gre/modules/Log.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+const {Log} = ChromeUtils.import("resource://gre/modules/Log.jsm");
+const {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 // Logger definitions.
 const LOGGER_NAME = "JsAccount";
@@ -119,7 +119,7 @@ JSAccountUtils.jaFactory = function (aProperties, aJsDelegateConstructor)
       Object.keys(delegator).forEach(name => {log.debug("delegator has key " + name);});
 
       // jsMethods contains the methods that may be targets of the C++ delegation to JS.
-      let jsMethods = Object.getPrototypeOf(delegator.jsDelegate.wrappedJSObject);
+      let jsMethods = Object.getPrototypeOf(jsDelegate);
       for (let name in jsMethods)
       {
         log.debug("processing jsDelegate method: " + name);
@@ -268,10 +268,10 @@ function configureLogging()
   log.addAppender(consoleAppender);
 
   // Make sure the logger keeps up with the logging level preference.
-  log.level = Log.Level[Preferences.get(PREF_LOG_LEVEL, LOG_LEVEL_DEFAULT)];
+  log.level = Log.Level[Services.prefs.getStringPref(PREF_LOG_LEVEL, LOG_LEVEL_DEFAULT)];
 
   // If enabled in the preferences, add a dump appender.
-  let logDumping = Preferences.get(PREF_LOG_DUMP, LOG_DUMP_DEFAULT);
+  let logDumping = Services.prefs.getBoolPref(PREF_LOG_DUMP, LOG_DUMP_DEFAULT);
   if (logDumping) {
     let dumpAppender = new Log.DumpAppender(new Log.BasicFormatter());
     log.addAppender(dumpAppender);

@@ -2,39 +2,37 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
   * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "cloudfile-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
-var MODULE_REQUIRES = ["folder-display-helpers", "mock-object-helpers"];
+var MODULE_REQUIRES = ["folder-display-helpers"];
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-var os = {};
-ChromeUtils.import("chrome://mozmill/content/stdlib/os.js", os);
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {cloudFileAccounts} = ChromeUtils.import("resource:///modules/cloudFileAccounts.js");
+var os = ChromeUtils.import("chrome://mozmill/content/stdlib/os.jsm");
 
 var kMockContractIDPrefix = "@mozilla.org/mail/mockCloudFile;1?id=";
 
 var kDefaults = {
-  iconClass: "chrome://messenger/skin/icons/box-logo.png",
+  iconURL: "chrome://messenger/skin/icons/box-logo.png",
   accountKey: null,
   settingsURL: "",
   managementURL: "",
-  authErr: Ci.nsIMsgCloudFileProvider.authErr,
-  offlineErr: Ci.nsIMsgCloudFileProvider.offlineErr,
-  uploadErr: Ci.nsIMsgCloudFileProvider.uploadErr,
-  uploadWouldExceedQuota: Ci.nsIMsgCloudFileProvider.uploadWouldExceedQuota,
-  uploadExceedsFileLimit: Ci.nsIMsgCloudFileProvider.uploadExceedsFileLimit,
-  uploadCanceled: Ci.nsIMsgCloudFileProvider.uploadCanceled,
+  authErr: cloudFileAccounts.constants.authErr,
+  offlineErr: cloudFileAccounts.constants.offlineErr,
+  uploadErr: cloudFileAccounts.constants.uploadErr,
+  uploadWouldExceedQuota: cloudFileAccounts.constants.uploadWouldExceedQuota,
+  uploadExceedsFileLimit: cloudFileAccounts.constants.uploadExceedsFileLimit,
+  uploadCancelled: cloudFileAccounts.constants.uploadCancelled,
 };
 
-var fdh, moh;
+var fdh;
 
 function setupModule(module) {
   fdh = collector.getModule("folder-display-helpers");
   fdh.installInto(module);
-
-  moh = collector.getModule("mock-object-helpers");
-  moh.installInto(module);
 }
 
 function installInto(module) {
@@ -71,128 +69,85 @@ function collectFiles(aFiles, aFileRoot) {
 }
 
 function MockCloudfileAccount() {
-  for(let someDefault in kDefaults)
+  for (let someDefault in kDefaults)
     this[someDefault] = kDefaults[someDefault];
 }
 
 MockCloudfileAccount.prototype = {
-
-  QueryInterface: ChromeUtils.generateQI([Ci.nsIMsgCloudFileProvider]),
-
-  init: function MCA_init(aAccountKey) {
+  init(aAccountKey) {
     this.accountKey = aAccountKey;
   },
 
-  uploadFile: function MCA_uploadFile(aFile, aListener) {
-    aListener.onStartRequest(null, null);
+  uploadFile(aFile, aListener) {
+    aListener.onStartRequest(null);
     fdh.mc.window.setTimeout(function() {
-      aListener.onStopRequest(null, null, Cr.NS_OK);
+      aListener.onStopRequest(null, Cr.NS_OK);
     }, 0);
   },
 
-  urlForFile: function MCA_urlForFile(aFile) {
+  urlForFile(aFile) {
     return "http://www.example.com/" + this.accountKey + "/" +
            aFile.leafName;
   },
 
-  refreshUserInfo: function MCA_refreshUserInfo(aWithUI,
-                                                aCallback) {
-    aCallback.onStartRequest(null, null);
-    aCallback.onStopRequest(null, null, Cr.NS_OK);
+  refreshUserInfo(aWithUI, aCallback) {
+    aCallback.onStartRequest(null);
+    aCallback.onStopRequest(null, Cr.NS_OK);
   },
 
-  cancelFileUpload: function MCA_cancelFileUpload(aFile) {
+  cancelFileUpload(aFile) {
     throw Cr.NS_ERROR_NOT_IMPLEMENTED;
   },
 
-  providerUrlForError: function MCA_providerUrlForError(aStatusCode) {
+  providerUrlForError(aStatusCode) {
     return "";
   },
 
-  deleteFile: function MCA_deleteFile(aFile, aCallback) {
-    aCallback.onStartRequest(null, null);
+  deleteFile(aFile, aCallback) {
+    aCallback.onStartRequest(null);
     fdh.mc.window.setTimeout(function() {
-      aCallback.onStopRequest(null, null, Cr.NS_OK);
+      aCallback.onStopRequest(null, Cr.NS_OK);
     }, 0);
   },
 
   get displayName() {
-    return "Mock Storage: " + this.accountKey;
+    return cloudFileAccounts.getDisplayName(this.accountKey);
   },
 };
-
-
-function MockCloudfileProviderGenerator(aID, aOverrides) {
-  let constructor = function MockCloudfileAccount() {
-
-    for(let someDefault in kDefaults)
-      this[someDefault] = kDefaults[someDefault];
-
-    for (let override in aOverrides)
-      this[override] = aOverrides[override];
-
-    this.type = aID;
-  }
-
-  constructor.prototype = MockCloudfileAccount.prototype;
-
-  return constructor;
-}
 
 var gMockCloudfileManager = {
   _mock_map: {},
 
-  register: function MCM_register(aID, aOverrides) {
+  register(aID, aOverrides) {
     if (!aID)
       aID = "default";
-
-    if (aID in this._mock_map)
-      throw Error("Already registered a mock cloudfile provider with id = " +
-                  aID);
 
     if (!aOverrides)
       aOverrides = {};
 
-    let mockContractID = kMockContractIDPrefix + aID;
-    let mockID = aID;
-    let mockCID = this._generateCID();
+    cloudFileAccounts.registerProvider(aID, {
+      type: aID,
+      displayName: aID,
+      iconURL: "chrome://messenger/skin/icons/box-logo.png",
+      initAccount(accountKey) {
+        let account = new MockCloudfileAccount();
 
-    let component = new moh.MockObjectRegisterer(
-      mockContractID,
-      mockCID,
-      MockCloudfileProviderGenerator(aID, aOverrides));
+        for (let someDefault in kDefaults)
+          account[someDefault] = kDefaults[someDefault];
 
-    this._mock_map[aID] = component;
+        for (let override in aOverrides)
+          account[override] = aOverrides[override];
 
-    gCategoryManager.addCategoryEntry("cloud-files", mockID,
-                                      mockContractID, false, true);
-    this._mock_map[aID].register();
+        account.init(accountKey);
+        return account;
+      },
+    });
   },
 
-  unregister: function MCM_unregister(aID) {
+  unregister(aID) {
     if (!aID)
       aID = "default";
 
-    if (!(aID in this._mock_map))
-      throw Error("No registered mock cloudfile provider with id = " +
-                  aID);
-
-    gCategoryManager.deleteCategoryEntry("cloud-files", aID, false);
-    this._mock_map[aID].unregister();
-    delete this._mock_map[aID];
+    cloudFileAccounts.unregisterProvider(aID);
   },
-
-  _generateCID: function MCM__generateCID() {
-    let uuid = this._uuidService.generateUUID().toString();
-    return uuid.replace('{', '').replace('}', '');
-  },
-}
-
-XPCOMUtils.defineLazyServiceGetter(gMockCloudfileManager, "_uuidService",
-                                   "@mozilla.org/uuid-generator;1",
-                                   "nsIUUIDGenerator");
-
-XPCOMUtils.defineLazyServiceGetter(this, "gCategoryManager",
-                                   "@mozilla.org/categorymanager;1",
-                                   "nsICategoryManager");
-
+};

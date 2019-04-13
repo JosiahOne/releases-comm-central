@@ -41,7 +41,7 @@
 <!-- LOCALIZATION NOTE (helpus.donateLink): This is a link title that links to the thunderbird donation page -->
 <!ENTITY helpus.donateLink          "Make a donation">
 <!ENTITY helpus.middle              " or ">
-<!-- LOCALIZATION NOTE (helpus.getInvolvedLink): This is a link title that links to https://www.mozilla.org/contribute/. -->
+<!-- LOCALIZATION NOTE (helpus.getInvolvedLink): This is a link title that links to https://www.thunderbird.net/get-involved/. -->
 <!ENTITY helpus.getInvolvedLink     "get involved!">
 <!ENTITY helpus.end                 "">
 
@@ -101,6 +101,7 @@
 <!ENTITY update.downloading.end     "">
 
 <!ENTITY update.applying            "Applying update…">
+<!ENTITY update.restarting          "Restarting…">
 
 <!-- LOCALIZATION NOTE (channel.description.start,channel.description.end): channel.description.start and
      channel.description.end create one sentence, with the current channel label inserted in between.

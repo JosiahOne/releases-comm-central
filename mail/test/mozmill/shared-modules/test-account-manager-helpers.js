@@ -2,16 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "account-manager-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
 // we need this for the main controller
 var MODULE_REQUIRES = ["folder-display-helpers", "window-helpers"];
 
-var utils = {};
-ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
+var utils = ChromeUtils.import("chrome://mozmill/content/modules/utils.jsm");
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
 
 var wh, fdh, mc;
 
@@ -91,7 +91,7 @@ function click_account_tree_row(controller, rowIndex) {
 
   // Ensure the page is fully loaded (e.g. onInit functions).
   wh.wait_for_frame_load(controller.e("contentFrame"),
-    controller.window.pageURL(tree.contentView.getItemAtIndex(rowIndex)
+    controller.window.pageURL(tree.view.getItemAtIndex(rowIndex)
                                               .getAttribute("PageTag")));
 }
 

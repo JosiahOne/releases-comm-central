@@ -10,11 +10,7 @@
           xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
           xmlns:xbl="http://www.mozilla.org/xbl">
 
-  <binding id="tooltip" extends="chrome://global/content/bindings/popup.xml#tooltip">
-    <resources>
-      <stylesheet src="chrome://chat/content/imtooltip.css"/>
-      <stylesheet src="chrome://chat/skin/imtooltip.css"/>
-    </resources>
+  <binding id="tooltip" extends="chrome://global/content/bindings/popup.xml#panel">
     <content noautohide="true" orient="vertical">
       <children>
         <xul:label class="tooltip-label" xbl:inherits="xbl:text=label" flex="1"/>
@@ -426,7 +422,8 @@
            return false;
 
          // Reset tooltip.
-         let largeTooltip = document.getElementById("largeTooltip");
+         let largeTooltip = document.getAnonymousElementByAttribute(this, "id",
+                                                                    "largeTooltip");
          largeTooltip.hidden = false;
          this.removeAttribute("label");
 
@@ -436,10 +433,10 @@
          if (localName == "imconv" && elt.conv)
            return updateTooltipFromConversation(elt.conv);
 
-         if (localName == "imcontact")
+         if (localName == "richlistitem" && elt.getAttribute("is") == "chat-contact")
            return updateTooltipFromBuddy(elt.contact.preferredBuddy.preferredAccountBuddy);
 
-         if (localName == "listitem") {
+         if (localName == "richlistitem") {
            let contactlistbox = document.getElementById("contactlistbox");
            let conv = contactlistbox.selectedItem.conv;
            return updateTooltipFromParticipant(elt.chatBuddy.name, conv,
@@ -461,7 +458,7 @@
          if (localName == "contact")
            return updateTooltipFromContact(elt.contact);
 
-         if (localName == "listitem") {
+         if (localName == "richlistitem") {
            let conv = document.getBindingParent(elt).conv;
            return updateTooltipFromParticipant(elt.chatBuddy.name, conv,
                                                elt.chatBuddy);
@@ -507,7 +504,7 @@
 
          // Use the default content tooltip.
          largeTooltip.hidden = true;
-         return fillInPageTooltip(elt);
+         return false;
        ]]>
      </handler>
      <handler event="popuphiding">

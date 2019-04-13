@@ -112,20 +112,16 @@ treechildren::-moz-tree-image(folderNameCol, serverType-nntp) {
   -moz-image-region: rect(208px 16px 224px 0px);
 }
 
-/* ..... Feed ..... */
+/* ..... Feed folder, feed item ..... */
 
 treechildren::-moz-tree-image(folderNameCol, isFeed-true) {
-  list-style-image: url("chrome://messenger-newsblog/skin/icons/rss-feed.png");
+  list-style-image: url("chrome://messenger-newsblog/skin/rss-feed.png");
   -moz-image-region: rect(32px 16px 48px 0);
 }
 .tabmail-tab[type="folder"][IsFeedFolder="true"],
 treechildren::-moz-tree-image(folderNameCol, isFeedFolder-true) {
-  list-style-image: url("chrome://messenger-newsblog/skin/icons/rss-feed.png");
-  -moz-image-region: rect(0 16px 16px 0);
-}
-treechildren::-moz-tree-image(folderNameCol, isFeedFolder-true, newMessages-true) {
-  list-style-image: url("chrome://messenger-newsblog/skin/icons/rss-feed.png");
-  -moz-image-region: rect(0 16px 16px 0);
+  list-style-image: url("chrome://messenger-newsblog/skin/rss-feed-folder.png");
+  -moz-image-region: auto;
 }
 treechildren::-moz-tree-image(folderNameCol, serverIsPaused),
 treechildren::-moz-tree-cell-text(folderNameCol, serverIsPaused),
@@ -133,14 +129,12 @@ treechildren::-moz-tree-image(folderNameCol, isPaused),
 treechildren::-moz-tree-cell-text(folderNameCol, isPaused) {
   opacity: 0.4;
 }
-treechildren::-moz-tree-image(folderNameCol, closed, isBusy),
-treechildren::-moz-tree-image(folderNameCol, leaf, isBusy) {
-  list-style-image: url("chrome://messenger/skin/icons/status.png");
-  -moz-image-region: rect(0 32px 16px 16px);
+treechildren::-moz-tree-image(folderNameCol, isBusy) {
+  list-style-image: url("chrome://messenger/skin/icons/waiting.svg");
+  -moz-image-region: rect(0 16px 16px 0);
 }
-treechildren::-moz-tree-image(folderNameCol, closed, hasError),
-treechildren::-moz-tree-image(folderNameCol, leaf, hasError) {
-  list-style-image: url("chrome://global/skin/icons/error-16.png");
+treechildren::-moz-tree-image(folderNameCol, hasError) {
+  list-style-image: url("chrome://mozapps/skin/extensions/alerticon-error.svg");
   -moz-image-region: rect(0 16px 16px 0);
 }
 
@@ -193,8 +187,8 @@ treechildren::-moz-tree-image(folderNameCol, isServer-true, serverType-nntp, isS
 
 .tabmail-tab[type="folder"][IsServer="true"][ServerType="rss"],
 treechildren::-moz-tree-image(folderNameCol, isServer-true, serverType-rss) {
-  list-style-image: url("chrome://messenger/skin/icons/folder-pane.png");
-  -moz-image-region: rect(32px 16px 48px 0px);
+  list-style-image: url("chrome://messenger-newsblog/skin/rss-feed.png");
+  -moz-image-region: rect(0 16px 16px 0);
 }
 
 /* ::::: All Servers ::::: */
@@ -202,33 +196,22 @@ treechildren::-moz-tree-image(folderNameCol, isServer-true, serverType-rss) {
 treechildren::-moz-tree-cell-text(folderNameCol, isServer-true, biffState-NewMail),
 treechildren::-moz-tree-cell-text(folderNameCol, newMessages-true),
 treechildren::-moz-tree-cell-text(folderNameCol, specialFolder-Inbox, newMessages-true) {
-  color: -moz-hyperlinktext;
+  color: -moz-hyperlinktext !important;
 }
 
-treechildren::-moz-tree-cell-text(folderNameCol, isServer-true, biffState-NewMail, selected),
-treechildren::-moz-tree-cell-text(folderNameCol, newMessages-true, selected),
-treechildren::-moz-tree-cell-text(folderNameCol, specialFolder-Inbox, newMessages-true, selected) {
-  color: -moz-CellHighlightText;
-}
-
-treechildren::-moz-tree-cell-text(folderNameCol, isServer-true, biffState-NewMail, selected, focus),
-treechildren::-moz-tree-cell-text(folderNameCol, newMessages-true, selected, focus),
-treechildren::-moz-tree-cell-text(folderNameCol, specialFolder-Inbox, newMessages-true, selected, focus) {
-  color: HighlightText;
-}
-
+treechildren::-moz-tree-cell-text(hasUnreadMessages-true),
+treechildren::-moz-tree-cell-text(folderNameCol, isServer-true),
 treechildren::-moz-tree-cell-text(closed, subfoldersHaveUnreadMessages-true) {
   font-weight: bold;
 }
 
-treechildren::-moz-tree-cell-text(folderNameCol, isServer-true),
-treechildren::-moz-tree-cell-text(hasUnreadMessages-true) {
-  font-weight: bold;
+treechildren::-moz-tree-cell-text(folderNameCol, noSelect-true) {
+  color: GrayText !important;
+  font-style: italic;
 }
 
-treechildren::-moz-tree-cell-text(folderNameCol, noSelect-true) {
-  color: GrayText;
-  font-style: italic;
+treechildren::-moz-tree-cell-text(imapdeleted) {
+  text-decoration: line-through;
 }
 
 .tree-folder-checkbox {

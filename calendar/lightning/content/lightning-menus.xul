@@ -11,7 +11,7 @@
   <!ENTITY % eventDialogDTD SYSTEM "chrome://calendar/locale/calendar-event-dialog.dtd" > %eventDialogDTD;
 ]>
 
-<overlay id="ltnMenusOverlay" xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+<overlay id="ltnMenusOverlay" xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
   <menupopup id="menu_FilePopup">
     <menu id="menu_Open"
           mode="calendar"
@@ -383,7 +383,7 @@
         <menuitem id="ltnPublishCalendar"
                   label="&calendar.publish.label;"
                   accesskey="&calendar.publish.accesskey;"
-                  commmand="calendar_publish_calendar_command"
+                  command="calendar_publish_calendar_command"
                   observes="calendar_publish_calendar_command"/>
         <menuitem id="ltnDeleteSelectedCalendar"
                   labeldelete="&calendar.deletecalendar.label;"
@@ -747,7 +747,7 @@
                   observes="calendar_import_command"/>
         <menuitem id="appmenu_ltnPublishCalendar"
                   label="&calendar.publish.label;"
-                  commmand="calendar_publish_calendar_command"
+                  command="calendar_publish_calendar_command"
                   observes="calendar_publish_calendar_command"/>
         <menuitem id="appmenu_ltnDeleteSelectedCalendar"
                   labeldelete="&calendar.deletecalendar.label;"

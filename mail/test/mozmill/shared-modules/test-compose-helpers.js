@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+"use strict";
+
 var MODULE_NAME = "compose-helpers";
 
 var RELATIVE_ROOT = "../shared-modules";
@@ -10,10 +12,8 @@ var MODULE_REQUIRES = ["folder-display-helpers",
                          "window-helpers",
                          "dom-helpers"];
 
-var elib = {};
-ChromeUtils.import("chrome://mozmill/content/modules/elementslib.js", elib);
-var utils = {};
-ChromeUtils.import("chrome://mozmill/content/modules/utils.js", utils);
+var elib = ChromeUtils.import("chrome://mozmill/content/modules/elementslib.jsm");
+var utils = ChromeUtils.import("chrome://mozmill/content/modules/utils.jsm");
 
 var kTextNodeType = 3;
 
@@ -49,6 +49,7 @@ function installInto(module) {
   module.create_msg_attachment = create_msg_attachment;
   module.add_attachments = add_attachments;
   module.add_attachment = add_attachments;
+  module.add_cloud_attachments = add_cloud_attachments;
   module.delete_attachment = delete_attachment;
   module.get_compose_body = get_compose_body;
   module.type_in_composer = type_in_composer;
@@ -260,7 +261,7 @@ function wait_for_compose_window(aController) {
 
   let editor = replyWindow.window.document.querySelector("editor");
 
-  if (editor.webNavigation.busyFlags != Ci.nsIDocShell.BUSY_FLAGS_NONE) {
+  if (editor.docShell.busyFlags != Ci.nsIDocShell.BUSY_FLAGS_NONE) {
     let editorObserver = {
       editorLoaded: false,
 
@@ -352,12 +353,14 @@ function create_msg_attachment(aUrl, aSize) {
 }
 
 /**
- * Add an attachment to the compose window
- * @param aComposeWindow the composition window in question
- * @param aUrl the URL for this attachment (either a file URL or a web URL)
- * @param aSize (optional) the file size of this attachment, in bytes
+ * Add an attachment to the compose window.
+ *
+ * @param aController  the controller of the composition window in question
+ * @param aUrl         the URL for this attachment (either a file URL or a web URL)
+ * @param aSize (optional)  the file size of this attachment, in bytes
+ * @param aWaitAdded (optional)  True to wait for the attachments to be fully added, false otherwise.
  */
-function add_attachments(aComposeWindow, aUrls, aSizes) {
+function add_attachments(aController, aUrls, aSizes, aWaitAdded = true) {
   if (!Array.isArray(aUrls))
     aUrls = [aUrls];
 
@@ -370,7 +373,56 @@ function add_attachments(aComposeWindow, aUrls, aSizes) {
     attachments.push(create_msg_attachment(url, aSizes[i]));
   }
 
-  aComposeWindow.window.AddAttachments(attachments);
+  let attachmentsDone = false;
+  function collectAddedAttachments(event) {
+    folderDisplayHelper.assert_equals(event.detail.length, attachments.length);
+    attachmentsDone = true;
+  }
+
+  let bucket = aController.e("attachmentBucket");
+  if (aWaitAdded)
+    bucket.addEventListener("attachments-added", collectAddedAttachments, { once: true });
+  aController.window.AddAttachments(attachments);
+  if (aWaitAdded)
+    aController.waitFor(() => attachmentsDone, "Attachments adding didn't finish");
+  aController.sleep(0);
+}
+
+/**
+ * Add a cloud (filelink) attachment to the compose window.
+ *
+ * @param aController    The controller of the composition window in question.
+ * @param aProvider      The provider account to upload to, with files to be uploaded.
+ * @param aWaitUploaded (optional)  True to wait for the attachments to be uploaded, false otherwise.
+ */
+function add_cloud_attachments(aController, aProvider, aWaitUploaded = true) {
+  let bucket = aController.e("attachmentBucket");
+
+  let attachmentsSubmitted = false;
+  function uploadAttachments(event) {
+    attachmentsSubmitted = true;
+    if (aWaitUploaded) {
+      // event.detail contains an array of nsIMsgAttachment objects that were uploaded.
+      attachmentCount = event.detail.length;
+      for (let attachment of event.detail) {
+        let item = bucket.findItemForAttachment(attachment);
+        item.addEventListener("attachment-uploaded", collectUploadedAttachments, { once: true });
+      }
+    }
+  }
+
+  let attachmentCount = 0;
+  function collectUploadedAttachments(event) {
+    attachmentCount--;
+  }
+
+  bucket.addEventListener("attachments-uploading", uploadAttachments, { once: true });
+  aController.window.attachToCloud(aProvider);
+  aController.waitFor(() => attachmentsSubmitted, "Couldn't attach attachments for upload");
+  if (aWaitUploaded) {
+    aController.waitFor(() => attachmentCount == 0, "Attachments uploading didn't finish");
+  }
+  aController.sleep(0);
 }
 
 /**
@@ -380,7 +432,7 @@ function add_attachments(aComposeWindow, aUrls, aSizes) {
  */
 function delete_attachment(aComposeWindow, aIndex) {
   let bucket = aComposeWindow.e('attachmentBucket');
-  let node = bucket.getElementsByTagName('attachmentitem')[aIndex];
+  let node = bucket.querySelectorAll("richlistitem.attachmentItem")[aIndex];
 
   aComposeWindow.click(new elib.Elem(node));
   aComposeWindow.window.RemoveSelectedAttachment();
@@ -392,8 +444,10 @@ function delete_attachment(aComposeWindow, aIndex) {
  * @param aController the controller for a compose window.
  */
 function get_compose_body(aController) {
-  let mailDoc = aController.e("content-frame").contentDocument;
-  return mailDoc.querySelector("body");
+  let mailBody = aController.e("content-frame").contentDocument.querySelector("body");
+  if (!mailBody)
+    throw new Error("Compose body not found!");
+  return mailBody;
 }
 
 /**
@@ -454,11 +508,11 @@ function assert_previous_text(aStart, aText) {
  * Helper to get the raw contents of a message. It only reads the first 64KiB.
  *
  * @param aMsgHdr  nsIMsgDBHdr addressing a message which will be returned as text.
- * @param aUTF8    True if the contents should be returned in UTF-8.
+ * @param aCharset Charset to use to decode the message.
  *
  * @return         String with the message source.
  */
-function get_msg_source(aMsgHdr, aUTF8 = false) {
+function get_msg_source(aMsgHdr, aCharset = "") {
   let msgUri = aMsgHdr.folder.getUriForMsg(aMsgHdr);
 
   let messenger = Cc["@mozilla.org/messenger;1"]
@@ -480,10 +534,11 @@ function get_msg_source(aMsgHdr, aUTF8 = false) {
   let content = sis.read(MAX_MESSAGE_LENGTH);
   sis.close();
 
-  if (!aUTF8)
+  if (!aCharset)
     return content;
 
-  return Cc["@mozilla.org/intl/utf8converterservice;1"]
-           .getService(Ci.nsIUTF8ConverterService)
-           .convertURISpecToUTF8(content, "UTF-8");
+  let converter = Cc["@mozilla.org/intl/scriptableunicodeconverter"]
+                    .createInstance(Ci.nsIScriptableUnicodeConverter);
+  converter.charset = aCharset;
+  return converter.ConvertToUnicode(content);
 }

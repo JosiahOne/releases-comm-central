@@ -5,20 +5,16 @@
 
 "use strict";
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
-ChromeUtils.import("resource://gre/modules/LightweightThemeConsumer.jsm");
-ChromeUtils.import("resource:///modules/distribution.js");
-ChromeUtils.import("resource:///modules/mailMigrator.js");
-ChromeUtils.import("resource:///modules/extensionSupport.jsm");
-const { L10nRegistry, FileSource } = ChromeUtils.import("resource://gre/modules/L10nRegistry.jsm", {});
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {AddonManager} = ChromeUtils.import("resource://gre/modules/AddonManager.jsm");
+var {LightweightThemeConsumer} = ChromeUtils.import("resource://gre/modules/LightweightThemeConsumer.jsm");
+var {TBDistCustomizer} = ChromeUtils.import("resource:///modules/TBDistCustomizer.jsm");
+var {MailMigrator} = ChromeUtils.import("resource:///modules/MailMigrator.jsm");
+var {ExtensionSupport} = ChromeUtils.import("resource:///modules/ExtensionSupport.jsm");
+var { L10nRegistry, FileSource } = ChromeUtils.import("resource://gre/modules/L10nRegistry.jsm");
 
 // lazy module getters
-
-XPCOMUtils.defineLazyModuleGetters(this, {
-  LightweightThemeManager: "resource://gre/modules/LightweightThemeManager.jsm",
-});
 
 XPCOMUtils.defineLazyGetter(this, "gBrandBundle", function() {
   return Services.strings.createBundle("chrome://branding/locale/brand.properties");
@@ -28,10 +24,16 @@ XPCOMUtils.defineLazyGetter(this, "gMailBundle", function() {
   return Services.strings.createBundle("chrome://messenger/locale/messenger.properties");
 });
 
+ChromeUtils.defineModuleGetter(this, "ActorManagerParent",
+                               "resource://gre/modules/ActorManagerParent.jsm");
+
+let ACTORS = {
+};
+
 /**
  * Glue code that should be executed before any windows are opened. Any
  * window-independent helper methods (a la nsBrowserGlue.js) should go in
- * MailUtils.js instead.
+ * MailUtils.jsm instead.
  */
 
 function MailGlue() {
@@ -47,12 +49,11 @@ function MailGlue() {
 
 MailGlue.prototype = {
   // init (called at app startup)
-  _init: function MailGlue__init() {
+  _init() {
     Services.obs.addObserver(this, "xpcom-shutdown");
     Services.obs.addObserver(this, "final-ui-startup");
     Services.obs.addObserver(this, "mail-startup-done");
     Services.obs.addObserver(this, "handle-xul-text-link");
-    Services.obs.addObserver(this, "profile-after-change");
     Services.obs.addObserver(this, "chrome-document-global-created");
 
     // Inject scripts into some devtools windows.
@@ -65,7 +66,7 @@ MailGlue.prototype = {
       "Thunderbird-internal-BrowserConsole",
       {
         chromeURLs: [ "chrome://devtools/content/webconsole/browserconsole.xul" ],
-        onLoadWindow: _setupBrowserConsole
+        onLoadWindow: _setupBrowserConsole,
       });
 
     function _setupToolbox(domWindow) {
@@ -77,18 +78,19 @@ MailGlue.prototype = {
       "Thunderbird-internal-Toolbox",
       {
         chromeURLs: [ "chrome://devtools/content/framework/toolbox-process-window.xul" ],
-        onLoadWindow: _setupToolbox
+        onLoadWindow: _setupToolbox,
       });
 
+    ActorManagerParent.addActors(ACTORS);
+    ActorManagerParent.flush();
   },
 
   // cleanup (called at shutdown)
-  _dispose: function MailGlue__dispose() {
+  _dispose() {
     Services.obs.removeObserver(this, "xpcom-shutdown");
     Services.obs.removeObserver(this, "final-ui-startup");
     Services.obs.removeObserver(this, "mail-startup-done");
     Services.obs.removeObserver(this, "handle-xul-text-link");
-    Services.obs.removeObserver(this, "profile-after-change");
     Services.obs.removeObserver(this, "chrome-document-global-created");
 
     ExtensionSupport.unregisterWindowListener("Thunderbird-internal-Toolbox");
@@ -96,8 +98,12 @@ MailGlue.prototype = {
   },
 
   // nsIObserver implementation
-  observe: function MailGlue_observe(aSubject, aTopic, aData) {
+  observe(aSubject, aTopic, aData) {
     switch (aTopic) {
+    case "app-startup":
+      const {BootstrapLoader} = ChromeUtils.import("resource:///modules/BootstrapLoader.jsm");
+      AddonManager.addExternalExtensionLoader(BootstrapLoader);
+      break;
     case "xpcom-shutdown":
       this._dispose();
       break;
@@ -110,9 +116,6 @@ MailGlue.prototype = {
     case "handle-xul-text-link":
       this._handleLink(aSubject, aData);
       break;
-    case "profile-after-change":
-      extensionDefaults(); // extensionSupport.jsm
-      break;
     case "chrome-document-global-created":
       // Set up lwt, but only if the "lightweightthemes" attr is set on the root
       // (i.e. in messenger.xul).
@@ -121,19 +124,31 @@ MailGlue.prototype = {
           new LightweightThemeConsumer(aSubject.document);
         }
       }, {once: true});
+
+      // Set up our custom elements.
+      aSubject.addEventListener("DOMWindowCreated", () => {
+        let doc = aSubject.document;
+        if (doc.nodePrincipal.isSystemPrincipal && (
+            doc.contentType == "application/vnd.mozilla.xul+xml" ||
+            doc.contentType == "application/xhtml+xml"
+        )) {
+          Services.scriptloader.loadSubScript(
+            "chrome://messenger/content/customElements.js", doc.ownerGlobal);
+        }
+      }, {once: true});
       break;
     }
   },
 
-  //nsIMailGlue implementation
-  sanitize: function MG_sanitize(aParentWindow) {
+  // nsIMailGlue implementation
+  sanitize(aParentWindow) {
     this._sanitizer.sanitize(aParentWindow);
   },
 
-  _onProfileStartup: function MailGlue__onProfileStartup() {
+  _onProfileStartup() {
     TBDistCustomizer.applyPrefDefaults();
 
-    let locales = Services.locale.getPackagedLocales();
+    let locales = Services.locale.packagedLocales;
     const appSource = new FileSource("app", locales, "resource:///localization/{locale}/");
     L10nRegistry.registerSource(appSource);
 
@@ -146,76 +161,28 @@ MailGlue.prototype = {
                              "_blank", "chrome,centerscreen,modal,resizable=no", null);
     }
 
-    let vendorShortName = gBrandBundle.GetStringFromName("vendorShortName");
-
-    LightweightThemeManager.addBuiltInTheme({
-      id: "thunderbird-compact-light@mozilla.org",
-      name: gMailBundle.GetStringFromName("lightTheme.name"),
-      description: gMailBundle.GetStringFromName("lightTheme.description"),
-      iconURL: "resource:///chrome/messenger/content/messenger/light.icon.svg",
-      textcolor: "black",
-      accentcolor: "white",
-      popup: "#fff",
-      popup_text: "#0c0c0d",
-      popup_border: "#ccc",
-      author: vendorShortName,
-    });
-    LightweightThemeManager.addBuiltInTheme({
-      id: "thunderbird-compact-dark@mozilla.org",
-      name: gMailBundle.GetStringFromName("darkTheme.name"),
-      description: gMailBundle.GetStringFromName("darkTheme.description"),
-      iconURL: "resource:///chrome/messenger/content/messenger/dark.icon.svg",
-      textcolor: "white",
-      accentcolor: "black",
-      popup: "#4a4a4f",
-      popup_text: "rgb(249, 249, 250)",
-      popup_border: "#27272b",
-      toolbar_field_text: "rgb(249, 249, 250)",
-      toolbar_field_border: "rgba(249, 249, 250, 0.2)",
-      author: vendorShortName,
-    }, {
-      useInDarkMode: true
-    });
+    AddonManager.maybeInstallBuiltinAddon(
+        "thunderbird-compact-light@mozilla.org", "1.0",
+        "resource:///modules/themes/light/");
+    AddonManager.maybeInstallBuiltinAddon(
+        "thunderbird-compact-dark@mozilla.org", "1.0",
+        "resource:///modules/themes/dark/");
   },
 
- _offertToEnableAddons(aAddons) {
-    let win = Services.wm.getMostRecentWindow("mail:3pane");
-    let tabmail = win.document.getElementById("tabmail");
-
-    aAddons.forEach(function(aAddon) {
-    // If the add-on isn't user disabled or can't be enabled, then skip it.
-    if (!aAddon.userDisabled || !(aAddon.permissions & AddonManager.PERM_CAN_ENABLE))
-      return;
-
-    tabmail.openTab("contentTab",
-                    { contentPage: "about:newaddon?id=" + aAddon.id,
-                      clickHandler: null });
-    });
-  },
-
-  _detectNewSideloadedAddons: async function () {
-    let newSideloadedAddons = await AddonManagerPrivate.getNewSideloads();
-    this._offertToEnableAddons(newSideloadedAddons);
-  },
-
-  _onMailStartupDone: function MailGlue__onMailStartupDone() {
+  _onMailStartupDone() {
     // On Windows 7 and above, initialize the jump list module.
     const WINTASKBAR_CONTRACTID = "@mozilla.org/windows-taskbar;1";
     if (WINTASKBAR_CONTRACTID in Cc &&
         Cc[WINTASKBAR_CONTRACTID].getService(Ci.nsIWinTaskbar).available) {
-      ChromeUtils.import("resource:///modules/windowsJumpLists.js");
+      const { WinTaskbarJumpList } = ChromeUtils.import("resource:///modules/windowsJumpLists.js");
       WinTaskbarJumpList.startup();
     }
 
-    // For any add-ons that were installed disabled and can be enabled, offer
-    // them to the user.
-    var changedIDs = AddonManager.getStartupChanges(AddonManager.STARTUP_CHANGE_INSTALLED);
-    AddonManager.getAddonsByIDs(changedIDs, this._offertToEnableAddons.bind(this));
-
-    this._detectNewSideloadedAddons();
+    const {ExtensionsUI} = ChromeUtils.import("resource:///modules/ExtensionsUI.jsm");
+    ExtensionsUI.checkForSideloadedExtensions();
   },
 
-  _handleLink: function MailGlue__handleLink(aSubject, aData) {
+  _handleLink(aSubject, aData) {
     let linkHandled = aSubject.QueryInterface(Ci.nsISupportsPRBool);
     if (!linkHandled.data) {
       let win = Services.wm.getMostRecentWindow("mail:3pane");
@@ -234,8 +201,7 @@ MailGlue.prototype = {
       // If we didn't have an open 3 pane window, try and open one.
       Services.ww.openWindow(null, "chrome://messenger/content/", "_blank",
                              "chrome,dialog=no,all",
-                             { type: "contentTab",
-                               tabParams: tabParams });
+                             { type: "contentTab", tabParams });
       linkHandled.data = true;
     }
   },

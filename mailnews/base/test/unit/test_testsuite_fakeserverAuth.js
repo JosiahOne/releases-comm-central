@@ -7,23 +7,24 @@
  * just check roundtrips, against static values etc..
  */
 
-ChromeUtils.import("resource://testing-common/mailnews/auth.js");
+var {
+  AuthPLAIN,
+  AuthCRAM,
+} = ChromeUtils.import("resource://testing-common/mailnews/auth.js");
 
 var kUsername = "fred1";
 var kPassword = "wilma2";
 
-function run_test()
-{
+function run_test() {
   authPLAIN();
   authCRAMMD5();
   return true;
-};
+}
 
 /**
  * Test AUTH PLAIN
  */
-function authPLAIN()
-{
+function authPLAIN() {
   // roundtrip works
   var line = AuthPLAIN.encodeLine(kUsername, kPassword);
   var req = AuthPLAIN.decodeLine(line);
@@ -32,13 +33,12 @@ function authPLAIN()
 
   // correct encoding
   Assert.equal(line, "AGZyZWQxAHdpbG1hMg==");
-};
+}
 
 /**
  * Test AUTH CRAM-MD5
  */
-function authCRAMMD5()
-{
+function authCRAMMD5() {
   // AuthCRAM.createChallenge() creates a different challenge each time
   var hardcodedChallenge = btoa("<123@fake.invalid>");
   var hardcodedResponse = "ZnJlZDEgOTA5YjgwMmM3NTI5NTJlYzI2NjgyMTNmYTdjNWU0ZjQ=";
@@ -55,4 +55,4 @@ function authCRAMMD5()
   Assert.equal(challengeSplit.length, 2);
   Assert.equal(challengeSplit[1], "fake.invalid>");
   Assert.equal(challengeSplit[0][0], "<");
-};
+}

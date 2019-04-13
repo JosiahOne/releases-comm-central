@@ -2,11 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+// Backwards compatibility with Thunderbird <60.
+if (!("Cc" in this)) {
+    // eslint-disable-next-line mozilla/no-define-cc-etc, no-unused-vars
+    const { interfaces: Ci } = Components;
+}
+
+var { cal } = ChromeUtils.import("resource://gdata-provider/modules/calUtilsShim.jsm");
 
 /* exported cancelRequest, loadRequestedUrl, reportUserClosed */
 
-var wpl = Components.interfaces.nsIWebProgressListener;
+var wpl = Ci.nsIWebProgressListener;
 
 var reporterListener = {
     _isBusy: false,
@@ -37,20 +43,13 @@ var reporterListener = {
     onSecurityChange: function(aWebProgress, aRequest, aState) {
         const wpl_security_bits = wpl.STATE_IS_SECURE |
                                     wpl.STATE_IS_BROKEN |
-                                    wpl.STATE_IS_INSECURE |
-                                    wpl.STATE_SECURE_HIGH |
-                                    wpl.STATE_SECURE_MED |
-                                    wpl.STATE_SECURE_LOW;
+                                    wpl.STATE_IS_INSECURE;
         let browser = document.getElementById("requestFrame");
         let level;
 
         switch (aState & wpl_security_bits) {
-            case wpl.STATE_IS_SECURE | wpl.STATE_SECURE_HIGH:
+            case wpl.STATE_IS_SECURE:
                 level = "high";
-                break;
-            case wpl.STATE_IS_SECURE | wpl.STATE_SECURE_MED:
-            case wpl.STATE_IS_SECURE | wpl.STATE_SECURE_LOW:
-                level = "low";
                 break;
             case wpl.STATE_IS_BROKEN:
                 level = "broken";
@@ -64,7 +63,10 @@ var reporterListener = {
             this.securityButton.removeAttribute("level");
         }
         this.securityButton.setAttribute("tooltiptext", browser.securityUI.tooltipText);
-    }
+    },
+
+    onContentBlockingEvent: function(aWebProgress, aRequest, aEvent) {
+    },
 };
 
 function cancelRequest() {
@@ -85,8 +87,7 @@ function loadRequestedUrl() {
     }
 
     let browser = document.getElementById("requestFrame");
-    browser.addProgressListener(reporterListener,
-                                Components.interfaces.nsIWebProgress.NOTIFY_ALL);
+    browser.addProgressListener(reporterListener, Ci.nsIWebProgress.NOTIFY_ALL);
     let url = request.url;
     if (url != "") {
         browser.setAttribute("src", url);

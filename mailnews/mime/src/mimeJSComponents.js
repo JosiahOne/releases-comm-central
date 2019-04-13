@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/jsmime.jsm");
-ChromeUtils.import("resource:///modules/mimeParser.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {jsmime} = ChromeUtils.import("resource:///modules/jsmime.jsm");
+var {MimeParser} = ChromeUtils.import("resource:///modules/mimeParser.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
 
 function HeaderHandler() {
   this.value = "";
@@ -17,8 +17,10 @@ function StringEnumerator(iterator) {
   this._next = undefined;
 }
 StringEnumerator.prototype = {
-  QueryInterface: ChromeUtils.generateQI([
-    Ci.nsIUTF8StringEnumerator]),
+  QueryInterface: ChromeUtils.generateQI([Ci.nsIUTF8StringEnumerator]),
+  [Symbol.iterator]: function () {
+    return this._iterator;
+  },
   _setNext: function () {
     if (this._next !== undefined)
       return;
@@ -177,9 +179,7 @@ MimeWritableStructuredHeaders.prototype = {
   },
 
   addAllHeaders: function (aHeaders) {
-    let headerList = aHeaders.headerNames;
-    while (headerList.hasMore()) {
-      let header = headerList.getNext();
+    for (let header of aHeaders.headerNames) {
       this.setHeader(header, aHeaders.getHeader(header));
     }
   },
@@ -268,6 +268,15 @@ MimeAddressParser.prototype = {
       MimeParser.HEADER_ADDRESS | MimeParser.HEADER_OPTION_ALL_I18N, aCharset);
     return fixArray(value, aPreserveGroups, count);
   },
+  parseEncodedHeaderW: function (aHeader, count) {
+    aHeader = aHeader || "";
+    let value = MimeParser.parseHeaderField(aHeader,
+      MimeParser.HEADER_ADDRESS |
+      MimeParser.HEADER_OPTION_DECODE_2231 |
+      MimeParser.HEADER_OPTION_DECODE_2047,
+      undefined);
+    return fixArray(value, false, count);
+  },
   parseDecodedHeader: function (aHeader, aPreserveGroups, count) {
     aHeader = aHeader || "";
     let value = MimeParser.parseHeaderField(aHeader, MimeParser.HEADER_ADDRESS);
@@ -292,8 +301,8 @@ MimeAddressParser.prototype = {
   },
 
   extractFirstName: function (aHeader) {
-    let address = this.parseDecodedHeader(aHeader, false)[0];
-    return address.name || address.email;
+    let addresses = this.parseDecodedHeader(aHeader, false);
+    return (addresses.length > 0) ? (addresses[0].name || addresses[0].email) : "";
   },
 
   removeDuplicateAddresses: function (aAddrs, aOtherAddrs) {
@@ -389,13 +398,7 @@ MimeAddressParser.prototype = {
 
   parseHeadersWithArray: function (aHeader, aAddrs, aNames, aFullNames) {
     let addrs = [], names = [], fullNames = [];
-    // Parse header, but without HEADER_OPTION_ALLOW_RAW.
-    let value = MimeParser.parseHeaderField(aHeader || "",
-                                            MimeParser.HEADER_ADDRESS |
-                                            MimeParser.HEADER_OPTION_DECODE_2231 |
-                                            MimeParser.HEADER_OPTION_DECODE_2047,
-                                            undefined);
-    let allAddresses = fixArray(value, false);
+    let allAddresses = this.parseEncodedHeader(aHeader, undefined, false);
 
     // Don't index the dummy empty address.
     if (aHeader.trim() == "")
@@ -414,17 +417,6 @@ MimeAddressParser.prototype = {
 
   extractHeaderAddressMailboxes: function (aLine) {
     return this.parseDecodedHeader(aLine).map(addr => addr.email).join(", ");
-  },
-
-  extractHeaderAddressNames: function (aLine) {
-    return this.parseDecodedHeader(aLine).map(addr => addr.name || addr.email)
-                                         .join(", ");
-  },
-
-  extractHeaderAddressName: function (aLine) {
-    let addrs = this.parseDecodedHeader(aLine).map(addr =>
-                 addr.name || addr.email);
-    return addrs.length == 0 ? "" : addrs[0];
   },
 
   makeMimeAddress: function (aName, aEmail) {

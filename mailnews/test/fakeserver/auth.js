@@ -16,7 +16,7 @@
 var EXPORTED_SYMBOLS = [
   "AuthPLAIN",
   "AuthLOGIN",
-  "AuthCRAM"
+  "AuthCRAM",
 ];
 
 /**
@@ -31,12 +31,12 @@ var AuthPLAIN = {
    * @returns {Object { username : value, password : value } }
    * @throws {String}   error to return to client
    */
-  decodeLine: function(line) {
+  decodeLine(line) {
     dump("AUTH PLAIN line -" + line + "-\n");
     line = atob(line); // base64 decode
     let aap = line.split("\u0000"); // 0-charater is delimiter
     if (aap.length != 3)
-      throw "Expected three parts";
+      throw new Error("Expected three parts");
     /* aap is: authorize-id, authenticate-id, password.
        Generally, authorize-id = authenticate-id = username.
        authorize-id may thus be empty and then defaults to authenticate-id. */
@@ -46,7 +46,7 @@ var AuthPLAIN = {
     result.password = aap[2];
     dump("authorize-id: -" + authzid + "-, username: -" + result.username + "-, password: -" + result.password + "-\n");
     if (authzid && authzid != result.username)
-      throw "Expecting a authorize-id that's either the same as authenticate-id or empty";
+      throw new Error("Expecting a authorize-id that's either the same as authenticate-id or empty");
     return result;
   },
 
@@ -54,8 +54,9 @@ var AuthPLAIN = {
    * Create an AUTH PLAIN line, to allow a client to authenticate to a server.
    * Useful for tests.
    */
-  encodeLine : function(username, password)
-  {
+  encodeLine(username, password) {
+    username = username.substring(0, 255);
+    password = password.substring(0, 255);
     return btoa("\u0000" + username + "\u0000" + password); // base64 encode
   },
 };
@@ -70,7 +71,7 @@ var AuthLOGIN = {
    * @returns {String}   username or password
    * @throws {String}   error to return to client
    */
-  decodeLine: function (line) {
+  decodeLine(line) {
     dump("AUTH LOGIN -" + atob(line) + "-\n");
     return atob(line); // base64 decode
   },
@@ -94,8 +95,7 @@ var AuthCRAM = {
    * @returns {String}   The challenge.
    *   It's already base64-encoded. Send it as-is to the client.
    */
-  createChallenge : function(domain)
-  {
+  createChallenge(domain) {
     var timestamp = new Date().getTime(); // unixtime
     var challenge = "<" + timestamp + "@" + domain + ">";
     dump("CRAM challenge unencoded: " + challenge + "\n");
@@ -112,14 +112,13 @@ var AuthCRAM = {
    * @returns {Object { username : value, digest : value } }
    * @throws {String}   error to return to client
    */
-  decodeLine : function(line)
-  {
+  decodeLine(line) {
     dump("AUTH CRAM-MD5 line -" + line + "-\n");
     line = atob(line);
     dump("base64 decoded -" + line + "-\n");
     var sp = line.split(" ");
     if (sp.length != 2)
-      throw "Expected one space";
+      throw new Error("Expected one space");
     var result = {};
     result.username = sp[0];
     result.digest = sp[1];
@@ -130,12 +129,11 @@ var AuthCRAM = {
    * @param key {String}   user's password
    * @return {String}   digest as hex string
    */
-  encodeCRAMMD5 : function(text, key)
-  {
+  encodeCRAMMD5(text, key) {
     text = atob(text); // createChallenge() returns it already encoded
     dump("encodeCRAMMD5(text: -" + text + "-, key: -" + key + "-)\n");
     const kInputLen = 64;
-    //const kHashLen = 16;
+    // const kHashLen = 16;
     const kInnerPad = 0x36; // per spec
     const kOuterPad = 0x5C;
 
@@ -154,35 +152,30 @@ var AuthCRAM = {
     return this.arrayToHexString(digest);
   },
   // Utils
-  xor : function(binary, value)
-  {
+  xor(binary, value) {
     var result = [];
     for (var i = 0; i < binary.length; i++)
       result.push(binary[i] ^ value);
     return result;
   },
-  md5 : function(binary)
-  {
+  md5(binary) {
     var md5 = Cc["@mozilla.org/security/hash;1"]
         .createInstance(Ci.nsICryptoHash);
     md5.init(Ci.nsICryptoHash.MD5);
     md5.update(binary, binary.length);
     return this.textToNumberArray(md5.finish(false));
   },
-  textToNumberArray : function(text)
-  {
+  textToNumberArray(text) {
     var array = [];
     for (var i = 0; i < text.length; i++)
       array.push(text.charCodeAt(i) & 0xFF); // convert string (only lower byte) to array
     return array;
   },
-  arrayToHexString : function(binary)
-  {
+  arrayToHexString(binary) {
     var result = "";
-    for (var i = 0; i < binary.length; i++)
-    {
+    for (var i = 0; i < binary.length; i++) {
       if (binary[i] > 255)
-        throw "unexpected that value > 255";
+        throw new Error("unexpected that value > 255");
       let hex = binary[i].toString(16);
       if (hex.length < 2)
         hex = "0" + hex;

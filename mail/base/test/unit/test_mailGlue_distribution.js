@@ -1,11 +1,10 @@
-ChromeUtils.import("resource:///modules/distribution.js");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {TBDistCustomizer} = ChromeUtils.import("resource:///modules/TBDistCustomizer.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
-function run_test()
-{
+function run_test() {
   do_test_pending();
 
-  Services.locale.setRequestedLocales(["en-US"]);
+  Services.locale.requestedLocales = ["en-US"];
 
   // Create an instance of nsIFile out of the current process directory
   let distroDir = Services.dirsvc.get("XCurProcD", Ci.nsIFile);
@@ -25,9 +24,6 @@ function run_test()
 
   registerCleanupFunction(function() {
     // Remove the distribution.ini file
-    let iniFile = Services.dirsvc.get("XCurProcD", Ci.nsIFile);
-    iniFile.append("distribution");
-    iniFile.append("distribution.ini");
     if (iniFile.exists())
       iniFile.remove(true);
   });
@@ -61,8 +57,7 @@ function run_test()
   let aboutLocale;
   try {
     aboutLocale = testIni.getString("Global", "about.en-US");
-  }
-  catch (e) {
+  } catch (e) {
     Cu.reportError(e);
   }
 
@@ -77,7 +72,7 @@ function run_test()
   let keys = testIni.getKeys(s);
   while (keys.hasMore()) {
     let key = keys.getNext();
-    let value = eval(testIni.getString(s, key));
+    let value = TBDistCustomizer.parseValue(testIni.getString(s, key));
     switch (typeof value) {
     case "boolean":
         Assert.equal(value, Services.prefs.getBoolPref(key));
@@ -100,7 +95,7 @@ function run_test()
   keys = testIni.getKeys(s);
   while (keys.hasMore()) {
     let key = keys.getNext();
-    let value = eval(testIni.getString(s, key));
+    let value = TBDistCustomizer.parseValue(testIni.getString(s, key));
     value = "data:text/plain," + key + "=" + value;
     Assert.equal(value, Services.prefs.getCharPref(key));
     overrides.push(key);
@@ -114,7 +109,7 @@ function run_test()
   while (keys.hasMore()) {
     let key = keys.getNext();
     if (!overrides.includes(key)) {
-      let value = eval(testIni.getString(s, key));
+      let value = TBDistCustomizer.parseValue(testIni.getString(s, key));
       value =  value.replace(/%LOCALE%/g, "en-US");
       value = "data:text/plain," + key + "=" + value;
       Assert.equal(value, Services.prefs.getCharPref(key));

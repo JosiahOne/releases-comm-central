@@ -9,18 +9,15 @@
 <!DOCTYPE dialog SYSTEM "chrome://editor/locale/EdLinkChecker.dtd">
 
 <dialog title="&windowTitle.label;"
-    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+    xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
     onload="Startup()"
-    buttonlabelcancel="&closeButton.label;"
-    ondialogaccept="return onAccept();"
-    ondialogcancel="return onCancelLinkChecker();">
+    buttonlabelcancel="&closeButton.label;">
 
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdDialogCommon.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdLinkChecker.js"/>
 
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
-  <broadcaster id="args" value=""/>
 
   <listbox rows="8" id="LinksList" class="MinWidth20" flex="1"/>
   <hbox align="center">

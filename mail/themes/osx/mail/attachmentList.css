@@ -20,32 +20,5 @@
 }
 
 .attachmentcell-size {
-  color: GrayText;
-}
-
-attachmentlist:focus > attachmentitem[selected="true"][current="true"] {
-  outline: 1px dotted #F3D982;
-}
-
-attachmentlist:focus > attachmentitem[current="true"] {
-  outline: 1px dotted;
-  outline-offset: -1px;
-}
-
-attachmentitem[selected="true"] {
-  background-color: -moz-CellHighlight;
-  color: -moz-CellHighlightText;
-}
-
-attachmentlist:focus > attachmentitem[selected="true"] {
-  background-color: Highlight;
-  color: HighlightText;
-}
-
-attachmentitem[selected="true"] .attachmentcell-size {
-  color: -moz-CellHighlightText;
-}
-
-attachmentlist:focus >attachmentitem[selected="true"] .attachmentcell-size {
-  color: HighlightText;
+  color: #999;
 }

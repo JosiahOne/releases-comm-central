@@ -2,14 +2,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+/* import-globals-from calendar-common-sets.js */
+/* import-globals-from calendar-item-editing.js */
+/* import-globals-from calendar-management.js */
+/* import-globals-from calendar-ui-utils.js */
+/* import-globals-from calendar-views.js */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
-function Synthetic(aOpen, aDuration, aMultiday) {
-    this.open = aOpen;
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+
+function Synthetic(aHeader, aDuration, aMultiday) {
+    this.open = aHeader.getAttribute("checked") == "true";
     this.duration = aDuration;
     this.multiday = aMultiday;
 }
@@ -25,12 +29,21 @@ var agendaListbox = {
 /**
  * Initialize the agenda listbox, used on window load.
  */
-agendaListbox.init = function() {
+agendaListbox.init = async function() {
     this.agendaListboxControl = document.getElementById("agenda-listbox");
     this.agendaListboxControl.removeAttribute("suppressonselect");
-    let showTodayHeader = (document.getElementById("today-header-hidden").getAttribute("checked") == "true");
-    let showTomorrowHeader = (document.getElementById("tomorrow-header-hidden").getAttribute("checked") == "true");
-    let showSoonHeader = (document.getElementById("nextweek-header-hidden").getAttribute("checked") == "true");
+    let showTodayHeader = document.getElementById("today-header");
+    let showTomorrowHeader = document.getElementById("tomorrow-header");
+    let showSoonHeader = document.getElementById("nextweek-header");
+    if (!("getCheckbox" in showTodayHeader)) {
+        await new Promise(resolve => showTodayHeader.addEventListener("bindingattached", resolve, { once: true }));
+    }
+    if (!("getCheckbox" in showTomorrowHeader)) {
+        await new Promise(resolve => showTomorrowHeader.addEventListener("bindingattached", resolve, { once: true }));
+    }
+    if (!("getCheckbox" in showSoonHeader)) {
+        await new Promise(resolve => showSoonHeader.addEventListener("bindingattached", resolve, { once: true }));
+    }
     this.today = new Synthetic(showTodayHeader, 1, false);
     this.addPeriodListItem(this.today, "today-header");
     this.tomorrow = new Synthetic(showTomorrowHeader, 1, false);
@@ -38,6 +51,10 @@ agendaListbox.init = function() {
     this.soon = new Synthetic(showSoonHeader, this.soonDays, true);
     this.periods = [this.today, this.tomorrow, this.soon];
     this.mPendingRefreshJobs = new Map();
+
+    for (let header of [showTodayHeader, showTomorrowHeader, showSoonHeader]) {
+        header.getCheckbox().addEventListener("CheckboxStateChange", this.onCheckboxChange, true);
+    }
 
     let prefObserver = {
         observe: function(aSubject, aTopic, aPrefName) {
@@ -82,15 +99,12 @@ agendaListbox.uninit = function() {
  * copy of the template node is made and added to the agenda listbox.
  *
  * @param aPeriod       The period item to add.
- * @param aItemId       The id of an <agenda-checkbox-richlist-item> to add to,
- *                        without the "-hidden" suffix.
+ * @param aItemId       The id of an <agenda-checkbox-richlist-item> to add to.
  */
 agendaListbox.addPeriodListItem = function(aPeriod, aItemId) {
-    aPeriod.listItem = document.getElementById(aItemId + "-hidden").cloneNode(true);
-    agendaListbox.agendaListboxControl.appendChild(aPeriod.listItem);
-    aPeriod.listItem.id = aItemId;
+    aPeriod.listItem = document.getElementById(aItemId);
+    aPeriod.listItem.hidden = false;
     aPeriod.listItem.getCheckbox().checked = aPeriod.open;
-    aPeriod.listItem.getCheckbox().addEventListener("CheckboxStateChange", this.onCheckboxChange, true);
 };
 
 /**
@@ -101,7 +115,7 @@ agendaListbox.removePeriodListItem = function(aPeriod) {
     if (aPeriod.listItem) {
         aPeriod.listItem.getCheckbox().removeEventListener("CheckboxStateChange", this.onCheckboxChange, true);
         if (aPeriod.listItem) {
-            aPeriod.listItem.remove();
+            aPeriod.listItem.hidden = true;
             aPeriod.listItem = null;
         }
     }
@@ -117,10 +131,14 @@ agendaListbox.onCheckboxChange = function(event) {
     let lopen = (periodCheckbox.getAttribute("checked") == "true");
     let listItem = cal.view.getParentNodeOrThis(periodCheckbox, "agenda-checkbox-richlist-item");
     let period = listItem.getItem();
+    if (!period) {
+        return;
+    }
+
     period.open = lopen;
     // as the agenda-checkboxes are only transient we have to set the "checked"
     // attribute at their hidden origins to make that attribute persistent.
-    document.getElementById(listItem.id + "-hidden").setAttribute("checked",
+    document.getElementById(listItem.id).setAttribute("checked",
                             periodCheckbox.getAttribute("checked"));
     if (lopen) {
         agendaListbox.refreshCalendarQuery(period.start, period.end);
@@ -213,7 +231,7 @@ agendaListbox.editSelectedItem = function() {
 
 /**
  * Finds the appropriate period for the given item, i.e finds "Tomorrow" if the
- * item occurrs tomorrow.
+ * item occurs tomorrow.
  *
  * @param aItem     The item to find the period for.
  */
@@ -269,9 +287,9 @@ agendaListbox.getEnd = function() {
 agendaListbox.addItemBefore = function(aNewItem, aAgendaItem, aPeriod, visible) {
     let newelement = null;
     if (aNewItem.startDate.isDate) {
-        newelement = createXULElement("agenda-allday-richlist-item");
+        newelement = document.createXULElement("agenda-allday-richlist-item");
     } else {
-        newelement = createXULElement("agenda-richlist-item");
+        newelement = document.createXULElement("agenda-richlist-item");
     }
     // set the item at the richlistItem. When the duration of the period
     // is bigger than 1 (day) the starttime of the item has to include
@@ -297,6 +315,7 @@ agendaListbox.addItem = function(aItem) {
     if (!cal.item.isEvent(aItem)) {
         return null;
     }
+    aItem.QueryInterface(Ci.calIEvent);
     let periods = this.findPeriodsForItem(aItem);
     if (periods.length == 0) {
         return null;
@@ -623,7 +642,7 @@ agendaListbox.refreshCalendarQuery = function(aStart, aEnd, aCalendar) {
 
         cancel: function() {
             this.cancelled = true;
-            let operation = cal.wrapInstance(this.operation, Components.interfaces.calIOperation);
+            let operation = cal.wrapInstance(this.operation, Ci.calIOperation);
             if (operation && operation.isPending) {
                 operation.cancel();
                 this.operation = null;
@@ -668,7 +687,7 @@ agendaListbox.refreshCalendarQuery = function(aStart, aEnd, aCalendar) {
             let filter = this.calendar.ITEM_FILTER_CLASS_OCCURRENCES |
                          this.calendar.ITEM_FILTER_TYPE_EVENT;
             let operation = this.calendar.getItems(filter, 0, aStart, aEnd, this);
-            operation = cal.wrapInstance(operation, Components.interfaces.calIOperation);
+            operation = cal.wrapInstance(operation, Ci.calIOperation);
             if (operation && operation.isPending) {
                 this.operation = operation;
                 this.agendaListbox.mPendingRefreshJobs.set(this.calId, this);
@@ -682,8 +701,9 @@ agendaListbox.refreshCalendarQuery = function(aStart, aEnd, aCalendar) {
 /**
  * Sets up the calendar for the agenda listbox.
  */
-agendaListbox.setupCalendar = function() {
-    this.init();
+agendaListbox.setupCalendar = async function() {
+    await this.init();
+
     if (this.calendar == null) {
         this.calendar = cal.view.getCompositeCalendar(window);
     }
@@ -770,9 +790,9 @@ agendaListbox.showsToday = function(aStartDate) {
  */
 agendaListbox.moveSelection = function() {
     if (this.isEventListItem(this.agendaListboxControl.selectedItem.nextSibling)) {
-        this.agendaListboxControl.goDown();
+        this.agendaListboxControl.moveByOffset(-1);
     } else {
-        this.agendaListboxControl.goUp();
+        this.agendaListboxControl.moveByOffset(1);
     }
 };
 
@@ -941,7 +961,7 @@ agendaListbox.calendarObserver.onModifyItem = function(newItem, oldItem) {
     setCurrentEvent();
 };
 
-agendaListbox.calendarObserver.onError = function(cal, errno, msg) {};
+agendaListbox.calendarObserver.onError = function(_cal, errno, msg) {};
 
 agendaListbox.calendarObserver.onPropertyChanged = function(aCalendar, aName, aValue, aOldValue) {
     switch (aName) {
@@ -1100,29 +1120,28 @@ function scheduleNextCurrentEventUpdate(aRefreshCallback, aMsUntil) {
             Services.obs.removeObserver(wakeObserver, "wake_notification");
         });
 
-        gEventTimer = Components.classes["@mozilla.org/timer;1"]
-                                   .createInstance(Components.interfaces.nsITimer);
+        gEventTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
     }
     gEventTimer.initWithCallback(udCallback, aMsUntil, gEventTimer.TYPE_ONE_SHOT);
 }
 
 /**
  * Gets a right value for calendar.agendaListbox.soondays preference, avoid
- * erroneus values edited in the lightning.js preference file
+ * erroneous values edited in the lightning.js preference file
  **/
 function getSoondaysPreference() {
     let prefName = "calendar.agendaListbox.soondays";
-    let soonpref = Preferences.get(prefName, 5);
+    let soonpref = Services.prefs.getIntPref(prefName, 5);
 
     if (soonpref > 0 && soonpref <= 28) {
         if (soonpref % 7 != 0) {
             let intSoonpref = Math.floor(soonpref / 7) * 7;
             soonpref = (intSoonpref == 0 ? soonpref : intSoonpref);
-            Preferences.set(prefName, soonpref, "INT");
+            Services.prefs.setIntPref(prefName, soonpref);
         }
     } else {
         soonpref = soonpref > 28 ? 28 : 1;
-        Preferences.set(prefName, soonpref, "INT");
+        Services.prefs.setIntPref(prefName, soonpref);
     }
     return soonpref;
 }

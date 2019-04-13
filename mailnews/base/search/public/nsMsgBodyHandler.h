@@ -36,9 +36,9 @@ public:
   // Returns next message line in buf and the applicable charset, if found.
   // The return value is the length of 'buf' or -1 for EOF.
   int32_t GetNextLine(nsCString &buf, nsCString &charset);
+  bool IsQP() { return m_partIsQP; }
 
   // Transformations
-  void SetStripHtml (bool strip) { m_stripHtml = strip; }
   void SetStripHeaders (bool strip) { m_stripHeaders = strip; }
 
 protected:
@@ -90,9 +90,9 @@ protected:
   // Transformations
   // With the exception of m_isMultipart, these all apply to the various parts
   bool m_stripHeaders;    // true if we're supposed to strip of message headers
-  bool m_stripHtml;       // true if we're supposed to strip off HTML tags
   bool m_pastMsgHeaders;  // true if we've already skipped over the message headers
   bool m_pastPartHeaders; // true if we've already skipped over the part headers
+  bool m_partIsQP;        // true if the Content-Transfer-Encoding header claims quoted-printable
   bool m_partIsHtml;      // true if the Content-type header claims text/html
   bool m_base64part;      // true if the current part is in base64
   bool m_isMultipart;     // true if the message is a multipart/* message

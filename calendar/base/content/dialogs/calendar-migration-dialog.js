@@ -2,12 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/* import-globals-from ../import-export.js */
+
 var FIREFOX_UID = "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}";
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
-ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var { AppConstants } = ChromeUtils.import("resource://gre/modules/AppConstants.jsm");
 
 //
 // The front-end wizard bits.
@@ -19,6 +20,9 @@ var gMigrateWizard = {
      * user can then check these off to migrate the data from those sources.
      */
     loadMigrators: function() {
+        let wizardPage2 = document.getElementById("wizardPage2");
+        wizardPage2.addEventListener("pageshow", gMigrateWizard.migrateChecked);
+
         let listbox = document.getElementById("datasource-list");
 
         // XXX Once we have branding for lightning, this hack can go away
@@ -36,12 +40,11 @@ var gMigrateWizard = {
 
         migLOG("migrators: " + window.arguments.length);
         for (let migrator of window.arguments[0]) {
-            let listItem = document.createElement("listitem");
-            listItem.setAttribute("type", "checkbox");
-            listItem.setAttribute("checked", true);
-            listItem.setAttribute("label", migrator.title);
-            listItem.migrator = migrator;
-            listbox.appendChild(listItem);
+            let checkbox = document.createElement("checkbox");
+            checkbox.setAttribute("checked", true);
+            checkbox.setAttribute("label", migrator.title);
+            checkbox.migrator = migrator;
+            listbox.appendChild(checkbox);
         }
     },
 
@@ -264,7 +267,7 @@ var gDataMigrator = {
                 if (getRDFAttr(node, "remote") == "false") {
                     migLOG("not remote");
                     let localFile = Cc["@mozilla.org/file/local;1"]
-                                    .createInstance(Ci.nsIFile);
+                                      .createInstance(Ci.nsIFile);
                     localFile.initWithPath(getRDFAttr(node, "path"));
                     calendar = gDataMigrator.importICSToStorage(localFile);
                 } else {
@@ -349,11 +352,11 @@ var gDataMigrator = {
                 }
 
                 let fileStream = Cc["@mozilla.org/network/file-input-stream;1"]
-                                 .createInstance(Ci.nsIFileInputStream);
+                                   .createInstance(Ci.nsIFileInputStream);
 
                 fileStream.init(dataStore, 0x01, parseInt("0444", 8), {});
                 let convIStream = Cc["@mozilla.org/intl/converter-input-stream;1"]
-                                  .getService(Ci.nsIConverterInputStream);
+                                    .getService(Ci.nsIConverterInputStream);
                 convIStream.init(fileStream, "UTF-8", 0, 0x0000);
                 let tmpStr = {};
                 let str = "";
@@ -380,10 +383,10 @@ var gDataMigrator = {
                                       parseInt("0600", 8));
 
                 let stream = Cc["@mozilla.org/network/file-output-stream;1"]
-                             .createInstance(Ci.nsIFileOutputStream);
+                               .createInstance(Ci.nsIFileOutputStream);
                 stream.init(tempFile, 0x2A, parseInt("0600", 8), 0);
                 let convOStream = Cc["@mozilla.org/intl/converter-output-stream;1"]
-                                 .createInstance(Ci.nsIConverterOutputStream);
+                                    .createInstance(Ci.nsIConverterOutputStream);
                 convOStream.init(stream, "UTF-8");
                 convOStream.writeString(str);
 
@@ -536,10 +539,10 @@ var gDataMigrator = {
             Services.io.newURI(uri)
         );
         let icsImporter = Cc["@mozilla.org/calendar/import;1?type=ics"]
-                          .getService(Ci.calIImporter);
+                            .getService(Ci.calIImporter);
 
         let inputStream = Cc["@mozilla.org/network/file-input-stream;1"]
-                          .createInstance(Ci.nsIFileInputStream);
+                            .createInstance(Ci.nsIFileInputStream);
         let items = [];
 
         calendar.id = cal.getUUID();
@@ -649,7 +652,7 @@ var gDataMigrator = {
  * @param aString   The string to log
  */
 function migLOG(aString) {
-    if (!Preferences.get("calendar.migration.log", false)) {
+    if (!Services.prefs.getBoolPref("calendar.migration.log", false)) {
         return;
     }
     Services.console.logStringMessage(aString);

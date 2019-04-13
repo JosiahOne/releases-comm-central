@@ -2,13 +2,23 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource:///modules/iteratorUtils.jsm");
-ChromeUtils.import("resource:///modules/errUtils.js");
-ChromeUtils.import("resource:///modules/quickFilterManager.js");
-ChromeUtils.import("resource:///modules/searchSpec.js");
+/* import-globals-from folderDisplay.js */
+/* import-globals-from mailWindow.js */
 
-////////////////////////////////////////////////////////////////////////////////
-//// Proper Code
+var {
+  logException,
+  errorWithDebug,
+} = ChromeUtils.import("resource:///modules/errUtils.js");
+var {
+  MessageTextFilter,
+  QuickFilterManager,
+  QuickFilterSearchListener,
+  QuickFilterState,
+} = ChromeUtils.import("resource:///modules/QuickFilterManager.jsm");
+var {SearchSpec} = ChromeUtils.import("resource:///modules/SearchSpec.jsm");
+
+// -----------
+// Proper Code
 
 /**
  * There is only one message filter bar widget; the muxer deals with tab
@@ -21,7 +31,7 @@ var QuickFilterBarMuxer = {
    *  gets registered prior to the first tab being opened.  This avoids
    *  complications about generating synthetic tab notifications.
    */
-  _init: function QFBM__init() {
+  _init() {
     // -- folder display hookup
     FolderDisplayListenerManager.registerListener(this);
 
@@ -33,14 +43,14 @@ var QuickFilterBarMuxer = {
     let dis = this;
     // know when a resize happens so we can expand things collapsed by our
     //  overflow handler (registered by attribute in the XUL file).
-    window.addEventListener("resize", function QFBM_resizeWrap() {
+    window.addEventListener("resize", function() {
                               dis.onWindowResize();
                             });
 
     this._bindUI();
   },
 
-  //////////////////////////////////////////////////////////////////////////////
+  // ---------------------
   // FolderDisplayListener
 
   /**
@@ -48,7 +58,7 @@ var QuickFilterBarMuxer = {
    *  display is made active.  makeActive is what triggers the display of
    *  account central so this is the perfect spot to do so.
    */
-  onMakeActive: function QFBM_onMakeActive(aFolderDisplay) {
+  onMakeActive(aFolderDisplay) {
     let tab = aFolderDisplay._tabInfo;
     this._updateToggle(tab);
     // The case in that previous aFolderDisplay is showing a normal folder is
@@ -69,7 +79,7 @@ var QuickFilterBarMuxer = {
    * Based on the passed in 3pane aTabInfo, determine whether or not the
    * quickFilter toggle should be enabled, and set it appropriately.
    */
-  _updateToggle: function QFBM__updateToggle(aTabInfo) {
+  _updateToggle(aTabInfo) {
     if (!this.isCommandEnabled("cmd_toggleQuickFilterBar", aTabInfo)) {
       document.getElementById("view_toolbars_popup_quickFilterBar")
               .setAttribute("checked", false);
@@ -81,7 +91,7 @@ var QuickFilterBarMuxer = {
   /**
    * Update the commands associated with the quick filter bar.
    */
-  _updateCommands: function QFBM__updateCommands() {
+  _updateCommands() {
     goUpdateCommand("cmd_popQuickFilterBarStack");
     goUpdateCommand("cmd_showQuickFilterBar");
     goUpdateCommand("cmd_toggleQuickFilterBar");
@@ -95,8 +105,7 @@ var QuickFilterBarMuxer = {
    *  just to nuke it and re-create it with our new search constraints shortly
    *  afterwards.
    */
-  onLoadingFolder: function QFBM_onFolderChanged(aFolderDisplay,
-                                                 aIsOutbound) {
+  onLoadingFolder(aFolderDisplay, aIsOutbound) {
     let tab = aFolderDisplay._tabInfo;
     let filterer = ("quickFilter" in tab._ext) ? tab._ext.quickFilter : null;
     if (!filterer)
@@ -119,8 +128,7 @@ var QuickFilterBarMuxer = {
    *   update their state.
    * - Update UI to reflect some/no matches.
    */
-  onActiveMessagesLoaded:
-      function QFBM_onFolderDisplayMessagesLoaded(aFolderDisplay) {
+  onActiveMessagesLoaded(aFolderDisplay) {
     let filterer = this.maybeActiveFilterer;
     if (!filterer)
       return;
@@ -157,8 +165,7 @@ var QuickFilterBarMuxer = {
    *  we're going to end up in the onFolderDisplayMessagesLoaded
    *  notification.  Mayhaps we should lose that vector and just use this one.)
    */
-  onSearching: function QFBM_onSearching(
-      aFolderDisplay, aIsSearching) {
+  onSearching(aFolderDisplay, aIsSearching) {
     // we only care if we just started searching and we are active
     if (!aIsSearching || !aFolderDisplay.active)
       return;
@@ -168,7 +175,7 @@ var QuickFilterBarMuxer = {
   },
 
 
-  //////////////////////////////////////////////////////////////////////////////
+  // ---------------------
   // UI State Manipulation
 
   /**
@@ -179,7 +186,7 @@ var QuickFilterBarMuxer = {
    * - "command" event listener.
    * - reflect filter state
    */
-  _bindUI: function QFBM__bindUI() {
+  _bindUI() {
     for (let filterDef of QuickFilterManager.filterDefs) {
       let domNode = document.getElementById(filterDef.domId);
       // the loop let binding does not latch, at least in 1.9.2
@@ -193,13 +200,11 @@ var QuickFilterBarMuxer = {
             QuickFilterBarMuxer.activeFilterer.setFilterValue(
               latchedFilterDef.name, postValue);
             QuickFilterBarMuxer.deferredUpdateSearch();
-          }
-          catch (ex) {
+          } catch (ex) {
             logException(ex);
           }
         };
-      }
-      else {
+      } else {
         handler = function(aEvent) {
           let filterValues = QuickFilterBarMuxer.activeFilterer.filterValues;
           let preValue = (latchedFilterDef.name in filterValues) ?
@@ -226,9 +231,7 @@ var QuickFilterBarMuxer = {
    * @param aFolderDisplay The active FolderDisplayWidget.
    * @param [aFilterName] If only a single filter needs to be updated, name it.
    */
-  reflectFiltererState: function QFBM_reflectFiltererState(aFilterer,
-                                                           aFolderDisplay,
-                                                           aFilterName) {
+  reflectFiltererState(aFilterer, aFolderDisplay, aFilterName) {
     // If we aren't visible then there is no need to update the widgets.
     if (aFilterer.visible) {
       let filterValues = aFilterer.filterValues;
@@ -268,8 +271,7 @@ var QuickFilterBarMuxer = {
    * - A filter is active, completed searching, and we have no results;
    *   filterActive=nomatches.
    */
-  reflectFiltererResults: function QFBM_reflectFiltererResults(aFilterer,
-                                                               aFolderDisplay) {
+  reflectFiltererResults(aFilterer, aFolderDisplay) {
     let view = aFolderDisplay.view;
     let threadPane = document.getElementById("threadTree");
     let qfb = document.getElementById("quick-filter-bar");
@@ -282,9 +284,7 @@ var QuickFilterBarMuxer = {
     if (!view.search || !view.search.userTerms) {
       threadPane.removeAttribute("filterActive");
       qfb.removeAttribute("filterActive");
-    }
-    // filter active, still searching
-    else if (view.searching) {
+    } else if (view.searching) { // filter active, still searching
       // Do not set this immediately; wait a bit and then only set this if we
       //  still are in this same state (and we are still the active tab...)
       setTimeout(function() {
@@ -294,22 +294,18 @@ var QuickFilterBarMuxer = {
         threadPane.setAttribute("filterActive", "searching");
         qfb.setAttribute("filterActive", "searching");
       }, 500);
-    }
-    // filter completed, results
-    else if (view.dbView.numMsgsInView) {
+    } else if (view.dbView.numMsgsInView) { // filter completed, results
       // some matches
       threadPane.setAttribute("filterActive", "matches");
       qfb.setAttribute("filterActive", "matches");
-    }
-    // filter completed, no results
-    else {
+    } else { // filter completed, no results
       // no matches! :(
       threadPane.setAttribute("filterActive", "nomatches");
       qfb.setAttribute("filterActive", "nomatches");
     }
   },
 
-  //////////////////////////////////////////////////////////////////////////////
+  // ----------------
   // Resizing regimen
 
   /**
@@ -344,7 +340,7 @@ var QuickFilterBarMuxer = {
    * buttons.  Our onWindowResize logic handles detecting when it is time to
    * un-collapse.
    */
-  onOverflow: function QFBM_onOverflow() {
+  onOverflow() {
     // If we are already collapsed, there is nothing more to do.
     if (this._buttonLabelsCollapsed)
       return;
@@ -364,7 +360,6 @@ var QuickFilterBarMuxer = {
     }
 
     collapsibleButtonBox.setAttribute("shrink", "true");
-
   },
 
   /**
@@ -372,7 +367,7 @@ var QuickFilterBarMuxer = {
    *  bar gets wide enough to support the desired minimum widget of the bar when
    *  the buttons are not collapsed.
    */
-  onWindowResize: function QFB_onWindowResize() {
+  onWindowResize() {
     // nothing to do here if the buttons are not collapsed
     if (!this._buttonLabelsCollapsed)
       return;
@@ -398,12 +393,12 @@ var QuickFilterBarMuxer = {
     collapsibleButtonBox.removeAttribute("shrink");
   },
 
-  //////////////////////////////////////////////////////////////////////////////
+  // -----------------------
   // Tab Monitor Interaction
 
   monitorName: "quickFilter",
 
-  onTabTitleChanged: function QFBM_onTabTitleChanged(aTab) {
+  onTabTitleChanged(aTab) {
     // nop
   },
 
@@ -411,7 +406,7 @@ var QuickFilterBarMuxer = {
    * Whenever an appropriate new tab is opened, initialize its quick filter
    *  state.
    */
-  onTabOpened: function QFBM_onTabOpened(aTab, aFirstTab, aOldTab) {
+  onTabOpened(aTab, aFirstTab, aOldTab) {
     if (aTab.mode.name == "folder" ||
         aTab.mode.name == "glodaList") {
       let modelTab =
@@ -424,14 +419,14 @@ var QuickFilterBarMuxer = {
     }
   },
 
-  onTabRestored: function QFBM_onTabRestored(aTab, aState, aFirstTab) {
+  onTabRestored(aTab, aState, aFirstTab) {
     let filterer = aTab._ext.quickFilter = new QuickFilterState(null, aState);
     this.updateSearch(aTab);
     if (aTab == this.tabmail.currentTabInfo)
       this.reflectFiltererState(filterer, aTab.folderDisplay);
   },
 
-  onTabPersist: function QFBM_onTabPersist(aTab) {
+  onTabPersist(aTab) {
     let filterer = ("quickFilter" in aTab._ext) ? aTab._ext.quickFilter : null;
     if (filterer)
       return filterer.persistToObj();
@@ -443,7 +438,7 @@ var QuickFilterBarMuxer = {
    * - Restore state for already existing state
    * - Create state if it's a new (to us) tab
    */
-  onTabSwitched: function QFBM_onTabSwitched(aTab, aOldTab) {
+  onTabSwitched(aTab, aOldTab) {
     // (Note: we used to explicitly handle the possibility that the user had
     // typed something but an ontimeout had not yet fired in the textbox.
     // We are bailing on that because it adds complexity without much functional
@@ -456,7 +451,7 @@ var QuickFilterBarMuxer = {
     this._updateCommands();
   },
 
-  supportsCommand: function QFBM_supportsCommand(aCommand, aTab) {
+  supportsCommand(aCommand, aTab) {
     // we are not active on tab types we do not support (message tabs)
     if (!("quickFilter" in aTab._ext))
       return null;
@@ -465,10 +460,9 @@ var QuickFilterBarMuxer = {
         aCommand == "cmd_showQuickFilterBar" ||
         aCommand == "cmd_toggleQuickFilterBar")
       return true;
-    else
-      return null;
+    return null;
   },
-  isCommandEnabled: function QFBM_isCommandEnabled(aCommand, aTab) {
+  isCommandEnabled(aCommand, aTab) {
     // we are not active on tab types we do not support (message tabs)
     if (!("quickFilter" in aTab._ext))
       return null;
@@ -485,10 +479,9 @@ var QuickFilterBarMuxer = {
         aCommand == "cmd_showQuickFilterBar" ||
         aCommand == "cmd_toggleQuickFilterBar")
       return true;
-    else
-      return null;
+    return null;
   },
-  doCommand: function QFBM_doCommand(aCommand, aTab) {
+  doCommand(aCommand, aTab) {
     // we are not active on tab types we do not support (message tabs)
     if (!("quickFilter" in aTab._ext))
       return null;
@@ -496,15 +489,13 @@ var QuickFilterBarMuxer = {
     if (aCommand == "cmd_popQuickFilterBarStack") {
       QuickFilterBarMuxer.cmdEscapeFilterStack();
       return true;
-    }
-    else if (aCommand == "cmd_showQuickFilterBar") {
+    } else if (aCommand == "cmd_showQuickFilterBar") {
       let textWidget = document.getElementById(QuickFilterManager.textBoxDomId);
-      if (this.activeFilterer.visible == false)
+      if (!this.activeFilterer.visible)
         QuickFilterBarMuxer._showFilterBar(true);
       textWidget.select();
       return true;
-    }
-    else if (aCommand == "cmd_toggleQuickFilterBar") {
+    } else if (aCommand == "cmd_toggleQuickFilterBar") {
       let show = !this.activeFilterer.visible;
       this._showFilterBar(show);
       if (show) {
@@ -530,7 +521,7 @@ var QuickFilterBarMuxer = {
     throw errorWithDebug("There is no active filterer but we want one.");
   },
 
-  //////////////////////////////////////////////////////////////////////////////
+  // ----------------------
   // Event Handling Support
 
   /**
@@ -538,7 +529,7 @@ var QuickFilterBarMuxer = {
    *  purposes.  This causes the filter to be the last touched filter for escape
    *  undo-ish purposes.
    */
-  getFilterValueForMutation: function QFBM_getFilterValueForMutation(aName) {
+  getFilterValueForMutation(aName) {
     return this.activeFilterer.getFilterValue(aName);
   },
 
@@ -550,7 +541,7 @@ var QuickFilterBarMuxer = {
    * @param aName Filter name.
    * @param aValue The new filter state.
    */
-  setFilterValue: function QFBM_setFilterValue(aName, aValue) {
+  setFilterValue(aName, aValue) {
     this.activeFilterer.setFilterValue(aName, aValue);
   },
 
@@ -559,7 +550,7 @@ var QuickFilterBarMuxer = {
    *  until after the button click handling has completed and had the ability
    *  to paint such.
    */
-  deferredUpdateSearch: function QFBM_deferredUpdateSearch() {
+  deferredUpdateSearch() {
     setTimeout(this._deferredInvocUpdateSearch, 10);
   },
 
@@ -567,7 +558,7 @@ var QuickFilterBarMuxer = {
    * The actual helper function to call updateSearch for deferredUpdateSearch
    *  that makes 'this' relevant.
    */
-  _deferredInvocUpdateSearch: function QFBM__deferredInvocUpdateSearch() {
+  _deferredInvocUpdateSearch() {
     QuickFilterBarMuxer.updateSearch();
   },
 
@@ -575,7 +566,7 @@ var QuickFilterBarMuxer = {
    * Update the user terms part of the search definition to reflect the active
    *  filterer's current state.
    */
-  updateSearch: function QFBM_updateSearch(aTab) {
+  updateSearch(aTab) {
     let tab = aTab || this.tabmail.currentTabInfo;
     // bail if things don't really exist yet
     if (!tab.folderDisplay || !tab.folderDisplay.view.search)
@@ -595,10 +586,10 @@ var QuickFilterBarMuxer = {
     }
     tab.folderDisplay.view.search.userTerms = terms;
     // Uncomment to know what the search state is when we (try and) update it.
-    //dump(tab.folderDisplay.view.search.prettyString());
+    // dump(tab.folderDisplay.view.search.prettyString());
   },
 
-  _showFilterBar: function QFBM__showFilterBar(aShow) {
+  _showFilterBar(aShow) {
     this.activeFilterer.visible = aShow;
     if (!aShow) {
       this.activeFilterer.clear();
@@ -613,7 +604,7 @@ var QuickFilterBarMuxer = {
   /**
    * Invoked when the user chooses the popup from the gloda search box.
    */
-  cmdGlodaSearchDownSell: function QFBM_cmdGlodaSearchDownSell(aEvent) {
+  cmdGlodaSearchDownSell(aEvent) {
     aEvent.stopPropagation();
     this._showFilterBar(true);
     let textWidget = document.getElementById(
@@ -624,7 +615,7 @@ var QuickFilterBarMuxer = {
   /**
    * User explicitly closed the filter bar.
    */
-  cmdClose: function QFBM_cmdClose(aEvent) {
+  cmdClose(aEvent) {
     this._showFilterBar(false);
   },
 
@@ -632,7 +623,7 @@ var QuickFilterBarMuxer = {
    * User hit the escape key; do our undo-ish thing keeping in mind that this
    *  may be invoked in situations where the filter bar is not legal / enabled.
    */
-  cmdEscapeFilterStack: function QFBM_cmdEscapeFilterStack() {
+  cmdEscapeFilterStack() {
     let filterer = this.maybeActiveFilterer;
     if (!filterer || !filterer.visible)
       return;
@@ -642,14 +633,13 @@ var QuickFilterBarMuxer = {
       this.updateSearch();
       this.reflectFiltererState(filterer,
                                 this.tabmail.currentTabInfo.folderDisplay);
-    }
-    // close the filter since there was nothing left to relax
-    else {
+    } else {
+      // close the filter since there was nothing left to relax
       this.cmdClose();
     }
   },
 
-  _testHelperResetFilterState: function QFBM_resetFilterState() {
+  _testHelperResetFilterState() {
     let filterer = this.maybeActiveFilterer;
     if (!filterer)
       return;

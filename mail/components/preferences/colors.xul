@@ -8,45 +8,31 @@
 <?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
 <?xml-stylesheet href="chrome://messenger/skin/preferences/preferences.css"?>
 
-<!DOCTYPE prefwindow SYSTEM "chrome://messenger/locale/preferences/colors.dtd" >
+<!DOCTYPE dialog SYSTEM "chrome://messenger/locale/preferences/colors.dtd" >
 
-<prefwindow id="ColorsDialog" type="child"
-            xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-            title="&colorsDialog.title;"
-            dlgbuttons="accept,cancel"
+<dialog id="ColorsDialog" type="child"
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml"
+        title="&colorsDialog.title;"
+        dlgbuttons="accept,cancel"
 #ifdef XP_MACOSX
-            style="width: &window.macWidth; !important;">
+        style="width: &window.macWidth; !important;">
 #else
-            style="width: &window.width; !important;">
+        style="width: &window.width; !important;">
 #endif
-
-  <script type="application/javascript" src="chrome://communicator/content/utilityOverlay.js"/>
   <prefpane id="ColorsDialogPane">
-
-    <preferences>
-      <preference id="browser.display.document_color_use"   name="browser.display.document_color_use"   type="int"/>
-      <preference id="browser.anchor_color"                 name="browser.anchor_color"                 type="string"/>
-      <preference id="browser.visited_color"                name="browser.visited_color"                type="string"/>
-      <preference id="browser.underline_anchors"            name="browser.underline_anchors"            type="bool"/>
-      <preference id="browser.display.foreground_color"     name="browser.display.foreground_color"     type="string"/>
-      <preference id="browser.display.background_color"     name="browser.display.background_color"     type="string"/>
-      <preference id="browser.display.use_system_colors"    name="browser.display.use_system_colors"    type="bool"/>
-    </preferences>
-
     <hbox>
       <groupbox flex="1">
-        <caption label="&color;"/>
+        <label><html:h2>&color;</html:h2></label>
         <hbox align="center">
           <label value="&textColor.label;" accesskey="&textColor.accesskey;" control="foregroundtextmenu"/>
           <spacer flex="1"/>
-          <colorpicker type="button" id="foregroundtextmenu" palettename="standard"
-                       preference="browser.display.foreground_color"/>
+          <html:input type="color" id="foregroundtextmenu" preference="browser.display.foreground_color"/>
         </hbox>
         <hbox align="center" style="margin-top: 5px">
           <label value="&backgroundColor.label;" accesskey="&backgroundColor.accesskey;" control="backgroundmenu"/>
           <spacer flex="1"/>
-          <colorpicker type="button" id="backgroundmenu" palettename="standard"
-                       preference="browser.display.background_color"/>
+          <html:input type="color" id="backgroundmenu" preference="browser.display.background_color"/>
         </hbox>
         <separator class="thin"/>
         <hbox align="center">
@@ -56,18 +42,16 @@
       </groupbox>
 
       <groupbox flex="1">
-        <caption label="&links;"/>
+        <label><html:h2>&links;</html:h2></label>
         <hbox align="center">
           <label value="&linkColor.label;" accesskey="&linkColor.accesskey;" control="unvisitedlinkmenu"/>
           <spacer flex="1"/>
-          <colorpicker type="button" id="unvisitedlinkmenu" palettename="standard"
-                       preference="browser.anchor_color"/>
+          <html:input type="color" id="unvisitedlinkmenu" preference="browser.anchor_color"/>
         </hbox>
         <hbox align="center" style="margin-top: 5px">
           <label value="&visitedLinkColor.label;" accesskey="&visitedLinkColor.accesskey;" control="visitedlinkmenu"/>
           <spacer flex="1"/>
-          <colorpicker type="button" id="visitedlinkmenu" palettename="standard"
-                       preference="browser.visited_color"/>
+          <html:input type="color" id="visitedlinkmenu" preference="browser.visited_color"/>
         </hbox>
         <separator class="thin"/>
         <hbox align="center">
@@ -96,4 +80,7 @@
       </menulist>
     </vbox>
   </prefpane>
-</prefwindow>
+
+  <script type="application/javascript" src="chrome://global/content/preferencesBindings.js"/>
+  <script type="application/javascript" src="chrome://messenger/content/preferences/colors.js"/>
+</dialog>

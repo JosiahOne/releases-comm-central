@@ -17,28 +17,25 @@
 ]>
 
 <dialog id="linkDlg" title="&windowTitle.label;"
-   xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
-   onload = "Startup()"
-   ondialogaccept="return onAccept();"
-   ondialogcancel="return onCancel();">
+   xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml"
+   onload = "Startup()">
 
   <script type="application/javascript" src="chrome://editor/content/editorUtilities.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdDialogCommon.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdLinkProps.js"/>
   <script type="application/javascript" src="chrome://editor/content/EdImageLinkLoader.js"/>
 
-  <broadcaster id="args" value=""/>
   <spacer id="location" offsetY="50" persist="offsetX offsetY"/>
 
   <vbox style="min-width: 20em">
-    <groupbox><caption id="linkTextCaption"/>
+    <groupbox><label id="linkTextCaption" class="header"/>
       <vbox>
         <label id="linkTextMessage" control="linkTextInput"/>
         <textbox id="linkTextInput"/>
       </vbox>
     </groupbox>
 
-    <groupbox id="LinkURLBox"><caption label="&LinkURLBox.label;"/>
+    <groupbox id="LinkURLBox"><label class="header">&LinkURLBox.label;</label>
       <vbox id="LinkLocationBox">
         <label control="hrefInput"
                accesskey="&LinkURLEditField2.accessKey;"

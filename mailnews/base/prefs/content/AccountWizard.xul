@@ -13,16 +13,13 @@
 ]>
 
 <wizard id="AccountWizard" title="&windowTitle.label;"
-        onwizardcancel="return onCancel();"
-        onwizardfinish="return FinishAccount();"
 #ifdef MOZ_THUNDERBIRD
         onload="onAccountWizardLoad(); initAccountWizardTB(window.arguments);"
 #else
         onload="onAccountWizardLoad();"
 #endif
         style="&accountWizard.size;"
-        xmlns:nc="http://home.netscape.com/NC-rdf#"
-        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+        xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" xmlns:html="http://www.w3.org/1999/xhtml">
 
   <stringbundle id="bundle_prefs" src="chrome://messenger/locale/prefs.properties"/>
   <stringbundle id="bundle_messenger" src="chrome://messenger/locale/messenger.properties"/>
@@ -39,15 +36,13 @@
 
   <!-- Account Type page : Displays choices of mail and news accounts that user can create -->
   <wizardpage id="accounttype" pageid="accounttype"
-              label="&accountTypeTitle.label;"
-              onpageshow="document.documentElement.canAdvance = true;"
-              onpageadvanced="return acctTypePageUnload();">
+              label="&accountTypeTitle.label;">
     <vbox flex="1">
       <description>&accountSetupInfo2.label;</description>
       <description>&accountTypeDesc2.label;</description>
       <label control="acctyperadio">&accountTypeDirections.label;</label>
       <separator/>
-      <radiogroup id="acctyperadio" >
+      <radiogroup id="acctyperadio">
 #ifndef MOZ_THUNDERBIRD
         <radio id="mailaccount" value="mailaccount"
                label="&accountTypeMail.label;" accesskey="&accountTypeMail.accesskey;"
@@ -56,25 +51,12 @@
 #ifdef MOZ_MOVEMAIL
         <radio id="movemailaccount" label="&accountTypeMovemail.label;"
                accesskey="&accountTypeMovemail.accesskey;"
-               value="movemail" />
+               value="movemail"/>
 #endif
 #ifndef MOZ_THUNDERBIRD
         <radio id="rssaccount" value="rss" label="&feeds.wizardLongName;"
                accesskey="&feeds.wizardLongName.accesskey;"/>
 #endif
-        <vbox datasources="rdf:ispdefaults"
-              containment="http://home.netscape.com/NC-rdf#providers"
-              id="ispBox"
-              ref="NC:ispinfo">
-          <template>
-            <rule nc:wizardShow="true">
-              <radio uri="..."
-                     value="rdf:http://home.netscape.com/NC-rdf#wizardShortName"
-                     label="rdf:http://home.netscape.com/NC-rdf#wizardLongName"
-                     accesskey="rdf:http://home.netscape.com/NC-rdf#wizardLongNameAccesskey"/>
-            </rule>
-         </template>
-        </vbox>
         <radio id="newsaccount" value="newsaccount"
                label="&accountTypeNews.label;" accesskey="&accountTypeNews.accesskey;"/>
       </radiogroup>
@@ -83,9 +65,7 @@
 
   <!-- Identity page : Collects user's full name and email address -->
   <wizardpage id="identitypage" pageid="identitypage"
-              label="&identityTitle.label;"
-              onpageshow="return identityPageInit();"
-              onpageadvanced="return identityPageUnload();">
+              label="&identityTitle.label;">
     <vbox flex="1">
       <description>&identityDesc.label;</description>
       <separator/>
@@ -128,9 +108,7 @@
   <!-- Login name is prefilled with user id from the email address provided in identity page -->
   <!-- User can enter a login name here if it is different from the user id of his/her email address -->
   <wizardpage id="incomingpage" pageid="incomingpage"
-              label="&incomingTitle.label;"
-              onpageshow="return incomingPageInit();"
-              onpageadvanced="return incomingPageUnload();">
+              label="&incomingTitle.label;">
     <vbox flex="1">
         <vbox id="serverTypeBox">
         <label control="servertype">&incomingServerTypeDesc.label;</label>
@@ -209,9 +187,7 @@
   <!-- Login name is prefilled with user id from the email address provided in identity page -->
   <!-- User can enter a login name here if it is different from the user id of his/her email address -->
   <wizardpage id="outgoingpage" pageid="outgoingpage"
-              label="&outgoingTitle.label;"
-              onpageshow="return outgoingPageInit();"
-              onpageadvanced="return outgoingPageUnload();">
+              label="&outgoingTitle.label;">
     <vbox flex="1">
       <vbox id="noSmtp">
         <description>&outgoingServer.description;</description>
@@ -263,9 +239,7 @@
 
   <!-- News Server page : Collects the News groups server name -->
   <wizardpage id="newsserver" pageid="newsserver"
-              label="&incomingTitle.label;"
-              onpageshow="return incomingPageInit();"
-              onpageadvanced="return incomingPageUnload();">
+              label="&incomingTitle.label;">
     <vbox flex="1">
       <description>&newsServerNameDesc.label;</description>
       <separator class="thin"/>
@@ -283,9 +257,7 @@
   <!-- Account name page : User gets a choice to enter a pretty name for the account -->
   <!-- Defaults : Mail account -> Email address, Newsgroup account -> Newsgroup server name -->
   <wizardpage id="accnamepage" pageid="accnamepage"
-              label="&accnameTitle.label;"
-              onpageshow="return acctNamePageInit();"
-              onpageadvanced="return acctNamePageUnload();">
+              label="&accnameTitle.label;">
     <vbox flex="1">
       <description>&accnameDesc.label;</description>
       <separator class="thin"/>
@@ -299,8 +271,7 @@
 
   <!-- Done page : this page summarizes information collected to create a mail/news account -->
   <wizardpage id="done" pageid="done"
-              label="&completionTitle.label;"
-              onpageshow="return donePageInit();">
+              label="&completionTitle.label;">
     <vbox flex="1">
       <description>&completionText.label;</description>
       <separator class="thin"/>
@@ -364,22 +335,4 @@
 #endif
     </vbox>
   </wizardpage>
-
-  <wizardpage id="ispPage1"/>
-  <wizardpage id="ispPage2"/>
-  <wizardpage id="ispPage3"/>
-  <wizardpage id="ispPage4"/>
-  <wizardpage id="ispPage5"/>
-  <wizardpage id="ispPage6"/>
-  <wizardpage id="ispPage7"/>
-  <wizardpage id="ispPage8"/>
-  <wizardpage id="ispPage9"/>
-  <wizardpage id="ispPage10"/>
-  <wizardpage id="ispPage11"/>
-  <wizardpage id="ispPage12"/>
-  <wizardpage id="ispPage13"/>
-  <wizardpage id="ispPage14"/>
-  <wizardpage id="ispPage15"/>
-  <wizardpage id="ispPage16"/>
-
 </wizard>

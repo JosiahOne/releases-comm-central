@@ -5,7 +5,7 @@
 var EXPORTED_SYMBOLS = ["AboutSupportPlatform"];
 
 // JS ctypes are needed to get at the data we need
-ChromeUtils.import("resource://gre/modules/ctypes.jsm");
+var {ctypes} = ChromeUtils.import("resource://gre/modules/ctypes.jsm");
 
 var BOOL = ctypes.int32_t;
 var DRIVE_UNKNOWN = 0;
@@ -16,7 +16,7 @@ var AboutSupportPlatform = {
    * Given an nsIFile, gets the file system type. The type is returned as a
    * string. Possible values are "network", "local", "unknown" and null.
    */
-  getFileSystemType: function ASPWin32_getFileSystemType(aFile) {
+  getFileSystemType(aFile) {
     let kernel32 = ctypes.open("kernel32.dll");
 
     try {
@@ -24,10 +24,10 @@ var AboutSupportPlatform = {
       let GetVolumePathName = kernel32.declare(
         "GetVolumePathNameW",
         ctypes.winapi_abi,
-        BOOL,              // return type: 1 indicates success, 0 failure
+        BOOL,                // return type: 1 indicates success, 0 failure
         ctypes.char16_t.ptr, // in: lpszFileName
         ctypes.char16_t.ptr, // out: lpszVolumePathName
-        ctypes.uint32_t    // in: cchBufferLength
+        ctypes.uint32_t      // in: cchBufferLength
       );
 
       // Returns the last error.
@@ -53,7 +53,7 @@ var AboutSupportPlatform = {
       let GetDriveType = kernel32.declare(
         "GetDriveTypeW",
         ctypes.winapi_abi,
-        ctypes.uint32_t,  // return type: the drive type
+        ctypes.uint32_t,    // return type: the drive type
         ctypes.char16_t.ptr // in: lpRootPathName
       );
       let type = GetDriveType(volumePath);
@@ -62,10 +62,8 @@ var AboutSupportPlatform = {
         return "unknown";
       else if (type == DRIVE_NETWORK)
         return "network";
-      else
-        return "local";
-    }
-    finally {
+      return "local";
+    } finally {
       kernel32.close();
     }
   },

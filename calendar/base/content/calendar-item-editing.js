@@ -2,9 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource://gre/modules/Preferences.jsm");
+/* import-globals-from calendar-management.js */
+/* import-globals-from calendar-views.js */
+
+var { cal } = ChromeUtils.import("resource://calendar/modules/calUtils.jsm");
+var { Services } = ChromeUtils.import("resource://gre/modules/Services.jsm");
 
 /* exported modifyEventWithDialog, undo, redo, setContextPartstat */
 
@@ -34,14 +36,14 @@ function disposeJob(job) {
 function setDefaultItemValues(aItem, aCalendar=null, aStartDate=null, aEndDate=null, aInitialDate=null, aForceAllday=false) {
     function endOfDay(aDate) {
         let eod = aDate ? aDate.clone() : cal.dtz.now();
-        eod.hour = Preferences.get("calendar.view.dayendhour", 19);
+        eod.hour = Services.prefs.getIntPref("calendar.view.dayendhour", 19);
         eod.minute = 0;
         eod.second = 0;
         return eod;
     }
     function startOfDay(aDate) {
         let sod = aDate ? aDate.clone() : cal.dtz.now();
-        sod.hour = Preferences.get("calendar.view.daystarthour", 8);
+        sod.hour = Services.prefs.getIntPref("calendar.view.daystarthour", 8);
         sod.minute = 0;
         sod.second = 0;
         return sod;
@@ -87,7 +89,7 @@ function setDefaultItemValues(aItem, aCalendar=null, aStartDate=null, aEndDate=n
             } else {
                 // If the event is not all day, then add the default event
                 // length.
-                aItem.endDate.minute += Preferences.get("calendar.event.defaultlength", 60);
+                aItem.endDate.minute += Services.prefs.getIntPref("calendar.event.defaultlength", 60);
             }
         }
 
@@ -104,18 +106,18 @@ function setDefaultItemValues(aItem, aCalendar=null, aStartDate=null, aEndDate=n
         if (aStartDate) {
             aItem.entryDate = aStartDate.clone();
         } else {
-            let defaultStart = Preferences.get("calendar.task.defaultstart", "none");
-            if (Preferences.get("calendar.alarms.onfortodos", 0) == 1 && defaultStart == "none") {
+            let defaultStart = Services.prefs.getStringPref("calendar.task.defaultstart", "none");
+            if (Services.prefs.getIntPref("calendar.alarms.onfortodos", 0) == 1 && defaultStart == "none") {
                 // start date is required if we want to set an alarm
                 defaultStart = "offsetcurrent";
             }
 
-            let units = Preferences.get("calendar.task.defaultstartoffsetunits", "minutes");
+            let units = Services.prefs.getStringPref("calendar.task.defaultstartoffsetunits", "minutes");
             if (!["days", "hours", "minutes"].includes(units)) {
                 units = "minutes";
             }
             let startOffset = cal.createDuration();
-            startOffset[units] = Preferences.get("calendar.task.defaultstartoffset", 0);
+            startOffset[units] = Services.prefs.getIntPref("calendar.task.defaultstartoffset", 0);
             let start;
 
             switch (defaultStart) {
@@ -153,14 +155,14 @@ function setDefaultItemValues(aItem, aCalendar=null, aStartDate=null, aEndDate=n
         if (aEndDate) {
             aItem.dueDate = aEndDate.clone();
         } else {
-            let defaultDue = Preferences.get("calendar.task.defaultdue", "none");
+            let defaultDue = Services.prefs.getStringPref("calendar.task.defaultdue", "none");
 
-            let units = Preferences.get("calendar.task.defaultdueoffsetunits", "minutes");
+            let units = Services.prefs.getStringPref("calendar.task.defaultdueoffsetunits", "minutes");
             if (!["days", "hours", "minutes"].includes(units)) {
                 units = "minutes";
             }
             let dueOffset = cal.createDuration();
-            dueOffset[units] = Preferences.get("calendar.task.defaultdueoffset", 0);
+            dueOffset[units] = Services.prefs.getIntPref("calendar.task.defaultdueoffset", 0);
 
             let start = aItem.entryDate ? aItem.entryDate.clone() : initDate.clone();
             let due;
@@ -454,8 +456,8 @@ function openEventDialog(calendarItem, calendar, mode, callback, job=null, initi
     args.job = job;
     args.initialStartDateValue = initialDate || cal.dtz.getDefaultStartDate();
     args.counterProposal = counterProposal;
-    args.inTab = Preferences.get("calendar.item.editInTab", false);
-    args.useNewItemUI = Preferences.get("calendar.item.useNewItemUI", false);
+    args.inTab = Services.prefs.getBoolPref("calendar.item.editInTab", false);
+    args.useNewItemUI = Services.prefs.getBoolPref("calendar.item.useNewItemUI", false);
 
     // this will be called if file->new has been selected from within the dialog
     args.onNewEvent = function(opcalendar) {
@@ -471,7 +473,7 @@ function openEventDialog(calendarItem, calendar, mode, callback, job=null, initi
     // ask the provide if this item is an invitation. if this is the case
     // we'll open the summary dialog since the user is not allowed to change
     // the details of the item.
-    let wrappedCalendar = cal.wrapInstance(calendar, Components.interfaces.calISchedulingSupport);
+    let wrappedCalendar = cal.wrapInstance(calendar, Ci.calISchedulingSupport);
     let isInvitation = wrappedCalendar && wrappedCalendar.isInvitation(calendarItem);
 
     // open the dialog modeless
@@ -568,11 +570,6 @@ function promptOccurrenceModification(aItem, aNeedsFuture, aAction) {
     // Check if this actually is an instance of a recurring event
     if (items.every(item => item == item.parentItem)) {
         type = MODIFY_PARENT;
-    } else if (items.every(item => item.parentItem.recurrenceInfo.getExceptionFor(item.recurrenceId))) {
-        // If the user wants to edit an occurrence which is already an exception
-        // always edit this single item.
-        // XXX  Why? I think its ok to ask also for exceptions.
-        type = MODIFY_OCCURRENCE;
     } else if (aItem && items.length) {
         // Prompt the user. Setting modal blocks the dialog until it is closed. We
         // use rv to pass our return value.
@@ -590,7 +587,7 @@ function promptOccurrenceModification(aItem, aNeedsFuture, aAction) {
             break;
         case MODIFY_FOLLOWING:
             // TODO tbd in a different bug
-            throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
+            throw Cr.NS_ERROR_NOT_IMPLEMENTED;
         case MODIFY_OCCURRENCE:
             pastItems = items;
             break;
@@ -613,10 +610,9 @@ function promptOccurrenceModification(aItem, aNeedsFuture, aAction) {
  * @return      The calITransactionManager service.
  */
 function getTransactionMgr() {
-    return Components.classes["@mozilla.org/calendar/transactionmanager;1"]
-                     .getService(Components.interfaces.calITransactionManager);
+    return Cc["@mozilla.org/calendar/transactionmanager;1"]
+             .getService(Ci.calITransactionManager);
 }
-
 
 /**
  * Create and commit a transaction with the given arguments to the transaction
@@ -757,7 +753,7 @@ function setContextPartstat(aTarget, aItems) {
             let attendee = getParticipant(oldItem);
             if (attendee) {
                 // skip this item if the partstat for the participant hasn't
-                // changed. otherwise we would allways perfom updade operations
+                // changed. otherwise we would always perform update operations
                 // for recurring events on both, the master and the occurrence
                 // item
                 let partStat = aTarget.getAttribute("respvalue");

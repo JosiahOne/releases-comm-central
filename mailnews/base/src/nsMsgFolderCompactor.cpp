@@ -10,6 +10,7 @@
 #include "nsIFile.h"
 #include "nsNetUtil.h"
 #include "nsIMsgHdr.h"
+#include "nsIChannel.h"
 #include "nsIStreamListener.h"
 #include "nsIMsgMessageService.h"
 #include "nsMsgDBCID.h"
@@ -738,14 +739,13 @@ nsFolderCompactState::GetMessage(nsIMsgDBHdr **message)
 
 
 NS_IMETHODIMP
-nsFolderCompactState::OnStartRequest(nsIRequest *request, nsISupports *ctxt)
+nsFolderCompactState::OnStartRequest(nsIRequest *request)
 {
   return StartMessage();
 }
 
 NS_IMETHODIMP
-nsFolderCompactState::OnStopRequest(nsIRequest *request, nsISupports *ctxt,
-                                    nsresult status)
+nsFolderCompactState::OnStopRequest(nsIRequest *request, nsresult status)
 {
   nsCOMPtr<nsIMsgDBHdr> msgHdr;
   if (NS_FAILED(status))
@@ -759,6 +759,7 @@ nsFolderCompactState::OnStopRequest(nsIRequest *request, nsISupports *ctxt,
   }
   else
   {
+    // XXX TODO: Error checking and handling missing here.
     EndCopy(nullptr, status);
     if (m_curIndex >= m_size)
     {
@@ -780,7 +781,7 @@ nsFolderCompactState::OnStopRequest(nsIRequest *request, nsISupports *ctxt,
 }
 
 NS_IMETHODIMP
-nsFolderCompactState::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
+nsFolderCompactState::OnDataAvailable(nsIRequest *request,
                                       nsIInputStream *inStr,
                                       uint64_t sourceOffset, uint32_t count)
 {
@@ -1084,20 +1085,26 @@ nsresult nsOfflineStoreCompactState::CopyNextMessage(bool &done)
 }
 
 NS_IMETHODIMP
-nsOfflineStoreCompactState::OnStopRequest(nsIRequest *request, nsISupports *ctxt,
-                                          nsresult status)
+nsOfflineStoreCompactState::OnStopRequest(nsIRequest *request, nsresult status)
 {
   nsresult rv = status;
   nsCOMPtr<nsIURI> uri;
   nsCOMPtr<nsIMsgDBHdr> msgHdr;
   nsCOMPtr <nsIMsgStatusFeedback> statusFeedback;
+  nsCOMPtr<nsIChannel> channel;
   bool done = false;
 
   // The NS_MSG_ERROR_MSG_NOT_OFFLINE error should allow us to continue, so we
   // check for it specifically and don't terminate the compaction.
   if (NS_FAILED(rv) && rv != NS_MSG_ERROR_MSG_NOT_OFFLINE)
     goto done;
-  uri = do_QueryInterface(ctxt, &rv);
+
+  // We know the request is an nsIChannel we can get a URI from, but this is
+  // probably bad form. See Bug 1528662.
+  channel = do_QueryInterface(request, &rv);
+  NS_WARNING_ASSERTION(NS_SUCCEEDED(rv), "error QI nsIRequest to nsIChannel failed");
+  if (NS_FAILED(rv)) goto done;
+  rv = channel->GetURI(getter_AddRefs(uri));
   if (NS_FAILED(rv)) goto done;
   rv = GetMessage(getter_AddRefs(msgHdr));
   if (NS_FAILED(rv)) goto done;
@@ -1216,7 +1223,7 @@ NS_IMETHODIMP
 nsFolderCompactState::StartMessage()
 {
   nsresult rv = NS_ERROR_FAILURE;
-  NS_ASSERTION(m_fileStream, "Fatal, null m_fileStream...\n");
+  NS_ASSERTION(m_fileStream, "Fatal, null m_fileStream...");
   if (m_fileStream)
   {
     nsCOMPtr <nsISeekableStream> seekableStream = do_QueryInterface(m_fileStream, &rv);
@@ -1239,6 +1246,8 @@ nsFolderCompactState::EndMessage(nsMsgKey key)
   return NS_OK;
 }
 
+// XXX TODO: This function is sadly lacking all status checking, it always
+// returns NS_OK and moves onto the next message.
 NS_IMETHODIMP
 nsFolderCompactState::EndCopy(nsISupports *url, nsresult aStatus)
 {
@@ -1250,6 +1259,10 @@ nsFolderCompactState::EndCopy(nsISupports *url, nsresult aStatus)
     NS_ASSERTION(false, "m_curIndex out of bounds");
     return NS_OK;
   }
+
+  /* Messages need to have trailing blank lines */
+  uint32_t bytesWritten;
+  (void) m_fileStream->Write(MSG_LINEBREAK, MSG_LINEBREAK_LEN, &bytesWritten);
 
   /**
    * Done with the current message; copying the existing message header
@@ -1280,7 +1293,7 @@ nsFolderCompactState::EndCopy(nsISupports *url, nsresult aStatus)
       msgSize += m_addedHeaderSize;
       newMsgHdr->SetMessageSize(msgSize);
     }
-    m_totalMsgSize += msgSize;
+    m_totalMsgSize += msgSize + MSG_LINEBREAK_LEN;
   }
 
 //  m_db->Commit(nsMsgDBCommitType::kLargeCommit);  // no sense committing until the end
@@ -1315,7 +1328,7 @@ nsresult nsOfflineStoreCompactState::StartCompacting()
 }
 
 NS_IMETHODIMP
-nsOfflineStoreCompactState::OnDataAvailable(nsIRequest *request, nsISupports *ctxt,
+nsOfflineStoreCompactState::OnDataAvailable(nsIRequest *request,
                                             nsIInputStream *inStr,
                                             uint64_t sourceOffset, uint32_t count)
 {

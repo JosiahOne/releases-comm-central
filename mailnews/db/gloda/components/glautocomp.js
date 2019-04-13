@@ -2,8 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource:///modules/errUtils.js");
+/**
+ * glautocomp.js decides which autocomplete item type to
+ * use when one enters text in global search box. There are
+ * following types of autocomplete item: gloda-contact-chunk,
+ * gloda-fulltext-all, gloda-fulltext-single,gloda-multi,
+ * gloda-single-identity, gloda-single-tag.
+ */
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {logException} = ChromeUtils.import("resource:///modules/errUtils.js");
 
 var Gloda = null;
 var GlodaUtils = null;
@@ -467,20 +474,19 @@ function nsAutoCompleteGloda() {
   try {
     // set up our awesome globals!
     if (Gloda === null) {
-      let loadNS = {};
-      ChromeUtils.import("resource:///modules/gloda/public.js", loadNS);
+      let loadNS = ChromeUtils.import("resource:///modules/gloda/public.js");
       Gloda = loadNS.Gloda;
 
-      ChromeUtils.import("resource:///modules/gloda/utils.js", loadNS);
+      loadNS = ChromeUtils.import("resource:///modules/gloda/utils.js");
       GlodaUtils = loadNS.GlodaUtils;
-      ChromeUtils.import("resource:///modules/gloda/suffixtree.js", loadNS);
+      loadNS = ChromeUtils.import("resource:///modules/gloda/suffixtree.js");
       MultiSuffixTree = loadNS.MultiSuffixTree;
-      ChromeUtils.import("resource:///modules/gloda/noun_tag.js", loadNS);
+      loadNS = ChromeUtils.import("resource:///modules/gloda/noun_tag.js");
       TagNoun = loadNS.TagNoun;
-      ChromeUtils.import("resource:///modules/gloda/noun_freetag.js", loadNS);
+      loadNS = ChromeUtils.import("resource:///modules/gloda/noun_freetag.js");
       FreeTagNoun = loadNS.FreeTagNoun;
 
-      ChromeUtils.import("resource:///modules/gloda/log4moz.js", loadNS);
+      loadNS = ChromeUtils.import("resource:///modules/gloda/log4moz.js");
       LOG = loadNS["Log4Moz"].repository.getLogger("gloda.autocomp");
     }
 

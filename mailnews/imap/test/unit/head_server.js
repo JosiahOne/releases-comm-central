@@ -3,41 +3,58 @@
 if (typeof gDEPTH == "undefined")
   var gDEPTH = "../../../../";
 
-ChromeUtils.import("resource://gre/modules/Services.jsm");
-ChromeUtils.import("resource:///modules/mailServices.js");
-ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
-ChromeUtils.import("resource://testing-common/mailnews/mailTestUtils.js");
-ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
-ChromeUtils.import("resource://testing-common/mailnews/IMAPpump.js");
-ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
+var {Services} = ChromeUtils.import("resource://gre/modules/Services.jsm");
+var {MailServices} = ChromeUtils.import("resource:///modules/MailServices.jsm");
+var {XPCOMUtils} = ChromeUtils.import("resource://gre/modules/XPCOMUtils.jsm");
+var {mailTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/mailTestUtils.js");
+var {localAccountUtils} = ChromeUtils.import("resource://testing-common/mailnews/localAccountUtils.js");
+var {
+  IMAPPump,
+  setupIMAPPump,
+  teardownIMAPPump,
+} = ChromeUtils.import("resource://testing-common/mailnews/IMAPpump.js");
+var {PromiseTestUtils} = ChromeUtils.import("resource://testing-common/mailnews/PromiseTestUtils.jsm");
 
 var CC = Components.Constructor;
 
 // WebApps.jsm called by ProxyAutoConfig (PAC) requires a valid nsIXULAppInfo.
-ChromeUtils.import("resource://testing-common/AppInfo.jsm");
+var {getAppInfo, newAppInfo, updateAppInfo} = ChromeUtils.import("resource://testing-common/AppInfo.jsm");
 updateAppInfo();
 
 // Ensure the profile directory is set up
 do_get_profile();
 
 // Import fakeserver
-ChromeUtils.import("resource://testing-common/mailnews/maild.js");
-ChromeUtils.import("resource://testing-common/mailnews/imapd.js");
-ChromeUtils.import("resource://testing-common/mailnews/auth.js");
+var {
+  nsMailServer,
+  gThreadManager,
+  fsDebugNone,
+  fsDebugAll,
+  fsDebugRecv,
+  fsDebugRecvSend,
+} = ChromeUtils.import("resource://testing-common/mailnews/maild.js");
+var imapd = {};
+ChromeUtils.import("resource://testing-common/mailnews/imapd.js", imapd);
+var { imapDaemon, imapMessage } = imapd;
+var {
+  AuthPLAIN,
+  AuthLOGIN,
+  AuthCRAM,
+} = ChromeUtils.import("resource://testing-common/mailnews/auth.js");
 
 function makeServer(daemon, infoString, otherProps) {
-  if (infoString in configurations)
-    return makeServer(daemon, configurations[infoString].join(","), otherProps);
+  if (infoString in imapd.configurations)
+    return makeServer(daemon, imapd.configurations[infoString].join(","), otherProps);
 
   function createHandler(d) {
-    var handler = new IMAP_RFC3501_handler(d);
+    var handler = new imapd.IMAP_RFC3501_handler(d);
     if (!infoString)
       infoString = "RFC2195";
 
     var parts = infoString.split(/ *, */);
     for (var part of parts) {
       if (part.startsWith("RFC"))
-        mixinExtension(handler, eval("IMAP_" + part + "_extension"));
+        imapd.mixinExtension(handler, imapd["IMAP_" + part + "_extension"]);
     }
     if (otherProps) {
       for (var prop in otherProps)
